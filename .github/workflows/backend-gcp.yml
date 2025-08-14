@@ -1,0 +1,46 @@
+name: Backend Deploy (Cloud Run)
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
+
+      - name: Enable Docker auth
+        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev -q
+
+      - name: Build & Push image
+        run: |
+          REPO=${{ secrets.GCP_PROJECT_ID }}/${{ secrets.AR_REPO || 'rd-agent' }}
+          IMAGE=${{ secrets.GCP_REGION }}-docker.pkg.dev/$REPO/backend:$(git rev-parse --short HEAD)
+          docker build -t $IMAGE .
+          docker push $IMAGE
+        working-directory: .
+
+      - name: Deploy to Cloud Run
+        run: |
+          REPO=${{ secrets.GCP_PROJECT_ID }}/${{ secrets.AR_REPO || 'rd-agent' }}
+          IMAGE=${{ secrets.GCP_REGION }}-docker.pkg.dev/$REPO/backend:$(git rev-parse --short HEAD)
+          gcloud run deploy ${{ secrets.BACKEND_SERVICE }} \
+            --image $IMAGE \
+            --region ${{ secrets.GCP_REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --cpu 1 --memory 1Gi \
+            --timeout 300 \
+            --set-env-vars=GEMINI_MAIN_MODEL=gemini-1.5-pro,GEMINI_SMALL_MODEL=gemini-1.5-flash \
+            --set-env-vars=ALLOW_ORIGIN_REGEX=${{ secrets.ALLOW_ORIGIN_REGEX || '.*' }} \
+            --set-secrets=GOOGLE_GENAI_API_KEY=GOOGLE_GENAI_API_KEY:latest,GOOGLE_API_KEY=GOOGLE_API_KEY:latest,GOOGLE_CSE_ID=GOOGLE_CSE_ID:latest \
+            --set-secrets=PINECONE_API_KEY=PINECONE_API_KEY:latest,PINECONE_INDEX=PINECONE_INDEX:latest
+
