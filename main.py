@@ -86,7 +86,17 @@ llm_critic = ChatGoogleGenerativeAI(
     google_api_key=_GENAI_KEY,
     temperature=0.1,
 )
-embeddings = HuggingFaceEmbeddings(model_name=os.getenv("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2"))
+_EMBED_MODEL_NAME = os.getenv("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+_EMBEDDINGS_OBJ = None
+
+def _get_embeddings():
+    global _EMBEDDINGS_OBJ
+    if _EMBEDDINGS_OBJ is None:
+        try:
+            _EMBEDDINGS_OBJ = HuggingFaceEmbeddings(model_name=_EMBED_MODEL_NAME)
+        except Exception:
+            _EMBEDDINGS_OBJ = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    return _EMBEDDINGS_OBJ
 _CROSS_MODEL_NAME = os.getenv("CROSS_ENCODER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
 cross_encoder = CrossEncoder(_CROSS_MODEL_NAME) if (os.getenv("CROSS_ENCODER_ENABLED", "0") not in ("0","false","False") and _HAS_CROSS) else None
 _NLI_MODEL_NAME = os.getenv("NLI_CROSS_ENCODER_MODEL", "cross-encoder/nli-deberta-v3-base")
@@ -392,7 +402,7 @@ class EmbeddingCache:
             if vec is not None:
                 return vec
         try:
-            vec = embeddings.embed_query(text or "")
+            vec = _get_embeddings().embed_query(text or "")
         except Exception:
             vec = []
         with self._lock:
