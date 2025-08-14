@@ -38,22 +38,31 @@ jobs:
 
       - name: Ensure Artifact Registry repository exists
         run: |
-          gcloud artifacts repositories create ${{ secrets.AR_REPO || 'rd-agent' }} \
+          AR_REPO="${{ secrets.AR_REPO }}"; if [ -z "$AR_REPO" ]; then AR_REPO='rd-agent'; fi
+          gcloud artifacts repositories create "$AR_REPO" \
             --repository-format=docker --location=${{ secrets.GCP_REGION }} \
             --description="RD Agent images" || true
 
       - name: Build & Push image
         run: |
-          REPO=${{ secrets.GCP_PROJECT_ID }}/${{ secrets.AR_REPO || 'rd-agent' }}
-          IMAGE=${{ secrets.GCP_REGION }}-docker.pkg.dev/$REPO/backend:$(git rev-parse --short HEAD)
+          set -euo pipefail
+          GCP_PROJECT_ID="${{ secrets.GCP_PROJECT_ID }}"
+          AR_REPO="${{ secrets.AR_REPO }}"; if [ -z "$AR_REPO" ]; then AR_REPO='rd-agent'; fi
+          REGION="${{ secrets.GCP_REGION }}"
+          REPO="$GCP_PROJECT_ID/$AR_REPO"
+          IMAGE="$REGION-docker.pkg.dev/$REPO/backend:$(git rev-parse --short HEAD)"
           docker build -t $IMAGE .
           docker push $IMAGE
         working-directory: .
 
       - name: Deploy to Cloud Run
         run: |
-          REPO=${{ secrets.GCP_PROJECT_ID }}/${{ secrets.AR_REPO || 'rd-agent' }}
-          IMAGE=${{ secrets.GCP_REGION }}-docker.pkg.dev/$REPO/backend:$(git rev-parse --short HEAD)
+          set -euo pipefail
+          GCP_PROJECT_ID="${{ secrets.GCP_PROJECT_ID }}"
+          AR_REPO="${{ secrets.AR_REPO }}"; if [ -z "$AR_REPO" ]; then AR_REPO='rd-agent'; fi
+          REGION="${{ secrets.GCP_REGION }}"
+          REPO="$GCP_PROJECT_ID/$AR_REPO"
+          IMAGE="$REGION-docker.pkg.dev/$REPO/backend:$(git rev-parse --short HEAD)"
           gcloud run deploy ${{ secrets.BACKEND_SERVICE }} \
             --image $IMAGE \
             --region ${{ secrets.GCP_REGION }} \

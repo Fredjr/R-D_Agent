@@ -41,20 +41,11 @@ jobs:
           set -euo pipefail
           npm ci --no-audit --no-fund
           BACKEND_PUBLIC_URL="${{ secrets.BACKEND_PUBLIC_URL }}"
-          BACKEND_SERVICE="${{ secrets.BACKEND_SERVICE }}"
-          GCP_REGION="${{ secrets.GCP_REGION }}"
-          if [ -n "${BACKEND_PUBLIC_URL}" ]; then
-            echo "NEXT_PUBLIC_BACKEND_URL=${BACKEND_PUBLIC_URL}" >> "$GITHUB_ENV"
-          else
-            for i in 1 2 3 4 5; do
-              BACKEND_URL="$(gcloud run services describe "${BACKEND_SERVICE}" --region "${GCP_REGION}" --format=value(status.url) 2>/dev/null || echo '')"
-              if [ -n "$BACKEND_URL" ]; then
-                echo "NEXT_PUBLIC_BACKEND_URL=$BACKEND_URL" >> "$GITHUB_ENV"
-                break
-              fi
-              echo "Backend URL not ready yet. Retrying in 20s ($i/5)..." && sleep 20
-            done
+          if [ -z "${BACKEND_PUBLIC_URL}" ]; then
+            echo "BACKEND_PUBLIC_URL secret is required. Please set it to your backend Cloud Run URL." >&2
+            exit 1
           fi
+          echo "NEXT_PUBLIC_BACKEND_URL=${BACKEND_PUBLIC_URL}" >> "$GITHUB_ENV"
           echo "Using NEXT_PUBLIC_BACKEND_URL set in GITHUB_ENV" || true
           npm run build
 
