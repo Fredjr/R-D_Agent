@@ -20,6 +20,10 @@ jobs:
           service_account_key: ${{ secrets.GCP_SA_KEY }}
           export_default_credentials: true
 
+      - name: Enable required services (idempotent)
+        run: |
+          gcloud services enable run.googleapis.com artifactregistry.googleapis.com -q
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -49,6 +53,6 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --cpu 1 --memory 512Mi \
-            --timeout 120 \
+            --timeout 180 \
             --set-env-vars=NEXT_PUBLIC_BACKEND_URL=${{ env.NEXT_PUBLIC_BACKEND_URL }}
 
