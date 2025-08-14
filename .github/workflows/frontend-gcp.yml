@@ -24,6 +24,9 @@ jobs:
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
+      - name: Set gcloud project
+        run: gcloud config set project ${{ secrets.GCP_PROJECT_ID }} -q
+
       - name: Enable required services (idempotent)
         run: |
           gcloud services enable run.googleapis.com artifactregistry.googleapis.com -q
@@ -55,6 +58,8 @@ jobs:
         run: |
           REPO=${{ secrets.GCP_PROJECT_ID }}/${{ secrets.AR_REPO || 'rd-agent' }}
           IMAGE=${{ secrets.GCP_REGION }}-docker.pkg.dev/$REPO/frontend:$(git rev-parse --short HEAD)
+          REGION=${{ secrets.GCP_REGION }}
+          gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://$REGION-docker.pkg.dev
           docker build -t $IMAGE .
           docker push $IMAGE
 

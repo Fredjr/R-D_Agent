@@ -21,12 +21,20 @@ jobs:
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
+      - name: Set gcloud project
+        run: gcloud config set project ${{ secrets.GCP_PROJECT_ID }} -q
+
       - name: Enable required services (idempotent)
         run: |
           gcloud services enable run.googleapis.com artifactregistry.googleapis.com secretmanager.googleapis.com iamcredentials.googleapis.com -q
 
       - name: Enable Docker auth
         run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev -q
+
+      - name: Docker login to Artifact Registry
+        run: |
+          REGION=${{ secrets.GCP_REGION }}
+          gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://$REGION-docker.pkg.dev
 
       - name: Ensure Artifact Registry repository exists
         run: |
