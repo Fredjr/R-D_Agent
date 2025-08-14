@@ -38,27 +38,35 @@ jobs:
 
       - name: Install & Build
         run: |
+          set -euo pipefail
           npm ci --no-audit --no-fund
-          if [ -n "${{ secrets.BACKEND_PUBLIC_URL }}" ]; then
-            echo "NEXT_PUBLIC_BACKEND_URL=${{ secrets.BACKEND_PUBLIC_URL }}" >> $GITHUB_ENV
+          BACKEND_PUBLIC_URL="${{ secrets.BACKEND_PUBLIC_URL }}"
+          BACKEND_SERVICE="${{ secrets.BACKEND_SERVICE }}"
+          GCP_REGION="${{ secrets.GCP_REGION }}"
+          if [ -n "${BACKEND_PUBLIC_URL}" ]; then
+            echo "NEXT_PUBLIC_BACKEND_URL=${BACKEND_PUBLIC_URL}" >> "$GITHUB_ENV"
           else
             for i in 1 2 3 4 5; do
-              BACKEND_URL=$(gcloud run services describe ${{ secrets.BACKEND_SERVICE }} --region ${{ secrets.GCP_REGION }} --format='value(status.url)' 2>/dev/null || true)
+              BACKEND_URL=$(gcloud run services describe "${BACKEND_SERVICE}" --region "${GCP_REGION}" --format='value(status.url)' 2>/dev/null || true)
               if [ -n "$BACKEND_URL" ]; then
-                echo "NEXT_PUBLIC_BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
+                echo "NEXT_PUBLIC_BACKEND_URL=$BACKEND_URL" >> "$GITHUB_ENV"
                 break
               fi
               echo "Backend URL not ready yet. Retrying in 20s ($i/5)..." && sleep 20
             done
           fi
-          echo "Using NEXT_PUBLIC_BACKEND_URL=${NEXT_PUBLIC_BACKEND_URL:-unset}"
+          echo "Using NEXT_PUBLIC_BACKEND_URL set in GITHUB_ENV"
           npm run build
 
       - name: Build & Push image
         run: |
-          REPO=${{ secrets.GCP_PROJECT_ID }}/${{ secrets.AR_REPO || 'rd-agent' }}
-          IMAGE=${{ secrets.GCP_REGION }}-docker.pkg.dev/$REPO/frontend:$(git rev-parse --short HEAD)
-          REGION=${{ secrets.GCP_REGION }}
+          set -euo pipefail
+          GCP_PROJECT_ID="${{ secrets.GCP_PROJECT_ID }}"
+          AR_REPO="${{ secrets.AR_REPO }}"
+          REGION="${{ secrets.GCP_REGION }}"
+          if [ -z "$AR_REPO" ]; then AR_REPO='rd-agent'; fi
+          REPO="$GCP_PROJECT_ID/$AR_REPO"
+          IMAGE="$REGION-docker.pkg.dev/$REPO/frontend:$(git rev-parse --short HEAD)"
           gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://$REGION-docker.pkg.dev
           docker build -t $IMAGE .
           docker push $IMAGE
