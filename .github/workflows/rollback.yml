@@ -1,0 +1,51 @@
+name: Manual Rollback (Cloud Run)
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Service to rollback (backend/frontend)"
+        required: true
+        default: backend
+      image_tag:
+        description: "Image tag to deploy (e.g., a previous commit SHA)"
+        required: true
+      region:
+        description: "GCP region"
+        required: false
+        default: us-central1
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
+
+      - name: Compute image and service names
+        id: vars
+        run: |
+          if [ "${{ github.event.inputs.service }}" = "frontend" ]; then
+            SERVICE_NAME=${{ secrets.FRONTEND_SERVICE }}
+            REPO_PATH=${{ secrets.GCP_PROJECT_ID }}/${{ secrets.AR_REPO || 'rd-agent' }}/frontend
+          else
+            SERVICE_NAME=${{ secrets.BACKEND_SERVICE }}
+            REPO_PATH=${{ secrets.GCP_PROJECT_ID }}/${{ secrets.AR_REPO || 'rd-agent' }}/backend
+          fi
+          echo "service=$SERVICE_NAME" >> $GITHUB_OUTPUT
+          echo "image=${{ secrets.GCP_REGION || github.event.inputs.region }}-docker.pkg.dev/$REPO_PATH:${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
+
+      - name: Rollback to specified image
+        run: |
+          gcloud run deploy ${{ steps.vars.outputs.service }} \
+            --image ${{ steps.vars.outputs.image }} \
+            --region ${{ github.event.inputs.region }} \
+            --platform managed \
+            --allow-unauthenticated
+
