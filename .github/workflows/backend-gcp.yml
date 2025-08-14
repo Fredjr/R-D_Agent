@@ -29,7 +29,8 @@ jobs:
           gcloud services enable run.googleapis.com artifactregistry.googleapis.com secretmanager.googleapis.com iamcredentials.googleapis.com -q
 
       - name: Ensure Pinecone index exists and get host
-        if: ${{ !secrets.PINECONE_HOST }}   # skip provisioning if host provided via secrets
+        if: ${{ secrets.PINECONE_HOST == '' }}   # run ONLY when no host secret
+        continue-on-error: true                  # do not fail the job if jq/API flake
         id: pinecone
         env:
           PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
@@ -37,33 +38,27 @@ jobs:
         run: |
           set -euo pipefail
           IDX="${PINECONE_INDEX:-rd-agent-memory}"
-          # List indexes (capture HTTP code and avoid printing JSON to logs)
+
+          # List indexes safely
           CODE=$(curl -sS -w "%{http_code}" -o list.json -H "Api-Key: $PINECONE_API_KEY" https://api.pinecone.io/indexes || true)
-          if [ "$CODE" != "200" ]; then
-            echo "Pinecone list indexes HTTP $CODE; skipping auto-provision."
+          if [ "$CODE" != "200" ] || ! jq -e . list.json >/dev/null 2>&1; then
             echo "host=" >> $GITHUB_OUTPUT
             exit 0
           fi
-          if ! jq -e . list.json >/dev/null 2>&1; then
-            echo "Pinecone list indexes invalid JSON; skipping auto-provision."
-            echo "host=" >> $GITHUB_OUTPUT
-            exit 0
-          fi
+
+          # Create if missing
           if ! jq -e --arg n "$IDX" '.indexes // [] | map(.name) | index($n)' list.json >/dev/null; then
             echo "Creating Pinecone index $IDX"
             CODE=$(curl -sS -w "%{http_code}" -o create.json -X POST https://api.pinecone.io/indexes \
               -H "Api-Key: $PINECONE_API_KEY" -H "Content-Type: application/json" \
               -d "{\"name\":\"$IDX\",\"dimension\":384,\"metric\":\"cosine\",\"spec\":{\"serverless\":{\"cloud\":\"aws\",\"region\":\"us-east-1\"}}}" || true)
-            if [ "$CODE" = "201" ] || [ "$CODE" = "200" ]; then
-              sleep 5
-            else
-              echo "Create index HTTP $CODE; continuing without host."
-            fi
+            sleep 5
           fi
+
+          # Describe and output host (if available)
           CODE=$(curl -sS -w "%{http_code}" -o desc.json -H "Api-Key: $PINECONE_API_KEY" https://api.pinecone.io/indexes/$IDX || true)
           if [ "$CODE" = "200" ] && jq -e . desc.json >/dev/null 2>&1; then
-            HOST=$(jq -r '.host // empty' desc.json)
-            echo "host=$HOST" >> $GITHUB_OUTPUT
+            echo "host=$(jq -r '.host // empty' desc.json)" >> $GITHUB_OUTPUT
           else
             echo "host=" >> $GITHUB_OUTPUT
           fi
@@ -105,10 +100,11 @@ jobs:
           IMAGE="$REGION-docker.pkg.dev/$REPO/backend:$(git rev-parse --short HEAD)"
           # Safely handle regex with special chars like <, > by quoting
           ALLOW_ORIGIN_REGEX_VAL="${{ secrets.ALLOW_ORIGIN_REGEX }}"; if [ -z "$ALLOW_ORIGIN_REGEX_VAL" ]; then ALLOW_ORIGIN_REGEX_VAL='.*'; fi
-          # Prefer explicit PINECONE_HOST secret; fallback to auto-provisioned host output
+          # Prefer explicit PINECONE_HOST secret; then (optional) typo fallback; then step output
           PINECONE_HOST_VAL="${{ secrets.PINECONE_HOST }}"
           if [ -z "$PINECONE_HOST_VAL" ]; then PINECONE_HOST_VAL="${{ secrets.PINECOST_HOST }}"; fi
           if [ -z "$PINECONE_HOST_VAL" ]; then PINECONE_HOST_VAL="${{ steps.pinecone.outputs.host }}"; fi
+
           gcloud run deploy ${{ secrets.BACKEND_SERVICE }} \
             --image $IMAGE \
             --region ${{ secrets.GCP_REGION }} \
