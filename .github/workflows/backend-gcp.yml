@@ -87,7 +87,9 @@ jobs:
           # Safely handle regex with special chars like <, > by quoting
           ALLOW_ORIGIN_REGEX_VAL="${{ secrets.ALLOW_ORIGIN_REGEX }}"; if [ -z "$ALLOW_ORIGIN_REGEX_VAL" ]; then ALLOW_ORIGIN_REGEX_VAL='.*'; fi
           # Prefer explicit PINECONE_HOST secret; fallback to auto-provisioned host output
-          PINECONE_HOST_VAL="${{ secrets.PINECONE_HOST }}"; if [ -z "$PINECONE_HOST_VAL" ]; then PINECONE_HOST_VAL="${{ steps.pinecone.outputs.host }}"; fi
+          PINECONE_HOST_VAL="${{ secrets.PINECONE_HOST }}"
+          if [ -z "$PINECONE_HOST_VAL" ]; then PINECONE_HOST_VAL="${{ secrets.PINECOST_HOST }}"; fi
+          if [ -z "$PINECONE_HOST_VAL" ]; then PINECONE_HOST_VAL="${{ steps.pinecone.outputs.host }}"; fi
           gcloud run deploy ${{ secrets.BACKEND_SERVICE }} \
             --image $IMAGE \
             --region ${{ secrets.GCP_REGION }} \
