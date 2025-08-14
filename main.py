@@ -98,13 +98,20 @@ def _get_embeddings():
             _EMBEDDINGS_OBJ = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     return _EMBEDDINGS_OBJ
 _CROSS_MODEL_NAME = os.getenv("CROSS_ENCODER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
-cross_encoder = CrossEncoder(_CROSS_MODEL_NAME) if (os.getenv("CROSS_ENCODER_ENABLED", "0") not in ("0","false","False") and _HAS_CROSS) else None
+cross_encoder = None
+if os.getenv("CROSS_ENCODER_ENABLED", "0") not in ("0","false","False") and _HAS_CROSS:
+    try:
+        cross_encoder = CrossEncoder(_CROSS_MODEL_NAME)
+    except Exception:
+        cross_encoder = None
 _NLI_MODEL_NAME = os.getenv("NLI_CROSS_ENCODER_MODEL", "cross-encoder/nli-deberta-v3-base")
 _ENTAILMENT_ENABLED = os.getenv("ENTAILMENT_ENABLED", "0") not in ("0","false","False")
-try:
-    nli_encoder = CrossEncoder(_NLI_MODEL_NAME) if (_HAS_CROSS and _ENTAILMENT_ENABLED) else None
-except Exception:
-    nli_encoder = None
+nli_encoder = None
+if _HAS_CROSS and _ENTAILMENT_ENABLED:
+    try:
+        nli_encoder = CrossEncoder(_NLI_MODEL_NAME)
+    except Exception:
+        nli_encoder = None
 
 # Pinecone client
 PINECONE_INDEX = os.getenv("PINECONE_INDEX", "rd-agent-memory")
