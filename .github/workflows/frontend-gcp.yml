@@ -32,8 +32,19 @@ jobs:
       - name: Install & Build
         run: |
           npm ci --no-audit --no-fund
-          BACKEND_URL=$(gcloud run services describe ${{ secrets.BACKEND_SERVICE }} --region ${{ secrets.GCP_REGION }} --format='value(status.url)')
-          echo "NEXT_PUBLIC_BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
+          if [ -n "${{ secrets.BACKEND_PUBLIC_URL }}" ]; then
+            echo "NEXT_PUBLIC_BACKEND_URL=${{ secrets.BACKEND_PUBLIC_URL }}" >> $GITHUB_ENV
+          else
+            for i in 1 2 3 4 5; do
+              BACKEND_URL=$(gcloud run services describe ${{ secrets.BACKEND_SERVICE }} --region ${{ secrets.GCP_REGION }} --format='value(status.url)' 2>/dev/null || true)
+              if [ -n "$BACKEND_URL" ]; then
+                echo "NEXT_PUBLIC_BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
+                break
+              fi
+              echo "Backend URL not ready yet. Retrying in 20s ($i/5)..." && sleep 20
+            done
+          fi
+          echo "Using NEXT_PUBLIC_BACKEND_URL=${NEXT_PUBLIC_BACKEND_URL:-unset}"
           npm run build
 
       - name: Build & Push image
