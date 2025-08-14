@@ -47,7 +47,7 @@ jobs:
             echo "NEXT_PUBLIC_BACKEND_URL=${BACKEND_PUBLIC_URL}" >> "$GITHUB_ENV"
           else
             for i in 1 2 3 4 5; do
-              BACKEND_URL=$(gcloud run services describe "${BACKEND_SERVICE}" --region "${GCP_REGION}" --format='value(status.url)' 2>/dev/null || true)
+              BACKEND_URL="$(gcloud run services describe "${BACKEND_SERVICE}" --region "${GCP_REGION}" --format=value(status.url) 2>/dev/null || echo '')"
               if [ -n "$BACKEND_URL" ]; then
                 echo "NEXT_PUBLIC_BACKEND_URL=$BACKEND_URL" >> "$GITHUB_ENV"
                 break
@@ -55,7 +55,7 @@ jobs:
               echo "Backend URL not ready yet. Retrying in 20s ($i/5)..." && sleep 20
             done
           fi
-          echo "Using NEXT_PUBLIC_BACKEND_URL set in GITHUB_ENV"
+          echo "Using NEXT_PUBLIC_BACKEND_URL set in GITHUB_ENV" || true
           npm run build
 
       - name: Build & Push image
