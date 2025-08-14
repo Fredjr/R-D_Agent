@@ -70,7 +70,7 @@ jobs:
             --region ${{ secrets.GCP_REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --cpu 1 --memory 1Gi \
+            --cpu 1 --memory 2Gi --min-instances 1 \
             --timeout 300 \
             --set-env-vars=GEMINI_MAIN_MODEL=gemini-1.5-pro,GEMINI_SMALL_MODEL=gemini-1.5-flash \
             --set-env-vars=ALLOW_ORIGIN_REGEX="$ALLOW_ORIGIN_REGEX_VAL" \
