@@ -28,6 +28,27 @@ jobs:
         run: |
           gcloud services enable run.googleapis.com artifactregistry.googleapis.com secretmanager.googleapis.com iamcredentials.googleapis.com -q
 
+      - name: Ensure Pinecone index exists and get host
+        id: pinecone
+        env:
+          PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
+          PINECONE_INDEX: ${{ secrets.PINECONE_INDEX }}
+        run: |
+          set -euo pipefail
+          IDX="${PINECONE_INDEX:-rd-agent-memory}"
+          LIST=$(curl -sS -H "Api-Key: $PINECONE_API_KEY" https://api.pinecone.io/indexes || echo "{}")
+          if ! echo "$LIST" | jq -e --arg n "$IDX" '.indexes // [] | map(.name) | index($n)' >/dev/null; then
+            echo "Creating Pinecone index $IDX"
+            curl -sS -X POST https://api.pinecone.io/indexes \
+              -H "Api-Key: $PINECONE_API_KEY" -H "Content-Type: application/json" \
+              -d "{\"name\":\"$IDX\",\"dimension\":384,\"metric\":\"cosine\",\"spec\":{\"serverless\":{\"cloud\":\"aws\",\"region\":\"us-east-1\"}}}" >/dev/null
+            # wait briefly
+            sleep 5
+          fi
+          DESC=$(curl -sS -H "Api-Key: $PINECONE_API_KEY" https://api.pinecone.io/indexes/$IDX || echo '{}')
+          HOST=$(echo "$DESC" | jq -r '.host // empty')
+          echo "host=$HOST" >> $GITHUB_OUTPUT
+
       - name: Enable Docker auth
         run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev -q
 
@@ -76,7 +97,7 @@ jobs:
             --set-env-vars=TOTAL_BUDGET_S=120,HARVEST_BUDGET_S=30,TRIAGE_BUDGET_S=10,DEEPDIVE_BUDGET_S=75,SYNTH_BUDGET_S=8,ENTAILMENT_BUDGET_S=3.0,TRIAGE_TOP_K=20,DEEPDIVE_TOP_K=8 \
             --set-env-vars=ALLOW_ORIGIN_REGEX="$ALLOW_ORIGIN_REGEX_VAL" \
             --set-env-vars=GOOGLE_GENAI_API_KEY="${{ secrets.GOOGLE_GENAI_API_KEY }}",GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}",GOOGLE_CSE_ID="${{ secrets.GOOGLE_CSE_ID }}" \
-            --set-env-vars=PINECONE_API_KEY="${{ secrets.PINECONE_API_KEY }}",PINECONE_INDEX="${{ secrets.PINECONE_INDEX }}"
+            --set-env-vars=PINECONE_API_KEY="${{ secrets.PINECONE_API_KEY }}",PINECONE_INDEX="${{ secrets.PINECONE_INDEX }}",PINECONE_HOST="${{ steps.pinecone.outputs.host }}"
 
       - name: Output backend URL
         run: gcloud run services describe ${{ secrets.BACKEND_SERVICE }} --region ${{ secrets.GCP_REGION }} --format='value(status.url)'
