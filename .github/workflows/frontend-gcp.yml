@@ -64,8 +64,12 @@ jobs:
 
       - name: Deploy to Cloud Run
         run: |
-          REPO=${{ secrets.GCP_PROJECT_ID }}/${{ secrets.AR_REPO || 'rd-agent' }}
-          IMAGE=${{ secrets.GCP_REGION }}-docker.pkg.dev/$REPO/frontend:$(git rev-parse --short HEAD)
+          set -euo pipefail
+          GCP_PROJECT_ID="${{ secrets.GCP_PROJECT_ID }}"
+          AR_REPO="${{ secrets.AR_REPO }}"; if [ -z "$AR_REPO" ]; then AR_REPO='rd-agent'; fi
+          REGION="${{ secrets.GCP_REGION }}"
+          REPO="$GCP_PROJECT_ID/$AR_REPO"
+          IMAGE="$REGION-docker.pkg.dev/$REPO/frontend:$(git rev-parse --short HEAD)"
           gcloud run deploy ${{ secrets.FRONTEND_SERVICE }} \
             --image $IMAGE \
             --region ${{ secrets.GCP_REGION }} \
@@ -73,5 +77,5 @@ jobs:
             --allow-unauthenticated \
             --cpu 1 --memory 512Mi \
             --timeout 180 \
-            --set-env-vars=NEXT_PUBLIC_BACKEND_URL=${{ env.NEXT_PUBLIC_BACKEND_URL }}
+            --set-env-vars=NEXT_PUBLIC_BACKEND_URL="${{ env.NEXT_PUBLIC_BACKEND_URL }}"
 
