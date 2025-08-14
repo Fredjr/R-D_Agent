@@ -37,6 +37,11 @@ from scoring import calculate_publication_score
 from langchain.embeddings import HuggingFaceEmbeddings
 from pinecone import Pinecone
 try:
+    # Optional: legacy/alternate Index constructor in some pinecone versions
+    from pinecone import Index as PineconeIndex  # type: ignore
+except Exception:  # pragma: no cover - optional import
+    PineconeIndex = None  # type: ignore
+try:
     from sentence_transformers import CrossEncoder
     _HAS_CROSS = True
 except Exception:
@@ -122,15 +127,37 @@ def _get_pinecone_index():
     api_key = os.getenv("PINECONE_API_KEY")
     if not api_key:
         return None
+    host = os.getenv("PINECONE_HOST")
+    index_name = os.getenv("PINECONE_INDEX", PINECONE_INDEX)
     try:
         pc = Pinecone(api_key=api_key)
-        # Prefer explicit host if provided (serverless indexes expose a host)
-        if PINECONE_HOST:
-            return pc.Index(host=PINECONE_HOST)
-        # Fallback to index by name
-        return pc.Index(PINECONE_INDEX)
     except Exception:
         return None
+
+    # Try host-first path (new serverless style)
+    if host:
+        try:
+            return pc.Index(host=host)
+        except Exception:
+            pass
+        # Fallback to legacy constructor if available
+        if PineconeIndex is not None:
+            try:
+                return PineconeIndex(host=host)  # type: ignore
+            except Exception:
+                pass
+
+    # Try by name (control-plane resolves host)
+    try:
+        return pc.Index(index_name)
+    except Exception:
+        pass
+    if PineconeIndex is not None:
+        try:
+            return PineconeIndex(index_name)  # type: ignore
+        except Exception:
+            pass
+    return None
 
 
 
@@ -1565,7 +1592,11 @@ async def ready() -> dict:
         if index is not None:
             _ = index.describe_index_stats()
             pc_ok = True
-    except Exception:
+    except Exception as e:
+        try:
+            log_event({"ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "event": "pinecone_ready_exception", "error": str(e)})
+        except Exception:
+            pass
         pc_ok = False
     keys_ok = bool(os.getenv("GOOGLE_API_KEY")) and bool(os.getenv("GOOGLE_CSE_ID")) and bool(os.getenv("PINECONE_API_KEY"))
     return {"pinecone": pc_ok, "keys": keys_ok}
@@ -1767,6 +1798,27 @@ async def generate_review(request: ReviewRequest):
                 raise RuntimeError("DAG graph unavailable")
             out = await _DAG_APP.ainvoke(state)
             results_sections = out.get("results_sections", [])
+            # If DAG produced no results, fall back to V2 to avoid empty responses
+            if not results_sections:
+                try:
+                    v2 = await orchestrate_v2(request, memories)
+                    resp = {
+                        "molecule": request.molecule,
+                        "objective": request.objective,
+                        "project_id": request.project_id,
+                        "queries": v2.get("queries", []),
+                        "results": v2.get("results", []),
+                        "diagnostics": {**(out.get("diagnostics", {}) or {}), "dag_fallback_v2": True, "dag_empty": True},
+                        "executive_summary": v2.get("executive_summary", ""),
+                        "memories": memories,
+                    }
+                    took = _now_ms() - req_start
+                    _metrics_inc("latency_ms_sum", took)
+                    log_event({"event": "generate_review_dag_fallback_v2", "sections": len(resp["results"]), "latency_ms": took})
+                    return resp
+                except Exception as e2:
+                    log_event({"event": "dag_empty_v2_error", "error": str(e2)[:200]})
+
             resp = {
                 "molecule": request.molecule,
                 "objective": request.objective,

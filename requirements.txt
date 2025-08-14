@@ -4,7 +4,7 @@ langchain
 langchain-google-genai
 python-dotenv
 requests
-pinecone
+pinecone>=4.0.0
 langchain-community
 sentence-transformers
 jsonschema
