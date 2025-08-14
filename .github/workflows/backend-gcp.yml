@@ -73,6 +73,7 @@ jobs:
             --cpu 1 --memory 2Gi --min-instances 1 \
             --timeout 300 \
             --set-env-vars=GEMINI_MAIN_MODEL=gemini-1.5-pro,GEMINI_SMALL_MODEL=gemini-1.5-flash \
+            --set-env-vars=TOTAL_BUDGET_S=120,HARVEST_BUDGET_S=30,TRIAGE_BUDGET_S=10,DEEPDIVE_BUDGET_S=75,SYNTH_BUDGET_S=8,ENTAILMENT_BUDGET_S=3.0,TRIAGE_TOP_K=20,DEEPDIVE_TOP_K=8 \
             --set-env-vars=ALLOW_ORIGIN_REGEX="$ALLOW_ORIGIN_REGEX_VAL" \
             --set-env-vars=GOOGLE_GENAI_API_KEY="${{ secrets.GOOGLE_GENAI_API_KEY }}",GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}",GOOGLE_CSE_ID="${{ secrets.GOOGLE_CSE_ID }}" \
             --set-env-vars=PINECONE_API_KEY="${{ secrets.PINECONE_API_KEY }}",PINECONE_INDEX="${{ secrets.PINECONE_INDEX }}"
