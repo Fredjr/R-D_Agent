@@ -17,7 +17,7 @@ export async function POST(request: Request): Promise<Response> {
         status: upstream.status,
         headers: { 'Content-Type': upstream.headers.get('Content-Type') || 'application/json' },
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       const body = JSON.stringify({ error: 'Gateway timeout', detail: String(err) });
       return new Response(body, { status: 504, headers: { 'Content-Type': 'application/json' } });
     } finally {
