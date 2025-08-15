@@ -86,10 +86,15 @@ export default function ArticleCard({ item }: Props) {
               <strong className="block text-sm uppercase tracking-wide mb-2">Relevance Scorecard</strong>
               {(() => {
                 const sb = (item.result as any).score_breakdown || {};
-                const sim = typeof sb.objective_similarity_score === 'number' ? sb.objective_similarity_score : undefined;
-                const rec = typeof sb.recency_score === 'number' ? sb.recency_score : undefined;
-                const imp = typeof sb.impact_score === 'number' ? sb.impact_score : undefined;
-                const ctx = typeof sb.contextual_match_score === 'number' ? sb.contextual_match_score : undefined;
+                const toNum = (v: unknown): number | undefined => {
+                  if (typeof v === 'number') return Number.isFinite(v) ? v : undefined;
+                  const n = Number((v as any));
+                  return Number.isFinite(n) ? n : undefined;
+                };
+                const sim = toNum(sb.objective_similarity_score);
+                const rec = toNum(sb.recency_score);
+                const imp = toNum(sb.impact_score);
+                const ctx = toNum(sb.contextual_match_score);
                 return (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                     <div>
