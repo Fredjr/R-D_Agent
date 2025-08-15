@@ -543,7 +543,11 @@ def _build_dag_app():
             request = state["request"]
             memories = state.get("memories") or []
             mem_txt = " | ".join(m.get("text", "")[:200] for m in memories) if memories else ""
-            plan = await _with_timeout(asyncio.to_thread(_build_query_plan, request.objective, mem_txt, state["deadline"]), PLAN_BUDGET_S, "Plan")
+            plan = await _with_timeout(
+                asyncio.to_thread(_build_query_plan, request.objective, mem_txt, state["deadline"], getattr(request, "molecule", None)),
+                PLAN_BUDGET_S,
+                "Plan"
+            )
             state["plan"] = plan or {}
             _log_node_event("Plan", t0, True, {"has_plan": bool(plan)})
             return state
@@ -643,6 +647,39 @@ def _build_dag_app():
                 if _is_duplicate_section(top, seen_pmids, seen_titles):
                     continue
                 _mark_seen(top, seen_pmids, seen_titles)
+                # Backfill score_breakdown if DAG deep-dive result is missing components
+                try:
+                    res = d.get("result") or {}
+                    sb = res.setdefault("score_breakdown", {})
+                    if ("objective_similarity_score" not in sb) or ("recency_score" not in sb) or ("impact_score" not in sb):
+                        objective = state["request"].objective
+                        abstract = art.get("abstract") or art.get("summary") or ""
+                        # similarity
+                        try:
+                            obj_vec = np.array(EMBED_CACHE.get_or_compute(objective or ""), dtype=float)
+                            abs_vec = np.array(EMBED_CACHE.get_or_compute(abstract or art.get("title") or ""), dtype=float)
+                            sim_raw = float(np.dot(obj_vec, abs_vec) / ((np.linalg.norm(obj_vec) or 1.0) * (np.linalg.norm(abs_vec) or 1.0)))
+                            sb["objective_similarity_score"] = round(max(0.0, min(100.0, ((sim_raw + 1.0) / 2.0) * 100.0)), 1)
+                        except Exception:
+                            sb.setdefault("objective_similarity_score", 0.0)
+                        # recency
+                        try:
+                            year = int(top.get("pub_year") or 0)
+                            nowy = datetime.utcnow().year
+                            rec_norm = max(0.0, min(1.0, (year - 2015) / float((nowy - 2015 + 1)))) if year else 0.0
+                            sb["recency_score"] = round(rec_norm * 100.0, 1)
+                        except Exception:
+                            sb.setdefault("recency_score", 0.0)
+                        # impact
+                        try:
+                            year = int(top.get("pub_year") or 0)
+                            cites = float(top.get("citation_count") or 0.0)
+                            cpy = (cites / max(1, (datetime.utcnow().year - year + 1))) if year else 0.0
+                            sb["impact_score"] = round(max(0.0, min(100.0, (cpy / 100.0) * 100.0)), 1)
+                        except Exception:
+                            sb.setdefault("impact_score", 0.0)
+                except Exception:
+                    pass
                 results_sections.append({
                     "query": (state.get("plan") or {}).get("mechanism_query") or (state.get("plan") or {}).get("review_query") or request.objective,
                     "result": d["result"],
@@ -743,7 +780,7 @@ def _mark_seen(top_article: dict | None, seen_pmids: set[str], seen_titles: set[
 def _time_left(deadline: float) -> float:
     return max(0.0, deadline - time.time())
 
-def _build_query_plan(objective: str, memories_text: str, deadline: float) -> dict:
+def _build_query_plan(objective: str, memories_text: str, deadline: float, molecule: str | None = None) -> dict:
     """Return a dict with five queries: review_query, mechanism_query, clinical_query, broad_query, web_query."""
     if _time_left(deadline) < 1.0:
         return {}
@@ -757,12 +794,13 @@ review_query, mechanism_query, clinical_query, broad_query, web_query.
 - web_query: Google search query optimized to find relevant PDFs/news
 
 Objective: {objective}
+Molecule (if any): {molecule}
 Prior Context: {memories}
 """
     try:
-        prompt = PromptTemplate(template=strategist_template, input_variables=["objective", "memories"])
+        prompt = PromptTemplate(template=strategist_template, input_variables=["objective", "memories", "molecule"])
         chain = LLMChain(llm=llm_analyzer, prompt=prompt)
-        out = chain.invoke({"objective": objective[:400], "memories": memories_text[:400]})
+        out = chain.invoke({"objective": objective[:400], "memories": memories_text[:400], "molecule": (molecule or "")[:200]})
         txt = out.get("text", out) if isinstance(out, dict) else str(out)
         if "```" in txt:
             txt = txt.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
@@ -773,11 +811,13 @@ Prior Context: {memories}
         pass
     # Fallback: construct reasonable defaults
     obj = objective.strip()
-    review_query = f'("{obj}"[tiab] AND (review[pt] OR systematic[sb]) AND (2015:3000[dp]))'
-    mechanism_query = f'("{obj}"[tiab] AND (mechanism[tiab] OR "mechanism of action"[tiab]))'
-    clinical_query = f'("{obj}" AND (randomized OR clinical trial OR phase))'
-    broad_query = f'{obj} mechanism pathway signaling'
-    web_query = f'{obj} mechanism site:nih.gov OR site:nature.com filetype:pdf'
+    mol = (molecule or "").strip()
+    focus = f'"{mol}"[tiab] AND ' if mol else ''
+    review_query = f'({focus}"{obj}"[tiab] AND (review[pt] OR systematic[sb]) AND (2015:3000[dp]))'
+    mechanism_query = f'({focus}"{obj}"[tiab] AND (mechanism[tiab] OR "mechanism of action"[tiab]))'
+    clinical_query = f'(({mol or obj}) AND (randomized OR clinical trial OR phase))'
+    broad_query = f'{(mol+" "+obj).strip()} mechanism pathway signaling'
+    web_query = f'{(mol+" "+obj).strip()} mechanism site:nih.gov OR site:nature.com filetype:pdf'
     return {
         "review_query": review_query,
         "mechanism_query": mechanism_query,
@@ -1099,7 +1139,7 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
     # Strategist
     mem_txt = " | ".join(m.get("text", "")[:200] for m in memories) if memories else ""
     _t0 = _now_ms()
-    plan = _build_query_plan(request.objective, mem_txt, deadline)
+    plan = _build_query_plan(request.objective, mem_txt, deadline, getattr(request, "molecule", None))
     plan_ms = _now_ms() - _t0
     if not plan:
         plan = {}
