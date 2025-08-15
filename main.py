@@ -919,6 +919,13 @@ def _triage_rank(objective: str, candidates: list[dict], max_keep: int) -> list[
 async def _deep_dive_articles(objective: str, items: list[dict], memories: list[dict], deadline: float) -> list[dict]:
     # Extraction, summarization, justification
     extracted_results: list[dict] = []
+    # Pre-compute objective embedding for similarity scoring
+    try:
+        objective_vec = np.array(EMBED_CACHE.get_or_compute(objective or ""), dtype=float)
+        objective_vec_norm = float(np.linalg.norm(objective_vec)) or 1.0
+    except Exception:
+        objective_vec = None
+        objective_vec_norm = 1.0
     extraction_tmpl = """
 You are an information extraction bot. From the abstract below, return ONLY JSON with keys: key_methodologies (array), disease_context (array), primary_conclusion (string).
 Abstract: {abstract}
@@ -1010,13 +1017,55 @@ Abstract: {abstract}
                 contextual_match_score = float(int(''.join(ch for ch in txt if ch.isdigit()) or '0'))
         except Exception:
             contextual_match_score = 0.0
-        # Weighted overall score (Glass-Box): 40% similarity + 20% recency + 20% impact + 20% contextual match
-        # We’ll map similarity/recency/impact from triage’s breakdown where available (fallback to publication score and confidence)
-        overall = (0.4 * (structured.get("score_breakdown", {}).get("objective_similarity_score", 0.0)) +
-                   0.2 * (structured.get("score_breakdown", {}).get("recency_score", 0.0)) +
-                   0.2 * (structured.get("score_breakdown", {}).get("impact_score", 0.0)) +
-                   0.2 * contextual_match_score)
+        # Compute objective similarity / recency / impact (0-100) so UI never shows "—"
+        try:
+            if objective_vec is not None:
+                abs_vec = np.array(EMBED_CACHE.get_or_compute(abstract or art.get("title") or ""), dtype=float)
+                abs_norm = float(np.linalg.norm(abs_vec)) or 1.0
+                sim_raw = float(np.dot(objective_vec, abs_vec) / (objective_vec_norm * abs_norm))
+                # map cosine [-1,1] → [0,100]
+                objective_similarity_score = max(0.0, min(100.0, ((sim_raw + 1.0) / 2.0) * 100.0))
+            else:
+                objective_similarity_score = 0.0
+        except Exception:
+            objective_similarity_score = 0.0
+        try:
+            year = int(top_article_payload.get("pub_year") or 0)
+            nowy = datetime.utcnow().year
+            recency_score = 0.0
+            if year:
+                # newer → closer to 100; baseline 2015
+                rec_norm = max(0.0, min(1.0, (year - 2015) / float((nowy - 2015 + 1))))
+                recency_score = round(rec_norm * 100.0, 1)
+        except Exception:
+            recency_score = 0.0
+        try:
+            year = int(top_article_payload.get("pub_year") or 0)
+            cites = float(top_article_payload.get("citation_count") or 0.0)
+            cpy = (cites / max(1, (datetime.utcnow().year - year + 1))) if year else 0.0
+            # simple cap at 100 cpy → 100
+            impact_score = max(0.0, min(100.0, (cpy / 100.0) * 100.0))
+        except Exception:
+            impact_score = 0.0
+        # Weighted overall score (Glass-Box)
+        # Default: 40% similarity, 20% recency, 20% impact, 20% contextual match (all 0-100)
+        # Mechanism objectives: boost similarity/contextual
+        obj_lc = (objective or "").lower()
+        is_mechanism = ("mechanism" in obj_lc) or ("moa" in obj_lc) or ("mechanism of action" in obj_lc)
+        if is_mechanism:
+            w_sim, w_rec, w_imp, w_ctx = 0.55, 0.10, 0.10, 0.25
+        else:
+            w_sim, w_rec, w_imp, w_ctx = 0.40, 0.20, 0.20, 0.20
+        overall = (
+            w_sim * objective_similarity_score +
+            w_rec * recency_score +
+            w_imp * impact_score +
+            w_ctx * contextual_match_score
+        )
         structured.setdefault("score_breakdown", {})
+        structured["score_breakdown"]["objective_similarity_score"] = round(objective_similarity_score, 1)
+        structured["score_breakdown"]["recency_score"] = round(recency_score, 1)
+        structured["score_breakdown"]["impact_score"] = round(impact_score, 1)
         structured["score_breakdown"]["contextual_match_score"] = round(contextual_match_score, 1)
         structured["publication_score"] = round(pub_score, 1)
         structured["overall_relevance_score"] = round(overall, 1)
