@@ -1063,7 +1063,8 @@ Abstract: {abstract}
             structured = _validate_or_repair_summary(structured, objective, abstract)
             # Attach evidence to fact anchors if missing; fallback-generate if absent
             try:
-                if isinstance(structured.get("fact_anchors"), list):
+                fa = structured.get("fact_anchors")
+                if isinstance(fa, list) and len(fa) > 0:
                     for fa in structured["fact_anchors"]:
                         if isinstance(fa, dict):
                             ev = fa.get("evidence") or {}
@@ -1086,6 +1087,13 @@ Abstract: {abstract}
                 pass
         except Exception:
             structured = {"summary": abstract[:400], "confidence_score": 60, "methodologies": []}
+            # Ensure anchors even on summarization failure
+            try:
+                fa_fb = _fallback_fact_anchors(abstract, art, max_items=3)
+                if fa_fb:
+                    structured["fact_anchors"] = _lightweight_entailment_filter(abstract, fa_fb)
+            except Exception:
+                pass
         top_article_payload = {
             "title": art.get("title"),
             "pmid": art.get("pmid"),
