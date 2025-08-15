@@ -3,6 +3,7 @@ name: Backend Deploy (Cloud Run)
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -38,51 +39,19 @@ jobs:
         run: |
           set -euo pipefail
           IDX="${PINECONE_INDEX:-rd-agent-memory}"
-<<<<<<< HEAD
-
           # List indexes safely
           CODE=$(curl -sS -w "%{http_code}" -o list.json -H "Api-Key: $PINECONE_API_KEY" https://api.pinecone.io/indexes || true)
           if [ "$CODE" != "200" ] || ! jq -e . list.json >/dev/null 2>&1; then
             echo "host=" >> $GITHUB_OUTPUT
             exit 0
           fi
-
-          # Create if missing
-=======
-          # List indexes (capture HTTP code and avoid printing JSON to logs)
-          CODE=$(curl -sS -w "%{http_code}" -o list.json -H "Api-Key: $PINECONE_API_KEY" https://api.pinecone.io/indexes || true)
-          if [ "$CODE" != "200" ]; then
-            echo "Pinecone list indexes HTTP $CODE; skipping auto-provision."
-            echo "host=" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          if ! jq -e . list.json >/dev/null 2>&1; then
-            echo "Pinecone list indexes invalid JSON; skipping auto-provision."
-            echo "host=" >> $GITHUB_OUTPUT
-            exit 0
-          fi
->>>>>>> c8544fc (Backend: DAG->V2 fallback, robust Pinecone init, pinecone>=4; CI: gate Pinecone provisioning when PINECONE_HOST is set)
           if ! jq -e --arg n "$IDX" '.indexes // [] | map(.name) | index($n)' list.json >/dev/null; then
             echo "Creating Pinecone index $IDX"
             CODE=$(curl -sS -w "%{http_code}" -o create.json -X POST https://api.pinecone.io/indexes \
               -H "Api-Key: $PINECONE_API_KEY" -H "Content-Type: application/json" \
               -d "{\"name\":\"$IDX\",\"dimension\":384,\"metric\":\"cosine\",\"spec\":{\"serverless\":{\"cloud\":\"aws\",\"region\":\"us-east-1\"}}}" || true)
-<<<<<<< HEAD
-            sleep 5
-          fi
-
-          # Describe and output host (if available)
-          CODE=$(curl -sS -w "%{http_code}" -o desc.json -H "Api-Key: $PINECONE_API_KEY" https://api.pinecone.io/indexes/$IDX || true)
-          if [ "$CODE" = "200" ] && jq -e . desc.json >/dev/null 2>&1; then
-            echo "host=$(jq -r '.host // empty' desc.json)" >> $GITHUB_OUTPUT
-          else
-            echo "host=" >> $GITHUB_OUTPUT
-          fi
-=======
             if [ "$CODE" = "201" ] || [ "$CODE" = "200" ]; then
               sleep 5
-            else
-              echo "Create index HTTP $CODE; continuing without host."
             fi
           fi
           CODE=$(curl -sS -w "%{http_code}" -o desc.json -H "Api-Key: $PINECONE_API_KEY" https://api.pinecone.io/indexes/$IDX || true)
@@ -92,7 +61,6 @@ jobs:
           else
             echo "host=" >> $GITHUB_OUTPUT
           fi
->>>>>>> c8544fc (Backend: DAG->V2 fallback, robust Pinecone init, pinecone>=4; CI: gate Pinecone provisioning when PINECONE_HOST is set)
 
       - name: Enable Docker auth
         run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev -q
