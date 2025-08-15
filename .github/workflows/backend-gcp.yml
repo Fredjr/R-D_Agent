@@ -30,15 +30,20 @@ jobs:
           gcloud services enable run.googleapis.com artifactregistry.googleapis.com secretmanager.googleapis.com iamcredentials.googleapis.com -q
 
       - name: Ensure Pinecone index exists and get host
-        if: ${{ secrets.PINECONE_HOST == '' }}   # run ONLY when no host secret
         continue-on-error: true                  # do not fail the job if jq/API flake
         id: pinecone
         env:
           PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
           PINECONE_INDEX: ${{ secrets.PINECONE_INDEX }}
+          PINECONE_HOST: ${{ secrets.PINECONE_HOST }}
         run: |
           set -euo pipefail
           IDX="${PINECONE_INDEX:-rd-agent-memory}"
+          # If host already provided via secret, skip provisioning
+          if [ -n "${PINECONE_HOST:-}" ]; then
+            echo "host=${PINECONE_HOST}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
           # List indexes safely
           CODE=$(curl -sS -w "%{http_code}" -o list.json -H "Api-Key: $PINECONE_API_KEY" https://api.pinecone.io/indexes || true)
           if [ "$CODE" != "200" ] || ! jq -e . list.json >/dev/null 2>&1; then
