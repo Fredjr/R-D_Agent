@@ -548,6 +548,7 @@ def _build_dag_app():
                 PLAN_BUDGET_S,
                 "Plan"
             )
+            plan = _inject_molecule_into_plan(plan, getattr(request, "molecule", None))
             state["plan"] = plan or {}
             _log_node_event("Plan", t0, True, {"has_plan": bool(plan)})
             return state
@@ -825,6 +826,34 @@ Prior Context: {memories}
         "broad_query": broad_query,
         "web_query": web_query,
     }
+
+
+def _inject_molecule_into_plan(plan: dict, molecule: str | None) -> dict:
+    """Ensure molecule token is present in key queries for better specificity.
+
+    If a molecule is provided and a plan query lacks it, prefix a title/tiab clause.
+    Conservative so we do not over-filter; no change if molecule already present.
+    """
+    try:
+        mol = (molecule or "").strip()
+        if not mol or not isinstance(plan, dict):
+            return plan
+        def ensure(term: str) -> str:
+            q = str(plan.get(term) or "")
+            if not q:
+                return q
+            q_l = q.lower()
+            mol_l = mol.lower()
+            if mol_l in q_l:
+                return q
+            prefix = f'("{mol}"[tiab] OR "{mol}"[Title]) AND '
+            return f"{prefix}{q}"
+        for key in ("mechanism_query", "review_query", "broad_query"):
+            if key in plan:
+                plan[key] = ensure(key)
+        return plan
+    except Exception:
+        return plan
 
 def _harvest_pubmed(query: str, deadline: float) -> list[dict]:
     if _time_left(deadline) <= 0.5:
@@ -1140,6 +1169,7 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
     mem_txt = " | ".join(m.get("text", "")[:200] for m in memories) if memories else ""
     _t0 = _now_ms()
     plan = _build_query_plan(request.objective, mem_txt, deadline, getattr(request, "molecule", None))
+    plan = _inject_molecule_into_plan(plan, getattr(request, "molecule", None))
     plan_ms = _now_ms() - _t0
     if not plan:
         plan = {}
