@@ -712,6 +712,11 @@ def _build_dag_app():
                             sb.setdefault("impact_score", 0.0)
                 except Exception:
                     pass
+                # Ensure complete score_breakdown for UI
+                try:
+                    _ensure_score_breakdown(d.get("result", {}), request.objective, art.get("abstract") or art.get("summary") or "", top, None)
+                except Exception:
+                    pass
                 results_sections.append({
                     "query": (state.get("plan") or {}).get("mechanism_query") or (state.get("plan") or {}).get("review_query") or request.objective,
                     "result": d["result"],
@@ -782,6 +787,52 @@ def _ensure_relevance_fields(structured: Dict[str, object], molecule: str, objec
     structured["publication_score"] = round(_sanitize_number(structured.get("publication_score", 0.0), 0.0), 1)
     structured["overall_relevance_score"] = round(_sanitize_number(structured.get("overall_relevance_score", 0.0), 0.0), 1)
 
+
+def _ensure_score_breakdown(structured: Dict[str, object], objective: str, abstract: str, top_article: dict | None, contextual_match_score: float | None = None) -> None:
+    """Make sure score_breakdown has objective_similarity_score, recency_score, impact_score, and contextual_match_score.
+
+    Computes values if missing, using embeddings for similarity and article metadata for recency/impact.
+    """
+    try:
+        sb = structured.setdefault("score_breakdown", {})  # type: ignore
+        # Objective similarity (0-100)
+        if sb.get("objective_similarity_score") is None:
+            try:
+                obj_vec = np.array(EMBED_CACHE.get_or_compute(objective or ""), dtype=float)
+                abs_vec = np.array(EMBED_CACHE.get_or_compute(abstract or (top_article or {}).get("title") or ""), dtype=float)
+                sim_raw = float(np.dot(obj_vec, abs_vec) / ((np.linalg.norm(obj_vec) or 1.0) * (np.linalg.norm(abs_vec) or 1.0)))
+                sb["objective_similarity_score"] = round(max(0.0, min(100.0, ((sim_raw + 1.0) / 2.0) * 100.0)), 1)
+            except Exception:
+                sb["objective_similarity_score"] = 0.0
+        # Recency (0-100)
+        if sb.get("recency_score") is None:
+            try:
+                year = int((top_article or {}).get("pub_year") or 0)
+                nowy = datetime.utcnow().year
+                rec_norm = max(0.0, min(1.0, (year - 2015) / float((nowy - 2015 + 1)))) if year else 0.0
+                sb["recency_score"] = round(rec_norm * 100.0, 1)
+            except Exception:
+                sb["recency_score"] = 0.0
+        # Impact (0-100)
+        if sb.get("impact_score") is None:
+            try:
+                year = int((top_article or {}).get("pub_year") or 0)
+                cites = float((top_article or {}).get("citation_count") or 0.0)
+                cpy = (cites / max(1, (datetime.utcnow().year - year + 1))) if year else 0.0
+                sb["impact_score"] = round(max(0.0, min(100.0, (cpy / 100.0) * 100.0)), 1)
+            except Exception:
+                sb["impact_score"] = 0.0
+        # Contextual match (0-100)
+        if sb.get("contextual_match_score") is None:
+            sb["contextual_match_score"] = round(float(contextual_match_score or 0.0), 1)
+    except Exception:
+        # last-resort defaults
+        structured.setdefault("score_breakdown", {  # type: ignore
+            "objective_similarity_score": 0.0,
+            "recency_score": 0.0,
+            "impact_score": 0.0,
+            "contextual_match_score": float(contextual_match_score or 0.0),
+        })
 
 def _is_duplicate_section(top_article: dict | None, seen_pmids: set[str], seen_titles: set[str]) -> bool:
     if not top_article:
@@ -1180,6 +1231,8 @@ Abstract: {abstract}
         structured["score_breakdown"]["recency_score"] = round(recency_score, 1)
         structured["score_breakdown"]["impact_score"] = round(impact_score, 1)
         structured["score_breakdown"]["contextual_match_score"] = round(contextual_match_score, 1)
+        # Guaranteed population for UI
+        _ensure_score_breakdown(structured, objective, abstract, top_article_payload, contextual_match_score)
         structured["publication_score"] = round(pub_score, 1)
         structured["overall_relevance_score"] = round(overall, 1)
         # Specialist-tailored relevance justification
