@@ -452,6 +452,37 @@ class EmbeddingCache:
 EMBED_CACHE = EmbeddingCache()
 
 
+def _fallback_fact_anchors(abstract: str, art: dict, max_items: int = 3) -> list[dict]:
+    """Generate simple fact anchors from the abstract when the LLM did not.
+
+    Takes the first few substantive sentences as claims and attaches evidence
+    (title/year/pmid/quote). This guarantees UI rendering even on LLM miss.
+    """
+    try:
+        text = (abstract or "").strip()
+        if not text:
+            return []
+        # Split into sentences conservatively
+        parts: list[str] = []
+        for seg in re.split(r"(?<=[\.!?])\s+|\n+", text):
+            s = seg.strip()
+            if len(s) >= 40:  # discard very short fragments
+                parts.append(s)
+        claims = parts[:max_items] if parts else [(text[:200] + ("…" if len(text) > 200 else ""))]
+        anchors: list[dict] = []
+        for c in claims:
+            ev = {
+                "title": art.get("title"),
+                "year": art.get("pub_year"),
+                "pmid": art.get("pmid"),
+                "quote": c[:240],
+            }
+            anchors.append({"claim": c, "evidence": ev})
+        return anchors[:max_items]
+    except Exception:
+        return []
+
+
 def _lightweight_entailment_filter(abstract: str, fact_anchors: list[dict]) -> list[dict]:
     """Heuristic entailment: keep anchors whose claim tokens or evidence quote occur in abstract.
     Lightweight, no extra model calls.
@@ -1030,7 +1061,7 @@ Abstract: {abstract}
             grounded_text = grounded.get("text", grounded) if isinstance(grounded, dict) else str(grounded)
             structured = ensure_json_response(grounded_text)
             structured = _validate_or_repair_summary(structured, objective, abstract)
-            # Attach evidence to fact anchors if missing
+            # Attach evidence to fact anchors if missing; fallback-generate if absent
             try:
                 if isinstance(structured.get("fact_anchors"), list):
                     for fa in structured["fact_anchors"]:
@@ -1046,6 +1077,11 @@ Abstract: {abstract}
                                 fa["evidence"] = ev
                     # entailment filter (NLI if enabled, else lightweight)
                     structured["fact_anchors"] = _nli_entailment_filter(abstract, structured["fact_anchors"], deadline)  # type: ignore
+                else:
+                    # Fallback: synthesize simple anchors from abstract
+                    fa_fb = _fallback_fact_anchors(abstract, art, max_items=3)
+                    if fa_fb:
+                        structured["fact_anchors"] = _lightweight_entailment_filter(abstract, fa_fb)
             except Exception:
                 pass
         except Exception:
