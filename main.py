@@ -534,6 +534,46 @@ def _expand_molecule_synonyms(molecule: str, limit: int = 6) -> list[str]:
         pass
     return out[:limit]
 
+
+# ---------------------
+# Per-corpus planners (PubMed / Trials / Web / Patents)
+# ---------------------
+
+def _plan_pubmed_queries(molecule: str, synonyms: list[str], objective: str) -> dict:
+    mol = _sanitize_molecule_name(molecule)
+    tokens_tiab = "(" + " OR ".join([f'"{t}"[tiab]' for t in ([mol] + synonyms) if t]) + ")" if mol else ""
+    tokens_title = "(" + " OR ".join([f'"{t}"[Title]' for t in ([mol] + synonyms) if t]) + ")" if mol else ""
+    # Review focus
+    review_query = (
+        f'(({tokens_tiab} OR {tokens_title}) AND ' if mol else "("
+    ) + f'(review[pt] OR systematic[sb]) AND (2015:3000[dp]))'
+    # Mechanism focus
+    mech_query = (
+        f'(({tokens_tiab} OR {tokens_title}) AND ' if mol else "("
+    ) + '("mechanism"[tiab] OR "mechanism of action"[tiab] OR "signaling"[tiab] OR "pathway"[tiab]))'
+    # Broader mechanism with common lexicon
+    broad_query = f'{(" ".join(([mol] + synonyms)).strip() + " "+objective).strip()} mechanism pathway signaling'
+    return {
+        "review_query": review_query,
+        "mechanism_query": mech_query,
+        "broad_query": broad_query,
+    }
+
+def _plan_trials_query(molecule: str, synonyms: list[str], objective: str) -> str:
+    # ClinicalTrials.gov is accessed via a separate endpoint; we build a simple textual expression
+    base = _sanitize_molecule_name(molecule)
+    combo = " ".join(([base] + synonyms)).strip() or objective.strip()
+    return f"{combo} type 2 diabetes OR human OR randomized"
+
+def _plan_web_query(molecule: str, synonyms: list[str], objective: str) -> str:
+    combo = (" ".join(([molecule] + synonyms)).strip() + " " + objective).strip()
+    # Prefer mechanistic PDFs on reputable domains
+    return f'{combo} mechanism site:nih.gov OR site:nature.com OR site:nejm.org filetype:pdf'
+
+def _plan_patents_query(molecule: str, synonyms: list[str], objective: str) -> str:
+    combo = (" ".join(([molecule] + synonyms)).strip() + " " + objective).strip()
+    return f'{combo} formulation OR delivery OR analog patents'
+
 def _lightweight_entailment_filter(abstract: str, fact_anchors: list[dict]) -> list[dict]:
     """Heuristic entailment: keep anchors whose claim tokens or evidence quote occur in abstract.
     Lightweight, no extra model calls.
@@ -956,23 +996,15 @@ Prior Context: {memories}
     obj = objective.strip()
     mol = _sanitize_molecule_name(molecule or "")
     synonyms = _expand_molecule_synonyms(mol) if mol else []
-    mol_tiab = "(" + " OR ".join([f'"{t}"[tiab]' for t in ([mol] + synonyms) if t]) + ")" if mol else ""
-    mol_title = "(" + " OR ".join([f'"{t}"[Title]' for t in ([mol] + synonyms) if t]) + ")" if mol else ""
-    focus = f'"{mol}"[tiab] AND ' if mol else ''
-    review_query = (
-        f'(({mol_tiab} OR {mol_title}) AND ' if mol else "(" 
-    ) + f'"{obj}"[tiab] AND (review[pt] OR systematic[sb]) AND (2015:3000[dp]))'
-    mechanism_query = (
-        f'(({mol_tiab} OR {mol_title}) AND ' if mol else "(" 
-    ) + f'("mechanism"[tiab] OR "mechanism of action"[tiab] OR "signaling"[tiab] OR "pathway"[tiab]))'
-    clinical_query = f'(({mol or obj}) AND (randomized OR clinical trial OR phase))'
-    broad_query = f'{(" ".join(([mol] + synonyms)).strip() + " "+obj).strip()} mechanism pathway signaling'
-    web_query = f'{(" ".join(([mol] + synonyms)).strip() + " "+obj).strip()} mechanism site:nih.gov OR site:nature.com filetype:pdf'
+    # Per-corpus
+    pubmed = _plan_pubmed_queries(mol, synonyms, obj)
+    clinical_query = _plan_trials_query(mol, synonyms, obj)
+    web_query = _plan_web_query(mol, synonyms, obj)
     return {
-        "review_query": review_query,
-        "mechanism_query": mechanism_query,
+        "review_query": pubmed["review_query"],
+        "mechanism_query": pubmed["mechanism_query"],
         "clinical_query": clinical_query,
-        "broad_query": broad_query,
+        "broad_query": pubmed["broad_query"],
         "web_query": web_query,
     }
 
