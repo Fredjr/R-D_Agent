@@ -12,6 +12,8 @@ export default function ArticleCard({ item }: Props) {
   const relevanceJustification = (item.result as any).relevance_justification as string | undefined;
   const specialistTags = Array.isArray((item.result as any).specialist_tags) ? (item.result as any).specialist_tags as string[] : [];
 
+  const [expandSummary, setExpandSummary] = React.useState(false);
+  const [expandAnchors, setExpandAnchors] = React.useState(false);
   return (
     <article className="bg-white border border-gray-200 rounded-lg shadow-sm p-6 flex flex-col gap-4">
       <header className="flex items-start justify-between gap-4">
@@ -53,7 +55,14 @@ export default function ArticleCard({ item }: Props) {
               ))}
             </div>
           ) : null}
-          <p className="mt-2 text-gray-700 leading-relaxed">{summary}</p>
+          <div className="mt-2 text-gray-700 leading-relaxed">
+            <p className={expandSummary ? '' : 'line-clamp-4'}>{summary}</p>
+            {summary && summary.length > 280 && (
+              <button onClick={() => setExpandSummary(!expandSummary)} className="mt-1 text-xs text-indigo-600 hover:underline">
+                {expandSummary ? 'Show less' : 'Show more'}
+              </button>
+            )}
+          </div>
           {typeof (item as any).memories_used === 'number' && (item as any).memories_used > 0 ? (
             <div className="mt-2 text-xs text-slate-600" title="Previous relevant context informed this result">
               Memories used: {(item as any).memories_used}
@@ -68,16 +77,21 @@ export default function ArticleCard({ item }: Props) {
           {Array.isArray(factAnchors) && factAnchors.length ? (
             <div className="mt-3 p-3 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-900">
               <strong className="block text-sm uppercase tracking-wide mb-1">Fact Anchors</strong>
-              <ul className="list-disc list-inside text-sm space-y-1">
-                {factAnchors.slice(0,5).map((fa, i) => (
+              <ul className={`list-disc list-inside text-sm space-y-1 ${expandAnchors ? '' : ''}`}>
+                {(expandAnchors ? factAnchors : factAnchors.slice(0,5)).map((fa, i) => (
                   <li key={i}>
                     <span className="font-medium">{fa.claim}</span>
                     {fa.evidence ? (
-                      <span className="ml-2 text-xs text-emerald-800">[{fa.evidence.title} {fa.evidence.year}{fa.evidence.pmid ? ` · PMID ${fa.evidence.pmid}` : ''}] “{fa.evidence.quote?.slice(0,120)}{(fa.evidence.quote?.length||0)>120?'…':''}”</span>
+                      <span className="ml-2 text-xs text-emerald-800">[{fa.evidence.title} {fa.evidence.year}{fa.evidence.pmid ? ` · PMID ${fa.evidence.pmid}` : ''}] “{expandAnchors ? fa.evidence.quote : `${fa.evidence.quote?.slice(0,120)}${(fa.evidence.quote?.length||0)>120?'…':''}`}”</span>
                     ) : null}
                   </li>
                 ))}
               </ul>
+              {factAnchors.length > 5 && (
+                <button onClick={() => setExpandAnchors(!expandAnchors)} className="mt-2 text-xs text-emerald-700 hover:underline">
+                  {expandAnchors ? 'Show fewer' : `Show all (${factAnchors.length})`}
+                </button>
+              )}
             </div>
           ) : null}
           {/* Relevance Scorecard */}
