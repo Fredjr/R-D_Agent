@@ -1109,6 +1109,17 @@ def _triage_rank(objective: str, candidates: list[dict], max_keep: int) -> list[
     def score_one(a: dict) -> float:
         text = f"{a.get('title','')} {a.get('abstract','')}`".lower()
         mech_hits = sum(1 for kw in ["mechanism", "pathway", "inhibit", "agonist", "antagonist"] if kw in text)
+        # Domain filter (demotions) and context boosts
+        social_terms = [
+            "social media", "pharmacovigilance", "aesthetic", "plastic", "marketing", "influencer",
+            "twitter", "reddit", "tiktok", "instagram"
+        ]
+        glp1_lexicon = [
+            "glp-1", "glp1", "glp-1r", "glp1r", "incretin", "semaglutide", "liraglutide", "exenatide",
+            "beta-cell", "c-amp", "camp", "pka", "gastric emptying", "insulin secretion"
+        ]
+        objective_l = (objective or "").lower()
+        is_glp1_context = any(k in objective_l for k in ["glp-1", "glp1", "semaglutide", "incretin", "type 2 diabetes", "t2d"]) 
         # cosine
         try:
             if objective_vec is not None:
@@ -1125,6 +1136,12 @@ def _triage_rank(objective: str, candidates: list[dict], max_keep: int) -> list[
         cites = float(a.get('citation_count') or 0.0)
         cpy = cites / max(1, (nowy - year + 1)) if year else 0.0
         score = 0.5 * similarity + 0.2 * (min(mech_hits, 5) / 5.0) + 0.2 * (cpy / 100.0) + 0.1 * recency
+        # Demote social/aesthetic drift
+        if any(term in text for term in social_terms):
+            score -= 0.2
+        # Boost GLP-1 mechanistic context
+        if is_glp1_context and any(term in text for term in glp1_lexicon):
+            score += 0.1
         return score
     for a in candidates:
         try:
