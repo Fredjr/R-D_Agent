@@ -483,6 +483,57 @@ def _fallback_fact_anchors(abstract: str, art: dict, max_items: int = 3) -> list
         return []
 
 
+def _sanitize_molecule_name(molecule: str) -> str:
+    """Normalize molecule for query planning: strip parentheses content and extra symbols, keep hyphens.
+
+    Examples: "Pembrolizumab (Keytruda)" -> "Pembrolizumab Keytruda"
+    """
+    try:
+        t = (molecule or "").strip()
+        if not t:
+            return ""
+        # Remove parenthetical content
+        t = re.sub(r"\([^)]*\)", " ", t)
+        # Keep letters, numbers, hyphen, spaces
+        t = re.sub(r"[^\w\-\s]", " ", t)
+        # Collapse whitespace
+        t = re.sub(r"\s+", " ", t).strip()
+        return t
+    except Exception:
+        return molecule or ""
+
+
+def _expand_molecule_synonyms(molecule: str, limit: int = 6) -> list[str]:
+    """Collect a small set of synonyms (PubChem + CHEMBL), dedup, short list."""
+    base = _sanitize_molecule_name(molecule)
+    seen: set[str] = set()
+    out: list[str] = []
+    def _add(s: str):
+        ss = (s or "").strip()
+        if not ss:
+            return
+        if ss.lower() in seen:
+            return
+        seen.add(ss.lower())
+        out.append(ss)
+    _add(base)
+    try:
+        for s in _fetch_pubchem_synonyms(base)[:limit*2]:
+            _add(_sanitize_molecule_name(s))
+            if len(out) >= limit:
+                break
+    except Exception:
+        pass
+    try:
+        if len(out) < limit:
+            for s in _fetch_chembl_synonyms(base)[:limit*2]:
+                _add(_sanitize_molecule_name(s))
+                if len(out) >= limit:
+                    break
+    except Exception:
+        pass
+    return out[:limit]
+
 def _lightweight_entailment_filter(abstract: str, fact_anchors: list[dict]) -> list[dict]:
     """Heuristic entailment: keep anchors whose claim tokens or evidence quote occur in abstract.
     Lightweight, no extra model calls.
@@ -682,6 +733,15 @@ def _build_dag_app():
                 # Backfill score_breakdown if DAG deep-dive result is missing components
                 try:
                     res = d.get("result") or {}
+                    # Guarantee fact_anchors exist for UI
+                    try:
+                        fa = res.get("fact_anchors")
+                        if not (isinstance(fa, list) and len(fa) > 0):
+                            fa_fb = _fallback_fact_anchors(art.get("abstract") or art.get("summary") or "", art, max_items=3)
+                            if fa_fb:
+                                res["fact_anchors"] = _lightweight_entailment_filter(art.get("abstract") or art.get("summary") or "", fa_fb)
+                    except Exception:
+                        pass
                     sb = res.setdefault("score_breakdown", {})
                     if ("objective_similarity_score" not in sb) or ("recency_score" not in sb) or ("impact_score" not in sb):
                         objective = state["request"].objective
@@ -894,13 +954,20 @@ Prior Context: {memories}
         pass
     # Fallback: construct reasonable defaults
     obj = objective.strip()
-    mol = (molecule or "").strip()
+    mol = _sanitize_molecule_name(molecule or "")
+    synonyms = _expand_molecule_synonyms(mol) if mol else []
+    mol_tiab = "(" + " OR ".join([f'"{t}"[tiab]' for t in ([mol] + synonyms) if t]) + ")" if mol else ""
+    mol_title = "(" + " OR ".join([f'"{t}"[Title]' for t in ([mol] + synonyms) if t]) + ")" if mol else ""
     focus = f'"{mol}"[tiab] AND ' if mol else ''
-    review_query = f'({focus}"{obj}"[tiab] AND (review[pt] OR systematic[sb]) AND (2015:3000[dp]))'
-    mechanism_query = f'({focus}"{obj}"[tiab] AND (mechanism[tiab] OR "mechanism of action"[tiab]))'
+    review_query = (
+        f'(({mol_tiab} OR {mol_title}) AND ' if mol else "(" 
+    ) + f'"{obj}"[tiab] AND (review[pt] OR systematic[sb]) AND (2015:3000[dp]))'
+    mechanism_query = (
+        f'(({mol_tiab} OR {mol_title}) AND ' if mol else "(" 
+    ) + f'("mechanism"[tiab] OR "mechanism of action"[tiab] OR "signaling"[tiab] OR "pathway"[tiab]))'
     clinical_query = f'(({mol or obj}) AND (randomized OR clinical trial OR phase))'
-    broad_query = f'{(mol+" "+obj).strip()} mechanism pathway signaling'
-    web_query = f'{(mol+" "+obj).strip()} mechanism site:nih.gov OR site:nature.com filetype:pdf'
+    broad_query = f'{(" ".join(([mol] + synonyms)).strip() + " "+obj).strip()} mechanism pathway signaling'
+    web_query = f'{(" ".join(([mol] + synonyms)).strip() + " "+obj).strip()} mechanism site:nih.gov OR site:nature.com filetype:pdf'
     return {
         "review_query": review_query,
         "mechanism_query": mechanism_query,
