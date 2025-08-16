@@ -293,6 +293,7 @@ ENTAILMENT_BUDGET_S = float(os.getenv("ENTAILMENT_BUDGET_S", "2.5"))
 PUBMED_POOL_MAX = int(os.getenv("PUBMED_POOL_MAX", "50"))
 TRIALS_POOL_MAX = int(os.getenv("TRIALS_POOL_MAX", "50"))
 PATENTS_POOL_MAX = int(os.getenv("PATENTS_POOL_MAX", "50"))
+ADAPTIVE_PROJECT_BLEND = float(os.getenv("ADAPTIVE_PROJECT_BLEND", "0.2"))
 
 # Metrics (simple in-memory counters)
 _METRICS_LOCK = threading.Lock()
@@ -560,15 +561,16 @@ def _plan_pubmed_queries(molecule: str, synonyms: list[str], objective: str) -> 
     }
 
 def _plan_trials_query(molecule: str, synonyms: list[str], objective: str) -> str:
-    # ClinicalTrials.gov is accessed via a separate endpoint; we build a simple textual expression
+    # ClinicalTrials.gov is accessed via a separate endpoint; simple textual expression
     base = _sanitize_molecule_name(molecule)
     combo = " ".join(([base] + synonyms)).strip() or objective.strip()
-    return f"{combo} type 2 diabetes OR human OR randomized"
+    return f"{combo} randomized OR human OR type 2 diabetes"
 
 def _plan_web_query(molecule: str, synonyms: list[str], objective: str) -> str:
     combo = (" ".join(([molecule] + synonyms)).strip() + " " + objective).strip()
     # Prefer mechanistic PDFs on reputable domains
-    return f'{combo} mechanism site:nih.gov OR site:nature.com OR site:nejm.org filetype:pdf'
+    wl = ["nih.gov", "nature.com", "nejm.org", "lancet.com", "sciencedirect.com", "springer.com"]
+    return f"{combo} mechanism (" + " OR ".join([f'site:{d}' for d in wl]) + ") filetype:pdf"
 
 def _plan_patents_query(molecule: str, synonyms: list[str], objective: str) -> str:
     combo = (" ".join(([molecule] + synonyms)).strip() + " " + objective).strip()
@@ -1102,6 +1104,7 @@ def _normalize_candidates(items: list[dict]) -> list[dict]:
     norm: list[dict] = []
     seen_titles: set[str] = set()
     seen_pmids: set[str] = set()
+    title_vecs: dict[str, np.ndarray] = {}
     for a in items:
         try:
             title = (a.get("title") or "").strip()
@@ -1115,6 +1118,22 @@ def _normalize_candidates(items: list[dict]) -> list[dict]:
                 seen_pmids.add(pmid)
             if key_title in seen_titles:
                 continue
+            # Near-dup clustering by title embedding cosine
+            try:
+                tvec = np.array(EMBED_CACHE.get_or_compute(title), dtype=float)
+                dup = False
+                for k, v in list(title_vecs.items())[:128]:  # limit comparisons
+                    denom = (np.linalg.norm(v) or 1.0) * (np.linalg.norm(tvec) or 1.0)
+                    if denom:
+                        cs = float(np.dot(v, tvec) / denom)
+                        if cs >= 0.95:  # very similar titles
+                            dup = True
+                            break
+                if dup:
+                    continue
+                title_vecs[key_title] = tvec
+            except Exception:
+                pass
             seen_titles.add(key_title)
             year = int(a.get("pub_year") or 0)
             norm.append({
@@ -1130,7 +1149,7 @@ def _normalize_candidates(items: list[dict]) -> list[dict]:
             continue
     return norm
 
-def _triage_rank(objective: str, candidates: list[dict], max_keep: int) -> list[dict]:
+def _triage_rank(objective: str, candidates: list[dict], max_keep: int, project_vec: np.ndarray | None = None) -> list[dict]:
     # Use existing _score_article-like features; reuse embeddings cosine
     try:
         objective_vec = np.array(EMBED_CACHE.get_or_compute(objective or ""), dtype=float)
@@ -1162,6 +1181,17 @@ def _triage_rank(objective: str, candidates: list[dict], max_keep: int) -> list[
                 similarity = 0.0
         except Exception:
             similarity = 0.0
+        # Adaptive project blend (if available)
+        if project_vec is not None:
+            try:
+                pv = project_vec
+                pv_norm = float(np.linalg.norm(pv)) or 1.0
+                abs_vec2 = np.array(EMBED_CACHE.get_or_compute(a.get('abstract') or a.get('title') or ""), dtype=float)
+                sim2 = float(np.dot(pv, abs_vec2) / (pv_norm * (np.linalg.norm(abs_vec2) or 1.0)))
+                sim2_mapped = max(0.0, min(1.0, (sim2 + 1.0) / 2.0))
+                similarity = (1.0 - ADAPTIVE_PROJECT_BLEND) * similarity + ADAPTIVE_PROJECT_BLEND * sim2_mapped
+            except Exception:
+                pass
         year = int(a.get('pub_year') or 0)
         nowy = datetime.utcnow().year
         recency = max(0.0, min(1.0, (year - 2015) / (nowy - 2015 + 1))) if year else 0.0
@@ -1423,7 +1453,8 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
     triage_cap = min(TRIAGE_TOP_K, 20)
     if _time_left(deadline) < 15.0:
         triage_cap = min(triage_cap, 16)
-    shortlist = _triage_rank(request.objective, norm, triage_cap)
+    proj_vec = _project_interest_vector(memories)
+    shortlist = _triage_rank(request.objective, norm, triage_cap, proj_vec)
     deep_cap = DEEPDIVE_TOP_K if _time_left(deadline) > 18.0 else min(DEEPDIVE_TOP_K, 5)
     top_k = shortlist[:deep_cap]
     triage_ms = _now_ms() - _t0
@@ -1957,6 +1988,29 @@ def _retrieve_memories(project_id: str | None, objective: str) -> list[dict]:
             time.sleep(0.2 * (attempt + 1))
     return []
 
+def _project_interest_vector(memories: list[dict]) -> np.ndarray | None:
+    """Compute a simple interest vector from project memories (mean embedding)."""
+    if not memories:
+        return None
+    vecs: list[np.ndarray] = []
+    for m in memories:
+        txt = (m.get("text") or "").strip()
+        if not txt:
+            continue
+        try:
+            v = np.array(EMBED_CACHE.get_or_compute(txt), dtype=float)
+            if v.size:
+                vecs.append(v)
+        except Exception:
+            continue
+    if not vecs:
+        return None
+    try:
+        mean = np.mean(vecs, axis=0)
+        return mean
+    except Exception:
+        return None
+
 def _fetch_pubchem_synonyms(name: str) -> list[str]:
     key = f"syn:{name.strip().lower()}"
     if ENABLE_CACHING:
@@ -2234,33 +2288,29 @@ Objective: {objective}
         # Build PubMed eUtils-friendly fielded clauses
         mol_tokens = [request.molecule] + (synonyms or [])
         mol_clause_tiab = "(" + " OR ".join([f'"{t}"[tiab]' for t in mol_tokens if t]) + ")"
-        mech_clause_tiab = f'("{mech_term}"[tiab] OR mechanism[tiab])'
-        # (<molecule>[tiab] AND (<mechanism>[tiab] OR mechanism[tiab])) AND (review OR systematic) AND date filter
-        forced_query = (
-            f"({mol_clause_tiab} AND {mech_clause_tiab}) AND (review[pt] OR systematic[sb]) AND (2015:3000[dp])"
-        )
-        # Clinical mode filters
+        # Review query (simple, valid)
+        review_query = f"({mol_clause_tiab} AND (review[pt] OR systematic[sb]) AND (2015:3000[dp]))"
         if getattr(request, "clinical_mode", False):
-            forced_query += " AND humans[mesh] NOT plants[mesh] NOT fungi[mesh]"
-        # Title-biased precision query using [Title]
+            review_query += " AND humans[mesh] NOT plants[mesh] NOT fungi[mesh]"
+        # Mechanism lexicon; split into simpler queries
+        mech_lex = [mech_term, "mechanism of action", "mechanism", "signaling", "pathway"]
+        # If GLP-1 context, enrich
+        obj_l = (request.objective or "").lower()
+        if any(k in obj_l for k in ["glp-1", "glp1", "semaglutide", "incretin"]):
+            mech_lex += ["glp-1 receptor", "cAMP", "PKA", "insulin secretion", "gastric emptying", "beta-cell"]
+        mech_queries = []
+        for term in mech_lex[:6]:
+            q = f"({mol_clause_tiab} AND \"{term}\"[tiab])"
+            if getattr(request, "clinical_mode", False):
+                q += " AND humans[mesh] NOT plants[mesh] NOT fungi[mesh]"
+            mech_queries.append(q)
+        # Title-biased precision query
         mol_clause_title = "(" + " OR ".join([f'"{t}"[Title]' for t in mol_tokens if t]) + ")"
-        mech_clause_title = f'("{mech_term}"[Title] OR mechanism[Title])'
-        title_query = f"({mol_clause_title} AND {mech_clause_title})"
+        title_query = f"({mol_clause_title} AND (\"{mech_term}\"[Title] OR mechanism[Title]))"
         if getattr(request, "clinical_mode", False):
             title_query += " AND humans[mesh] NOT plants[mesh] NOT fungi[mesh]"
-        # Negative keyword pruning only in clinical mode (to avoid over-filtering)
-        neg_terms = ["formulation", "assay", "analytical", "sers", "raman"] if getattr(request, "clinical_mode", False) else []
-        if neg_terms:
-            title_query += " " + " ".join([f"NOT {t}[tiab]" for t in neg_terms])
-            forced_query += " " + " ".join([f"NOT {t}[tiab]" for t in neg_terms])
-        queries = [forced_query, title_query]
-        # Prepare a broader mechanistic primary query for conditional use later
-        broad_mech_tiab = "(" + " OR ".join([
-            'mechanism[tiab]', '"mechanism of action"[tiab]', 'signaling[tiab]', 'pathway[tiab]'
-        ]) + ")"
-        conditional_broad_query = f"({mol_clause_tiab} AND {broad_mech_tiab}) AND (2000:3000[dp])"
-        if getattr(request, "clinical_mode", False):
-            conditional_broad_query += " AND humans[mesh] NOT plants[mesh] NOT fungi[mesh]"
+        # Assembled
+        queries = [review_query, title_query] + mech_queries[:3]
     else:
         # Fall back to objective-only variants when molecule missing
         base = (request.objective or "").strip()
