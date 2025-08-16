@@ -10,3 +10,4 @@ sentence-transformers
 jsonschema
 langgraph
 langchain-huggingface
+sentence-transformers==2.2.2
