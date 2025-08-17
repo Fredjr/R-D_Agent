@@ -27,7 +27,7 @@ class PubMedSearchTool(BaseTool):
         try:
             # Step 1: Search for articles and get PMIDs
             search_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
-            retmax = int(os.getenv("PUBMED_RETMAX", "12"))
+            retmax = int(os.getenv("PUBMED_RETMAX", "25"))
             search_params = {
                 "db": "pubmed",
                 "term": query,
