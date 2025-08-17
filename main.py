@@ -795,6 +795,13 @@ def _build_dag_app():
         t0 = _now_ms()
         try:
             norm = _normalize_candidates(state.get("arts") or [])
+            # Prefer items mentioning the molecule when provided
+            try:
+                mol = getattr(state.get("request"), "molecule", None)
+            except Exception:
+                mol = None
+            if mol:
+                norm = _filter_by_molecule(norm, mol)
             request = state["request"]
             time_left = _time_left(state["deadline"])
             sc_cap, deep_pref = _compute_controller_caps(getattr(request, "preference", "precision"), len(norm), time_left)
@@ -915,8 +922,10 @@ def _build_dag_app():
                     })
                 except Exception:
                     pass
+                _plan = (state.get("plan") or {})
+                _q = art.get("source_query") or _plan.get("mechanism_query") or _plan.get("review_query") or request.objective,
                 results_sections.append({
-                    "query": (state.get("plan") or {}).get("mechanism_query") or (state.get("plan") or {}).get("review_query") or request.objective,
+                    "query": _q,
                     "result": d["result"],
                     "articles": [art],
                     "top_article": top,
@@ -1183,7 +1192,13 @@ def _harvest_pubmed(query: str, deadline: float) -> list[dict]:
         raw = tool._run(query)
         import json as _json
         arts = _json.loads(raw) if isinstance(raw, str) else (raw or [])
-        return arts if isinstance(arts, list) else []
+        if isinstance(arts, list):
+            # Annotate with source query for transparency/debugging
+            for a in arts:
+                if isinstance(a, dict):
+                    a["source_query"] = query
+            return arts
+        return []
     except Exception:
         return []
 
@@ -1232,6 +1247,7 @@ def _harvest_trials(query: str, deadline: float) -> list[dict]:
                 "nct_id": nct,
                 "source": "clinicaltrials",
                 "phase": phase,
+                "source_query": query,
             })
         return out
     except Exception:
@@ -1281,10 +1297,34 @@ def _normalize_candidates(items: list[dict]) -> list[dict]:
                 "url": a.get("url") or "",
                 "citation_count": int(a.get("citation_count") or 0),
                 "source": a.get("source") or ("pubmed" if pmid else "unknown"),
+                "source_query": a.get("source_query") or "",
             })
         except Exception:
             continue
     return norm
+
+
+def _filter_by_molecule(candidates: list[dict], molecule: str | None) -> list[dict]:
+    """Prefer candidates that mention the molecule or a synonym.
+    If filtering would drop everything, return the original candidates.
+    """
+    mol = (molecule or "").strip()
+    if not mol:
+        return candidates
+    try:
+        synonyms = _expand_molecule_synonyms(mol)
+    except Exception:
+        synonyms = []
+    tokens = [t.lower() for t in ([mol] + synonyms) if t]
+    filtered: list[dict] = []
+    for a in candidates:
+        try:
+            text = f"{a.get('title','')} {a.get('abstract','')}".lower()
+            if any(tok in text for tok in tokens):
+                filtered.append(a)
+        except Exception:
+            continue
+    return filtered if filtered else candidates
 
 def _triage_rank(objective: str, candidates: list[dict], max_keep: int, project_vec: np.ndarray | None = None) -> list[dict]:
     # Use existing _score_article-like features; reuse embeddings cosine
@@ -1349,6 +1389,34 @@ def _triage_rank(objective: str, candidates: list[dict], max_keep: int, project_
             a["score"] = 0.0
     ranked = sorted(candidates, key=lambda x: x.get("score", 0.0), reverse=True)
     return ranked[:max_keep]
+
+
+def _filter_candidates_by_molecule(candidates: list[dict], molecule: str | None, minimum_keep: int = 6) -> list[dict]:
+    """If a molecule is specified, prefer items that explicitly mention the molecule or a synonym
+    in the title or abstract. Always keep at least `minimum_keep` to avoid over-filtering."""
+    mol = _sanitize_molecule_name(molecule or "").strip()
+    if not mol:
+        return candidates
+    try:
+        synonyms = _expand_molecule_synonyms(mol, limit=6)
+    except Exception:
+        synonyms = [mol]
+    tokens = [t.lower() for t in ([mol] + (synonyms or [])) if t]
+    hits: list[dict] = []
+    non_hits: list[dict] = []
+    for a in candidates:
+        try:
+            txt = f"{a.get('title','')} {a.get('abstract','')}".lower()
+            if any(tok in txt for tok in tokens):
+                hits.append(a)
+            else:
+                non_hits.append(a)
+        except Exception:
+            non_hits.append(a)
+    if len(hits) >= minimum_keep:
+        return hits + non_hits[: max(0, minimum_keep - len(hits))]
+    # If too few explicit hits, keep all hits and top-up with non-hits
+    return hits + non_hits[: max(0, minimum_keep - len(hits))]
 
 async def _deep_dive_articles(objective: str, items: list[dict], memories: list[dict], deadline: float) -> list[dict]:
     # Extraction, summarization, justification
@@ -1586,6 +1654,13 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
     # Normalize and triage
     _t0 = _now_ms()
     norm = _normalize_candidates(arts)
+    # Prefer items mentioning the molecule when provided
+    try:
+        mol = getattr(request, "molecule", None)
+    except Exception:
+        mol = None
+    if mol:
+        norm = _filter_by_molecule(norm, mol)
     # Time-aware caps
     triage_cap = min(TRIAGE_TOP_K, 50)
     if _time_left(deadline) < 15.0:
@@ -1623,8 +1698,9 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
         if _is_duplicate_section(top, seen_pmids, seen_titles):
             continue
         _mark_seen(top, seen_pmids, seen_titles)
+        _q = art.get("source_query") or plan.get("mechanism_query") or plan.get("review_query") or request.objective
         results_sections.append({
-            "query": plan.get("mechanism_query") or plan.get("review_query") or request.objective,
+            "query": _q,
             "result": d["result"],
             "articles": [art],
             "top_article": top,
