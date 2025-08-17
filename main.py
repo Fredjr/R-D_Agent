@@ -294,6 +294,8 @@ PUBMED_POOL_MAX = int(os.getenv("PUBMED_POOL_MAX", "50"))
 TRIALS_POOL_MAX = int(os.getenv("TRIALS_POOL_MAX", "50"))
 PATENTS_POOL_MAX = int(os.getenv("PATENTS_POOL_MAX", "50"))
 ADAPTIVE_PROJECT_BLEND = float(os.getenv("ADAPTIVE_PROJECT_BLEND", "0.2"))
+APP_VERSION = os.getenv("APP_VERSION", "v0.1.0")
+GIT_SHA = os.getenv("GIT_SHA", "")
 
 # Metrics (simple in-memory counters)
 _METRICS_LOCK = threading.Lock()
@@ -306,6 +308,10 @@ METRICS = {
     "review_fallback_sections_total": 0,
     "response_cached_hits": 0,
     "latency_ms_sum": 0,
+    "anchors_entailment_kept": 0,
+    "anchors_entailment_filtered": 0,
+    "controller_precision_deep": 0,
+    "controller_recall_deep": 0,
 }
 
 def _metrics_inc(key: str, amount: int = 1):
@@ -622,6 +628,11 @@ def _nli_entailment_filter(abstract: str, fact_anchors: list[dict], deadline: fl
                 score = 0.0
             if score >= float(os.getenv("ENTAILMENT_KEEP_THRESHOLD", "0.5")):
                 kept.append(fa)
+        try:
+            _metrics_inc("anchors_entailment_kept", len(kept))
+            _metrics_inc("anchors_entailment_filtered", max(0, len(fact_anchors) - len(kept)))
+        except Exception:
+            pass
         return kept[:5] if kept else _lightweight_entailment_filter(abstract, fact_anchors)
     except Exception:
         return _lightweight_entailment_filter(abstract, fact_anchors)
@@ -1501,12 +1512,25 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
     _t0 = _now_ms()
     norm = _normalize_candidates(arts)
     # Time-aware caps
-    triage_cap = min(TRIAGE_TOP_K, 20)
+    triage_cap = min(TRIAGE_TOP_K, 50)
     if _time_left(deadline) < 15.0:
-        triage_cap = min(triage_cap, 16)
+        triage_cap = min(triage_cap, 24)
     proj_vec = _project_interest_vector(memories)
     shortlist = _triage_rank(request.objective, norm, triage_cap, proj_vec)
-    deep_cap = DEEPDIVE_TOP_K if _time_left(deadline) > 18.0 else min(DEEPDIVE_TOP_K, 5)
+    # Controller for deep dive cap
+    try:
+        pref = str(getattr(request, "preference", "precision") or "precision").lower()
+    except Exception:
+        pref = "precision"
+    desired = 13 if pref == "recall" else 8
+    deep_cap = min(len(shortlist), max(DEEPDIVE_TOP_K, desired))
+    try:
+        if pref == "precision":
+            _metrics_inc("controller_precision_deep", deep_cap)
+        else:
+            _metrics_inc("controller_recall_deep", deep_cap)
+    except Exception:
+        pass
     top_k = shortlist[:deep_cap]
     triage_ms = _now_ms() - _t0
 
@@ -2014,6 +2038,11 @@ async def ready() -> dict:
         pc_ok = False
     keys_ok = bool(os.getenv("GOOGLE_API_KEY")) and bool(os.getenv("GOOGLE_CSE_ID")) and bool(os.getenv("PINECONE_API_KEY"))
     return {"pinecone": pc_ok, "keys": keys_ok}
+
+
+@app.get("/version")
+async def version() -> dict:
+    return {"version": APP_VERSION, "git": GIT_SHA}
 
 
 def _retrieve_memories(project_id: str | None, objective: str) -> list[dict]:
