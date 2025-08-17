@@ -546,10 +546,23 @@ def _expand_molecule_synonyms(molecule: str, limit: int = 6) -> list[str]:
 # Per-corpus planners (PubMed / Trials / Web / Patents)
 # ---------------------
 
-def _plan_pubmed_queries(molecule: str, synonyms: list[str], objective: str) -> dict:
+def _plan_pubmed_queries(molecule: str, synonyms: list[str], objective: str, preference: str | None = None) -> dict:
     mol = _sanitize_molecule_name(molecule)
     tokens_tiab = "(" + " OR ".join([f'"{t}"[tiab]' for t in ([mol] + synonyms) if t]) + ")" if mol else ""
     tokens_title = "(" + " OR ".join([f'"{t}"[Title]' for t in ([mol] + synonyms) if t]) + ")" if mol else ""
+    # Objective-derived tokens for general adaptability
+    obj_tokens = [t for t in re.split(r"[^a-zA-Z0-9\-]+", (objective or "").lower()) if len(t) >= 3]
+    # Common mechanism markers and biomarker signals inferred from objective (generic, molecule-agnostic)
+    mech_terms = ["mechanism", "mechanism of action", "signaling", "pathway", "activation", "inhibition"]
+    bio_signals = []
+    if any(k in obj_tokens for k in ["msi", "msi-h", "dmmr"]):
+        bio_signals += ["MSI-H", "dMMR"]
+    if any(k in obj_tokens for k in ["tmb", "mutational"]):
+        bio_signals += ["tumor mutational burden"]
+    if any(k in obj_tokens for k in ["cps", "pd-l1"]):
+        bio_signals += ["PD-L1 CPS"]
+    if any(k in obj_tokens for k in ["ifn", "ifn-γ", "ifn-g", "gep", "gene", "expression"]):
+        bio_signals += ["IFN-γ", "gene expression profile"]
     # Review focus
     review_query = (
         f'(({tokens_tiab} OR {tokens_title}) AND ' if mol else "("
@@ -560,10 +573,28 @@ def _plan_pubmed_queries(molecule: str, synonyms: list[str], objective: str) -> 
     ) + '("mechanism"[tiab] OR "mechanism of action"[tiab] OR "signaling"[tiab] OR "pathway"[tiab]))'
     # Broader mechanism with common lexicon
     broad_query = f'{(" ".join(([mol] + synonyms)).strip() + " "+objective).strip()} mechanism pathway signaling'
+    # Recall variants (drop review constraint, add biomarker/mechanistic terms)
+    pref = (preference or "").lower()
+    recall_mech = None
+    recall_broad = None
+    if pref == "recall":
+        # Mechanism recall: simpler [tiab] presence plus optional biomarker signals
+        extra = []
+        if bio_signals:
+            extra = [f'"{s}"[tiab]' for s in bio_signals]
+        recall_mech = (
+            f'(({tokens_tiab} OR {tokens_title}) AND ' if mol else "("
+        ) + '(("mechanism"[tiab] OR "mechanism of action"[tiab] OR "signaling"[tiab] OR "pathway"[tiab])' + (f" OR {' OR '.join(extra)}" if extra else "") + '))'
+        # Broad recall: remove explicit mechanism requirement; rely on objective tokens and title bias
+        recall_broad = (
+            f'(({tokens_tiab} OR {tokens_title}) AND ' if mol else "("
+        ) + '(humans[mesh]))'
     return {
         "review_query": review_query,
         "mechanism_query": mech_query,
         "broad_query": broad_query,
+        "recall_mechanism_query": recall_mech,
+        "recall_broad_query": recall_broad,
     }
 
 def _plan_trials_query(molecule: str, synonyms: list[str], objective: str) -> str:
@@ -700,7 +731,7 @@ def _build_dag_app():
             deadline = state["deadline"]
             # PubMed (bounded pool)
             pubmed_items: list[dict] = []
-            for key in ("review_query", "mechanism_query", "broad_query"):
+            for key in ("review_query", "mechanism_query", "broad_query", "recall_mechanism_query", "recall_broad_query"):
                 if _time_left(deadline) < (TOTAL_BUDGET_S - HARVEST_BUDGET_S):
                     break
                 q = plan.get(key)
@@ -1061,7 +1092,9 @@ Prior Context: {memories}
     mol = _sanitize_molecule_name(molecule or "")
     synonyms = _expand_molecule_synonyms(mol) if mol else []
     # Per-corpus
-    pubmed = _plan_pubmed_queries(mol, synonyms, obj)
+    # Use a simple preference heuristic in fallback: recall if objective looks exploratory
+    pref_hint = "recall" if any(k in obj.lower() for k in ["overview", "broad", "landscape", "review"]) else None
+    pubmed = _plan_pubmed_queries(mol, synonyms, obj, pref_hint)
     clinical_query = _plan_trials_query(mol, synonyms, obj)
     web_query = _plan_web_query(mol, synonyms, obj)
     return {
@@ -1069,6 +1102,8 @@ Prior Context: {memories}
         "mechanism_query": pubmed["mechanism_query"],
         "clinical_query": clinical_query,
         "broad_query": pubmed["broad_query"],
+        "recall_mechanism_query": pubmed.get("recall_mechanism_query"),
+        "recall_broad_query": pubmed.get("recall_broad_query"),
         "web_query": web_query,
     }
 
@@ -1484,7 +1519,7 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
     _t0 = _now_ms()
     if _time_left(deadline) > 1.0:
         pubmed_items: list[dict] = []
-        for key in ("review_query", "mechanism_query", "broad_query"):
+        for key in ("review_query", "mechanism_query", "broad_query", "recall_mechanism_query", "recall_broad_query"):
             if _time_left(deadline) < (TOTAL_BUDGET_S - HARVEST_BUDGET_S):
                 break
             q = plan.get(key)
