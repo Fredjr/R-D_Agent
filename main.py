@@ -490,6 +490,36 @@ def _fallback_fact_anchors(abstract: str, art: dict, max_items: int = 3) -> list
         return []
 
 
+# ---------------------
+# Objective tokenization and signal inference (generic, molecule-agnostic)
+# ---------------------
+
+def _extract_objective_tokens(objective: str) -> list[str]:
+    try:
+        toks = [t for t in re.split(r"[^a-zA-Z0-9\-]+", (objective or "").lower()) if len(t) >= 3]
+        # de-dup order preserving
+        seen: set[str] = set()
+        out: list[str] = []
+        for t in toks:
+            if t not in seen:
+                seen.add(t)
+                out.append(t)
+        return out
+    except Exception:
+        return []
+
+_IMMUNO_ALIASES = ["pdcd1", "cd279", "cd274", "b7-h1", "ifng", "ifn-γ", "ifn-g", "gep", "ici", "cpi", "neoantigen", "exhaustion"]
+
+def _infer_signals(objective: str) -> list[str]:
+    toks = _extract_objective_tokens(objective)
+    signals: list[str] = []
+    def add(sig: str, keys: list[str]):
+        if any(k in toks for k in keys) and sig not in signals:
+            signals.append(sig)
+    add("MSI-H", ["msi", "msi-h"]) ; add("dMMR", ["dmmr"]) ; add("TMB", ["tmb", "mutational"]) ; add("PD-L1 CPS", ["cps", "pd-l1"]) ; add("IFN-γ GEP", ["ifng", "ifn-γ", "ifn-g", "gep", "gene", "expression"]) ; add("neoantigen", ["neoantigen"]) ; add("exhaustion", ["exhaustion"]) ; add("PD-1/PD-L1", ["pd-1", "pd1", "pd-l1", "pdl1"]) 
+    return signals
+
+
 def _sanitize_molecule_name(molecule: str) -> str:
     """Normalize molecule for query planning: strip parentheses content and extra symbols, keep hyphens.
 
@@ -751,21 +781,26 @@ def _build_dag_app():
             state["arts"] = state.get("arts") or []
             return state
 
+    def _compute_controller_caps(preference: str, pool_len: int, time_left: float) -> tuple[int, int]:
+        pref = (preference or "precision").lower()
+        shortlist_goal = 28 if pref == "precision" else 50
+        deep_goal = 13 if pref == "recall" else 8
+        if time_left < 12:
+            shortlist_goal = 24 if pref == "precision" else 40
+        shortlist_cap = max(8, min(shortlist_goal, pool_len))
+        deep_cap = max(5, min(deep_goal if pool_len >= deep_goal else pool_len, shortlist_cap))
+        return shortlist_cap, deep_cap
+
     async def node_triage(state: dict) -> dict:
         t0 = _now_ms()
         try:
             norm = _normalize_candidates(state.get("arts") or [])
             request = state["request"]
-            triage_cap = min(TRIAGE_TOP_K, 20)
-            if _time_left(state["deadline"]) < 15.0:
-                triage_cap = min(triage_cap, 16)
+            time_left = _time_left(state["deadline"])
+            sc_cap, deep_pref = _compute_controller_caps(getattr(request, "preference", "precision"), len(norm), time_left)
+            triage_cap = min(TRIAGE_TOP_K, sc_cap)
             shortlist = _triage_rank(request.objective, norm, triage_cap)
-            try:
-                pref = str(getattr(request, "preference", "precision") or "precision").lower()
-            except Exception:
-                pref = "precision"
-            desired = 13 if pref == "recall" else 8
-            deep_cap = min(len(shortlist), max(DEEPDIVE_TOP_K, desired))
+            deep_cap = min(len(shortlist), max(DEEPDIVE_TOP_K, deep_pref))
             state.update({"norm": norm, "shortlist": shortlist, "top_k": shortlist[:deep_cap]})
             _log_node_event("Triage", t0, True, {"norm": len(norm), "shortlist": len(shortlist), "top_k": len(state["top_k"])})
             return state
@@ -796,7 +831,12 @@ def _build_dag_app():
         t0 = _now_ms()
         try:
             request = state["request"]
-            exec_sum = await _with_timeout(asyncio.to_thread(_synthesize_executive_summary, request.objective, state.get("deep") or [], time.time() + SYNTH_BUDGET_S), SYNTH_BUDGET_S + 0.5, "Synthesis")
+            deep = state.get("deep") or []
+            if len(deep) < 3:
+                state["executive_summary"] = ""
+                _log_node_event("Synthesis", t0, True, {"len": 0, "skipped": True})
+                return state
+            exec_sum = await _with_timeout(asyncio.to_thread(_synthesize_executive_summary, request.objective, deep, time.time() + SYNTH_BUDGET_S), SYNTH_BUDGET_S + 0.5, "Synthesis")
             state["executive_summary"] = exec_sum or ""
             _log_node_event("Synthesis", t0, True, {"len": len(exec_sum or "")})
             return state
@@ -2440,12 +2480,12 @@ Objective: {objective}
         obj_norm = 1.0
 
     # Parallelize PubMed fetches per query
-    # Precision: keep 2; Recall: widen to 4 if available
+    # Explicit shortlist controller goals: precision=24–28, recall=40–50 → widen queries accordingly
     try:
         _pref_local = (request.preference or "precision").lower()
     except Exception:
         _pref_local = "precision"
-    queries = queries[:4] if _pref_local == "recall" else queries[:2]
+    queries = queries[:4] if _pref_local == "recall" else queries[:3]
     fetch_tasks = [asyncio.create_task(_run_pubmed_with_retry(q, attempts=2)) for q in queries]
     seen_pmids_global: set[str] = set()
     seen_titles_global: set[str] = set()
