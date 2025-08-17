@@ -718,7 +718,12 @@ def _build_dag_app():
             if _time_left(state["deadline"]) < 15.0:
                 triage_cap = min(triage_cap, 16)
             shortlist = _triage_rank(request.objective, norm, triage_cap)
-            deep_cap = DEEPDIVE_TOP_K if _time_left(state["deadline"]) > 18.0 else min(DEEPDIVE_TOP_K, 5)
+            try:
+                pref = str(getattr(request, "preference", "precision") or "precision").lower()
+            except Exception:
+                pref = "precision"
+            desired = 13 if pref == "recall" else 8
+            deep_cap = min(len(shortlist), max(DEEPDIVE_TOP_K, desired))
             state.update({"norm": norm, "shortlist": shortlist, "top_k": shortlist[:deep_cap]})
             _log_node_event("Triage", t0, True, {"norm": len(norm), "shortlist": len(shortlist), "top_k": len(state["top_k"])})
             return state
@@ -819,6 +824,15 @@ def _build_dag_app():
                     _ensure_score_breakdown(d.get("result", {}), request.objective, art.get("abstract") or art.get("summary") or "", top, None)
                 except Exception:
                     pass
+                # Ensure article-specific relevance justification
+                try:
+                    _ensure_relevance_fields(d.get("result", {}), getattr(request, "molecule", ""), getattr(request, "objective", ""), {
+                        "title": top.get("title"),
+                        "pub_year": top.get("pub_year"),
+                        "abstract": art.get("abstract") or art.get("summary") or "",
+                    })
+                except Exception:
+                    pass
                 results_sections.append({
                     "query": (state.get("plan") or {}).get("mechanism_query") or (state.get("plan") or {}).get("review_query") or request.objective,
                     "result": d["result"],
@@ -877,13 +891,37 @@ def _ensure_relevance_fields(structured: Dict[str, object], molecule: str, objec
         structured["summary"] = str(structured.get("summary", "")).strip()
     # Fallback relevance if missing
     rel = structured.get("relevance_justification")
-    if not isinstance(rel, str) or not rel.strip():
+    try:
+        abs_text = ((top_article or {}).get("abstract") or "").lower()
+    except Exception:
+        abs_text = ""
+    if not isinstance(rel, str) or not rel.strip() or rel.strip().startswith("Selected because it directly mentions"):
         title = (top_article or {}).get("title") or "this article"
-        mol = molecule or "the molecule"
-        structured["relevance_justification"] = (
-            f"Selected because it directly mentions {mol} and aligns with the objective: {objective}. "
-            f"Top-ranked by our mechanism and similarity scoring for {title}."
-        )
+        year = (top_article or {}).get("pub_year") or ""
+        mol = (molecule or "the molecule").strip()
+        obj_l = (objective or "").lower()
+        # Heuristic extraction of salient mechanistic/biomarker signals
+        tokens: list[str] = []
+        def add_if(txt: str, *keys: str) -> None:
+            tl = txt.lower()
+            if any(k in tl for k in keys):
+                tokens.append(keys[0])
+        add_if(obj_l + " " + abs_text, "pd-1/pd-l1", "pd-1", "pd-l1", "immune checkpoint")
+        add_if(abs_text, "tmb", "tumor mutational burden")
+        add_if(abs_text, "msi-h/dmmr", "msi-h", "dmmr")
+        add_if(abs_text, "pd-l1 cps", "combined positive score", "cps")
+        add_if(abs_text, "ifn-γ gep", "ifn-γ", "ifn-g", "gene expression profile")
+        add_if(abs_text, "t cell activation", "t cell", "t-cell")
+        sig = ", ".join(dict.fromkeys(tokens)) if tokens else None
+        core = f"Selected for {mol} vs objective: {objective}."
+        if sig:
+            structured["relevance_justification"] = (
+                f"{core} Evidence in {title}{f' ({year})' if year else ''} mentions: {sig}."
+            )
+        else:
+            structured["relevance_justification"] = (
+                f"{core} High mechanistic alignment found in {title}{f' ({year})' if year else ''}."
+            )
     # Sanitize numeric fields to avoid NaN in UI
     structured["confidence_score"] = int(_sanitize_number(structured.get("confidence_score", 60), 60))
     structured["publication_score"] = round(_sanitize_number(structured.get("publication_score", 0.0), 0.0), 1)
@@ -926,7 +964,20 @@ def _ensure_score_breakdown(structured: Dict[str, object], objective: str, abstr
                 sb["impact_score"] = 0.0
         # Contextual match (0-100)
         if sb.get("contextual_match_score") is None:
-            sb["contextual_match_score"] = round(float(contextual_match_score or 0.0), 1)
+            try:
+                if contextual_match_score is None:
+                    obj = (objective or "").lower()
+                    ab = (abstract or (top_article or {}).get("title") or "").lower()
+                    # Token overlap heuristic
+                    toks = [t for t in re.split(r"[^a-z0-9\-]+", obj) if len(t) >= 3]
+                    if toks:
+                        hits = sum(1 for t in toks if t in ab)
+                        contextual_match_score = max(0.0, min(100.0, (hits / max(1, len(toks))) * 100.0))
+                    else:
+                        contextual_match_score = 0.0
+                sb["contextual_match_score"] = round(float(contextual_match_score or 0.0), 1)
+            except Exception:
+                sb["contextual_match_score"] = round(float(contextual_match_score or 0.0), 1)
     except Exception:
         # last-resort defaults
         structured.setdefault("score_breakdown", {  # type: ignore
@@ -2325,8 +2376,12 @@ Objective: {objective}
         obj_norm = 1.0
 
     # Parallelize PubMed fetches per query
-    # Cap number of initial primary programmatic queries to 2
-    queries = queries[:2]
+    # Precision: keep 2; Recall: widen to 4 if available
+    try:
+        _pref_local = (request.preference or "precision").lower()
+    except Exception:
+        _pref_local = "precision"
+    queries = queries[:4] if _pref_local == "recall" else queries[:2]
     fetch_tasks = [asyncio.create_task(_run_pubmed_with_retry(q, attempts=2)) for q in queries]
     seen_pmids_global: set[str] = set()
     seen_titles_global: set[str] = set()
@@ -2594,6 +2649,14 @@ Objective: {objective}
                 _ensure_relevance_fields(structured, request.molecule, request.objective, top_article_payload)
             except Exception:
                 pass
+            try:
+                _ensure_relevance_fields(structured, request.molecule, request.objective, {
+                    "title": top_article_payload.get("title"),
+                    "pub_year": top_article_payload.get("pub_year"),
+                    "abstract": (articles[0] or {}).get("abstract", "") if isinstance(articles, list) and articles else "",
+                })
+            except Exception:
+                pass
             results.append({
                 "query": q,
                 "result": structured,
@@ -2732,8 +2795,12 @@ Objective: {objective}
                 if pm:
                     seen_pmids.add(str(pm))
 
-        # Ensure at least 3 sections in recall mode even if ALWAYS_THREE_SECTIONS is off
-        target_sections = 3 if (ALWAYS_THREE_SECTIONS or (request.preference or "precision").lower() == "recall") else 2
+        # Ensure minimum sections based on preference: precision>=8, recall>=13
+        try:
+            _pref_local = (request.preference or "precision").lower()
+        except Exception:
+            _pref_local = "precision"
+        target_sections = 13 if (_pref_local == "recall") else 8
         need_sections = max(0, target_sections - initial_sections)
         low_recall = total_articles <= 3 or len(seen_pmids) <= 3
         if need_sections > 0 or low_recall:
