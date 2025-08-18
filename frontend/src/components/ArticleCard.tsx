@@ -57,7 +57,7 @@ export default function ArticleCard({ item }: Props) {
           ) : null}
           <div className="mt-2 text-gray-700 leading-relaxed">
             <p className={expandSummary ? '' : 'line-clamp-4'}>{summary}</p>
-            {summary && summary.length > 280 && (
+            {summary && summary.length > 0 && (
               <button onClick={() => setExpandSummary(!expandSummary)} className="mt-1 text-xs text-indigo-600 hover:underline">
                 {expandSummary ? 'Show less' : 'Show more'}
               </button>

@@ -14,8 +14,9 @@ export default function ResultsList({ results }: Props) {
   }
 
   const [showAll, setShowAll] = useState(false);
-  const visible = showAll ? results.slice(0, 8) : results.slice(0, 5);
-  const hasMore = results.length > 5;
+  const initialCount = 8;
+  const visible = showAll ? results.slice(0, results.length) : results.slice(0, initialCount);
+  const hasMore = results.length > initialCount;
 
   return (
     <div className="max-w-3xl mx-auto mt-8 grid gap-6">
@@ -31,7 +32,7 @@ export default function ResultsList({ results }: Props) {
           className="mx-auto mt-2 rounded bg-gray-800 text-white px-4 py-2 hover:bg-gray-700"
           onClick={() => setShowAll(true)}
         >
-          Show 3 more
+          {`Show all (${results.length - initialCount} more)`}
         </button>
       )}
     </div>
