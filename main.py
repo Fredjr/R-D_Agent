@@ -2816,6 +2816,27 @@ async def generate_review(request: ReviewRequest):
         except Exception as e:
             log_event({"event": "v2_error_fallback_v1", "error": str(e)[:200]})
 
+    # If DAG requested but graph unavailable, run V2 instead
+    if getattr(request, "dag_mode", False) and (StateGraph is None) and MULTISOURCE_ENABLED:
+        try:
+            v2 = await orchestrate_v2(request, memories)
+            resp = {
+                "molecule": request.molecule,
+                "objective": request.objective,
+                "project_id": request.project_id,
+                "queries": v2.get("queries", []),
+                "results": v2.get("results", []),
+                "diagnostics": {**(v2.get("diagnostics", {}) or {}), "dag_unavailable": True},
+                "executive_summary": v2.get("executive_summary", ""),
+                "memories": memories,
+            }
+            took = _now_ms() - req_start
+            _metrics_inc("latency_ms_sum", took)
+            log_event({"event": "generate_review_v2_dag_unavailable", "sections": len(resp["results"]), "latency_ms": took})
+            return resp
+        except Exception as e:
+            log_event({"event": "v2_error_dag_unavailable", "error": str(e)[:200]})
+
     # Optional: DAG orchestration path
     if getattr(request, "dag_mode", False) and StateGraph is not None:
         try:
@@ -2937,6 +2958,25 @@ async def generate_review(request: ReviewRequest):
             return resp
         except Exception as e:
             log_event({"event": "dag_error_fallback_v1", "error": str(e)[:200]})
+            # Hard fallback to V2 on any DAG exception
+            if MULTISOURCE_ENABLED:
+                try:
+                    v2 = await orchestrate_v2(request, memories)
+                    resp = {
+                        "molecule": request.molecule,
+                        "objective": request.objective,
+                        "project_id": request.project_id,
+                        "queries": v2.get("queries", []),
+                        "results": v2.get("results", []),
+                        "diagnostics": {**(v2.get("diagnostics", {}) or {}), "dag_exception": True},
+                        "executive_summary": v2.get("executive_summary", ""),
+                        "memories": memories,
+                    }
+                    took = _now_ms() - req_start
+                    _metrics_inc("latency_ms_sum", took)
+                    return resp
+                except Exception:
+                    pass
 
     # Use memory as slight prefix to objective for query generation (V1 flow)
     objective_with_memory = (request.objective + memory_hint) if memory_hint else request.objective
