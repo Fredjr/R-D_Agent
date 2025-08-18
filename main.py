@@ -577,6 +577,29 @@ def _expand_molecule_synonyms(molecule: str, limit: int = 6) -> list[str]:
     return out[:limit]
 
 
+def _normalize_entities(text: str) -> str:
+    """Systematically normalize common aliases for molecules/targets to reduce off-topic drift.
+    Minimal, extensible map; safe across domains.
+    """
+    try:
+        t = (text or "")
+        mapping = {
+            "keytruda": "pembrolizumab",
+            "mk-3475": "pembrolizumab",
+            "opdivo": "nivolumab",
+            "t790m": "EGFR T790M",
+            "c797s": "EGFR C797S",
+            "parpi": "PARP inhibitor",
+            "glp 1": "GLP-1",
+            "glp1": "GLP-1",
+        }
+        for k, v in mapping.items():
+            t = re.sub(rf"\b{re.escape(k)}\b", v, t, flags=re.IGNORECASE)
+        return t
+    except Exception:
+        return text or ""
+
+
 # ---------------------
 # Per-corpus planners (PubMed / Trials / Web / Patents)
 # ---------------------
@@ -962,14 +985,37 @@ def _build_dag_app():
             except Exception:
                 mol_tokens = [mol] if mol else []
             shortlist = _triage_rank(request.objective, norm, triage_cap, None, mol_tokens)
-            # Cross-encoder re-ranking for DAG shortlist if enabled and time remains
+            # Cross-encoder re-ranking for DAG shortlist if enabled and time remains (robustness: blend CE with heuristic)
             try:
                 if cross_encoder is not None and time_left > 5.0:
                     pairs = [(request.objective or "", (a.get('title') or '') + ". " + (a.get('abstract') or '')) for a in shortlist[:30]]
                     scores = cross_encoder.predict(pairs)
                     for i, s in enumerate(scores):
-                        shortlist[i]["score"] = 0.8 * float(shortlist[i].get("score", 0.0)) + 0.2 * float(s)
+                        base = float(shortlist[i].get("score", 0.0))
+                        ce = float(s)
+                        shortlist[i]["score"] = 0.7 * base + 0.3 * ce
                     shortlist = sorted(shortlist, key=lambda x: x.get("score", 0.0), reverse=True)
+                else:
+                    # Lightweight LTR-style rescoring: combine normalized heuristic features for stability when CE is off
+                    # Features: title hit, abstract hit, year recency, citations per year
+                    nowy = datetime.utcnow().year
+                    def _ltr_score(a: dict) -> float:
+                        try:
+                            title = (a.get('title') or '').lower()
+                            abstract = (a.get('abstract') or '').lower()
+                            obj = (request.objective or '').lower()
+                            title_hit = 1.0 if any(tok in title for tok in obj.split()[:3]) else 0.0
+                            abs_hit = 1.0 if any(tok in abstract for tok in obj.split()[:3]) else 0.0
+                            year = int(a.get('pub_year') or 0)
+                            rec = max(0.0, min(1.0, (year - 2015) / float((nowy - 2015 + 1)))) if year else 0.0
+                            cites = float(a.get('citation_count') or 0.0)
+                            cpy = (cites / max(1, (nowy - year + 1))) if year else 0.0
+                            cpy_n = max(0.0, min(1.0, cpy / 100.0))
+                            base = float(a.get('score', 0.0))
+                            return 0.4*base + 0.25*title_hit + 0.15*abs_hit + 0.1*rec + 0.1*cpy_n
+                        except Exception:
+                            return float(a.get('score', 0.0))
+                    shortlist = sorted(shortlist, key=_ltr_score, reverse=True)
             except Exception:
                 pass
             deep_cap = min(len(shortlist), max(DEEPDIVE_TOP_K, deep_pref))
@@ -1344,8 +1390,8 @@ Prior Context: {memories}
         except Exception:
             llm_plan = None
     # Deterministic fallback (default path)
-    obj = objective.strip()
-    mol = _sanitize_molecule_name(molecule or "")
+    obj = _normalize_entities(objective or "").strip()
+    mol = _sanitize_molecule_name(_normalize_entities(molecule or ""))
     synonyms = _expand_molecule_synonyms(mol) if mol else []
     # Per-corpus
     # Use a simple preference heuristic in fallback: recall if objective looks exploratory
@@ -1415,13 +1461,19 @@ def _harvest_pubmed(query: str, deadline: float) -> list[dict]:
         return []
     try:
         tool = PubMedSearchTool()
-        raw = tool._run(query)
+        raw = tool._run(_normalize_entities(query))
         import json as _json
         arts = _json.loads(raw) if isinstance(raw, str) else (raw or [])
         if isinstance(arts, list):
             # Annotate with source query for transparency/debugging
             for a in arts:
                 if isinstance(a, dict):
+                    # Normalize entities in harvested titles to improve downstream matching
+                    try:
+                        if a.get("title"):
+                            a["title"] = _normalize_entities(a["title"])
+                    except Exception:
+                        pass
                     a["source_query"] = query
             return arts
         return []
