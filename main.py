@@ -300,6 +300,7 @@ GIT_SHA = os.getenv("GIT_SHA", "")
 # Feature flags for Phase 1
 SIGNAL_EXTRACTOR_ENABLED = os.getenv("SIGNAL_EXTRACTOR_ENABLED", "1") not in ("0", "false", "False")
 MESH_EXPANSION_ENABLED = os.getenv("MESH_EXPANSION_ENABLED", "1") not in ("0", "false", "False")
+STRATEGIST_LLM_ENABLED = os.getenv("STRATEGIST_LLM_ENABLED", "0") not in ("0", "false", "False")
 
 # Metrics (simple in-memory counters)
 _METRICS_LOCK = threading.Lock()
@@ -630,8 +631,10 @@ def _extract_signals(objective: str) -> list[str]:
 
 def _plan_pubmed_queries(molecule: str, synonyms: list[str], objective: str, preference: str | None = None) -> dict:
     mol = _sanitize_molecule_name(molecule)
-    tokens_tiab = "(" + " OR ".join([f'"{t}"[tiab]' for t in ([mol] + synonyms) if t]) + ")" if mol else ""
-    tokens_title = "(" + " OR ".join([f'"{t}"[Title]' for t in ([mol] + synonyms) if t]) + ")" if mol else ""
+    tiab_terms = [t for t in ([mol] + synonyms) if t]
+    title_terms = [t for t in ([mol] + synonyms) if t]
+    tokens_tiab = ("(" + " OR ".join([f'"{t}"[tiab]' for t in tiab_terms]) + ")") if (mol and tiab_terms) else ""
+    tokens_title = ("(" + " OR ".join([f'"{t}"[Title]' for t in title_terms]) + ")") if (mol and title_terms) else ""
     # Objective-derived tokens for general adaptability
     obj_tokens = [t for t in re.split(r"[^a-zA-Z0-9\-]+", (objective or "").lower()) if len(t) >= 3]
     # Common mechanism markers and biomarker signals inferred from objective (generic, molecule-agnostic)
@@ -665,11 +668,13 @@ def _plan_pubmed_queries(molecule: str, synonyms: list[str], objective: str, pre
     mesh_clause = (" OR ".join(mesh_terms)) if mesh_terms else ""
     # Review focus
     review_query = (
-        f'(({tokens_tiab} OR {tokens_title}{(" OR "+mesh_clause) if mesh_clause else ""}) AND ' if mol or mesh_clause else "("
+        (f'(({tokens_tiab} OR {tokens_title}{(" OR "+mesh_clause) if mesh_clause else ""}) AND ')
+        if (tokens_tiab or tokens_title or mesh_clause) else "("
     ) + f'(review[pt] OR systematic[sb]) AND (2015:3000[dp]))'
     # Mechanism focus
     mech_query = (
-        f'(({tokens_tiab} OR {tokens_title}{(" OR "+mesh_clause) if mesh_clause else ""}) AND ' if mol or mesh_clause else "("
+        (f'(({tokens_tiab} OR {tokens_title}{(" OR "+mesh_clause) if mesh_clause else ""}) AND ')
+        if (tokens_tiab or tokens_title or mesh_clause) else "("
     ) + '("mechanism"[tiab] OR "mechanism of action"[tiab] OR "signaling"[tiab] OR "pathway"[tiab]))'
     # Broader mechanism with common lexicon
     broad_query = f'{(" ".join(([mol] + synonyms)).strip() + " "+objective).strip()} mechanism pathway signaling'
@@ -683,11 +688,13 @@ def _plan_pubmed_queries(molecule: str, synonyms: list[str], objective: str, pre
         if bio_signals:
             extra = [f'"{s}"[tiab]' for s in bio_signals]
         recall_mech = (
-            f'(({tokens_tiab} OR {tokens_title}{(" OR "+mesh_clause) if mesh_clause else ""}) AND ' if mol or mesh_clause else "("
+            (f'(({tokens_tiab} OR {tokens_title}{(" OR "+mesh_clause) if mesh_clause else ""}) AND ')
+            if (tokens_tiab or tokens_title or mesh_clause) else "("
         ) + '(("mechanism"[tiab] OR "mechanism of action"[tiab] OR "signaling"[tiab] OR "pathway"[tiab])' + (f" OR {' OR '.join(extra)}" if extra else "") + '))'
         # Broad recall: remove explicit mechanism requirement; rely on objective tokens and title bias
         recall_broad = (
-            f'(({tokens_tiab} OR {tokens_title}{(" OR "+mesh_clause) if mesh_clause else ""}) AND ' if mol or mesh_clause else "("
+            (f'(({tokens_tiab} OR {tokens_title}{(" OR "+mesh_clause) if mesh_clause else ""}) AND ')
+            if (tokens_tiab or tokens_title or mesh_clause) else "("
         ) + '(humans[mesh]))'
     return {
         "review_query": review_query,
@@ -1267,7 +1274,7 @@ def _time_left(deadline: float) -> float:
     return max(0.0, deadline - time.time())
 
 def _build_query_plan(objective: str, memories_text: str, deadline: float, molecule: str | None = None) -> dict:
-    """Return a dict with five queries: review_query, mechanism_query, clinical_query, broad_query, web_query."""
+    """Return a dict of queries. Prefer deterministic planner; optionally try LLM strategist when enabled."""
     if _time_left(deadline) < 1.0:
         return {}
     strategist_template = """
@@ -1283,19 +1290,22 @@ Objective: {objective}
 Molecule (if any): {molecule}
 Prior Context: {memories}
 """
-    try:
-        prompt = PromptTemplate(template=strategist_template, input_variables=["objective", "memories", "molecule"])
-        chain = LLMChain(llm=llm_analyzer, prompt=prompt)
-        out = chain.invoke({"objective": objective[:400], "memories": memories_text[:400], "molecule": (molecule or "")[:200]})
-        txt = out.get("text", out) if isinstance(out, dict) else str(out)
-        if "```" in txt:
-            txt = txt.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
-        plan = json.loads(txt)
-        if isinstance(plan, dict):
-            return plan
-    except Exception:
-        pass
-    # Fallback: construct reasonable defaults
+    # Prefer deterministic per-corpus plan. Optionally augment with LLM strategist if enabled and valid.
+    llm_plan: dict | None = None
+    if STRATEGIST_LLM_ENABLED:
+        try:
+            prompt = PromptTemplate(template=strategist_template, input_variables=["objective", "memories", "molecule"])
+            chain = LLMChain(llm=llm_analyzer, prompt=prompt)
+            out = chain.invoke({"objective": objective[:400], "memories": memories_text[:400], "molecule": (molecule or "")[:200]})
+            txt = out.get("text", out) if isinstance(out, dict) else str(out)
+            if "```" in txt:
+                txt = txt.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
+            candidate = json.loads(txt)
+            if isinstance(candidate, dict):
+                llm_plan = candidate
+        except Exception:
+            llm_plan = None
+    # Deterministic fallback (default path)
     obj = objective.strip()
     mol = _sanitize_molecule_name(molecule or "")
     synonyms = _expand_molecule_synonyms(mol) if mol else []
@@ -1305,7 +1315,7 @@ Prior Context: {memories}
     pubmed = _plan_pubmed_queries(mol, synonyms, obj, pref_hint)
     clinical_query = _plan_trials_query(mol, synonyms, obj)
     web_query = _plan_web_query(mol, synonyms, obj)
-    return {
+    base_plan = {
         "review_query": pubmed["review_query"],
         "mechanism_query": pubmed["mechanism_query"],
         "clinical_query": clinical_query,
@@ -1314,6 +1324,25 @@ Prior Context: {memories}
         "recall_broad_query": pubmed.get("recall_broad_query"),
         "web_query": web_query,
     }
+    # If LLM strategist produced fields, only accept those that are clearly PubMed-safe
+    if llm_plan:
+        def _safe(q: str) -> bool:
+            s = (q or "").strip()
+            if not s:
+                return False
+            # Reject obviously malformed field tags like "[tiab](" or unbalanced brackets
+            if "[tiab](" in s.lower():
+                return False
+            if s.count("(") != s.count(")"):
+                return False
+            if s.count("[") != s.count("]"):
+                return False
+            return True
+        for k in ("review_query", "mechanism_query", "broad_query"):
+            v = llm_plan.get(k)
+            if isinstance(v, str) and _safe(v):
+                base_plan[k] = v
+    return base_plan
 
 
 def _inject_molecule_into_plan(plan: dict, molecule: str | None) -> dict:
