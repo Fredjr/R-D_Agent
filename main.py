@@ -1020,6 +1020,16 @@ def _build_dag_app():
             except Exception:
                 pass
             deep_cap = min(len(shortlist), max(DEEPDIVE_TOP_K, deep_pref))
+            # If shortlist ended empty (over-gated), relax once by blending gated+ungated and recompute
+            if not shortlist and norm:
+                try:
+                    # Blend gated with original norm to allow breadth, then re-rank
+                    shortlist_relaxed = _triage_rank(request.objective, norm, triage_cap, None, mol_tokens, getattr(request, "preference", None))
+                    if shortlist_relaxed:
+                        shortlist = shortlist_relaxed
+                        deep_cap = min(len(shortlist), max(DEEPDIVE_TOP_K, deep_pref))
+                except Exception:
+                    pass
             state.update({"norm": norm, "shortlist": shortlist, "top_k": shortlist[:deep_cap]})
             _log_node_event("Triage", t0, True, {"norm": len(norm), "shortlist": len(shortlist), "top_k": len(state["top_k"])})
             return state
@@ -2822,6 +2832,19 @@ async def generate_review(request: ReviewRequest):
                 raise RuntimeError("DAG graph unavailable")
             out = await _DAG_APP.ainvoke(state)
             results_sections = out.get("results_sections", [])
+            # Synthesize minimal diagnostics if Scorecard didn't run
+            if "diagnostics" not in out:
+                try:
+                    out["diagnostics"] = {
+                        "pool_size": int(len(out.get("norm") or [])),
+                        "shortlist_size": int(len(out.get("shortlist") or [])),
+                        "deep_dive_count": int(len(out.get("deep") or [])),
+                        "timings_ms": {},
+                        "pool_caps": {"pubmed": PUBMED_POOL_MAX, "trials": TRIALS_POOL_MAX, "patents": PATENTS_POOL_MAX},
+                        "dag_missing_scorecard": True,
+                    }
+                except Exception:
+                    out["diagnostics"] = {"dag_missing_scorecard": True}
             # If DAG produced no results, fall back to V2 to avoid empty responses
             if not results_sections:
                 try:
@@ -2842,6 +2865,21 @@ async def generate_review(request: ReviewRequest):
                     return resp
                 except Exception as e2:
                     log_event({"event": "dag_empty_v2_error", "error": str(e2)[:200]})
+                    # Return minimal diagnostics instead of empty
+                    md = out.get("diagnostics") or {}
+                    resp = {
+                        "molecule": request.molecule,
+                        "objective": request.objective,
+                        "project_id": request.project_id,
+                        "queries": [v for k, v in (out.get("plan") or {}).items() if isinstance(v, str)],
+                        "results": [],
+                        "diagnostics": {**md, "dag_empty": True, "dag_fallback_v2_error": True},
+                        "executive_summary": "",
+                        "memories": memories,
+                    }
+                    took = _now_ms() - req_start
+                    _metrics_inc("latency_ms_sum", took)
+                    return resp
 
             resp = {
                 "molecule": request.molecule,
