@@ -297,6 +297,10 @@ ADAPTIVE_PROJECT_BLEND = float(os.getenv("ADAPTIVE_PROJECT_BLEND", "0.2"))
 APP_VERSION = os.getenv("APP_VERSION", "v0.1.0")
 GIT_SHA = os.getenv("GIT_SHA", "")
 
+# Feature flags for Phase 1
+SIGNAL_EXTRACTOR_ENABLED = os.getenv("SIGNAL_EXTRACTOR_ENABLED", "1") not in ("0", "false", "False")
+MESH_EXPANSION_ENABLED = os.getenv("MESH_EXPANSION_ENABLED", "1") not in ("0", "false", "False")
+
 # Metrics (simple in-memory counters)
 _METRICS_LOCK = threading.Lock()
 METRICS = {
@@ -593,13 +597,31 @@ def _plan_pubmed_queries(molecule: str, synonyms: list[str], objective: str, pre
         bio_signals += ["PD-L1 CPS"]
     if any(k in obj_tokens for k in ["ifn", "ifn-γ", "ifn-g", "gep", "gene", "expression"]):
         bio_signals += ["IFN-γ", "gene expression profile"]
+    # Signals extractor (feature-flagged): enrich signals list from objective text
+    if SIGNAL_EXTRACTOR_ENABLED:
+        try:
+            for k in ("pd-1", "pd-l1", "ctla-4", "lag-3", "tigit", "msi", "dmmr", "tmb", "neoantigen", "ifn", "gep"):
+                if any(k in x for x in obj_tokens):
+                    bio_signals.append(k.upper())
+        except Exception:
+            pass
+    # MeSH expansion (feature-flagged): add MeSH terms for molecule and PD-1/PD-L1
+    mesh_terms: list[str] = []
+    if MESH_EXPANSION_ENABLED:
+        try:
+            if mol:
+                mesh_terms += [f'"{mol}"[mesh]']
+            mesh_terms += ['"Programmed Cell Death 1 Receptor"[mesh]', '"Programmed Cell Death 1 Ligand 1 Protein"[mesh]']
+        except Exception:
+            pass
+    mesh_clause = (" OR ".join(mesh_terms)) if mesh_terms else ""
     # Review focus
     review_query = (
-        f'(({tokens_tiab} OR {tokens_title}) AND ' if mol else "("
+        f'(({tokens_tiab} OR {tokens_title}{(" OR "+mesh_clause) if mesh_clause else ""}) AND ' if mol or mesh_clause else "("
     ) + f'(review[pt] OR systematic[sb]) AND (2015:3000[dp]))'
     # Mechanism focus
     mech_query = (
-        f'(({tokens_tiab} OR {tokens_title}) AND ' if mol else "("
+        f'(({tokens_tiab} OR {tokens_title}{(" OR "+mesh_clause) if mesh_clause else ""}) AND ' if mol or mesh_clause else "("
     ) + '("mechanism"[tiab] OR "mechanism of action"[tiab] OR "signaling"[tiab] OR "pathway"[tiab]))'
     # Broader mechanism with common lexicon
     broad_query = f'{(" ".join(([mol] + synonyms)).strip() + " "+objective).strip()} mechanism pathway signaling'
@@ -613,11 +635,11 @@ def _plan_pubmed_queries(molecule: str, synonyms: list[str], objective: str, pre
         if bio_signals:
             extra = [f'"{s}"[tiab]' for s in bio_signals]
         recall_mech = (
-            f'(({tokens_tiab} OR {tokens_title}) AND ' if mol else "("
+            f'(({tokens_tiab} OR {tokens_title}{(" OR "+mesh_clause) if mesh_clause else ""}) AND ' if mol or mesh_clause else "("
         ) + '(("mechanism"[tiab] OR "mechanism of action"[tiab] OR "signaling"[tiab] OR "pathway"[tiab])' + (f" OR {' OR '.join(extra)}" if extra else "") + '))'
         # Broad recall: remove explicit mechanism requirement; rely on objective tokens and title bias
         recall_broad = (
-            f'(({tokens_tiab} OR {tokens_title}) AND ' if mol else "("
+            f'(({tokens_tiab} OR {tokens_title}{(" OR "+mesh_clause) if mesh_clause else ""}) AND ' if mol or mesh_clause else "("
         ) + '(humans[mesh]))'
     return {
         "review_query": review_query,
