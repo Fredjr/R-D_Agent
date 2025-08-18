@@ -761,8 +761,9 @@ def _build_dag_app():
             deadline = state["deadline"]
             # PubMed (bounded pool)
             pubmed_items: list[dict] = []
+            # Run all planned PubMed queries unless we're very close to deadline
             for key in ("review_query", "mechanism_query", "broad_query", "recall_mechanism_query", "recall_broad_query"):
-                if _time_left(deadline) < (TOTAL_BUDGET_S - HARVEST_BUDGET_S):
+                if _time_left(deadline) < 2.0:
                     break
                 q = plan.get(key)
                 if q:
@@ -795,18 +796,43 @@ def _build_dag_app():
         t0 = _now_ms()
         try:
             norm = _normalize_candidates(state.get("arts") or [])
-            # Prefer items mentioning the molecule when provided
+            # Prefer items mentioning the molecule when provided; gate by PD-1 context
             try:
-                mol = getattr(state.get("request"), "molecule", None)
+                req_obj = state.get("request")
+                mol = getattr(req_obj, "molecule", None)
+                pref = str(getattr(req_obj, "preference", "precision") or "precision").lower()
             except Exception:
-                mol = None
+                mol, pref = None, "precision"
             if mol:
-                norm = _filter_by_molecule(norm, mol)
+                gated = _filter_by_molecule(norm, mol)
+                if pref == "precision":
+                    norm = gated
+                else:
+                    # recall: blend gated to top to keep breadth
+                    seen = set()
+                    mixed = []
+                    for a in gated + norm:
+                        t = a.get("title", "")
+                        if t in seen:
+                            continue
+                        seen.add(t)
+                        mixed.append(a)
+                    norm = mixed
             request = state["request"]
             time_left = _time_left(state["deadline"])
             sc_cap, deep_pref = _compute_controller_caps(getattr(request, "preference", "precision"), len(norm), time_left)
             triage_cap = min(TRIAGE_TOP_K, sc_cap)
             shortlist = _triage_rank(request.objective, norm, triage_cap)
+            # Cross-encoder re-ranking for DAG shortlist if enabled and time remains
+            try:
+                if cross_encoder is not None and time_left > 5.0:
+                    pairs = [(request.objective or "", (a.get('title') or '') + ". " + (a.get('abstract') or '')) for a in shortlist[:30]]
+                    scores = cross_encoder.predict(pairs)
+                    for i, s in enumerate(scores):
+                        shortlist[i]["score"] = 0.8 * float(shortlist[i].get("score", 0.0)) + 0.2 * float(s)
+                    shortlist = sorted(shortlist, key=lambda x: x.get("score", 0.0), reverse=True)
+            except Exception:
+                pass
             deep_cap = min(len(shortlist), max(DEEPDIVE_TOP_K, deep_pref))
             state.update({"norm": norm, "shortlist": shortlist, "top_k": shortlist[:deep_cap]})
             _log_node_event("Triage", t0, True, {"norm": len(norm), "shortlist": len(shortlist), "top_k": len(state["top_k"])})
@@ -1681,6 +1707,16 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
         triage_cap = min(triage_cap, 24)
     proj_vec = _project_interest_vector(memories)
     shortlist = _triage_rank(request.objective, norm, triage_cap, proj_vec)
+    # Cross-encoder re-ranking for V2 shortlist
+    try:
+        if cross_encoder is not None and _time_left(deadline) > 5.0:
+            pairs = [(request.objective or "", (a.get('title') or '') + ". " + (a.get('abstract') or '')) for a in shortlist[:30]]
+            scores = cross_encoder.predict(pairs)
+            for i, s in enumerate(scores):
+                shortlist[i]["score"] = 0.8 * float(shortlist[i].get("score", 0.0)) + 0.2 * float(s)
+            shortlist = sorted(shortlist, key=lambda x: x.get("score", 0.0), reverse=True)
+    except Exception:
+        pass
     # Controller for deep dive cap
     try:
         pref = str(getattr(request, "preference", "precision") or "precision").lower()
