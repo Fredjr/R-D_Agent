@@ -2845,6 +2845,46 @@ async def generate_review(request: ReviewRequest):
                     }
                 except Exception:
                     out["diagnostics"] = {"dag_missing_scorecard": True}
+            # If diagnostics exists but is empty, also synthesize
+            try:
+                if not out.get("diagnostics"):
+                    out["diagnostics"] = {
+                        "pool_size": int(len(out.get("norm") or [])),
+                        "shortlist_size": int(len(out.get("shortlist") or [])),
+                        "deep_dive_count": int(len(out.get("deep") or [])),
+                        "timings_ms": {},
+                        "pool_caps": {"pubmed": PUBMED_POOL_MAX, "trials": TRIALS_POOL_MAX, "patents": PATENTS_POOL_MAX},
+                        "dag_synth_diagnostics": True,
+                    }
+            except Exception:
+                pass
+            # If DAG produced no sections or had empty shortlist/deep, fall back to V2
+            try:
+                norm_n = int(len(out.get("norm") or []))
+                short_n = int(len(out.get("shortlist") or []))
+                deep_n = int(len(out.get("deep") or []))
+            except Exception:
+                norm_n = short_n = deep_n = 0
+            if (not results_sections) or short_n == 0 or deep_n == 0:
+                try:
+                    v2 = await orchestrate_v2(request, memories)
+                    md = out.get("diagnostics") or {}
+                    resp = {
+                        "molecule": request.molecule,
+                        "objective": request.objective,
+                        "project_id": request.project_id,
+                        "queries": v2.get("queries", []),
+                        "results": v2.get("results", []),
+                        "diagnostics": {**md, **(v2.get("diagnostics") or {}), "dag_fallback_v2": True, "dag_incomplete": True, "dag_norm": norm_n, "dag_shortlist": short_n, "dag_deep": deep_n},
+                        "executive_summary": v2.get("executive_summary", ""),
+                        "memories": memories,
+                    }
+                    took = _now_ms() - req_start
+                    _metrics_inc("latency_ms_sum", took)
+                    log_event({"event": "generate_review_dag_incomplete_fallback_v2", "sections": len(resp["results"]), "latency_ms": took})
+                    return resp
+                except Exception as e2:
+                    log_event({"event": "dag_incomplete_v2_error", "error": str(e2)[:200]})
             # If DAG produced no results, fall back to V2 to avoid empty responses
             if not results_sections:
                 try:
