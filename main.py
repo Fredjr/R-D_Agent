@@ -428,7 +428,7 @@ def _validate_or_repair_summary(obj: Dict[str, object], objective: str, abstract
         except Exception:
             pass
         # Minimal fallback
-        obj.setdefault("summary", str(obj.get("summary", "")).strip() or abstract[:400])
+        obj.setdefault("summary", str(obj.get("summary", "")).strip() or abstract[:1500])
         obj.setdefault("relevance_justification", "")
         return obj
 
@@ -1710,7 +1710,7 @@ Abstract: {abstract}
             except Exception:
                 pass
         except Exception:
-            structured = {"summary": abstract[:400], "confidence_score": 60, "methodologies": []}
+            structured = {"summary": abstract[:1500], "confidence_score": 60, "methodologies": []}
             # Ensure anchors even on summarization failure
             try:
                 fa_fb = _fallback_fact_anchors(abstract, art, max_items=2)
