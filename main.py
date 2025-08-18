@@ -873,7 +873,8 @@ def _build_dag_app():
                     try:
                         fa = res.get("fact_anchors")
                         if not (isinstance(fa, list) and len(fa) > 0):
-                            fa_fb = _fallback_fact_anchors(art.get("abstract") or art.get("summary") or "", art, max_items=3)
+                            # Cap fallback anchors to reduce per-article work
+                            fa_fb = _fallback_fact_anchors(art.get("abstract") or art.get("summary") or "", art, max_items=2)
                             if fa_fb:
                                 res["fact_anchors"] = _lightweight_entailment_filter(art.get("abstract") or art.get("summary") or "", fa_fb)
                     except Exception:
@@ -1481,8 +1482,8 @@ Abstract: {abstract}
                     # entailment filter (NLI if enabled, else lightweight)
                     structured["fact_anchors"] = _nli_entailment_filter(abstract, structured["fact_anchors"], deadline)  # type: ignore
                 else:
-                    # Fallback: synthesize simple anchors from abstract
-                    fa_fb = _fallback_fact_anchors(abstract, art, max_items=3)
+                    # Fallback: synthesize simple anchors from abstract (cap to 2)
+                    fa_fb = _fallback_fact_anchors(abstract, art, max_items=2)
                     if fa_fb:
                         structured["fact_anchors"] = _lightweight_entailment_filter(abstract, fa_fb)
             except Exception:
@@ -1491,7 +1492,7 @@ Abstract: {abstract}
             structured = {"summary": abstract[:400], "confidence_score": 60, "methodologies": []}
             # Ensure anchors even on summarization failure
             try:
-                fa_fb = _fallback_fact_anchors(abstract, art, max_items=3)
+                fa_fb = _fallback_fact_anchors(abstract, art, max_items=2)
                 if fa_fb:
                     structured["fact_anchors"] = _lightweight_entailment_filter(abstract, fa_fb)
             except Exception:
@@ -1588,7 +1589,11 @@ Abstract: {abstract}
         structured["overall_relevance_score"] = round(overall, 1)
         # Specialist-tailored relevance justification
         try:
-            if not structured.get("relevance_justification") and _time_left(deadline) > 3.0:
+            # Guarantee a small slice for specialist relevance if current text is empty or too generic
+            cur = str(structured.get("relevance_justification", "")).strip()
+            need_specialist = (len(cur) < 40)
+            if need_specialist and _time_left(deadline) > 1.5:
+                # Reserve ~1.5s within the remaining deadline
                 rj = _specialist_relevance_justification(objective, art, structured.get("summary", ""), deadline)
                 if isinstance(rj, dict):
                     if rj.get("text"):
