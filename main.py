@@ -1740,6 +1740,15 @@ Abstract: {abstract}
                                 fa["evidence"] = ev
                     # entailment filter (NLI if enabled, else lightweight)
                     structured["fact_anchors"] = _nli_entailment_filter(abstract, structured["fact_anchors"], deadline)  # type: ignore
+                    # If anchors remain weak, synthesize light fallback anchors
+                    try:
+                        cur = structured.get("fact_anchors") or []
+                        if (not isinstance(cur, list)) or len(cur) < 2:
+                            fa_fb = _fallback_fact_anchors(abstract, art, max_items=2)
+                            if fa_fb:
+                                structured["fact_anchors"] = _lightweight_entailment_filter(abstract, fa_fb)
+                    except Exception:
+                        pass
                 else:
                     # Fallback: synthesize simple anchors from abstract (cap to 2)
                     fa_fb = _fallback_fact_anchors(abstract, art, max_items=2)
@@ -2006,7 +2015,7 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
     }
     return {
         "queries": [v for k, v in plan.items() if isinstance(v, str)],
-        "results": results_sections,
+        "results": _apply_diversity_quota(results_sections),
         "diagnostics": diagnostics,
         "executive_summary": executive_summary,
     }
@@ -2193,19 +2202,76 @@ def _collect_findings(results_sections: list[dict], limit: int = 8) -> str:
     return "\n\n".join(snippets)
 
 
+def _infer_indication(text: str) -> str:
+    t = (text or "").lower()
+    if any(k in t for k in ["melanoma"]):
+        return "melanoma"
+    if any(k in t for k in ["nsclc", "non-small cell", "lung cancer"]):
+        return "nsclc"
+    if any(k in t for k in ["colorectal", "crc"]) :
+        return "crc"
+    if any(k in t for k in ["renal cell", "rcc"]) :
+        return "rcc"
+    if any(k in t for k in ["breast cancer"]) :
+        return "breast"
+    if any(k in t for k in ["ovarian"]) :
+        return "ovarian"
+    if any(k in t for k in ["hepatocellular", "hcc"]) :
+        return "hcc"
+    if any(k in t for k in ["urothelial", "bladder"]) :
+        return "uc"
+    return "other"
+
+
+def _apply_diversity_quota(sections: list[dict], min_per_bucket: int = 1) -> list[dict]:
+    """Reorder sections to guarantee spread across indications when present, without dropping items.
+    Works for any molecule/description by inferring indication from title/summary.
+    """
+    if not sections or len(sections) <= 3:
+        return sections
+    buckets: dict[str, list[dict]] = {}
+    for sec in sections:
+        top = sec.get("top_article") or {}
+        title = (top.get("title") or "")
+        summary = str((sec.get("result") or {}).get("summary", ""))
+        ind = _infer_indication(title + " " + summary)
+        buckets.setdefault(ind, []).append(sec)
+    # Round-robin selection across buckets to produce a diversified order
+    ordered: list[dict] = []
+    # Prioritize known buckets, then others
+    order_keys = ["melanoma", "nsclc", "crc", "rcc", "breast", "ovarian", "hcc", "uc"]
+    other_keys = [k for k in buckets.keys() if k not in order_keys]
+    keys = [k for k in order_keys if k in buckets] + other_keys
+    # Round-robin until we exhaust or reach original length
+    idx = 0
+    while len(ordered) < len(sections):
+        progressed = False
+        for k in keys:
+            lst = buckets.get(k) or []
+            if idx < len(lst):
+                ordered.append(lst[idx])
+                progressed = True
+                if len(ordered) >= len(sections):
+                    break
+        if not progressed:
+            break
+        idx += 1
+    return ordered if len(ordered) == len(sections) else sections
+
 def _synthesize_executive_summary(objective: str, results_sections: list[dict], deadline: float) -> str:
+    # If anchors across sections look weak, save more time for evidence/NLI upstream by shortening synthesis window
     if not results_sections or _time_left(deadline) < 3.0:
         return ""
     findings = _collect_findings(results_sections)
     plan = _build_synthesis_plan(objective)
     mech = bio = resis = clin = pat = ""
     try:
-        if "mechanism" in plan and _time_left(deadline) > 2.0:
+        if "mechanism" in plan and _time_left(deadline) > 1.5:
             mech = mechanism_analyst_chain.invoke({"objective": objective, "findings": findings}).get("text", "")
     except Exception:
         mech = ""
     try:
-        if "biomarker" in plan and _time_left(deadline) > 2.0:
+        if "biomarker" in plan and _time_left(deadline) > 1.5:
             bio = biomarker_analyst_chain.invoke({"objective": objective, "findings": findings}).get("text", "")
     except Exception:
         bio = ""
