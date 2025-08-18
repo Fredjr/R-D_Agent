@@ -2858,6 +2858,37 @@ async def generate_review(request: ReviewRequest):
                 raise RuntimeError("DAG graph unavailable")
             out = await _DAG_APP.ainvoke(state)
             results_sections = out.get("results_sections", [])
+            # If DAG produced fewer sections than desired (e.g., 13 for recall, 8 for precision), top-up from V2 results
+            try:
+                pref_str = str(getattr(request, "preference", "precision") or "precision").lower()
+            except Exception:
+                pref_str = "precision"
+            desired_min = 13 if pref_str == "recall" else 8
+            try:
+                if MULTISOURCE_ENABLED and results_sections and (len(results_sections) < desired_min):
+                    v2_extra = await orchestrate_v2(request, memories)
+                    existing_keys = set()
+                    for sec in results_sections:
+                        top = (sec.get("top_article") or {})
+                        existing_keys.add(f"{top.get('pmid')}||{top.get('title')}")
+                    for sec in (v2_extra.get("results") or []):
+                        if len(results_sections) >= desired_min:
+                            break
+                        top = (sec.get("top_article") or {})
+                        key = f"{top.get('pmid')}||{top.get('title')}"
+                        if key in existing_keys:
+                            continue
+                        existing_keys.add(key)
+                        results_sections.append(sec)
+                    # If diagnostics existed, annotate and update deep count
+                    try:
+                        diag = out.get("diagnostics") or {}
+                        diag = {**diag, "deep_dive_count": int(len(results_sections)), "dag_topped_up": True, "desired_min": desired_min}
+                        out["diagnostics"] = diag
+                    except Exception:
+                        pass
+            except Exception:
+                pass
             # Synthesize minimal diagnostics if Scorecard didn't run
             if "diagnostics" not in out:
                 try:
