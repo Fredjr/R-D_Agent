@@ -822,7 +822,14 @@ def _build_dag_app():
             time_left = _time_left(state["deadline"])
             sc_cap, deep_pref = _compute_controller_caps(getattr(request, "preference", "precision"), len(norm), time_left)
             triage_cap = min(TRIAGE_TOP_K, sc_cap)
-            shortlist = _triage_rank(request.objective, norm, triage_cap)
+            # Build molecule tokens for gating across molecules
+            mol_tokens = []
+            try:
+                if mol:
+                    mol_tokens = [mol] + _expand_molecule_synonyms(mol)
+            except Exception:
+                mol_tokens = [mol] if mol else []
+            shortlist = _triage_rank(request.objective, norm, triage_cap, None, mol_tokens)
             # Cross-encoder re-ranking for DAG shortlist if enabled and time remains
             try:
                 if cross_encoder is not None and time_left > 5.0:
@@ -1353,7 +1360,13 @@ def _filter_by_molecule(candidates: list[dict], molecule: str | None) -> list[di
             continue
     return filtered if filtered else candidates
 
-def _triage_rank(objective: str, candidates: list[dict], max_keep: int, project_vec: np.ndarray | None = None) -> list[dict]:
+def _triage_rank(
+    objective: str,
+    candidates: list[dict],
+    max_keep: int,
+    project_vec: np.ndarray | None = None,
+    molecule_tokens: list[str] | None = None,
+) -> list[dict]:
     # Use existing _score_article-like features; reuse embeddings cosine
     try:
         objective_vec = np.array(EMBED_CACHE.get_or_compute(objective or ""), dtype=float)
@@ -1363,11 +1376,24 @@ def _triage_rank(objective: str, candidates: list[dict], max_keep: int, project_
         obj_norm = 1.0
     obj_lc = (objective or "").lower()
     is_pd1_objective = any(k in obj_lc for k in ["pd-1", "pd1", "pd-l1", "programmed death", "programmed-death"])
+    # Signals lexicon for broader objectives (extensible)
+    signal_lexicon = [
+        "pd-1", "pd1", "pd-l1", "pdl1", "ctla-4", "ctla4", "tigit", "lag-3", "lag3", "ido", "ido1",
+        "msi-h", "dmmr", "tmb", "neoantigen", "pdl-1", "gep", "ifn-",
+    ]
+    required_hits = any(tok in obj_lc for tok in signal_lexicon)
+    # Negative topic demotions (tangential unless co-mentioned with molecule)
+    tangential_terms = [
+        "t-vec", "talimogene", "laherparepvec", "oncolytic", "virotherapy", "herpes simplex virus", "hf-10", "oncorine", "measles virus"
+    ]
+    mol_tokens_lc = [t.lower() for t in (molecule_tokens or []) if t]
     def score_one(a: dict) -> float:
         text = f"{a.get('title','')} {a.get('abstract','')}`".lower()
         mech_hits = sum(1 for kw in ["mechanism", "pathway", "inhibit", "agonist", "antagonist"] if kw in text)
         # Signal presence
         has_icp = any(tok in text for tok in ["pd-1", "pd1", "pd-l1", "programmed death", "programmed-death", "checkpoint"])
+        has_molecule = any(mt in text for mt in mol_tokens_lc) if mol_tokens_lc else False
+        has_required = has_icp or any(tok in text for tok in signal_lexicon)
         # Domain filter (demotions) and context boosts
         social_terms = [
             "social media", "pharmacovigilance", "aesthetic", "plastic", "marketing", "influencer",
@@ -1411,6 +1437,12 @@ def _triage_rank(objective: str, candidates: list[dict], max_keep: int, project_
             score -= 0.2
         elif is_pd1_objective and has_icp:
             score += 0.05
+        # Generic gating: if neither molecule nor required signals appear, demote
+        if not has_molecule and not has_required:
+            score -= 0.15
+        # Tangential demotion: if oncolytic/virotherapy appears without molecule co-mention, demote more strongly
+        if any(tt in text for tt in tangential_terms) and not has_molecule:
+            score -= 0.25
         # Demote social/aesthetic drift
         if any(term in text for term in social_terms):
             score -= 0.2
@@ -1706,7 +1738,15 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
     if _time_left(deadline) < 15.0:
         triage_cap = min(triage_cap, 24)
     proj_vec = _project_interest_vector(memories)
-    shortlist = _triage_rank(request.objective, norm, triage_cap, proj_vec)
+    # Build molecule tokens for generalization across molecules
+    mol_tokens: list[str] = []
+    try:
+        mol_v2 = getattr(request, "molecule", None)
+        if mol_v2:
+            mol_tokens = [mol_v2] + _expand_molecule_synonyms(mol_v2)
+    except Exception:
+        mol_tokens = []
+    shortlist = _triage_rank(request.objective, norm, triage_cap, proj_vec, mol_tokens)
     # Cross-encoder re-ranking for V2 shortlist
     try:
         if cross_encoder is not None and _time_left(deadline) > 5.0:
