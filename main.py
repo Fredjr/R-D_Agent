@@ -759,18 +759,73 @@ def _build_dag_app():
             plan = state.get("plan", {})
             arts: list[dict] = []
             deadline = state["deadline"]
-            # PubMed (bounded pool)
+            # PubMed (bounded pool) – parallel per-query with retry and min-pool guard
             pubmed_items: list[dict] = []
-            # Run all planned PubMed queries unless we're very close to deadline
-            for key in ("review_query", "mechanism_query", "broad_query", "recall_mechanism_query", "recall_broad_query"):
-                if _time_left(deadline) < 2.0:
-                    break
-                q = plan.get(key)
-                if q:
-                    pubmed_items += await _with_timeout(asyncio.to_thread(_harvest_pubmed, q, deadline), HARVEST_BUDGET_S, "Harvest", retries=1)
-                if len(pubmed_items) >= PUBMED_POOL_MAX:
-                    break
+            keys_order = ("review_query", "mechanism_query", "broad_query", "recall_mechanism_query", "recall_broad_query")
+            queries: list[str] = [plan.get(k) for k in keys_order if plan.get(k)]
+            # Helper to run one query with timeout
+            async def _run_one(q: str) -> list[dict]:
+                if _time_left(deadline) <= 0.8:
+                    return []
+                try:
+                    return await _with_timeout(asyncio.to_thread(_harvest_pubmed, q, deadline), HARVEST_BUDGET_S, "Harvest", retries=1)
+                except Exception:
+                    return []
+            # First pass: run all in parallel
+            if queries and _time_left(deadline) > 1.0:
+                results = await asyncio.gather(*[_run_one(q) for q in queries], return_exceptions=True)
+                for res in results:
+                    if isinstance(res, list):
+                        pubmed_items += res
+            # Retry lightly for weak queries (returned <3)
+            if _time_left(deadline) > 2.0:
+                weak_indices = []
+                for idx, q in enumerate(queries):
+                    try:
+                        # Count how many items from this q by checking source_query
+                        cnt = sum(1 for a in pubmed_items if isinstance(a, dict) and a.get("source_query") == q)
+                        if cnt < 3:
+                            weak_indices.append(idx)
+                    except Exception:
+                        continue
+                if weak_indices:
+                    retry_res = await asyncio.gather(*[_run_one(queries[i]) for i in weak_indices], return_exceptions=True)
+                    for res in retry_res:
+                        if isinstance(res, list):
+                            pubmed_items += res
             arts += pubmed_items[:PUBMED_POOL_MAX]
+            # Min-pool guard: relax and re-harvest if pool is too small
+            if len(arts) < 10 and _time_left(deadline) > 4.0:
+                # Prefer recall queries if present, else broaden existing ones
+                relaxed: list[str] = []
+                for k in ("recall_mechanism_query", "recall_broad_query", "broad_query"):
+                    q = plan.get(k)
+                    if q:
+                        relaxed.append(q)
+                # If still nothing, strip review/systematic and [tiab] field tags from review/mechanism queries
+                def _relax_q(q: str) -> str:
+                    try:
+                        x = q
+                        x = x.replace("review[pt]", "").replace("systematic[sb]", "")
+                        x = x.replace("[tiab]", "").replace("[Title]", "")
+                        x = re.sub(r"\s+AND\s+\(\)\s*", " ", x)
+                        return re.sub(r"\s{2,}", " ", x).strip()
+                    except Exception:
+                        return q
+                if not relaxed:
+                    for k in ("review_query", "mechanism_query"):
+                        q = plan.get(k)
+                        if q:
+                            relaxed.append(_relax_q(q))
+                # Run relaxed queries in parallel
+                if relaxed and _time_left(deadline) > 2.0:
+                    relax_res = await asyncio.gather(*[_run_one(q) for q in relaxed], return_exceptions=True)
+                    for res in relax_res:
+                        if isinstance(res, list):
+                            arts += res
+                # Cap again
+                if len(arts) > PUBMED_POOL_MAX:
+                    arts = arts[:PUBMED_POOL_MAX]
             # Trials
             if _time_left(deadline) > 1.0 and plan.get("clinical_query"):
                 arts += await _with_timeout(asyncio.to_thread(_harvest_trials, plan.get("clinical_query"), deadline), HARVEST_BUDGET_S, "Harvest", retries=1)
