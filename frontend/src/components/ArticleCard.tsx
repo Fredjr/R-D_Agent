@@ -133,6 +133,22 @@ export default function ArticleCard({ item }: Props) {
               <div className="mt-2 text-xs text-slate-600">
                 Weighted Overall = 40% Similarity + 20% Recency + 20% Impact + 20% Contextual Match
               </div>
+              {(() => {
+                const sb = (item.result as any).score_breakdown || {};
+                const tokens: string[] = Array.isArray(sb.matched_tokens) ? sb.matched_tokens : [];
+                const cosine = typeof sb.cosine_similarity === 'number' ? sb.cosine_similarity : undefined;
+                if (!tokens.length && cosine === undefined) return null;
+                return (
+                  <div className="mt-2 border-t border-slate-200 pt-2 text-xs text-slate-700">
+                    {tokens.length > 0 && (
+                      <div className="mb-1"><span className="font-medium">Matched tokens:</span> {tokens.join(', ')}</div>
+                    )}
+                    {cosine !== undefined && (
+                      <div><span className="font-medium">Cosine similarity (objective vs abstract/title):</span> {Math.round(cosine)} / 100</div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           ) : null}
         </div>
