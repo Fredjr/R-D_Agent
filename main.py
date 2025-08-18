@@ -580,6 +580,54 @@ def _expand_molecule_synonyms(molecule: str, limit: int = 6) -> list[str]:
 # Per-corpus planners (PubMed / Trials / Web / Patents)
 # ---------------------
 
+def _extract_signals(objective: str) -> list[str]:
+    """Heuristic signal extractor from Description/objective across domains.
+    Returns a small list of keywords to inject into recall queries.
+    """
+    obj = (objective or "").lower()
+    signals: list[str] = []
+    try:
+        # Immuno/checkpoints
+        if any(k in obj for k in ["pd-1", "pd1", "pd-l1", "pdl1", "checkpoint", "immunotherapy", "t cell", "t-cell"]):
+            signals += ["PD-1", "PD-L1", "checkpoint", "T cell", "IFN-γ", "neoantigen"]
+        if any(k in obj for k in ["ctla-4", "ctla4", "lag-3", "lag3", "tigit"]):
+            signals += ["CTLA-4", "LAG-3", "TIGIT"]
+        # DNA repair / PARP / HRR
+        if any(k in obj for k in ["brca", "parp", "hrr", "homologous recombination"]):
+            signals += ["BRCA1", "BRCA2", "PARP", "RAD51", "homologous recombination"]
+        # Angiogenesis
+        if any(k in obj for k in ["vegf", "vegfa", "angiogenesis"]):
+            signals += ["VEGF", "VEGFA", "angiogenesis"]
+        # MAPK / RTK signaling
+        if any(k in obj for k in ["braf", "kras", "egfr", "mapk", "ras"]):
+            signals += ["BRAF", "KRAS", "EGFR", "MAPK"]
+        # Endocrine (examples)
+        if any(k in obj for k in ["estrogen receptor", "er+", "androgen receptor", "ar+"]):
+            signals += ["estrogen receptor", "androgen receptor"]
+        # Metabolic/incretin
+        if any(k in obj for k in ["glp-1", "glp1", "incretin", "semaglutide", "liraglutide"]):
+            signals += ["GLP-1", "incretin", "cAMP", "PKA"]
+        # Inflammation/cytokines
+        if any(k in obj for k in ["il-6", "il6", "tnf", "cytokine"]):
+            signals += ["IL-6", "TNF-α", "cytokine"]
+        # Biomarker common
+        if any(k in obj for k in ["msi", "msi-h", "dmmr", "tmb", "mutational burden", "gep", "gene expression"]):
+            signals += ["MSI-H", "dMMR", "TMB", "gene expression profile"]
+    except Exception:
+        pass
+    # Dedup and limit
+    out: list[str] = []
+    seen: set[str] = set()
+    for s in signals:
+        if not s:
+            continue
+        k = s.strip().lower()
+        if k in seen:
+            continue
+        seen.add(k)
+        out.append(s)
+    return out[:8]
+
 def _plan_pubmed_queries(molecule: str, synonyms: list[str], objective: str, preference: str | None = None) -> dict:
     mol = _sanitize_molecule_name(molecule)
     tokens_tiab = "(" + " OR ".join([f'"{t}"[tiab]' for t in ([mol] + synonyms) if t]) + ")" if mol else ""
@@ -597,12 +645,10 @@ def _plan_pubmed_queries(molecule: str, synonyms: list[str], objective: str, pre
         bio_signals += ["PD-L1 CPS"]
     if any(k in obj_tokens for k in ["ifn", "ifn-γ", "ifn-g", "gep", "gene", "expression"]):
         bio_signals += ["IFN-γ", "gene expression profile"]
-    # Signals extractor (feature-flagged): enrich signals list from objective text
+    # Signals extractor (feature-flagged): enrich signals list from objective text across domains
     if SIGNAL_EXTRACTOR_ENABLED:
         try:
-            for k in ("pd-1", "pd-l1", "ctla-4", "lag-3", "tigit", "msi", "dmmr", "tmb", "neoantigen", "ifn", "gep"):
-                if any(k in x for x in obj_tokens):
-                    bio_signals.append(k.upper())
+            bio_signals += _extract_signals(objective)
         except Exception:
             pass
     # MeSH expansion (feature-flagged): add MeSH terms for molecule and PD-1/PD-L1
@@ -611,7 +657,9 @@ def _plan_pubmed_queries(molecule: str, synonyms: list[str], objective: str, pre
         try:
             if mol:
                 mesh_terms += [f'"{mol}"[mesh]']
-            mesh_terms += ['"Programmed Cell Death 1 Receptor"[mesh]', '"Programmed Cell Death 1 Ligand 1 Protein"[mesh]']
+            # Only add checkpoint MeSH when objective mentions checkpoint terms to avoid bias
+            if any(k in obj_tokens for k in ["pd", "checkpoint", "immunotherapy", "t", "pdl1", "pd1", "pd-1", "pd-l1"]):
+                mesh_terms += ['"Programmed Cell Death 1 Receptor"[mesh]', '"Programmed Cell Death 1 Ligand 1 Protein"[mesh]']
         except Exception:
             pass
     mesh_clause = (" OR ".join(mesh_terms)) if mesh_terms else ""
