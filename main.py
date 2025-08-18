@@ -1156,29 +1156,51 @@ def _ensure_relevance_fields(structured: Dict[str, object], molecule: str, objec
         title = (top_article or {}).get("title") or "this article"
         year = (top_article or {}).get("pub_year") or ""
         mol = (molecule or "the molecule").strip()
-        obj_l = (objective or "").lower()
-        # Heuristic extraction of salient mechanistic/biomarker signals
-        tokens: list[str] = []
-        def add_if(txt: str, *keys: str) -> None:
-            tl = txt.lower()
-            if any(k in tl for k in keys):
-                tokens.append(keys[0])
-        add_if(obj_l + " " + abs_text, "pd-1/pd-l1", "pd-1", "pd-l1", "immune checkpoint")
-        add_if(abs_text, "tmb", "tumor mutational burden")
-        add_if(abs_text, "msi-h/dmmr", "msi-h", "dmmr")
-        add_if(abs_text, "pd-l1 cps", "combined positive score", "cps")
-        add_if(abs_text, "ifn-γ gep", "ifn-γ", "ifn-g", "gene expression profile")
-        add_if(abs_text, "t cell activation", "t cell", "t-cell")
-        sig = ", ".join(dict.fromkeys(tokens)) if tokens else None
-        core = f"Selected for {mol} vs objective: {objective}."
-        if sig:
-            structured["relevance_justification"] = (
-                f"{core} Evidence in {title}{f' ({year})' if year else ''} mentions: {sig}."
-            )
-        else:
-            structured["relevance_justification"] = (
-                f"{core} High mechanistic alignment found in {title}{f' ({year})' if year else ''}."
-            )
+        obj_txt = (objective or "").strip()
+        # Matched tokens between objective and abstract
+        def _tokenize(txt: str) -> list[str]:
+            return [t for t in re.split(r"[^a-zA-Z0-9\-]+", (txt or "").lower()) if len(t) >= 4]
+        abs_tokens = set(_tokenize(abs_text))
+        obj_tokens = set(_tokenize(obj_txt))
+        matched_tokens = sorted(list((obj_tokens & abs_tokens)))[:6]
+        matched_part = ", ".join(matched_tokens) if matched_tokens else "—"
+        # Signals from objective and abstract
+        sigs = []
+        try:
+            for s in _extract_signals(objective):
+                if s.lower() in abs_text:
+                    sigs.append(s)
+        except Exception:
+            pass
+        signals_part = ", ".join(dict.fromkeys(sigs)) if sigs else "—"
+        # Why selected: based on impact/recency/contextual match if present
+        sb = structured.get("score_breakdown") or {}
+        try:
+            ctx = float(sb.get("contextual_match_score", 0) or 0)
+        except Exception:
+            ctx = 0.0
+        try:
+            rec = float(sb.get("recency_score", 0) or 0)
+        except Exception:
+            rec = 0.0
+        try:
+            imp = float(sb.get("impact_score", 0) or 0)
+        except Exception:
+            imp = 0.0
+        why_bits: list[str] = []
+        if ctx >= 70:  # strong alignment
+            why_bits.append("mechanistic alignment")
+        if imp >= 70:
+            why_bits.append("high impact")
+        if rec >= 60:
+            why_bits.append("recent")
+        why_part = ", ".join(why_bits) if why_bits else "balanced evidence"
+        # Limitation heuristic
+        limitation = "older review" if rec < 30 else ("broad scope" if ctx < 30 else "")
+        lim_part = f"; limitation: {limitation}." if limitation else "."
+        structured["relevance_justification"] = (
+            f"Matched tokens: {matched_part}. Signals: {signals_part}. Why selected: {why_part} based on {title}{f' ({year})' if year else ''}{lim_part}"
+        )
     # Sanitize numeric fields to avoid NaN in UI
     structured["confidence_score"] = int(_sanitize_number(structured.get("confidence_score", 60), 60))
     structured["publication_score"] = round(_sanitize_number(structured.get("publication_score", 0.0), 0.0), 1)
@@ -1235,6 +1257,22 @@ def _ensure_score_breakdown(structured: Dict[str, object], objective: str, abstr
                 sb["contextual_match_score"] = round(float(contextual_match_score or 0.0), 1)
             except Exception:
                 sb["contextual_match_score"] = round(float(contextual_match_score or 0.0), 1)
+        # Glass-box extras for transparency
+        try:
+            obj_toks = [t for t in re.split(r"[^a-zA-Z0-9\-]+", (objective or "").lower()) if len(t) >= 4]
+            abs_toks = [t for t in re.split(r"[^a-zA-Z0-9\-]+", (abstract or "").lower()) if len(t) >= 4]
+            matches = sorted(list(dict.fromkeys(set(obj_toks) & set(abs_toks))))[:10]
+            sb["matched_tokens"] = matches
+        except Exception:
+            pass
+        try:
+            obj_vec = np.array(EMBED_CACHE.get_or_compute(objective or ""), dtype=float)
+            abs_vec = np.array(EMBED_CACHE.get_or_compute(abstract or (top_article or {}).get("title") or ""), dtype=float)
+            denom = (float(np.linalg.norm(obj_vec)) or 1.0) * (float(np.linalg.norm(abs_vec)) or 1.0)
+            cosine = float(np.dot(obj_vec, abs_vec) / denom)
+            sb["cosine_similarity"] = round(100 * max(-1.0, min(1.0, cosine)), 1)
+        except Exception:
+            pass
     except Exception:
         # last-resort defaults
         structured.setdefault("score_breakdown", {  # type: ignore
