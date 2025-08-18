@@ -1136,7 +1136,7 @@ def _build_dag_app():
                     _ensure_score_breakdown(d.get("result", {}), request.objective, art.get("abstract") or art.get("summary") or "", top, None)
                 except Exception:
                     pass
-                # Ensure article-specific relevance justification
+                # Ensure article-specific relevance justification (tightened template ensures signals + why vs others + limitation)
                 try:
                     _ensure_relevance_fields(d.get("result", {}), getattr(request, "molecule", ""), getattr(request, "objective", ""), {
                         "title": top.get("title"),
@@ -2493,7 +2493,12 @@ def _specialist_relevance_justification(objective: str, article: dict, summary: 
     try:
         if pieces and _time_left(deadline) > 2.0:
             synth_prompt = """
-            You are the Project Manager. Synthesize the analyst notes below into a single 1-2 sentence, plain-language relevance_justification tailored to the user's objective. Mention which signal(s) triggered inclusion (e.g., PD-1/PD-L1, TMB/GEP, resistance pathway) and the molecule/pathway where applicable.
+            You are the Project Manager. Synthesize the analyst notes below into a single 1-2 sentence relevance_justification tailored to the user's objective.
+            Strictly include all of the following in ONE compact paragraph (no bullets):
+            - Mention which signal(s) triggered inclusion (e.g., PD-1/PD-L1, TMB/GEP, dMMR/MSI-H, JAK1/2, B2M) and the molecule/pathway where applicable.
+            - Why this article vs others: cite one discriminative reason (e.g., stronger mechanistic specificity, larger cohort, prospective design, higher CPY, direct pembrolizumab evidence).
+            - One-line limitation (e.g., older cohort, single-arm, non-specific ICPI, non-index disease).
+            Keep it article-specific; avoid generic statements.
             Analyst Notes:\n{notes}
             """
             p = PromptTemplate(template=synth_prompt, input_variables=["notes"])
