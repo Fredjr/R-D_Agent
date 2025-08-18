@@ -714,11 +714,12 @@ def _plan_pubmed_queries(molecule: str, synonyms: list[str], objective: str, pre
             (f'(({tokens_tiab} OR {tokens_title}{(" OR "+mesh_clause) if mesh_clause else ""}) AND ')
             if (tokens_tiab or tokens_title or mesh_clause) else "("
         ) + '(("mechanism"[tiab] OR "mechanism of action"[tiab] OR "signaling"[tiab] OR "pathway"[tiab])' + (f" OR {' OR '.join(extra)}" if extra else "") + '))'
-        # Broad recall: remove explicit mechanism requirement; rely on objective tokens and title bias
-        recall_broad = (
-            (f'(({tokens_tiab} OR {tokens_title}{(" OR "+mesh_clause) if mesh_clause else ""}) AND ')
-            if (tokens_tiab or tokens_title or mesh_clause) else "("
-        ) + '(humans[mesh]))'
+        # Broad recall: allow results without molecule tokens (loosen gating) while still biasing if present
+        if (tokens_tiab or tokens_title or mesh_clause):
+            prefix = f'({tokens_tiab} OR {tokens_title}{(" OR "+mesh_clause) if mesh_clause else ""}) OR '
+        else:
+            prefix = ""
+        recall_broad = "(" + prefix + "humans[mesh])"
     return {
         "review_query": review_query,
         "mechanism_query": mech_query,
@@ -984,7 +985,7 @@ def _build_dag_app():
                     mol_tokens = [mol] + _expand_molecule_synonyms(mol)
             except Exception:
                 mol_tokens = [mol] if mol else []
-            shortlist = _triage_rank(request.objective, norm, triage_cap, None, mol_tokens)
+            shortlist = _triage_rank(request.objective, norm, triage_cap, None, mol_tokens, getattr(request, "preference", None))
             # Cross-encoder re-ranking for DAG shortlist if enabled and time remains (robustness: blend CE with heuristic)
             try:
                 if cross_encoder is not None and time_left > 5.0:
@@ -1144,11 +1145,14 @@ def _build_dag_app():
                     "source": "primary",
                     "memories_used": len(memories or []),
                 })
+            # Always populate diagnostics, even if some earlier nodes returned empty, to avoid missing fields in UI
             diagnostics = {
-                "pool_size": len(state.get("norm") or []),
-                "shortlist_size": len(state.get("shortlist") or []),
-                "deep_dive_count": len(results_sections),
-                "timings_ms": {},
+                "pool_size": int(len(state.get("norm") or [])),
+                "shortlist_size": int(len(state.get("shortlist") or [])),
+                "deep_dive_count": int(len(results_sections)),
+                "timings_ms": {
+                    # Provide coarse timings if available in state; otherwise leave empty
+                },
                 "pool_caps": {"pubmed": PUBMED_POOL_MAX, "trials": TRIALS_POOL_MAX, "patents": PATENTS_POOL_MAX},
             }
             state.update({"results_sections": results_sections, "diagnostics": diagnostics})
@@ -1610,6 +1614,7 @@ def _triage_rank(
     max_keep: int,
     project_vec: np.ndarray | None = None,
     molecule_tokens: list[str] | None = None,
+    preference: str | None = None,
 ) -> list[dict]:
     # Use existing _score_article-like features; reuse embeddings cosine
     try:
@@ -1677,13 +1682,15 @@ def _triage_rank(
         cpy = cites / max(1, (nowy - year + 1)) if year else 0.0
         score = 0.5 * similarity + 0.2 * (min(mech_hits, 5) / 5.0) + 0.2 * (cpy / 100.0) + 0.1 * recency
         # Penalize lack of PD-1/PD-L1 signal when objective is about PD-1
+        pref_l = (preference or "").lower()
+        is_recall = (pref_l == "recall")
         if is_pd1_objective and not has_icp:
-            score -= 0.2
+            score -= (0.05 if is_recall else 0.2)
         elif is_pd1_objective and has_icp:
             score += 0.05
         # Generic gating: if neither molecule nor required signals appear, demote
         if not has_molecule and not has_required:
-            score -= 0.15
+            score -= (0.05 if is_recall else 0.15)
         # Tangential demotion: if oncolytic/virotherapy appears without molecule co-mention, demote more strongly
         if any(tt in text for tt in tangential_terms) and not has_molecule:
             score -= 0.25
@@ -1999,7 +2006,7 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
             mol_tokens = [mol_v2] + _expand_molecule_synonyms(mol_v2)
     except Exception:
         mol_tokens = []
-    shortlist = _triage_rank(request.objective, norm, triage_cap, proj_vec, mol_tokens)
+    shortlist = _triage_rank(request.objective, norm, triage_cap, proj_vec, mol_tokens, getattr(request, "preference", None))
     # Cross-encoder re-ranking for V2 shortlist
     try:
         if cross_encoder is not None and _time_left(deadline) > 5.0:
