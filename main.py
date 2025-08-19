@@ -512,6 +512,48 @@ def _fallback_fact_anchors(abstract: str, art: dict, max_items: int = 3) -> list
         return []
 
 
+def _normalize_anchor_quotes(abstract: str, anchors: list[dict]) -> list[dict]:
+    """Replace truncated quotes containing ellipses with the full sentence from the abstract.
+
+    Preserves existing claims; only adjusts evidence.quote when a matching full sentence is found.
+    """
+    try:
+        text = (abstract or "").strip()
+        if not text or not isinstance(anchors, list):
+            return anchors
+        # Split abstract into sentences
+        sentences: list[str] = []
+        for seg in re.split(r"(?<=[\.!?])\s+|\n+", text):
+            s = seg.strip()
+            if len(s) >= 20:
+                sentences.append(s)
+        if not sentences:
+            return anchors
+        normd: list[dict] = []
+        for a in anchors:
+            try:
+                ev = a.get("evidence") or {}
+                q = ev.get("quote")
+                if isinstance(q, str) and ("…" in q or "..." in q):
+                    q_clean = re.sub(r"\s+", " ", q.replace("…", "").replace("...", "")).strip()
+                    # Find a sentence containing the cleaned quote (case-insensitive)
+                    replacement = None
+                    q_lc = q_clean.lower()
+                    for s in sentences:
+                        if q_lc and q_lc in s.lower():
+                            replacement = s.strip()
+                            break
+                    if replacement:
+                        ev["quote"] = replacement
+                        a["evidence"] = ev
+                normd.append(a)
+            except Exception:
+                normd.append(a)
+        return normd
+    except Exception:
+        return anchors
+
+
 # ---------------------
 # Objective tokenization and signal inference (generic, molecule-agnostic)
 # ---------------------
@@ -1918,6 +1960,11 @@ Abstract: {abstract}
                                 fa["evidence"] = ev
                     # entailment filter (NLI if enabled, else lightweight)
                     structured["fact_anchors"] = _nli_entailment_filter(abstract, structured["fact_anchors"], deadline)  # type: ignore
+                    # Normalize quotes to avoid ellipsis-truncated snippets
+                    try:
+                        structured["fact_anchors"] = _normalize_anchor_quotes(abstract, structured["fact_anchors"])  # type: ignore
+                    except Exception:
+                        pass
                     # If anchors remain weak, synthesize light fallback anchors
                     try:
                         cur = structured.get("fact_anchors") or []
@@ -1932,6 +1979,10 @@ Abstract: {abstract}
                     fa_fb = _fallback_fact_anchors(abstract, art, max_items=3)
                     if fa_fb:
                         structured["fact_anchors"] = _lightweight_entailment_filter(abstract, fa_fb)
+                        try:
+                            structured["fact_anchors"] = _normalize_anchor_quotes(abstract, structured["fact_anchors"])  # type: ignore
+                        except Exception:
+                            pass
             except Exception:
                 pass
         except Exception:
@@ -1941,6 +1992,10 @@ Abstract: {abstract}
                 fa_fb = _fallback_fact_anchors(abstract, art, max_items=3)
                 if fa_fb:
                     structured["fact_anchors"] = _lightweight_entailment_filter(abstract, fa_fb)
+                    try:
+                        structured["fact_anchors"] = _normalize_anchor_quotes(abstract, structured["fact_anchors"])  # type: ignore
+                    except Exception:
+                        pass
             except Exception:
                 pass
         top_article_payload = {
