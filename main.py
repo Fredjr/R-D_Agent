@@ -636,6 +636,36 @@ def _expand_molecule_synonyms(molecule: str, limit: int = 6) -> list[str]:
     return out[:limit]
 
 
+def _split_molecule_components(molecule: str) -> list[str]:
+    """Split combination molecules (e.g., "atezolizumab + bevacizumab") into sanitized components.
+
+    Delimiters handled: +, /, comma, semicolon, ' and ', ' plus '.
+    """
+    try:
+        raw = (molecule or "").strip()
+        if not raw:
+            return []
+        # Keep original for delimiter detection; sanitize components individually
+        parts = re.split(r"\s*(?:\+|/|,|;|\band\b|\bplus\b)\s*", raw, flags=re.IGNORECASE)
+        comps: list[str] = []
+        for p in parts:
+            sp = _sanitize_molecule_name(p)
+            if sp:
+                comps.append(sp)
+        # Deduplicate while preserving order
+        seen: set[str] = set()
+        uniq: list[str] = []
+        for c in comps:
+            cl = c.lower()
+            if cl in seen:
+                continue
+            seen.add(cl)
+            uniq.append(c)
+        return uniq
+    except Exception:
+        return []
+
+
 def _normalize_entities(text: str) -> str:
     """Systematically normalize common aliases for molecules/targets to reduce off-topic drift.
     Minimal, extensible map; safe across domains.
@@ -713,10 +743,20 @@ def _extract_signals(objective: str) -> list[str]:
 
 def _plan_pubmed_queries(molecule: str, synonyms: list[str], objective: str, preference: str | None = None) -> dict:
     mol = _sanitize_molecule_name(molecule)
-    tiab_terms = [t for t in ([mol] + synonyms) if t]
-    title_terms = [t for t in ([mol] + synonyms) if t]
-    tokens_tiab = ("(" + " OR ".join([f'"{t}"[tiab]' for t in tiab_terms]) + ")") if (mol and tiab_terms) else ""
-    tokens_title = ("(" + " OR ".join([f'"{t}"[Title]' for t in title_terms]) + ")") if (mol and title_terms) else ""
+    comps = _split_molecule_components(molecule)
+    # Build molecule tokens; if combination, require co-mention as primary clause
+    if comps and len(comps) >= 2:
+        and_tiab = "(" + " AND ".join([f'"{c}"[tiab]' for c in comps]) + ")"
+        and_title = "(" + " AND ".join([f'"{c}"[Title]' for c in comps]) + ")"
+        phrase_tiab = " OR ".join([f'"{" ".join(comps)}"[tiab]'])
+        phrase_title = " OR ".join([f'"{" ".join(comps)}"[Title]'])
+        tokens_tiab = f"({and_tiab} OR {phrase_tiab})"
+        tokens_title = f"({and_title} OR {phrase_title})"
+    else:
+        tiab_terms = [t for t in ([mol] + synonyms) if t]
+        title_terms = [t for t in ([mol] + synonyms) if t]
+        tokens_tiab = ("(" + " OR ".join([f'"{t}"[tiab]' for t in tiab_terms]) + ")") if (mol and tiab_terms) else ""
+        tokens_title = ("(" + " OR ".join([f'"{t}"[Title]' for t in title_terms]) + ")") if (mol and title_terms) else ""
     # Objective-derived tokens for general adaptability
     obj_tokens = [t for t in re.split(r"[^a-zA-Z0-9\-]+", (objective or "").lower()) if len(t) >= 3]
     # Common mechanism markers and biomarker signals inferred from objective (generic, molecule-agnostic)
@@ -790,7 +830,12 @@ def _plan_pubmed_queries(molecule: str, synonyms: list[str], objective: str, pre
 def _plan_trials_query(molecule: str, synonyms: list[str], objective: str) -> str:
     # ClinicalTrials.gov is accessed via a separate endpoint; simple textual expression
     base = _sanitize_molecule_name(molecule)
-    combo = " ".join(([base] + synonyms)).strip() or objective.strip()
+    comps = _split_molecule_components(molecule)
+    if comps and len(comps) >= 2:
+        combo_core = " AND ".join(comps)
+    else:
+        combo_core = base
+    combo = (" ".join(([combo_core] + synonyms)).strip() or objective.strip())
     obj_l = (objective or "").lower()
     is_glp1_context = any(k in obj_l for k in ["glp-1", "glp1", "semaglutide", "incretin", "type 2 diabetes", "t2d"])
     tail = "randomized OR human OR type 2 diabetes" if is_glp1_context else "randomized OR human"
@@ -798,7 +843,12 @@ def _plan_trials_query(molecule: str, synonyms: list[str], objective: str) -> st
 
 def _plan_web_query(molecule: str, synonyms: list[str], objective: str) -> str:
     base = _sanitize_molecule_name(molecule)
-    combo = (" ".join(([base] + synonyms)).strip() + " " + objective).strip()
+    comps = _split_molecule_components(molecule)
+    if comps and len(comps) >= 2:
+        core = " AND ".join([f'"{c}"' for c in comps])
+    else:
+        core = base
+    combo = (" ".join(([core] + synonyms)).strip() + " " + objective).strip()
     # Prefer mechanistic PDFs on reputable domains
     wl = ["nih.gov", "nature.com", "nejm.org", "lancet.com", "sciencedirect.com", "springer.com"]
     return f"{combo} mechanism (" + " OR ".join([f'site:{d}' for d in wl]) + ") filetype:pdf"
