@@ -791,10 +791,14 @@ def _plan_trials_query(molecule: str, synonyms: list[str], objective: str) -> st
     # ClinicalTrials.gov is accessed via a separate endpoint; simple textual expression
     base = _sanitize_molecule_name(molecule)
     combo = " ".join(([base] + synonyms)).strip() or objective.strip()
-    return f"{combo} randomized OR human OR type 2 diabetes"
+    obj_l = (objective or "").lower()
+    is_glp1_context = any(k in obj_l for k in ["glp-1", "glp1", "semaglutide", "incretin", "type 2 diabetes", "t2d"])
+    tail = "randomized OR human OR type 2 diabetes" if is_glp1_context else "randomized OR human"
+    return f"{combo} {tail}"
 
 def _plan_web_query(molecule: str, synonyms: list[str], objective: str) -> str:
-    combo = (" ".join(([molecule] + synonyms)).strip() + " " + objective).strip()
+    base = _sanitize_molecule_name(molecule)
+    combo = (" ".join(([base] + synonyms)).strip() + " " + objective).strip()
     # Prefer mechanistic PDFs on reputable domains
     wl = ["nih.gov", "nature.com", "nejm.org", "lancet.com", "sciencedirect.com", "springer.com"]
     return f"{combo} mechanism (" + " OR ".join([f'site:{d}' for d in wl]) + ") filetype:pdf"
@@ -1583,18 +1587,21 @@ def _inject_molecule_into_plan(plan: dict, molecule: str | None) -> dict:
     Conservative so we do not over-filter; no change if molecule already present.
     """
     try:
-        mol = (molecule or "").strip()
-        if not mol or not isinstance(plan, dict):
+        # Use sanitized molecule token to avoid over-specific phrases like "olaparib (AZD2281, Lynparza)"
+        base_mol = _sanitize_molecule_name(_normalize_entities(molecule or "")).strip()
+        if not base_mol or not isinstance(plan, dict):
             return plan
+        syns = _expand_molecule_synonyms(base_mol) if base_mol else []
+        tokens_lc = set([base_mol.lower()] + [s.lower() for s in syns])
+
         def ensure(term: str) -> str:
             q = str(plan.get(term) or "")
             if not q:
                 return q
             q_l = q.lower()
-            mol_l = mol.lower()
-            if mol_l in q_l:
+            if any(tok in q_l for tok in tokens_lc):
                 return q
-            prefix = f'("{mol}"[tiab] OR "{mol}"[Title]) AND '
+            prefix = f'("{base_mol}"[tiab] OR "{base_mol}"[Title]) AND '
             return f"{prefix}{q}"
         for key in ("mechanism_query", "review_query", "broad_query"):
             if key in plan:
