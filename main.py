@@ -619,16 +619,27 @@ def _expand_molecule_synonyms(molecule: str, limit: int = 6) -> list[str]:
         out.append(ss)
     _add(base)
     try:
-        for s in _fetch_pubchem_synonyms(base)[:limit*2]:
-            _add(_sanitize_molecule_name(s))
+        for s in _fetch_pubchem_synonyms(base)[:limit*3]:
+            cand = _sanitize_molecule_name(s)
+            # Filter out long chemical strings and raw formulas that hurt recall precision
+            if len(cand) > 40:
+                continue
+            if re.search(r"\d", cand) and len(cand.split()) > 4:
+                continue
+            _add(cand)
             if len(out) >= limit:
                 break
     except Exception:
         pass
     try:
         if len(out) < limit:
-            for s in _fetch_chembl_synonyms(base)[:limit*2]:
-                _add(_sanitize_molecule_name(s))
+            for s in _fetch_chembl_synonyms(base)[:limit*3]:
+                cand = _sanitize_molecule_name(s)
+                if len(cand) > 40:
+                    continue
+                if re.search(r"\d", cand) and len(cand.split()) > 4:
+                    continue
+                _add(cand)
                 if len(out) >= limit:
                     break
     except Exception:
@@ -706,8 +717,10 @@ def _extract_signals(objective: str) -> list[str]:
         if any(k in obj for k in ["ctla-4", "ctla4", "lag-3", "lag3", "tigit"]):
             signals += ["CTLA-4", "LAG-3", "TIGIT"]
         # DNA repair / PARP / HRR
-        if any(k in obj for k in ["brca", "parp", "hrr", "homologous recombination"]):
-            signals += ["BRCA1", "BRCA2", "PARP", "RAD51", "homologous recombination"]
+        if any(k in obj for k in ["brca", "parp", "hrr", "homologous recombination", "parpi", "rad51", "53bp1", "fork"]):
+            signals += ["BRCA1", "BRCA2", "PARP", "RAD51", "homologous recombination", "53BP1", "fork protection"]
+        if any(k in obj for k in ["resistance", "restore", "restoration", "reversion", "revert"]):
+            signals += ["resistance", "HR restoration"]
         # Angiogenesis
         if any(k in obj for k in ["vegf", "vegfa", "angiogenesis"]):
             signals += ["VEGF", "VEGFA", "angiogenesis"]
