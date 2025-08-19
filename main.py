@@ -3160,6 +3160,36 @@ async def generate_review(request: ReviewRequest):
                 "executive_summary": out.get("executive_summary", ""),
                 "memories": memories,
             }
+            # Final safety net: if results are under desired minimum, top-up from V2 here as well
+            try:
+                pref_str_final = str(getattr(request, "preference", "precision") or "precision").lower()
+            except Exception:
+                pref_str_final = "precision"
+            desired_min_final = 13 if pref_str_final == "recall" else 8
+            try:
+                if MULTISOURCE_ENABLED and len(resp.get("results") or []) < desired_min_final:
+                    v2_pad = await orchestrate_v2(request, memories)
+                    existing_keys_final = set()
+                    for sec in (resp.get("results") or []):
+                        top = (sec.get("top_article") or {})
+                        existing_keys_final.add(f"{top.get('pmid')}||{top.get('title')}")
+                    for sec in (v2_pad.get("results") or []):
+                        if len(resp["results"]) >= desired_min_final:
+                            break
+                        top = (sec.get("top_article") or {})
+                        key = f"{top.get('pmid')}||{top.get('title')}"
+                        if key in existing_keys_final:
+                            continue
+                        existing_keys_final.add(key)
+                        resp["results"].append(sec)
+                    # annotate diagnostics
+                    diag_f = resp.get("diagnostics") or {}
+                    diag_f["deep_dive_count"] = int(len(resp["results"]))
+                    diag_f["dag_topped_up"] = True
+                    diag_f["desired_min"] = desired_min_final
+                    resp["diagnostics"] = diag_f
+            except Exception:
+                pass
             took = _now_ms() - req_start
             _metrics_inc("latency_ms_sum", took)
             log_event({"event": "generate_review_dag", "sections": len(resp["results"]), "latency_ms": took})
