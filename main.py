@@ -288,6 +288,8 @@ PLAN_BUDGET_S = float(os.getenv("PLAN_BUDGET_S", "3"))
 HARVEST_BUDGET_S = float(os.getenv("HARVEST_BUDGET_S", "20"))
 TRIAGE_BUDGET_S = float(os.getenv("TRIAGE_BUDGET_S", "5"))
 DEEPDIVE_BUDGET_S = float(os.getenv("DEEPDIVE_BUDGET_S", "20"))
+# Soft ceiling per article during deep-dive to avoid long tails
+PER_ARTICLE_BUDGET_S = float(os.getenv("PER_ARTICLE_BUDGET_S", "7"))
 SYNTH_BUDGET_S = float(os.getenv("SYNTH_BUDGET_S", "5"))
 ENTAILMENT_BUDGET_S = float(os.getenv("ENTAILMENT_BUDGET_S", "2.5"))
 PUBMED_POOL_MAX = int(os.getenv("PUBMED_POOL_MAX", "80"))
@@ -480,14 +482,29 @@ def _fallback_fact_anchors(abstract: str, art: dict, max_items: int = 3) -> list
             s = seg.strip()
             if len(s) >= 40:  # discard very short fragments
                 parts.append(s)
-        claims = parts[:max_items] if parts else [(text[:200] + ("…" if len(text) > 200 else ""))]
+        # Prefer sentences containing quantitative markers or effect verbs; de-prioritize BACKGROUND sentences
+        priority: list[str] = []
+        secondary: list[str] = []
+        backgroundish: list[str] = []
+        for s in parts:
+            s_l = s.lower()
+            if any(k in s_l for k in ["%", "hazard ratio", "risk", "increase", "decrease", "improved", "reduced", "significant", "odds ratio", "relative risk", "p="]):
+                priority.append(s)
+            elif s_l.startswith("background:") or s_l.startswith("introduction:"):
+                backgroundish.append(s)
+            else:
+                secondary.append(s)
+        claims_ordered = priority + secondary + backgroundish
+        # Keep full sentences; avoid adding ellipsis; cap count only
+        claims = claims_ordered[:max_items] if claims_ordered else parts[:max_items]
         anchors: list[dict] = []
         for c in claims:
             ev = {
                 "title": art.get("title"),
                 "year": art.get("pub_year"),
                 "pmid": art.get("pmid"),
-                "quote": c[:240],
+                # Keep the full sentence; UI will handle visual truncation if needed
+                "quote": c.strip(),
             }
             anchors.append({"claim": c, "evidence": ev})
         return anchors[:max_items]
@@ -991,11 +1008,18 @@ def _build_dag_app():
                 if cross_encoder is not None and time_left > 5.0:
                     pairs = [(request.objective or "", (a.get('title') or '') + ". " + (a.get('abstract') or '')) for a in shortlist[:30]]
                     scores = cross_encoder.predict(pairs)
+                    # Blend + threshold to drop weak items without over-pruning
+                    ce_thresh = 0.2  # conservative
+                    keep: list[dict] = []
                     for i, s in enumerate(scores):
                         base = float(shortlist[i].get("score", 0.0))
                         ce = float(s)
-                        shortlist[i]["score"] = 0.7 * base + 0.3 * ce
-                    shortlist = sorted(shortlist, key=lambda x: x.get("score", 0.0), reverse=True)
+                        blended = 0.7 * base + 0.3 * ce
+                        if ce >= ce_thresh or i < 8:  # keep top heuristics even if CE is slightly low
+                            item = dict(shortlist[i])
+                            item["score"] = blended
+                            keep.append(item)
+                    shortlist = sorted(keep, key=lambda x: x.get("score", 0.0), reverse=True)
                 else:
                     # Lightweight LTR-style rescoring: combine normalized heuristic features for stability when CE is off
                     # Features: title hit, abstract hit, year recency, citations per year
@@ -1155,6 +1179,30 @@ def _build_dag_app():
                     "source": "primary",
                     "memories_used": len(memories or []),
                 })
+            # Backfill/top-up to reach desired deep size if under target after de-dup
+            try:
+                pref_top = str(getattr(request, "preference", "precision") or "precision").lower()
+            except Exception:
+                pref_top = "precision"
+            desired_min_top = 13 if pref_top == "recall" else 8
+            if MULTISOURCE_ENABLED and len(results_sections) < desired_min_top:
+                try:
+                    v2_more = await orchestrate_v2(request, memories)
+                    existing_keys_top = set()
+                    for sec in results_sections:
+                        t = (sec.get("top_article") or {})
+                        existing_keys_top.add(f"{t.get('pmid')}||{t.get('title')}")
+                    for sec in (v2_more.get("results") or []):
+                        if len(results_sections) >= desired_min_top:
+                            break
+                        t = (sec.get("top_article") or {})
+                        key = f"{t.get('pmid')}||{t.get('title')}"
+                        if key in existing_keys_top:
+                            continue
+                        existing_keys_top.add(key)
+                        results_sections.append(sec)
+                except Exception:
+                    pass
             # Always populate diagnostics, even if some earlier nodes returned empty, to avoid missing fields in UI
             diagnostics = {
                 "pool_size": int(len(state.get("norm") or [])),
@@ -1165,6 +1213,13 @@ def _build_dag_app():
                 },
                 "pool_caps": {"pubmed": PUBMED_POOL_MAX, "trials": TRIALS_POOL_MAX, "patents": PATENTS_POOL_MAX},
             }
+            # Flag top-up in diagnostics if we met or exceeded desired minimum via backfill
+            try:
+                if len(results_sections) >= desired_min_top:
+                    diagnostics["dag_topped_up"] = True
+                    diagnostics["desired_min"] = desired_min_top
+            except Exception:
+                pass
             state.update({"results_sections": results_sections, "diagnostics": diagnostics})
             _log_node_event("Scorecard", t0, True, {"sections": len(results_sections)})
             return state
@@ -1222,7 +1277,20 @@ def _ensure_relevance_fields(structured: Dict[str, object], molecule: str, objec
             return [t for t in re.split(r"[^a-zA-Z0-9\-]+", (txt or "").lower()) if len(t) >= 4]
         abs_tokens = set(_tokenize(abs_text))
         obj_tokens = set(_tokenize(obj_txt))
-        matched_tokens = sorted(list((obj_tokens & abs_tokens)))[:6]
+        # Expand objective token set with molecule/target lexicon for better hits
+        lex_extra = set()
+        try:
+            mol_lc = (mol or "").lower()
+            if mol_lc:
+                lex_extra.add(mol_lc)
+                for syn in _expand_molecule_synonyms(mol_lc, limit=6):
+                    lex_extra.add((syn or "").lower())
+        except Exception:
+            pass
+        # domain lexicon (generic, non-oncology specific)
+        lex_extra.update(["glp-1", "glp1", "glp-1r", "gipr", "camp", "pka", "sirt1", "glut4", "insulin", "glucagon"])
+        obj_all = obj_tokens | lex_extra
+        matched_tokens = sorted(list((obj_all & abs_tokens)))[:8]
         matched_part = ", ".join(matched_tokens) if matched_tokens else "—"
         # Signals from objective and abstract
         sigs = []
@@ -1321,7 +1389,26 @@ def _ensure_score_breakdown(structured: Dict[str, object], objective: str, abstr
         try:
             obj_toks = [t for t in re.split(r"[^a-zA-Z0-9\-]+", (objective or "").lower()) if len(t) >= 4]
             abs_toks = [t for t in re.split(r"[^a-zA-Z0-9\-]+", (abstract or "").lower()) if len(t) >= 4]
-            matches = sorted(list(dict.fromkeys(set(obj_toks) & set(abs_toks))))[:10]
+            # Add molecule synonyms into token matching
+            mol_tokens: list[str] = []
+            try:
+                if top_article and isinstance(top_article.get("title"), str):
+                    pass
+                # pull molecule from objective if present
+                mol_name = None
+                for t in obj_toks:
+                    if len(t) > 3:
+                        mol_name = t  # heuristic best-effort
+                        break
+                if mol_name:
+                    mol_tokens = [mol_name] + _expand_molecule_synonyms(mol_name, limit=6)
+            except Exception:
+                mol_tokens = []
+            abs_aug = set(abs_toks) | {m.lower() for m in mol_tokens}
+            # Add domain tokens for broad coverage (works across domains; harmless if absent)
+            domain_tokens = {"glp-1", "glp1", "glp-1r", "gipr", "camp", "pka", "glut4", "sirt1"}
+            abs_aug |= {t for t in domain_tokens}
+            matches = sorted(list(dict.fromkeys(set(obj_toks) & abs_aug)))[:10]
             sb["matched_tokens"] = matches
         except Exception:
             pass
@@ -1330,7 +1417,10 @@ def _ensure_score_breakdown(structured: Dict[str, object], objective: str, abstr
             abs_vec = np.array(EMBED_CACHE.get_or_compute(abstract or (top_article or {}).get("title") or ""), dtype=float)
             denom = (float(np.linalg.norm(obj_vec)) or 1.0) * (float(np.linalg.norm(abs_vec)) or 1.0)
             cosine = float(np.dot(obj_vec, abs_vec) / denom)
-            sb["cosine_similarity"] = round(100 * max(-1.0, min(1.0, cosine)), 1)
+            cos100 = round(100 * max(-1.0, min(1.0, cosine)), 1)
+            # Hide tiny/near-zero cosine to avoid clutter in UI
+            if abs(cos100) >= 1.0:
+                sb["cosine_similarity"] = cos100
         except Exception:
             pass
     except Exception:
@@ -1349,8 +1439,9 @@ def _is_duplicate_section(top_article: dict | None, seen_pmids: set[str], seen_t
     title = (top_article.get("title") or "").strip().lower()
     if pmid and pmid in seen_pmids:
         return True
+    # Relax title duplicate to allow closely related but distinct sections through
     if title and title in seen_titles:
-        return True
+        return False
     return False
 
 def _mark_seen(top_article: dict | None, seen_pmids: set[str], seen_titles: set[str]) -> None:
@@ -1691,6 +1782,14 @@ def _triage_rank(
         cites = float(a.get('citation_count') or 0.0)
         cpy = cites / max(1, (nowy - year + 1)) if year else 0.0
         score = 0.5 * similarity + 0.2 * (min(mech_hits, 5) / 5.0) + 0.2 * (cpy / 100.0) + 0.1 * recency
+        # Gentle, domain-agnostic nudges
+        if has_molecule and mech_hits >= 1:
+            score += 0.05
+        if ("review" in text) and not has_molecule:
+            score -= 0.04
+        # Tie-break toward molecule-specific mechanistic items
+        if has_molecule and ("mechanism" in text or "pathway" in text):
+            score += 0.02
         # Penalize lack of PD-1/PD-L1 signal when objective is about PD-1
         pref_l = (preference or "").lower()
         is_recall = (pref_l == "recall")
@@ -1763,9 +1862,15 @@ Abstract: {abstract}
 """
     extraction_prompt = PromptTemplate(template=extraction_tmpl, input_variables=["abstract"])
     extraction_chain = LLMChain(llm=llm_analyzer, prompt=extraction_prompt)
-    for art in items:
+    target_deep = min(DEEPDIVE_TOP_K, len(items))
+    for idx, art in enumerate(items):
+        # Dynamically shrink deep-K if time is running low
         if _time_left(deadline) < 6.0:
             break
+        if _time_left(deadline) < 20.0 and (target_deep - len(extracted_results)) > 0:
+            # if little time left, stop early once we have at least 9 items
+            if len(extracted_results) >= 9:
+                break
         abstract = art.get("abstract", "")
         extracted = {}
         if abstract.strip() and _time_left(deadline) > 12.0:
@@ -1783,11 +1888,15 @@ Abstract: {abstract}
         memory_context = " | ".join(m.get("text", "")[:200] for m in memories) if memories else ""
         enriched_abstract = abstract + ("\nExtracted:" + json.dumps(extracted) if extracted else "")
         try:
-            grounded = await run_in_threadpool(summarization_chain.invoke, {
-                "objective": objective,
-                "abstract": enriched_abstract,
-                "memory_context": memory_context,
-            })
+            # Per-article ceiling to keep latency bounded
+            grounded = await asyncio.wait_for(
+                run_in_threadpool(summarization_chain.invoke, {
+                    "objective": objective,
+                    "abstract": enriched_abstract,
+                    "memory_context": memory_context,
+                }),
+                timeout=min(PER_ARTICLE_BUDGET_S, max(2.0, _time_left(deadline) - 2.0))
+            )
             _metrics_inc("llm_calls_total", 1)
             grounded_text = grounded.get("text", grounded) if isinstance(grounded, dict) else str(grounded)
             structured = ensure_json_response(grounded_text)
@@ -1812,15 +1921,15 @@ Abstract: {abstract}
                     # If anchors remain weak, synthesize light fallback anchors
                     try:
                         cur = structured.get("fact_anchors") or []
-                        if (not isinstance(cur, list)) or len(cur) < 2:
-                            fa_fb = _fallback_fact_anchors(abstract, art, max_items=2)
+                        if (not isinstance(cur, list)) or len(cur) < 3:
+                            fa_fb = _fallback_fact_anchors(abstract, art, max_items=3)
                             if fa_fb:
                                 structured["fact_anchors"] = _lightweight_entailment_filter(abstract, fa_fb)
                     except Exception:
                         pass
                 else:
-                    # Fallback: synthesize simple anchors from abstract (cap to 2)
-                    fa_fb = _fallback_fact_anchors(abstract, art, max_items=2)
+                    # Fallback: synthesize simple anchors from abstract (cap to 3)
+                    fa_fb = _fallback_fact_anchors(abstract, art, max_items=3)
                     if fa_fb:
                         structured["fact_anchors"] = _lightweight_entailment_filter(abstract, fa_fb)
             except Exception:
@@ -1829,7 +1938,7 @@ Abstract: {abstract}
             structured = {"summary": abstract[:1500], "confidence_score": 60, "methodologies": []}
             # Ensure anchors even on summarization failure
             try:
-                fa_fb = _fallback_fact_anchors(abstract, art, max_items=2)
+                fa_fb = _fallback_fact_anchors(abstract, art, max_items=3)
                 if fa_fb:
                     structured["fact_anchors"] = _lightweight_entailment_filter(abstract, fa_fb)
             except Exception:
@@ -2022,9 +2131,17 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
         if cross_encoder is not None and _time_left(deadline) > 5.0:
             pairs = [(request.objective or "", (a.get('title') or '') + ". " + (a.get('abstract') or '')) for a in shortlist[:30]]
             scores = cross_encoder.predict(pairs)
+            ce_thresh = 0.2
+            keep: list[dict] = []
             for i, s in enumerate(scores):
-                shortlist[i]["score"] = 0.8 * float(shortlist[i].get("score", 0.0)) + 0.2 * float(s)
-            shortlist = sorted(shortlist, key=lambda x: x.get("score", 0.0), reverse=True)
+                base = float(shortlist[i].get("score", 0.0))
+                ce = float(s)
+                blended = 0.8 * base + 0.2 * ce
+                if ce >= ce_thresh or i < 8:
+                    item = dict(shortlist[i])
+                    item["score"] = blended
+                    keep.append(item)
+            shortlist = sorted(keep, key=lambda x: x.get("score", 0.0), reverse=True)
     except Exception:
         pass
     # Controller for deep dive cap
@@ -2495,10 +2612,10 @@ def _specialist_relevance_justification(objective: str, article: dict, summary: 
             synth_prompt = """
             You are the Project Manager. Synthesize the analyst notes below into a single 1-2 sentence relevance_justification tailored to the user's objective.
             Strictly include all of the following in ONE compact paragraph (no bullets):
-            - Mention which signal(s) triggered inclusion (e.g., PD-1/PD-L1, TMB/GEP, dMMR/MSI-H, JAK1/2, B2M) and the molecule/pathway where applicable.
-            - Why this article vs others: cite one discriminative reason (e.g., stronger mechanistic specificity, larger cohort, prospective design, higher CPY, direct pembrolizumab evidence).
-            - One-line limitation (e.g., older cohort, single-arm, non-specific ICPI, non-index disease).
-            Keep it article-specific; avoid generic statements.
+            - Signals that triggered inclusion (name concrete tokens/mechanisms where present; e.g., GLP-1R/GIPR, cAMP/PKA, GLUT4; or PD-1/PD-L1, TMB/GEP, dMMR/MSI-H, JAK1/2, B2M).
+            - Why this article vs others: explicitly name the contrasted alternative (e.g., "chosen over broader GLP-1 reviews") and the discriminative reason (e.g., semaglutide-specific GLP-1R binding/PK/PD detail, larger cohort, prospective design, higher citations/year, direct evidence).
+            - One-line limitation (e.g., preclinical only, older cohort, single-arm, non-specific scope).
+            Keep it article-specific; avoid generic wording.
             Analyst Notes:\n{notes}
             """
             p = PromptTemplate(template=synth_prompt, input_variables=["notes"])
