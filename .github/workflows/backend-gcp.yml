@@ -5,6 +5,10 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+concurrency:
+  group: backend-deploy
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -110,19 +114,36 @@ jobs:
           if [ -z "$PINECONE_HOST_VAL" ]; then PINECONE_HOST_VAL="${{ secrets.PINECOST_HOST }}"; fi
           if [ -z "$PINECONE_HOST_VAL" ]; then PINECONE_HOST_VAL="${{ steps.pinecone.outputs.host }}"; fi
 
-          gcloud run deploy ${{ secrets.BACKEND_SERVICE }} \
-            --image $IMAGE \
-            --region ${{ secrets.GCP_REGION }} \
-            --platform managed \
-            --allow-unauthenticated \
-            --cpu 1 --memory 2Gi --min-instances 1 \
-            --timeout 300 \
-            --set-env-vars=GEMINI_MAIN_MODEL=gemini-1.5-pro,GEMINI_SMALL_MODEL=gemini-1.5-flash \
-            --set-env-vars=TOTAL_BUDGET_S=120,HARVEST_BUDGET_S=30,TRIAGE_BUDGET_S=10,DEEPDIVE_BUDGET_S=75,SYNTH_BUDGET_S=8,ENTAILMENT_BUDGET_S=3.0,TRIAGE_TOP_K=20,DEEPDIVE_TOP_K=8 \
-            --set-env-vars=ALLOW_ORIGIN_REGEX="$ALLOW_ORIGIN_REGEX_VAL" \
-            --set-env-vars=GOOGLE_GENAI_API_KEY="${{ secrets.GOOGLE_GENAI_API_KEY }}",GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}",GOOGLE_CSE_ID="${{ secrets.GOOGLE_CSE_ID }}" \
-            --set-env-vars=PINECONE_API_KEY="${{ secrets.PINECONE_API_KEY }}",PINECONE_INDEX="${{ secrets.PINECONE_INDEX }}",PINECONE_HOST="$PINECONE_HOST_VAL",PUBMED_RETMAX=25 \
-            --set-env-vars=APP_VERSION=$HEAD,GIT_SHA=$HEAD
+          # Retry wrapper to avoid ABORTED etag/version conflicts on the service
+          attempts=4
+          for i in $(seq 1 $attempts); do
+            set +e
+            gcloud run deploy ${{ secrets.BACKEND_SERVICE }} \
+              --image $IMAGE \
+              --region ${{ secrets.GCP_REGION }} \
+              --platform managed \
+              --allow-unauthenticated \
+              --cpu 1 --memory 2Gi --min-instances 1 \
+              --timeout 300 \
+              --set-env-vars=GEMINI_MAIN_MODEL=gemini-1.5-pro,GEMINI_SMALL_MODEL=gemini-1.5-flash \
+              --set-env-vars=TOTAL_BUDGET_S=120,HARVEST_BUDGET_S=30,TRIAGE_BUDGET_S=10,DEEPDIVE_BUDGET_S=75,SYNTH_BUDGET_S=8,ENTAILMENT_BUDGET_S=3.0,TRIAGE_TOP_K=20,DEEPDIVE_TOP_K=8 \
+              --set-env-vars=ALLOW_ORIGIN_REGEX="$ALLOW_ORIGIN_REGEX_VAL" \
+              --set-env-vars=GOOGLE_GENAI_API_KEY="${{ secrets.GOOGLE_GENAI_API_KEY }}",GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}",GOOGLE_CSE_ID="${{ secrets.GOOGLE_CSE_ID }}" \
+              --set-env-vars=PINECONE_API_KEY="${{ secrets.PINECONE_API_KEY }}",PINECONE_INDEX="${{ secrets.PINECONE_INDEX }}",PINECONE_HOST="$PINECONE_HOST_VAL",PUBMED_RETMAX=25 \
+              --set-env-vars=APP_VERSION=$HEAD,GIT_SHA=$HEAD
+            rc=$?
+            set -e
+            if [ $rc -eq 0 ]; then
+              echo "Deploy succeeded on attempt $i"
+              break
+            fi
+            echo "Deploy attempt $i failed with code $rc. Waiting and retrying..."
+            sleep 6
+            if [ $i -eq $attempts ]; then
+              echo "All deploy attempts failed" >&2
+              exit $rc
+            fi
+          done
 
       - name: Output backend URL
         run: gcloud run services describe ${{ secrets.BACKEND_SERVICE }} --region ${{ secrets.GCP_REGION }} --format='value(status.url)'
