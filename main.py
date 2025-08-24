@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import UploadFile, File, Form
 from pydantic import BaseModel, Field
 from langchain_google_genai import ChatGoogleGenerativeAI
 import os
@@ -20,6 +21,7 @@ import numpy as np
 import uuid
 import urllib.request
 import urllib.parse
+from urllib.parse import urlparse
 import asyncio
 import random
 try:
@@ -2864,8 +2866,8 @@ class DeepDiveModuleResult(BaseModel):
 class DeepDiveResponse(BaseModel):
     source: dict
     model_description: DeepDiveModuleResult
-    experimental_methods: DeepDiveModuleResult
-    results_interpretation: DeepDiveModuleResult
+    experimental_methods: DeepDiveModuleResult | None
+    results_interpretation: DeepDiveModuleResult | None
     diagnostics: dict
 
 
@@ -2943,6 +2945,91 @@ def _fetch_article_text_from_url(url: str, timeout: float = 20.0) -> str:
         return ""
 
 
+def _extract_pubmed_abstract(html_text: str) -> str:
+    try:
+        # Very lightweight extraction of abstract content block on PubMed
+        # Look for patterns often used on PubMed pages
+        m = re.search(r"<div[^>]*class=\"abstract-content[^\"]*\"[\s\S]*?</div>", html_text, flags=re.IGNORECASE)
+        if not m:
+            m = re.search(r"<section[^>]*id=\"abstract\"[\s\S]*?</section>", html_text, flags=re.IGNORECASE)
+        if m:
+            return _strip_html(m.group(0))[:200000]
+    except Exception:
+        pass
+    return ""
+
+
+def _extract_doi_from_html(html_text: str) -> str:
+    try:
+        # Common meta tag
+        m = re.search(r"name=\"citation_doi\"[^>]*content=\"([^\"]+)\"", html_text, flags=re.IGNORECASE)
+        if m:
+            return m.group(1).strip()
+        # Fallback: doi: 10.xxxx/...
+        m = re.search(r"doi:\s*(10\.\S+)", html_text, flags=re.IGNORECASE)
+        if m:
+            return m.group(1).strip().rstrip('.')
+    except Exception:
+        pass
+    return ""
+
+
+def _fetch_json(url: str, timeout: float = 10.0) -> dict:
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"}), timeout=timeout) as r:
+            raw = r.read().decode("utf-8", errors="ignore")
+            import json as _json
+            return _json.loads(raw)
+    except Exception:
+        return {}
+
+
+def _resolve_oa_fulltext(pmid: str | None, landing_html: str, doi_hint: str | None = None) -> tuple[str, str, str]:
+    """Attempt to resolve open full text via PMC or Unpaywall.
+
+    Returns: (text, grounding, source) where grounding in {full_text, abstract_only, none}, source hints e.g. pmc|publisher|repository|pubmed_abstract|none
+    """
+    # 1) PMC via ELink
+    try:
+        if pmid:
+            elink = _fetch_json(f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi?dbfrom=pubmed&id={urllib.parse.quote(pmid)}&db=pmc&retmode=json")
+            links = (((elink.get("linksets") or [])[0] or {}).get("linksetdbs") or [])
+            for db in links:
+                if (db.get("dbto") == "pmc") and db.get("links"):
+                    pmcid = str((db.get("links") or [])[0])
+                    # Fetch PMC HTML and strip
+                    pmc_url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/"
+                    html = _fetch_article_text_from_url(pmc_url)
+                    if html and len(html) > 2000:
+                        return (html, "full_text", "pmc")
+    except Exception:
+        pass
+    # 2) Unpaywall via DOI
+    try:
+        doi = (doi_hint or _extract_doi_from_html(landing_html)).strip()
+        email = os.getenv("UNPAYWALL_EMAIL", "")
+        if doi and email:
+            up = _fetch_json(f"https://api.unpaywall.org/v2/{urllib.parse.quote(doi)}?email={urllib.parse.quote(email)}")
+            best = up.get("best_oa_location") or {}
+            for key in ("url_for_pdf", "url"):
+                u = best.get(key) or ""
+                if u:
+                    txt = _fetch_article_text_from_url(u)
+                    if txt and len(txt) > 1000:
+                        src = "publisher" if "publisher" in (best.get("host_type") or "") else "repository"
+                        return (txt, "full_text", src)
+    except Exception:
+        pass
+    # 3) Abstract-only fallback for PubMed landing pages
+    try:
+        ab = _extract_pubmed_abstract(landing_html)
+        if ab:
+            return (ab, "abstract_only", "pubmed_abstract")
+    except Exception:
+        pass
+    return ("", "none", "none")
+
+
 def _ensure_module_json(text: str) -> dict:
     try:
         if "```" in text:
@@ -3012,11 +3099,19 @@ async def deep_dive(request: DeepDiveRequest):
     source_info = {"url": request.url, "pmid": request.pmid, "title": request.title}
     # Ingestion: strictly from provided article
     text = ""
+    grounding = "none"
+    grounding_source = "none"
     if request.url:
-        text = _fetch_article_text_from_url(request.url)
+        landing_html = _fetch_article_text_from_url(request.url)
+        text, grounding, grounding_source = _resolve_oa_fulltext(request.pmid, landing_html, None)
+        if not text:
+            text = landing_html
+            if text:
+                grounding = "abstract_only" if "pubmed.ncbi.nlm.nih.gov" in (request.url or "") else "none"
+                grounding_source = "pubmed_abstract" if grounding == "abstract_only" else "none"
     if not text:
         return {
-            "error": "Unable to fetch or parse article full text. Please provide an accessible HTML URL.",
+            "error": "Unable to fetch or parse article content. Provide full-text URL or upload PDF.",
             "source": source_info,
         }
     # Run three specialist modules in parallel
@@ -3052,15 +3147,70 @@ async def deep_dive(request: DeepDiveRequest):
     took = _now_ms() - t0
     diagnostics = {
         "ingested_chars": len(text),
+        "grounding": grounding,
+        "grounding_source": grounding_source,
         "latency_ms": took,
     }
     return {
         "source": source_info,
         "model_description_structured": md_structured,
         "model_description": md_json,
+        "experimental_methods_structured": mth if grounding == "full_text" else None,
+        "results_interpretation_structured": res if grounding == "full_text" else None,
+        "diagnostics": diagnostics,
+    }
+
+
+@app.post("/deep-dive-upload")
+async def deep_dive_upload(objective: str = Form(...), file: UploadFile = File(...)):
+    t0 = _now_ms()
+    try:
+        raw = await file.read()
+    except Exception as e:
+        return {"error": f"Failed to read file: {str(e)[:120]}"}
+    text = ""
+    grounding = "none"
+    grounding_source = "upload"
+    try:
+        ctype = (file.content_type or "").lower()
+        if "pdf" in ctype and _HAS_PDF:
+            text = pdf_extract_text(io.BytesIO(raw))[:200000]
+            grounding = "full_text"
+        else:
+            # Assume text/markdown/rtf-like
+            try:
+                text = raw.decode("utf-8", errors="ignore")
+            except Exception:
+                text = raw.decode("latin-1", errors="ignore")
+            text = _strip_html(text)
+            grounding = "full_text" if len(text) > 1000 else "none"
+    except Exception:
+        text = ""
+    if not text:
+        return {"error": "Unable to parse uploaded file"}
+    # Run modules (same as /deep-dive)
+    try:
+        md_structured = await _with_timeout(
+            run_in_threadpool(analyze_scientific_model, text, objective, llm_analyzer), 12.0, "DeepDiveModel", retries=0
+        )
+        md_json = {"summary": md_structured.get("protocol_summary", ""), "relevance_justification": "", "fact_anchors": []}
+        mth_task = _with_timeout(
+            run_in_threadpool(analyze_experimental_methods, text, objective, llm_analyzer), 12.0, "DeepDiveMethods", retries=0
+        )
+        res_task = _with_timeout(
+            run_in_threadpool(analyze_results_interpretation, text, objective, llm_analyzer), 12.0, "DeepDiveResults", retries=0
+        )
+        mth, res = await asyncio.gather(mth_task, res_task)
+    except Exception as e:
+        return {"error": str(e)[:200]}
+    took = _now_ms() - t0
+    return {
+        "source": {"upload_name": file.filename},
+        "model_description_structured": md_structured,
+        "model_description": md_json,
         "experimental_methods_structured": mth,
         "results_interpretation_structured": res,
-        "diagnostics": diagnostics,
+        "diagnostics": {"ingested_chars": len(text), "grounding": grounding, "grounding_source": grounding_source, "latency_ms": took},
     }
 
 

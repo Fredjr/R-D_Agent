@@ -130,7 +130,7 @@ jobs:
               --set-env-vars=ALLOW_ORIGIN_REGEX="$ALLOW_ORIGIN_REGEX_VAL" \
               --set-env-vars=GOOGLE_GENAI_API_KEY="${{ secrets.GOOGLE_GENAI_API_KEY }}",GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}",GOOGLE_CSE_ID="${{ secrets.GOOGLE_CSE_ID }}" \
               --set-env-vars=PINECONE_API_KEY="${{ secrets.PINECONE_API_KEY }}",PINECONE_INDEX="${{ secrets.PINECONE_INDEX }}",PINECONE_HOST="$PINECONE_HOST_VAL",PUBMED_RETMAX=25 \
-              --set-env-vars=APP_VERSION=$HEAD,GIT_SHA=$HEAD
+              --set-env-vars=APP_VERSION=$HEAD,GIT_SHA=$HEAD,UNPAYWALL_EMAIL="${{ secrets.UNPAYWALL_EMAIL }}"
             rc=$?
             set -e
             if [ $rc -eq 0 ]; then
