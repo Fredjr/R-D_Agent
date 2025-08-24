@@ -5,6 +5,9 @@ Tests basic functionality with a sample query.
 """
 
 from tools import PubMedSearchTool, WebSearchTool
+from experimental_methods_analyst import analyze_experimental_methods
+from results_interpretation_analyst import analyze_results_interpretation
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 def main():
     """Test both tools with a sample query."""
@@ -39,6 +42,22 @@ def main():
         print(f"❌ Web Search Tool Error: {e}")
     
     print("\n🎉 Testing completed!")
+
+    # Optional schema smoke tests for deep-dive analysts if key present
+    try:
+        import os
+        key = os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_GENAI_API_KEY")
+        if key:
+            llm = ChatGoogleGenerativeAI(model=os.getenv("GEMINI_SMALL_MODEL", os.getenv("GEMINI_MODEL", "gemini-1.5-pro")), google_api_key=key)
+            methods = analyze_experimental_methods("Methods: We used Western Blot and ELISA to quantify proteins and cytokines.", "objective", llm)
+            assert isinstance(methods, list)
+            results = analyze_results_interpretation("Results: Compound X reduced NF-kB. Discussion: supports hypothesis.", "objective", llm)
+            assert isinstance(results, dict)
+            print("✅ Deep-dive analyst smoke tests passed.")
+        else:
+            print("ℹ️ Skipping deep-dive analyst smoke tests (no GOOGLE_API_KEY).")
+    except Exception as e:
+        print(f"❌ Deep-dive analyst smoke test failure: {e}")
 
 if __name__ == "__main__":
     main()

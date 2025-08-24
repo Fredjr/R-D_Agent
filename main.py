@@ -22,6 +22,13 @@ import urllib.request
 import urllib.parse
 import asyncio
 import random
+try:
+    # Optional lightweight PDF text extraction
+    import io
+    from pdfminer.high_level import extract_text as pdf_extract_text  # type: ignore
+    _HAS_PDF = True
+except Exception:
+    _HAS_PDF = False
 from jsonschema import validate as jsonschema_validate, ValidationError
 try:
     from langgraph.graph import StateGraph, END
@@ -30,6 +37,9 @@ except Exception:
     END = None  # type: ignore
 
 from tools import PubMedSearchTool, WebSearchTool, PatentsSearchTool
+from scientific_model_analyst import analyze_scientific_model
+from experimental_methods_analyst import analyze_experimental_methods
+from results_interpretation_analyst import analyze_results_interpretation
 from langchain.agents import AgentType, initialize_agent
 from scoring import calculate_publication_score
 
@@ -2832,6 +2842,33 @@ class ReviewRequest(BaseModel):
         allow_population_by_alias = True
 
 
+class DeepDiveRequest(BaseModel):
+    # Either a direct URL to the article full text, or an already-known PMID (optional)
+    url: str | None = None
+    pmid: str | None = None
+    title: str | None = None
+    objective: str
+    project_id: str | None = Field(default=None, alias="projectId")
+
+    class Config:
+        allow_population_by_field_name = True
+        allow_population_by_alias = True
+
+
+class DeepDiveModuleResult(BaseModel):
+    summary: str
+    relevance_justification: str
+    fact_anchors: list[dict]
+
+
+class DeepDiveResponse(BaseModel):
+    source: dict
+    model_description: DeepDiveModuleResult
+    experimental_methods: DeepDiveModuleResult
+    results_interpretation: DeepDiveModuleResult
+    diagnostics: dict
+
+
 @app.get("/")
 async def root():
     return {"status": "ok"}
@@ -2858,6 +2895,173 @@ async def ready() -> dict:
 @app.get("/version")
 async def version() -> dict:
     return {"version": APP_VERSION, "git": GIT_SHA}
+
+
+def _strip_html(html: str) -> str:
+    try:
+        t = html
+        # Remove script/style blocks
+        t = re.sub(r"<script[\s\S]*?</script>", " ", t, flags=re.IGNORECASE)
+        t = re.sub(r"<style[\s\S]*?</style>", " ", t, flags=re.IGNORECASE)
+        # Remove tags
+        t = re.sub(r"<[^>]+>", " ", t)
+        # Unescape basic entities
+        t = t.replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+        # Collapse whitespace
+        t = re.sub(r"\s+", " ", t).strip()
+        return t
+    except Exception:
+        return html
+
+
+def _fetch_article_text_from_url(url: str, timeout: float = 20.0) -> str:
+    try:
+        if not url or not url.startswith("http"):
+            return ""
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (DeepDiveBot)"})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            ctype = (r.headers.get("Content-Type") or "").lower()
+            raw = r.read()
+            if "application/pdf" in ctype:
+                if _HAS_PDF:
+                    try:
+                        # Attempt to extract PDF text
+                        return pdf_extract_text(io.BytesIO(raw))[:200000]
+                    except Exception:
+                        return ""
+                return ""
+            # Assume HTML or text
+            try:
+                text = raw.decode("utf-8", errors="ignore")
+            except Exception:
+                try:
+                    text = raw.decode("latin-1", errors="ignore")
+                except Exception:
+                    text = raw.decode(errors="ignore")
+            return _strip_html(text)
+    except Exception:
+        return ""
+
+
+def _ensure_module_json(text: str) -> dict:
+    try:
+        if "```" in text:
+            text = text.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
+        data = json.loads(text)
+        if not isinstance(data, dict):
+            raise ValueError("not obj")
+    except Exception:
+        data = {}
+    # Backfill minimal structure
+    data.setdefault("summary", str(text)[:1000] if isinstance(text, str) else "")
+    data.setdefault("relevance_justification", "")
+    fa = data.get("fact_anchors")
+    if not isinstance(fa, list):
+        data["fact_anchors"] = []
+    return data
+
+
+_DD_MODEL_PROMPT = PromptTemplate(
+    template=(
+        "You are a scientific reviewer. Using ONLY the provided article full text, and the user's objective, "
+        "produce STRICT JSON with keys: summary, relevance_justification, fact_anchors.\n"
+        "- summary: How did they study this? model/population/protocol; strengths/limitations.\n"
+        "- relevance_justification: one paragraph tying findings to the user's objective.\n"
+        "- fact_anchors: 3-5 objects with fields {claim, evidence:{title,year,pmid,quote}} grounded in the article.\n"
+        "NO external knowledge.\n\nObjective: {objective}\nFullText: {full_text}"
+    ),
+    input_variables=["objective", "full_text"],
+)
+
+_DD_METHODS_PROMPT = PromptTemplate(
+    template=(
+        "You are a methods auditor. Using ONLY the article full text and the user's objective, return JSON with "
+        "keys: summary, relevance_justification, fact_anchors.\n"
+        "- summary: key experimental approaches and lab techniques (e.g., PCR, WB), their role, pros/cons.\n"
+        "- relevance_justification: why these methods matter for the user's objective.\n"
+        "- fact_anchors: 3-5 grounded claim+evidence objects as above.\n"
+        "No external sources.\n\nObjective: {objective}\nFullText: {full_text}"
+    ),
+    input_variables=["objective", "full_text"],
+)
+
+_DD_RESULTS_PROMPT = PromptTemplate(
+    template=(
+        "You are a results interpreter. Using ONLY the article full text and the user's objective, return JSON with "
+        "keys: summary, relevance_justification, fact_anchors.\n"
+        "- summary: main findings, link to hypothesis, unexpected results, potential biases.\n"
+        "- relevance_justification: connect outcomes to the user's objective.\n"
+        "- fact_anchors: 3-5 grounded claim+evidence objects.\n"
+        "No external sources.\n\nObjective: {objective}\nFullText: {full_text}"
+    ),
+    input_variables=["objective", "full_text"],
+)
+
+
+async def _run_deepdive_chain(prompt: PromptTemplate, objective: str, full_text: str):
+    chain = LLMChain(llm=llm_analyzer, prompt=prompt)
+    resp = await run_in_threadpool(chain.invoke, {"objective": objective[:400], "full_text": full_text[:12000]})
+    out = resp.get("text", resp) if isinstance(resp, dict) else str(resp)
+    data = _ensure_module_json(out)
+    return data
+
+
+@app.post("/deep-dive")
+async def deep_dive(request: DeepDiveRequest):
+    t0 = _now_ms()
+    source_info = {"url": request.url, "pmid": request.pmid, "title": request.title}
+    # Ingestion: strictly from provided article
+    text = ""
+    if request.url:
+        text = _fetch_article_text_from_url(request.url)
+    if not text:
+        return {
+            "error": "Unable to fetch or parse article full text. Please provide an accessible HTML URL.",
+            "source": source_info,
+        }
+    # Run three specialist modules in parallel
+    try:
+        # Module 1 with timeout
+        md_structured = await _with_timeout(
+            run_in_threadpool(analyze_scientific_model, text, request.objective, llm_analyzer),
+            12.0,
+            "DeepDiveModel",
+            retries=0,
+        )
+        md_json = {
+            "summary": md_structured.get("protocol_summary", ""),
+            "relevance_justification": "",
+            "fact_anchors": [],
+        }
+        # Modules 2 and 3 with timeouts (structured)
+        mth_task = _with_timeout(
+            run_in_threadpool(analyze_experimental_methods, text, request.objective, llm_analyzer),
+            12.0,
+            "DeepDiveMethods",
+            retries=0,
+        )
+        res_task = _with_timeout(
+            run_in_threadpool(analyze_results_interpretation, text, request.objective, llm_analyzer),
+            12.0,
+            "DeepDiveResults",
+            retries=0,
+        )
+        mth, res = await asyncio.gather(mth_task, res_task)
+    except Exception as e:
+        return {"error": str(e)[:200], "source": source_info}
+    took = _now_ms() - t0
+    diagnostics = {
+        "ingested_chars": len(text),
+        "latency_ms": took,
+    }
+    return {
+        "source": source_info,
+        "model_description_structured": md_structured,
+        "model_description": md_json,
+        "experimental_methods_structured": mth,
+        "results_interpretation_structured": res,
+        "diagnostics": diagnostics,
+    }
 
 
 def _retrieve_memories(project_id: str | None, objective: str) -> list[dict]:
