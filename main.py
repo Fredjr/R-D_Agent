@@ -2247,6 +2247,22 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
     # Normalize and triage
     _t0 = _now_ms()
     norm = _normalize_candidates(arts)
+    # Enforce acceptance gating for full-text-only: drop items that are unlikely to have OA/full text
+    try:
+        if bool(getattr(request, "full_text_only", False)):
+            gated: list[dict] = []
+            for a in norm:
+                # Heuristics: must have PMID or a direct PMC/Publisher URL candidate
+                url = (a.get("url") or "").lower()
+                pmid = a.get("pmid")
+                if pmid:
+                    gated.append(a)
+                    continue
+                if any(s in url for s in ["/pmc/articles/", ".pdf", "nature.com", "nejm.org", "lancet.com", "sciencedirect.com", "springer.com"]):
+                    gated.append(a)
+            norm = gated if gated else norm
+    except Exception:
+        pass
     # Prefer items mentioning the molecule when provided
     try:
         mol = getattr(request, "molecule", None)
@@ -2254,6 +2270,21 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
         mol = None
     if mol:
         norm = _filter_by_molecule(norm, mol)
+    # Enforce strict acceptance gating post-normalization if requested
+    try:
+        if bool(getattr(request, "full_text_only", False)):
+            verified: list[dict] = []
+            for a in norm:
+                ok, meta = _quick_fulltext_capability(a.get("pmid"), a.get("title"))
+                if ok:
+                    # Attach hint for later UI if desired
+                    a = { **a, "_ft_ok": True, "_ft_meta": meta }
+                    verified.append(a)
+            # Only keep verified when we have any; otherwise retain original to avoid empty results
+            if verified:
+                norm = verified
+    except Exception:
+        pass
     # Time-aware caps
     triage_cap = min(TRIAGE_TOP_K, 50)
     if _time_left(deadline) < 15.0:
@@ -2547,6 +2578,51 @@ def _apply_fulltext_only_filters(plan: dict, full_text_only: bool) -> dict:
     except Exception:
         return plan
 
+def _quick_fulltext_capability(pmid: str | None, title: str | None) -> tuple[bool, dict]:
+    """Fast check: does this article likely have OA/full text available?
+    Returns (ok, meta) where ok True if PMC link or Europe PMC HAS_FT is present.
+    """
+    try:
+        # Prefer PMID via ELink → PMC
+        if pmid:
+            try:
+                elink = _fetch_json(f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi?dbfrom=pubmed&id={urllib.parse.quote(str(pmid))}&db=pmc&retmode=json")
+                links = (((elink.get("linksets") or [])[0] or {}).get("linksetdbs") or [])
+                for db in links:
+                    if (db.get("dbto") == "pmc") and db.get("links"):
+                        pmcid = str((db.get("links") or [])[0])
+                        return True, {"resolved_pmid": str(pmid), "resolved_pmcid": pmcid, "resolved_source": "pmc"}
+            except Exception:
+                pass
+            # Europe PMC by PMID
+            try:
+                base = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
+                q = f"EXT_ID:{urllib.parse.quote(str(pmid))} AND SRC:MED AND HAS_FT:y"
+                url = f"{base}?query={q}&format=json&pageSize=1"
+                data = _fetch_json(url)
+                results = (((data.get("resultList") or {}).get("result")) or [])
+                if results:
+                    r0 = results[0]
+                    return True, {"resolved_title": r0.get("title"), "resolved_pmid": r0.get("pmid") or r0.get("id"), "resolved_pmcid": r0.get("pmcid"), "resolved_doi": r0.get("doi"), "resolved_source": "europe_pmc"}
+            except Exception:
+                pass
+        # If no PMID, attempt Europe PMC by title (best-effort)
+        t = (title or "").strip()
+        if t:
+            try:
+                base = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
+                q = f'TITLE:"{urllib.parse.quote(t)}" AND HAS_FT:y'
+                url = f"{base}?query={q}&format=json&pageSize=1"
+                data = _fetch_json(url)
+                results = (((data.get("resultList") or {}).get("result")) or [])
+                if results:
+                    r0 = results[0]
+                    return True, {"resolved_title": r0.get("title"), "resolved_pmid": r0.get("pmid") or r0.get("id"), "resolved_pmcid": r0.get("pmcid"), "resolved_doi": r0.get("doi"), "resolved_source": "europe_pmc"}
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return False, {}
 def _collect_findings(results_sections: list[dict], limit: int = 8) -> str:
     snippets: list[str] = []
     for sec in results_sections[:limit]:
@@ -3076,6 +3152,74 @@ def _resolve_via_eupmc(pmid: str | None, doi: str | None) -> tuple[str, dict]:
     return "", {}
 
 
+def _normalize_title(title: str | None) -> str:
+    try:
+        s = (title or "").lower()
+        # Remove punctuation and excessive whitespace
+        s = re.sub(r"[^a-z0-9\s]", "", s)
+        s = re.sub(r"\s+", " ", s).strip()
+        return s
+    except Exception:
+        return (title or "").strip().lower()
+
+
+def _extract_title_from_html(html_text: str) -> str:
+    """Best-effort article title extraction from landing HTML."""
+    try:
+        # Try citation meta first
+        m = re.search(r"name=\"citation_title\"[^>]*content=\"([^\"]+)\"", html_text, flags=re.IGNORECASE)
+        if m:
+            return m.group(1).strip()
+        # Try og:title
+        m = re.search(r"property=\"og:title\"[^>]*content=\"([^\"]+)\"", html_text, flags=re.IGNORECASE)
+        if m:
+            return m.group(1).strip()
+        # Fallback to <title>
+        m = re.search(r"<title>([\s\S]*?)</title>", html_text, flags=re.IGNORECASE)
+        if m:
+            return _strip_html(m.group(0)).strip()
+    except Exception:
+        pass
+    return ""
+
+
+def _verify_source_match(req_title: str | None, req_pmid: str | None, meta: dict, landing_html: str | None) -> dict:
+    """Compare requested identifiers with resolved identifiers to detect mismatches.
+    Returns diagnostics dict including resolved identifiers and a mismatch flag.
+    """
+    try:
+        resolved = {
+            "resolved_title": meta.get("resolved_title") or ( _extract_title_from_html(landing_html or "") if landing_html else "" ),
+            "resolved_pmid": meta.get("resolved_pmid"),
+            "resolved_pmcid": meta.get("resolved_pmcid"),
+            "resolved_doi": meta.get("resolved_doi"),
+            "license": meta.get("license"),
+            "resolved_source": meta.get("resolved_source"),
+        }
+        # Title strict equality on normalized strings when both present
+        t_req = _normalize_title(req_title)
+        t_res = _normalize_title(resolved.get("resolved_title"))
+        title_match = bool(t_req and t_res and t_req == t_res)
+        # PMID equality when both present
+        pmid_match = False
+        try:
+            if req_pmid and resolved.get("resolved_pmid"):
+                pmid_match = str(req_pmid).strip() == str(resolved.get("resolved_pmid")).strip()
+        except Exception:
+            pmid_match = False
+        mismatch = False
+        # If any identifier provided, require equality; else rely on title when available
+        if req_pmid and resolved.get("resolved_pmid"):
+            mismatch = not pmid_match
+        elif t_req and t_res:
+            mismatch = not title_match
+        else:
+            mismatch = False
+        return { **resolved, "mismatch": bool(mismatch) }
+    except Exception:
+        return { **({k: meta.get(k) for k in ("resolved_title","resolved_pmid","resolved_pmcid","resolved_doi","license","resolved_source")}), "mismatch": False }
+
+
 def _resolve_oa_fulltext(pmid: str | None, landing_html: str, doi_hint: str | None = None) -> tuple[str, str, str, dict]:
     """Attempt to resolve open full text via PMC or Unpaywall.
 
@@ -3221,6 +3365,16 @@ async def deep_dive(request: DeepDiveRequest):
             "error": "Unable to fetch or parse article content. Provide full-text URL or upload PDF.",
             "source": source_info,
         }
+    # Source verification diagnostics
+    try:
+        meta = {}
+        if grounding == "full_text":
+            # Gather resolved meta from last OA resolver call if available (not retained here), fallback to landing page
+            meta = _verify_source_match(request.title, request.pmid, meta, landing_html)
+        else:
+            meta = _verify_source_match(request.title, request.pmid, {}, landing_html)
+    except Exception:
+        meta = {}
     # Run three specialist modules in parallel
     try:
         # Module 1 with timeout
@@ -3257,6 +3411,7 @@ async def deep_dive(request: DeepDiveRequest):
         "grounding": grounding,
         "grounding_source": grounding_source,
         "latency_ms": took,
+        **({k: v for k, v in (meta or {}).items() if v is not None}),
     }
     return {
         "source": source_info,
