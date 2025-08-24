@@ -3122,12 +3122,17 @@ async def deep_dive(request: DeepDiveRequest):
     if request.url:
         # Use raw HTML for OA resolution and abstract parsing
         landing_html = _fetch_url_raw_text(request.url)
-        text, grounding, grounding_source = _resolve_oa_fulltext(request.pmid, landing_html, None)
-        if not text:
+        # If this is a PMC article page, treat as full text directly
+        if "ncbi.nlm.nih.gov/pmc/articles/" in (request.url or "") and landing_html:
             text = _strip_html(landing_html)
-            if text:
-                grounding = "abstract_only" if "pubmed.ncbi.nlm.nih.gov" in (request.url or "") else "none"
-                grounding_source = "pubmed_abstract" if grounding == "abstract_only" else "none"
+            grounding, grounding_source = "full_text", "pmc"
+        else:
+            text, grounding, grounding_source = _resolve_oa_fulltext(request.pmid, landing_html, None)
+            if not text and landing_html:
+                text = _strip_html(landing_html)
+                if text:
+                    grounding = "abstract_only" if "pubmed.ncbi.nlm.nih.gov" in (request.url or "") else "none"
+                    grounding_source = "pubmed_abstract" if grounding == "abstract_only" else "none"
     if not text:
         return {
             "error": "Unable to fetch or parse article content. Provide full-text URL or upload PDF.",
