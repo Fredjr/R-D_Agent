@@ -41,15 +41,8 @@ _MODEL_ANALYST_PROMPT = PromptTemplate(
         "3) Study Design Classification (e.g., randomized trial, observational, meta-analysis).\n"
         "4) Protocol Summary (concise, grounded).\n"
         "5) Strengths & Limitations of the chosen model/design.\n\n"
-        "Then OUTPUT ONLY a single JSON object with EXACTLY these keys (strings only):\n"
-        "{\n"
-        "  \"model_type\": \"\",\n"
-        "  \"study_design\": \"\",\n"
-        "  \"population_description\": \"\",\n"
-        "  \"protocol_summary\": \"\",\n"
-        "  \"strengths\": \"\",\n"
-        "  \"limitations\": \"\"\n"
-        "}"
+        "Then OUTPUT ONLY a single JSON object with EXACTLY these keys (all string values):\n"
+        "model_type, study_design, population_description, protocol_summary, strengths, limitations."
     ),
     input_variables=["objective", "full_text"],
 )
