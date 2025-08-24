@@ -3347,6 +3347,7 @@ async def deep_dive(request: DeepDiveRequest):
         text = ""
         grounding = "none"
         grounding_source = "none"
+        meta: dict = {}
         if request.url:
             # Use raw HTML for OA resolution and abstract parsing
             landing_html = _fetch_url_raw_text(request.url)
@@ -3354,13 +3355,15 @@ async def deep_dive(request: DeepDiveRequest):
             if "ncbi.nlm.nih.gov/pmc/articles/" in (request.url or "") and landing_html:
                 text = _strip_html(landing_html)
                 grounding, grounding_source = "full_text", "pmc"
+                meta = {"resolved_source": "pmc"}
             else:
-                text, grounding, grounding_source = _resolve_oa_fulltext(request.pmid, landing_html, None)
+                text, grounding, grounding_source, meta = _resolve_oa_fulltext(request.pmid, landing_html, None)
                 if not text and landing_html:
                     text = _strip_html(landing_html)
                     if text:
                         grounding = "abstract_only" if "pubmed.ncbi.nlm.nih.gov" in (request.url or "") else "none"
                         grounding_source = "pubmed_abstract" if grounding == "abstract_only" else "none"
+                        meta = {}
         if not text:
             return {
                 "error": "Unable to fetch or parse article content. Provide full-text URL or upload PDF.",
@@ -3368,14 +3371,13 @@ async def deep_dive(request: DeepDiveRequest):
             }
         # Source verification diagnostics
         try:
-            meta = {}
             if grounding == "full_text":
-                # Gather resolved meta from last OA resolver call if available (not retained here), fallback to landing page
-                meta = _verify_source_match(request.title, request.pmid, meta, landing_html)
+                # Use resolved meta from OA resolver and enrich via landing page
+                meta = _verify_source_match(request.title, request.pmid, meta or {}, landing_html)
             else:
-                meta = _verify_source_match(request.title, request.pmid, {}, landing_html)
+                meta = _verify_source_match(request.title, request.pmid, meta or {}, landing_html)
         except Exception:
-            meta = {}
+            meta = meta or {}
         # Run three specialist modules in parallel
         try:
             # Module 1 with timeout
