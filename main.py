@@ -2206,6 +2206,11 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
     _t0 = _now_ms()
     plan = _build_query_plan(request.objective, mem_txt, deadline, getattr(request, "molecule", None))
     plan = _inject_molecule_into_plan(plan, getattr(request, "molecule", None))
+    # Apply OA/full-text filters when requested
+    try:
+        plan = _apply_fulltext_only_filters(plan, bool(getattr(request, "full_text_only", False)))
+    except Exception:
+        pass
     plan_ms = _now_ms() - _t0
     if not plan:
         plan = {}
@@ -2512,6 +2517,35 @@ def _build_synthesis_plan(objective: str) -> list[str]:
         plan = ["mechanism", "patent", "clinical", "biomarker", "resistance"]
     return plan
 
+
+def _apply_fulltext_only_filters(plan: dict, full_text_only: bool) -> dict:
+    """When full_text_only is True, restrict PubMed queries to OA/full-text.
+
+    Strategy: wrap fielded PubMed queries with ( ... ) AND (free full text[filter] OR pmc[filter]).
+    Drop broad and recall_broad queries to avoid non-fielded noise.
+    Optionally drop clinical_query (trials) since it doesn't guarantee full text articles.
+    """
+    try:
+        if not full_text_only or not isinstance(plan, dict):
+            return plan
+        def wrap(q: str | None) -> str | None:
+            if not q or not isinstance(q, str) or not q.strip():
+                return q
+            return f"({q}) AND (free full text[filter] OR pmc[filter])"
+        for key in ("review_query", "mechanism_query", "recall_mechanism_query"):
+            if key in plan and isinstance(plan.get(key), str):
+                plan[key] = wrap(plan.get(key))
+        # Remove queries that aren't strictly fielded/safe for OA filtering
+        if "broad_query" in plan:
+            plan["broad_query"] = None
+        if "recall_broad_query" in plan:
+            plan["recall_broad_query"] = None
+        # Trials query does not guarantee OA article text; skip when strict
+        if "clinical_query" in plan:
+            plan["clinical_query"] = None
+        return plan
+    except Exception:
+        return plan
 
 def _collect_findings(results_sections: list[dict], limit: int = 8) -> str:
     snippets: list[str] = []
@@ -2838,6 +2872,8 @@ class ReviewRequest(BaseModel):
     preference: str | None = Field(default=None)  # 'precision' | 'recall'
     # Optional: enable experimental DAG orchestration
     dag_mode: bool = Field(default=False, alias="dagMode")
+    # Optional: only include full-text/OA articles to ensure Deep Dive full coverage
+    full_text_only: bool | None = Field(default=False, alias="fullTextOnly")
 
     class Config:
         allow_population_by_field_name = True
@@ -3002,10 +3038,49 @@ def _fetch_json(url: str, timeout: float = 10.0) -> dict:
         return {}
 
 
-def _resolve_oa_fulltext(pmid: str | None, landing_html: str, doi_hint: str | None = None) -> tuple[str, str, str]:
+def _resolve_via_eupmc(pmid: str | None, doi: str | None) -> tuple[str, dict]:
+    """Try Europe PMC for OA full text. Returns (text, meta)."""
+    try:
+        base = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
+        if doi:
+            q = f"DOI:{urllib.parse.quote(doi)} AND HAS_FT:y AND OPEN_ACCESS:y"
+        elif pmid:
+            q = f"EXT_ID:{urllib.parse.quote(pmid)} AND SRC:MED AND HAS_FT:y"
+        else:
+            return "", {}
+        url = f"{base}?query={q}&format=json&pageSize=1"
+        data = _fetch_json(url)
+        results = (((data.get("resultList") or {}).get("result")) or [])
+        if not results:
+            return "", {}
+        r0 = results[0]
+        # Try to find a full text URL
+        ft_list = r0.get("fullTextUrlList", {}).get("fullTextUrl", [])
+        for ft in ft_list:
+            docurl = ft.get("url") or ""
+            if not docurl:
+                continue
+            txt = _fetch_article_text_from_url(docurl)
+            if txt and len(txt) > 1000:
+                meta = {
+                    "resolved_title": r0.get("title"),
+                    "resolved_pmid": r0.get("pmid") or r0.get("id"),
+                    "resolved_pmcid": r0.get("pmcid"),
+                    "resolved_doi": r0.get("doi"),
+                    "license": ft.get("license"),
+                    "resolved_source": "europe_pmc",
+                }
+                return txt, meta
+    except Exception:
+        pass
+    return "", {}
+
+
+def _resolve_oa_fulltext(pmid: str | None, landing_html: str, doi_hint: str | None = None) -> tuple[str, str, str, dict]:
     """Attempt to resolve open full text via PMC or Unpaywall.
 
-    Returns: (text, grounding, source) where grounding in {full_text, abstract_only, none}, source hints e.g. pmc|publisher|repository|pubmed_abstract|none
+    Returns: (text, grounding, source, meta) where grounding in {full_text, abstract_only, none},
+    source hints e.g. pmc|publisher|repository|pubmed_abstract|europe_pmc|none; meta carries resolved identifiers.
     """
     # 1) PMC via ELink
     try:
@@ -3019,7 +3094,7 @@ def _resolve_oa_fulltext(pmid: str | None, landing_html: str, doi_hint: str | No
                     pmc_url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/"
                     html = _fetch_article_text_from_url(pmc_url)
                     if html and len(html) > 2000:
-                        return (html, "full_text", "pmc")
+                        return (html, "full_text", "pmc", {"resolved_pmcid": pmcid, "resolved_source": "pmc"})
     except Exception:
         pass
     # 2) Unpaywall via DOI
@@ -3035,17 +3110,25 @@ def _resolve_oa_fulltext(pmid: str | None, landing_html: str, doi_hint: str | No
                     txt = _fetch_article_text_from_url(u)
                     if txt and len(txt) > 1000:
                         src = "publisher" if "publisher" in (best.get("host_type") or "") else "repository"
-                        return (txt, "full_text", src)
+                        return (txt, "full_text", src, {"resolved_doi": doi, "license": best.get("license"), "resolved_source": src})
+    except Exception:
+        pass
+    # 2b) Europe PMC fallback
+    try:
+        doi2 = doi_hint or _extract_doi_from_html(landing_html)
+        txt2, meta2 = _resolve_via_eupmc(pmid, doi2)
+        if txt2:
+            return (txt2, "full_text", meta2.get("resolved_source", "europe_pmc"), meta2)
     except Exception:
         pass
     # 3) Abstract-only fallback for PubMed landing pages
     try:
         ab = _extract_pubmed_abstract(landing_html)
         if ab:
-            return (ab, "abstract_only", "pubmed_abstract")
+            return (ab, "abstract_only", "pubmed_abstract", {})
     except Exception:
         pass
-    return ("", "none", "none")
+    return ("", "none", "none", {})
 
 
 def _ensure_module_json(text: str) -> dict:

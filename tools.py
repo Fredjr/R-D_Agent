@@ -114,10 +114,12 @@ class PubMedSearchTool(BaseTool):
                     journal_elem = article.find(".//Journal/Title")
                     journal = (journal_elem.text or "").strip() if journal_elem is not None else ""
                     doi = ""
+                    pmcid = ""
                     for el in article.findall(".//ArticleIdList/ArticleId"):
                         if el.get('IdType') == 'doi' and el.text:
                             doi = el.text.strip()
-                            break
+                        if el.get('IdType') == 'pmc' and el.text:
+                            pmcid = el.text.strip()  # e.g., PMC123456
                     
                     articles.append({
                         "title": title,
@@ -127,6 +129,7 @@ class PubMedSearchTool(BaseTool):
                         "pmid": pmid,
                         "journal": journal,
                         "doi": doi,
+                        "pmcid": pmcid,
                         "url": (f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/" if pmid else "")
                     })
                     

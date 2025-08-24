@@ -17,12 +17,12 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleGenerateReview({ molecule, objective, projectId, clinicalMode, preference }: { molecule: string; objective: string; projectId?: string | null; clinicalMode?: boolean; preference?: 'precision' | 'recall' }) {
+  async function handleGenerateReview({ molecule, objective, projectId, clinicalMode, preference, dagMode, fullTextOnly }: { molecule: string; objective: string; projectId?: string | null; clinicalMode?: boolean; preference?: 'precision' | 'recall'; dagMode?: boolean; fullTextOnly?: boolean }) {
     setIsLoading(true);
     setError(null);
     setResults([]);
     try {
-      const data = await fetchReview({ molecule, objective, projectId: projectId ?? null, clinicalMode, preference });
+      const data = await fetchReview({ molecule, objective, projectId: projectId ?? null, clinicalMode, preference, dagMode, fullTextOnly });
       const arr = Array.isArray(data?.results) ? data.results : [];
       setResults(arr);
       setDiagnostics(data?.diagnostics ?? null);

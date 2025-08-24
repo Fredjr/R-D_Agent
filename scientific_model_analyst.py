@@ -11,12 +11,8 @@ from langchain.chains import LLMChain
 SCIENTIFIC_MODEL_JSON_SCHEMA = {
     "type": "object",
     "required": [
-        "model_type",
-        "study_design",
-        "population_description",
-        "protocol_summary",
-        "strengths",
-        "limitations",
+        "model_type","study_design","population_description","protocol_summary","strengths","limitations",
+        "model_type_taxonomy","study_design_taxonomy","sample_size","arms_groups","blinding_randomization","control_type","collection_timepoints","justification","link_to_objective","fact_anchors"
     ],
     "properties": {
         "model_type": {"type": "string"},
@@ -25,6 +21,16 @@ SCIENTIFIC_MODEL_JSON_SCHEMA = {
         "protocol_summary": {"type": "string"},
         "strengths": {"type": "string"},
         "limitations": {"type": "string"},
+        "model_type_taxonomy": {"type": "string"},
+        "study_design_taxonomy": {"type": "string"},
+        "sample_size": {"type": "string"},
+        "arms_groups": {"type": "string"},
+        "blinding_randomization": {"type": "string"},
+        "control_type": {"type": "string"},
+        "collection_timepoints": {"type": "string"},
+        "justification": {"type": "string"},
+        "link_to_objective": {"type": "string"},
+        "fact_anchors": {"type": "array"},
     },
 }
 
@@ -40,9 +46,12 @@ _MODEL_ANALYST_PROMPT = PromptTemplate(
         "2) Population/Sample (cells, animals, patients, dataset; include specific characteristics when present).\n"
         "3) Study Design Classification (e.g., randomized trial, observational, meta-analysis).\n"
         "4) Protocol Summary (concise, grounded).\n"
-        "5) Strengths & Limitations of the chosen model/design.\n\n"
-        "Then OUTPUT ONLY a single JSON object with EXACTLY these keys (all string values):\n"
-        "model_type, study_design, population_description, protocol_summary, strengths, limitations."
+        "5) Strengths & Limitations of the chosen model/design.\n"
+        "6) Rationale for model choice (justification) and explicit linkage to the objective.\n"
+        "7) Taxonomy normalization and key metadata (model_type_taxonomy, study_design_taxonomy, sample_size, arms_groups, blinding_randomization, control_type, collection_timepoints).\n"
+        "8) Provide 3-5 fact_anchors: each is {claim, evidence:{title,year,pmid,quote}} with quotes present in text.\n\n"
+        "Then OUTPUT ONLY one JSON object with EXACTLY these keys:\n"
+        "model_type, study_design, population_description, protocol_summary, strengths, limitations, model_type_taxonomy, study_design_taxonomy, sample_size, arms_groups, blinding_randomization, control_type, collection_timepoints, justification, link_to_objective, fact_anchors."
     ),
     input_variables=["objective", "full_text"],
 )
@@ -57,17 +66,18 @@ def _strip_code_fences(text: str) -> str:
 
 def _coerce_schema(obj: Dict[str, object]) -> Dict[str, str]:
     out: Dict[str, str] = {}
-    for k in (
-        "model_type",
-        "study_design",
-        "population_description",
-        "protocol_summary",
-        "strengths",
-        "limitations",
-    ):
+    keys = [
+        "model_type","study_design","population_description","protocol_summary","strengths","limitations",
+        "model_type_taxonomy","study_design_taxonomy","sample_size","arms_groups","blinding_randomization","control_type","collection_timepoints","justification","link_to_objective"
+    ]
+    for k in keys:
         v = obj.get(k)
         out[k] = ("" if v is None else str(v)).strip()
-    return out
+    # pass through anchors as best-effort
+    anchors = obj.get("fact_anchors")
+    if not isinstance(anchors, list):
+        anchors = []
+    return {**out, "fact_anchors": anchors}
 
 
 def analyze_scientific_model(full_article_text: str, user_initial_objective: str, llm) -> Dict[str, str]:
