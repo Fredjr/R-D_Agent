@@ -73,11 +73,37 @@ def _coerce_schema(obj: Dict[str, object]) -> Dict[str, str]:
     for k in keys:
         v = obj.get(k)
         out[k] = ("" if v is None else str(v)).strip()
-    # pass through anchors as best-effort
+    
+    # Handle fact_anchors more robustly
     anchors = obj.get("fact_anchors")
     if not isinstance(anchors, list):
         anchors = []
-    return {**out, "fact_anchors": anchors}
+    
+    # Validate and normalize each anchor
+    normalized_anchors = []
+    for anchor in anchors:
+        if not isinstance(anchor, dict):
+            continue
+        claim = str(anchor.get("claim", "")).strip()
+        if not claim:
+            continue
+            
+        evidence = anchor.get("evidence")
+        if not isinstance(evidence, dict):
+            evidence = {}
+            
+        normalized_anchor = {
+            "claim": claim,
+            "evidence": {
+                "title": str(evidence.get("title", "")).strip(),
+                "year": evidence.get("year"),
+                "pmid": str(evidence.get("pmid", "")).strip() if evidence.get("pmid") else None,
+                "quote": str(evidence.get("quote", "")).strip()
+            }
+        }
+        normalized_anchors.append(normalized_anchor)
+    
+    return {**out, "fact_anchors": normalized_anchors}
 
 
 def analyze_scientific_model(full_article_text: str, user_initial_objective: str, llm) -> Dict[str, str]:

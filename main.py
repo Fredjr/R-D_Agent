@@ -3341,86 +3341,98 @@ async def _run_deepdive_chain(prompt: PromptTemplate, objective: str, full_text:
 @app.post("/deep-dive")
 async def deep_dive(request: DeepDiveRequest):
     t0 = _now_ms()
-    source_info = {"url": request.url, "pmid": request.pmid, "title": request.title}
-    # Ingestion: strictly from provided article
-    text = ""
-    grounding = "none"
-    grounding_source = "none"
-    if request.url:
-        # Use raw HTML for OA resolution and abstract parsing
-        landing_html = _fetch_url_raw_text(request.url)
-        # If this is a PMC article page, treat as full text directly
-        if "ncbi.nlm.nih.gov/pmc/articles/" in (request.url or "") and landing_html:
-            text = _strip_html(landing_html)
-            grounding, grounding_source = "full_text", "pmc"
-        else:
-            text, grounding, grounding_source = _resolve_oa_fulltext(request.pmid, landing_html, None)
-            if not text and landing_html:
+    try:
+        source_info = {"url": request.url, "pmid": request.pmid, "title": request.title}
+        # Ingestion: strictly from provided article
+        text = ""
+        grounding = "none"
+        grounding_source = "none"
+        if request.url:
+            # Use raw HTML for OA resolution and abstract parsing
+            landing_html = _fetch_url_raw_text(request.url)
+            # If this is a PMC article page, treat as full text directly
+            if "ncbi.nlm.nih.gov/pmc/articles/" in (request.url or "") and landing_html:
                 text = _strip_html(landing_html)
-                if text:
-                    grounding = "abstract_only" if "pubmed.ncbi.nlm.nih.gov" in (request.url or "") else "none"
-                    grounding_source = "pubmed_abstract" if grounding == "abstract_only" else "none"
-    if not text:
+                grounding, grounding_source = "full_text", "pmc"
+            else:
+                text, grounding, grounding_source = _resolve_oa_fulltext(request.pmid, landing_html, None)
+                if not text and landing_html:
+                    text = _strip_html(landing_html)
+                    if text:
+                        grounding = "abstract_only" if "pubmed.ncbi.nlm.nih.gov" in (request.url or "") else "none"
+                        grounding_source = "pubmed_abstract" if grounding == "abstract_only" else "none"
+        if not text:
+            return {
+                "error": "Unable to fetch or parse article content. Provide full-text URL or upload PDF.",
+                "source": source_info,
+            }
+        # Source verification diagnostics
+        try:
+            meta = {}
+            if grounding == "full_text":
+                # Gather resolved meta from last OA resolver call if available (not retained here), fallback to landing page
+                meta = _verify_source_match(request.title, request.pmid, meta, landing_html)
+            else:
+                meta = _verify_source_match(request.title, request.pmid, {}, landing_html)
+        except Exception:
+            meta = {}
+        # Run three specialist modules in parallel
+        try:
+            # Module 1 with timeout
+            md_structured = await _with_timeout(
+                run_in_threadpool(analyze_scientific_model, text, request.objective, llm_analyzer),
+                12.0,
+                "DeepDiveModel",
+                retries=0,
+            )
+            md_json = {
+                "summary": md_structured.get("protocol_summary", ""),
+                "relevance_justification": "",
+                "fact_anchors": [],
+            }
+            # Modules 2 and 3 with timeouts (structured)
+            mth_task = _with_timeout(
+                run_in_threadpool(analyze_experimental_methods, text, request.objective, llm_analyzer),
+                12.0,
+                "DeepDiveMethods",
+                retries=0,
+            )
+            res_task = _with_timeout(
+                run_in_threadpool(analyze_results_interpretation, text, request.objective, llm_analyzer),
+                12.0,
+                "DeepDiveResults",
+                retries=0,
+            )
+            mth, res = await asyncio.gather(mth_task, res_task)
+        except Exception as e:
+            return {"error": str(e)[:200], "source": source_info}
+        took = _now_ms() - t0
+        diagnostics = {
+            "ingested_chars": len(text),
+            "grounding": grounding,
+            "grounding_source": grounding_source,
+            "latency_ms": took,
+            **({k: v for k, v in (meta or {}).items() if v is not None}),
+        }
         return {
-            "error": "Unable to fetch or parse article content. Provide full-text URL or upload PDF.",
             "source": source_info,
+            "model_description_structured": md_structured,
+            "model_description": md_json,
+            "experimental_methods_structured": mth if grounding == "full_text" else None,
+            "results_interpretation_structured": res if grounding == "full_text" else None,
+            "diagnostics": diagnostics,
         }
-    # Source verification diagnostics
-    try:
-        meta = {}
-        if grounding == "full_text":
-            # Gather resolved meta from last OA resolver call if available (not retained here), fallback to landing page
-            meta = _verify_source_match(request.title, request.pmid, meta, landing_html)
-        else:
-            meta = _verify_source_match(request.title, request.pmid, {}, landing_html)
-    except Exception:
-        meta = {}
-    # Run three specialist modules in parallel
-    try:
-        # Module 1 with timeout
-        md_structured = await _with_timeout(
-            run_in_threadpool(analyze_scientific_model, text, request.objective, llm_analyzer),
-            12.0,
-            "DeepDiveModel",
-            retries=0,
-        )
-        md_json = {
-            "summary": md_structured.get("protocol_summary", ""),
-            "relevance_justification": "",
-            "fact_anchors": [],
-        }
-        # Modules 2 and 3 with timeouts (structured)
-        mth_task = _with_timeout(
-            run_in_threadpool(analyze_experimental_methods, text, request.objective, llm_analyzer),
-            12.0,
-            "DeepDiveMethods",
-            retries=0,
-        )
-        res_task = _with_timeout(
-            run_in_threadpool(analyze_results_interpretation, text, request.objective, llm_analyzer),
-            12.0,
-            "DeepDiveResults",
-            retries=0,
-        )
-        mth, res = await asyncio.gather(mth_task, res_task)
     except Exception as e:
-        return {"error": str(e)[:200], "source": source_info}
-    took = _now_ms() - t0
-    diagnostics = {
-        "ingested_chars": len(text),
-        "grounding": grounding,
-        "grounding_source": grounding_source,
-        "latency_ms": took,
-        **({k: v for k, v in (meta or {}).items() if v is not None}),
-    }
-    return {
-        "source": source_info,
-        "model_description_structured": md_structured,
-        "model_description": md_json,
-        "experimental_methods_structured": mth if grounding == "full_text" else None,
-        "results_interpretation_structured": res if grounding == "full_text" else None,
-        "diagnostics": diagnostics,
-    }
+        # Catch any unexpected errors and return structured error response
+        import traceback
+        error_detail = str(e)[:300]
+        if "Missing some input keys" in error_detail:
+            error_detail = "LLM validation error: " + error_detail
+        return {
+            "error": f"Deep dive processing failed: {error_detail}",
+            "source": {"url": request.url, "pmid": request.pmid, "title": request.title},
+            "diagnostics": {"error_type": type(e).__name__, "traceback": traceback.format_exc()[:500]}
+        }
 
 
 @app.post("/deep-dive-upload")
