@@ -47,11 +47,14 @@ _MODEL_ANALYST_PROMPT = PromptTemplate(
         "3) Study Design Classification (e.g., randomized trial, observational, meta-analysis).\n"
         "4) Protocol Summary (concise, grounded).\n"
         "5) Strengths & Limitations of the chosen model/design.\n"
-        "6) Rationale for model choice (justification) and explicit linkage to the objective.\n"
+        "6) Rationale for model choice (justification) and explicit linkage to the objective; state what would falsify it.\n"
         "7) Taxonomy normalization and key metadata (model_type_taxonomy, study_design_taxonomy, sample_size, arms_groups, blinding_randomization, control_type, collection_timepoints).\n"
-        "8) Provide 3-5 fact_anchors: each item must include a claim and an evidence object with fields title, year, pmid, and a direct quote from the text.\n\n"
+        "8) Provide group sizes (e.g., mice per group, patients per arm) and dosing schedule (dose, route, frequency, duration) if present.\n"
+        "9) Specify control arms (untreated/vehicle/sham/genetic) and any randomization/blinding evidence.\n"
+        "10) Bias inventory: selection/measurement biases and their likely direction of effect.\n"
+        "11) Provide 3-5 fact_anchors: each item must include a claim and an evidence object with fields title, year, pmid, and a direct quote from the text.\n\n"
         "Then OUTPUT ONLY one JSON object with EXACTLY these keys:\n"
-        "model_type, study_design, population_description, protocol_summary, strengths, limitations, model_type_taxonomy, study_design_taxonomy, sample_size, arms_groups, blinding_randomization, control_type, collection_timepoints, justification, link_to_objective, fact_anchors."
+        "model_type, study_design, population_description, protocol_summary, strengths, limitations, model_type_taxonomy, study_design_taxonomy, sample_size, arms_groups, blinding_randomization, control_type, collection_timepoints, justification, link_to_objective, group_sizes, dosing_schedule, control_arms, bias_inventory, fact_anchors."
     ),
     input_variables=["objective", "full_text"],
 )
@@ -68,7 +71,7 @@ def _coerce_schema(obj: Dict[str, object]) -> Dict[str, str]:
     out: Dict[str, str] = {}
     keys = [
         "model_type","study_design","population_description","protocol_summary","strengths","limitations",
-        "model_type_taxonomy","study_design_taxonomy","sample_size","arms_groups","blinding_randomization","control_type","collection_timepoints","justification","link_to_objective"
+        "model_type_taxonomy","study_design_taxonomy","sample_size","arms_groups","blinding_randomization","control_type","collection_timepoints","justification","link_to_objective","group_sizes","dosing_schedule","control_arms","bias_inventory"
     ]
     for k in keys:
         v = obj.get(k)

@@ -25,13 +25,13 @@ export default function ExperimentalMethodsTable({ rows }: { rows: ExperimentalM
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead>
-            <tr className="bg-slate-50 text-slate-700">
-              <th className="text-left font-semibold px-3 py-2 border-b border-slate-200">Technique</th>
-              <th className="text-left font-semibold px-3 py-2 border-b border-slate-200">Measurement</th>
-              <th className="text-left font-semibold px-3 py-2 border-b border-slate-200">Role</th>
-              <th className="text-left font-semibold px-3 py-2 border-b border-slate-200">Key Parameters</th>
-              <th className="text-left font-semibold px-3 py-2 border-b border-slate-200">Controls/Validation</th>
-              <th className="text-left font-semibold px-3 py-2 border-b border-slate-200">Limitations</th>
+            <tr className="bg-slate-50 text-slate-900 sticky top-0 z-10">
+              <th className="text-left font-semibold px-3 py-2 border-b border-slate-200 bg-slate-50">Technique</th>
+              <th className="text-left font-semibold px-3 py-2 border-b border-slate-200 bg-slate-50">Measurement</th>
+              <th className="text-left font-semibold px-3 py-2 border-b border-slate-200 bg-slate-50">Role</th>
+              <th className="text-left font-semibold px-3 py-2 border-b border-slate-200 bg-slate-50">Key Parameters</th>
+              <th className="text-left font-semibold px-3 py-2 border-b border-slate-200 bg-slate-50">Controls/Validation</th>
+              <th className="text-left font-semibold px-3 py-2 border-b border-slate-200 bg-slate-50">Limitations</th>
             </tr>
           </thead>
           <tbody>
@@ -45,6 +45,31 @@ export default function ExperimentalMethodsTable({ rows }: { rows: ExperimentalM
                         <span key={j} className="inline-block text-xxs px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">{id}</span>
                       ))}
                     </div>
+                  )}
+                  {Array.isArray((r as any).controls_matrix) && (r as any).controls_matrix.length > 0 && (
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-xxs text-slate-600">Show controls matrix</summary>
+                      <div className="mt-1 overflow-x-auto">
+                        <table className="min-w-[420px] text-xs">
+                          <thead>
+                            <tr className="bg-slate-50 text-slate-900">
+                              <th className="text-left font-semibold px-2 py-1 border-b border-slate-200 bg-slate-50">Control</th>
+                              <th className="text-left font-semibold px-2 py-1 border-b border-slate-200 bg-slate-50">Used in</th>
+                              <th className="text-left font-semibold px-2 py-1 border-b border-slate-200 bg-slate-50">Observed outcome</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(r as any).controls_matrix.map((cm: any, k: number) => (
+                              <tr key={k}>
+                                <td className="px-2 py-1 border-b border-slate-100">{cm?.type || '—'}</td>
+                                <td className="px-2 py-1 border-b border-slate-100">{cm?.used_in || '—'}</td>
+                                <td className="px-2 py-1 border-b border-slate-100">{cm?.outcome || '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </details>
                   )}
                 </td>
                 <td className="px-3 py-2 border-b border-slate-100 whitespace-pre-line">{r.measurement || '—'}</td>

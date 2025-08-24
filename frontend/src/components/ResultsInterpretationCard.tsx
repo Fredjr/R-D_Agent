@@ -28,25 +28,27 @@ export default function ResultsInterpretationCard({ hypothesis_alignment, key_re
       <h3 className="text-lg font-semibold mb-3">Results Interpretation</h3>
       <div className="space-y-4">
         <div>
-          <h4 className="text-sm font-semibold text-gray-800">Hypothesis Alignment</h4>
-          <p className="mt-1 text-sm text-gray-900 whitespace-pre-line">{NA(hypothesis_alignment)}</p>
+          <h4 className="text-sm font-semibold text-black">Hypothesis Alignment</h4>
+          <p className="mt-1 text-sm text-black whitespace-pre-line">{NA(hypothesis_alignment)}</p>
         </div>
         <div>
-          <h4 className="text-sm font-semibold text-gray-800">Key Quantitative Results</h4>
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-black">Key Quantitative Results</h4>
+          </div>
           {rows.length === 0 ? (
-            <p className="mt-1 text-sm text-gray-900">No quantitative results extracted.</p>
+            <p className="mt-1 text-sm text-black">No quantitative results extracted.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="bg-slate-50 text-slate-700">
-                    <th className="text-left font-semibold px-3 py-2 border-b border-slate-200">Metric</th>
-                    <th className="text-left font-semibold px-3 py-2 border-b border-slate-200">Value</th>
-                    <th className="text-left font-semibold px-3 py-2 border-b border-slate-200">Effect</th>
-                    <th className="text-left font-semibold px-3 py-2 border-b border-slate-200">p / FDR</th>
-                    <th className="text-left font-semibold px-3 py-2 border-b border-slate-200">CI</th>
-                    <th className="text-left font-semibold px-3 py-2 border-b border-slate-200">Direction</th>
-                    <th className="text-left font-semibold px-3 py-2 border-b border-slate-200">Figure/Table</th>
+                  <tr className="bg-slate-50 text-slate-900 sticky top-0 z-10">
+                    <th className="text-left font-semibold px-3 py-2 border-b border-slate-200 bg-slate-50">Metric</th>
+                    <th className="text-left font-semibold px-3 py-2 border-b border-slate-200 bg-slate-50">Value</th>
+                    <th className="text-left font-semibold px-3 py-2 border-b border-slate-200 bg-slate-50">Effect</th>
+                    <th className="text-left font-semibold px-3 py-2 border-b border-slate-200 bg-slate-50">p / FDR</th>
+                    <th className="text-left font-semibold px-3 py-2 border-b border-slate-200 bg-slate-50">CI</th>
+                    <th className="text-left font-semibold px-3 py-2 border-b border-slate-200 bg-slate-50">Direction</th>
+                    <th className="text-left font-semibold px-3 py-2 border-b border-slate-200 bg-slate-50">Figure/Table</th>
                   </tr>
                 </thead>
                 <tbody>

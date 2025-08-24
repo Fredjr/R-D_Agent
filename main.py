@@ -1603,17 +1603,17 @@ Prior Context: {memories}
     # Prefer deterministic per-corpus plan. Optionally augment with LLM strategist if enabled and valid.
     llm_plan: dict | None = None
     if STRATEGIST_LLM_ENABLED:
-        try:
+    try:
             prompt = PromptTemplate(template=strategist_template, input_variables=["objective", "memories", "molecule"])
-            chain = LLMChain(llm=llm_analyzer, prompt=prompt)
+        chain = LLMChain(llm=llm_analyzer, prompt=prompt)
             out = chain.invoke({"objective": objective[:400], "memories": memories_text[:400], "molecule": (molecule or "")[:200]})
-            txt = out.get("text", out) if isinstance(out, dict) else str(out)
-            if "```" in txt:
-                txt = txt.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
+        txt = out.get("text", out) if isinstance(out, dict) else str(out)
+        if "```" in txt:
+            txt = txt.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
             candidate = json.loads(txt)
             if isinstance(candidate, dict):
                 llm_plan = candidate
-        except Exception:
+    except Exception:
             llm_plan = None
     # Deterministic fallback (default path)
     obj = _normalize_entities(objective or "").strip()
@@ -1994,7 +1994,7 @@ Abstract: {abstract}
         if _time_left(deadline) < 20.0 and (target_deep - len(extracted_results)) > 0:
             # if little time left, stop early once we have at least 9 items
             if len(extracted_results) >= 9:
-                break
+            break
         abstract = art.get("abstract", "")
         extracted = {}
         if abstract.strip() and _time_left(deadline) > 12.0:
@@ -2015,9 +2015,9 @@ Abstract: {abstract}
             # Per-article ceiling to keep latency bounded
             grounded = await asyncio.wait_for(
                 run_in_threadpool(summarization_chain.invoke, {
-                    "objective": objective,
-                    "abstract": enriched_abstract,
-                    "memory_context": memory_context,
+                "objective": objective,
+                "abstract": enriched_abstract,
+                "memory_context": memory_context,
                 }),
                 timeout=min(PER_ARTICLE_BUDGET_S, max(2.0, _time_left(deadline) - 2.0))
             )
@@ -2045,7 +2045,7 @@ Abstract: {abstract}
                     # Normalize quotes to avoid ellipsis-truncated snippets
                     try:
                         structured["fact_anchors"] = _normalize_anchor_quotes(abstract, structured["fact_anchors"])  # type: ignore
-                    except Exception:
+        except Exception:
                         pass
                     # If anchors remain weak, synthesize light fallback anchors
                     try:
@@ -2999,7 +2999,7 @@ async def ready() -> dict:
     except Exception as e:
         try:
             log_event({"ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "event": "pinecone_ready_exception", "error": str(e)})
-        except Exception:
+    except Exception:
             pass
         pc_ok = False
     keys_ok = bool(os.getenv("GOOGLE_API_KEY")) and bool(os.getenv("GOOGLE_CSE_ID")) and bool(os.getenv("PINECONE_API_KEY"))
@@ -3024,7 +3024,7 @@ def _strip_html(html: str) -> str:
         # Collapse whitespace
         t = re.sub(r"\s+", " ", t).strip()
         return t
-    except Exception:
+        except Exception:
         return html
 
 
@@ -3041,7 +3041,7 @@ def _fetch_article_text_from_url(url: str, timeout: float = 20.0) -> str:
                     try:
                         # Attempt to extract PDF text
                         return pdf_extract_text(io.BytesIO(raw))[:200000]
-                    except Exception:
+    except Exception:
                         return ""
                 return ""
             # Assume HTML or text
@@ -3050,7 +3050,7 @@ def _fetch_article_text_from_url(url: str, timeout: float = 20.0) -> str:
             except Exception:
                 try:
                     text = raw.decode("latin-1", errors="ignore")
-                except Exception:
+        except Exception:
                     text = raw.decode(errors="ignore")
             return _strip_html(text)
     except Exception:
@@ -3066,10 +3066,10 @@ def _fetch_url_raw_text(url: str, timeout: float = 15.0) -> str:
             raw = r.read()
             try:
                 return raw.decode("utf-8", errors="ignore")
-            except Exception:
-                try:
+        except Exception:
+        try:
                     return raw.decode("latin-1", errors="ignore")
-                except Exception:
+        except Exception:
                     return raw.decode(errors="ignore")
     except Exception:
         return ""
@@ -3084,7 +3084,7 @@ def _extract_pubmed_abstract(html_text: str) -> str:
             m = re.search(r"<section[^>]*id=\"abstract\"[\s\S]*?</section>", html_text, flags=re.IGNORECASE)
         if m:
             return _strip_html(m.group(0))[:200000]
-    except Exception:
+        except Exception:
         pass
     return ""
 
@@ -3099,18 +3099,18 @@ def _extract_doi_from_html(html_text: str) -> str:
         m = re.search(r"doi:\s*(10\.\S+)", html_text, flags=re.IGNORECASE)
         if m:
             return m.group(1).strip().rstrip('.')
-    except Exception:
-        pass
+            except Exception:
+                pass
     return ""
 
 
 def _fetch_json(url: str, timeout: float = 10.0) -> dict:
-    try:
+        try:
         with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"}), timeout=timeout) as r:
             raw = r.read().decode("utf-8", errors="ignore")
             import json as _json
             return _json.loads(raw)
-    except Exception:
+        except Exception:
         return {}
 
 
@@ -3122,7 +3122,7 @@ def _resolve_via_eupmc(pmid: str | None, doi: str | None) -> tuple[str, dict]:
             q = f"DOI:{urllib.parse.quote(doi)} AND HAS_FT:y AND OPEN_ACCESS:y"
         elif pmid:
             q = f"EXT_ID:{urllib.parse.quote(pmid)} AND SRC:MED AND HAS_FT:y"
-        else:
+                else:
             return "", {}
         url = f"{base}?query={q}&format=json&pageSize=1"
         data = _fetch_json(url)
@@ -3147,7 +3147,7 @@ def _resolve_via_eupmc(pmid: str | None, doi: str | None) -> tuple[str, dict]:
                     "resolved_source": "europe_pmc",
                 }
                 return txt, meta
-    except Exception:
+            except Exception:
         pass
     return "", {}
 
@@ -3159,7 +3159,7 @@ def _normalize_title(title: str | None) -> str:
         s = re.sub(r"[^a-z0-9\s]", "", s)
         s = re.sub(r"\s+", " ", s).strip()
         return s
-    except Exception:
+            except Exception:
         return (title or "").strip().lower()
 
 
@@ -3178,8 +3178,8 @@ def _extract_title_from_html(html_text: str) -> str:
         m = re.search(r"<title>([\s\S]*?)</title>", html_text, flags=re.IGNORECASE)
         if m:
             return _strip_html(m.group(0)).strip()
-    except Exception:
-        pass
+            except Exception:
+                pass
     return ""
 
 
@@ -3205,7 +3205,7 @@ def _verify_source_match(req_title: str | None, req_pmid: str | None, meta: dict
         try:
             if req_pmid and resolved.get("resolved_pmid"):
                 pmid_match = str(req_pmid).strip() == str(resolved.get("resolved_pmid")).strip()
-        except Exception:
+                            except Exception:
             pmid_match = False
         mismatch = False
         # If any identifier provided, require equality; else rely on title when available
@@ -3213,10 +3213,10 @@ def _verify_source_match(req_title: str | None, req_pmid: str | None, meta: dict
             mismatch = not pmid_match
         elif t_req and t_res:
             mismatch = not title_match
-        else:
+                                else:
             mismatch = False
         return { **resolved, "mismatch": bool(mismatch) }
-    except Exception:
+                        except Exception:
         return { **({k: meta.get(k) for k in ("resolved_title","resolved_pmid","resolved_pmcid","resolved_doi","license","resolved_source")}), "mismatch": False }
 
 
@@ -3239,8 +3239,8 @@ def _resolve_oa_fulltext(pmid: str | None, landing_html: str, doi_hint: str | No
                     html = _fetch_article_text_from_url(pmc_url)
                     if html and len(html) > 2000:
                         return (html, "full_text", "pmc", {"resolved_pmcid": pmcid, "resolved_source": "pmc"})
-    except Exception:
-        pass
+            except Exception:
+                pass
     # 2) Unpaywall via DOI
     try:
         doi = (doi_hint or _extract_doi_from_html(landing_html)).strip()
@@ -3255,7 +3255,7 @@ def _resolve_oa_fulltext(pmid: str | None, landing_html: str, doi_hint: str | No
                     if txt and len(txt) > 1000:
                         src = "publisher" if "publisher" in (best.get("host_type") or "") else "repository"
                         return (txt, "full_text", src, {"resolved_doi": doi, "license": best.get("license"), "resolved_source": src})
-    except Exception:
+            except Exception:
         pass
     # 2b) Europe PMC fallback
     try:
@@ -3263,15 +3263,15 @@ def _resolve_oa_fulltext(pmid: str | None, landing_html: str, doi_hint: str | No
         txt2, meta2 = _resolve_via_eupmc(pmid, doi2)
         if txt2:
             return (txt2, "full_text", meta2.get("resolved_source", "europe_pmc"), meta2)
-    except Exception:
-        pass
+                except Exception:
+                    pass
     # 3) Abstract-only fallback for PubMed landing pages
     try:
         ab = _extract_pubmed_abstract(landing_html)
         if ab:
             return (ab, "abstract_only", "pubmed_abstract", {})
-    except Exception:
-        pass
+                except Exception:
+                    pass
     return ("", "none", "none", {})
 
 
@@ -3282,7 +3282,7 @@ def _ensure_module_json(text: str) -> dict:
         data = json.loads(text)
         if not isinstance(data, dict):
             raise ValueError("not obj")
-    except Exception:
+                except Exception:
         data = {}
     # Backfill minimal structure
     data.setdefault("summary", str(text)[:1000] if isinstance(text, str) else "")
@@ -3342,6 +3342,12 @@ async def _run_deepdive_chain(prompt: PromptTemplate, objective: str, full_text:
 async def deep_dive(request: DeepDiveRequest):
     t0 = _now_ms()
     try:
+        _dd_cache_maybe_invalidate()
+        # Server-side cache lookup
+        ck = _dd_cache_key(request.url, request.pmid, request.title, request.objective)
+        now = time.time()
+        if ck in _DEEPDIVE_CACHE and (now - _DEEPDIVE_CACHE_TS.get(ck, 0)) < _dd_cache_ttl():
+            return _DEEPDIVE_CACHE[ck]
         source_info = {"url": request.url, "pmid": request.pmid, "title": request.title}
         # Ingestion: strictly from provided article
         text = ""
@@ -3376,7 +3382,7 @@ async def deep_dive(request: DeepDiveRequest):
                 meta = _verify_source_match(request.title, request.pmid, meta or {}, landing_html)
             else:
                 meta = _verify_source_match(request.title, request.pmid, meta or {}, landing_html)
-        except Exception:
+                    except Exception:
             meta = meta or {}
         # Run three specialist modules in parallel
         try:
@@ -3406,7 +3412,19 @@ async def deep_dive(request: DeepDiveRequest):
                 retries=0,
             )
             mth, res = await asyncio.gather(mth_task, res_task)
-        except Exception as e:
+            # Augment anchors (confidence and figure/table id)
+            try:
+                if isinstance(md_structured.get("fact_anchors"), list):
+                    md_structured["fact_anchors"] = _augment_anchors(md_structured.get("fact_anchors"), res.get("key_results") if isinstance(res, dict) else [])
+                if isinstance(mth, list):
+                    for row in mth:
+                        if isinstance(row.get("fact_anchors"), list):
+                            row["fact_anchors"] = _augment_anchors(row.get("fact_anchors"), res.get("key_results") if isinstance(res, dict) else [])
+                if isinstance(res, dict) and isinstance(res.get("fact_anchors"), list):
+                    res["fact_anchors"] = _augment_anchors(res.get("fact_anchors"), res.get("key_results"))
+                        except Exception:
+                            pass
+                except Exception as e:
             return {"error": str(e)[:200], "source": source_info}
         took = _now_ms() - t0
         diagnostics = {
@@ -3435,8 +3453,8 @@ async def deep_dive(request: DeepDiveRequest):
                                 res.setdefault("key_results", [])
                                 res["key_results"] = (res.get("key_results") or []) + harvested
                                 has_results = True
-                        except Exception:
-                            pass
+            except Exception:
+                pass
                 diagnostics["coverage_methods"] = bool(has_methods)
                 diagnostics["coverage_results_quant"] = bool(has_results)
                 # Minimal quantitative completeness: p-value present OR (>=2 changes AND >=1 figure/table ref)
@@ -3445,21 +3463,54 @@ async def deep_dive(request: DeepDiveRequest):
                     rows = (res.get("key_results") or []) if isinstance(res, dict) else []
                     p_ct = sum(1 for r in rows if isinstance(r, dict) and str(r.get("metric","")) == "p_value")
                     ch_ct = sum(1 for r in rows if isinstance(r, dict) and str(r.get("metric","")) in ("change","fold_change"))
-                    ref_ct = sum(1 for r in rows if isinstance(r, dict) and str(r.get("metric","")) in ("reference",))
+                    ref_ct = sum(1 for r in rows if isinstance(r, dict) and str(r.get("figure_table_ref","")) not in ("", "None", "null"))
                     quant_ok = (p_ct >= 1) or (ch_ct >= 2 and ref_ct >= 1)
-                except Exception:
+        except Exception:
                     quant_ok = has_results
                 diagnostics["quant_minimum_met"] = bool(quant_ok)
                 diagnostics["qual_only"] = bool(not quant_ok)
-        except Exception:
-            pass
-        return {
+                # Evidence map (figure/table refs)
+                try:
+                    refs = []
+                    for r in (res.get("key_results") or []):
+                        if isinstance(r, dict):
+                            ref = str(r.get("figure_table_ref",""))
+                            if ref and ref not in refs:
+                                refs.append(ref)
+                    diagnostics["evidence_map"] = {"results_refs": refs[:12]}
+                    except Exception:
+                        pass
+                    except Exception:
+                        pass
+        resp = {
             "source": source_info,
             "model_description_structured": md_structured,
             "model_description": md_json,
             "experimental_methods_structured": mth if grounding == "full_text" else None,
             "results_interpretation_structured": res if grounding == "full_text" else None,
             "diagnostics": diagnostics,
+        }
+        # Hard acceptance gating when enabled
+        try:
+            if os.getenv("FULLTEXT_HARD_GATE", "0") in ("1","true","True") and grounding == "full_text":
+                if not diagnostics.get("quant_minimum_met"):
+                    return {"error": "Deep dive blocked by quantitative completeness gate (fullTextOnly hard gate)", "source": source_info, "diagnostics": diagnostics}
+                            except Exception:
+                                pass
+        # Store in cache
+        _DEEPDIVE_CACHE[ck] = resp
+        _DEEPDIVE_CACHE_TS[ck] = now
+        return resp
+    except Exception as e:
+        # Catch any unexpected errors and return structured error response
+        import traceback
+        error_detail = str(e)[:300]
+        if "Missing some input keys" in error_detail:
+            error_detail = "LLM validation error: " + error_detail
+        return {
+            "error": f"Deep dive processing failed: {error_detail}",
+            "source": {"url": request.url, "pmid": request.pmid, "title": request.title},
+            "diagnostics": {"error_type": type(e).__name__, "traceback": traceback.format_exc()[:500]}
         }
 
 import xml.etree.ElementTree as ET
@@ -3474,13 +3525,13 @@ def _fetch_pmc_jats_xml(pmcid: str) -> str:
         )
         with urllib.request.urlopen(url, timeout=12) as r:
             return r.read().decode("utf-8", errors="ignore")
-    except Exception:
-        try:
+                        except Exception:
+                        try:
             # Fallback: PMC HTML with format=xml sometimes works
             url2 = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/?page=1&format=xml"
             with urllib.request.urlopen(url2, timeout=12) as r2:
                 return r2.read().decode("utf-8", errors="ignore")
-        except Exception:
+                        except Exception:
             return ""
 
 def _harvest_quant_from_jats(jats_xml: str) -> list[dict]:
@@ -3491,16 +3542,16 @@ def _harvest_quant_from_jats(jats_xml: str) -> list[dict]:
         # Remove namespaces for simpler XPath
         try:
             jats_xml = re.sub(r"xmlns(:\w+)?=\"[^\"]+\"", "", jats_xml)
-        except Exception:
-            pass
+                        except Exception:
+                            pass
         root = ET.fromstring(jats_xml)
         text_blobs: list[str] = []
         # Collect paragraph text
         for t in root.iter():
-            try:
+                    try:
                 if t.text and t.tag.lower().endswith(('{p}', 'p')):
                     text_blobs.append(t.text)
-            except Exception:
+                    except Exception:
                 continue
         big = "\n".join(text_blobs)[:200000]
         # p-values
@@ -3534,7 +3585,7 @@ def _harvest_quant_from_jats(jats_xml: str) -> list[dict]:
         for t in root.iter():
             try:
                 tag = t.tag.lower()
-            except Exception:
+                        except Exception:
                 tag = ""
             if tag.endswith('fig') or tag.endswith('table-wrap'):
                 label = None
@@ -3559,7 +3610,7 @@ def _harvest_quant_from_jats(jats_xml: str) -> list[dict]:
                 "direction": "",
                 "figure_table_ref": c,
             })
-    except Exception:
+                        except Exception:
         return out[:10]
     return out[:15]
 
@@ -3570,8 +3621,8 @@ def _harvest_tables_from_jats(jats_xml: str) -> list[dict]:
     try:
         try:
             jats_xml = re.sub(r"xmlns(:\w+)?=\"[^\"]+\"", "", jats_xml)
-        except Exception:
-            pass
+                        except Exception:
+                            pass
         root = ET.fromstring(jats_xml)
         # Iterate table-wraps
         for tw in root.iter():
@@ -3605,3 +3656,65 @@ def _harvest_tables_from_jats(jats_xml: str) -> list[dict]:
         return out[:25]
     except Exception:
         return out[:10]
+
+# Simple in-memory cache for deep-dive results
+_DEEPDIVE_CACHE: dict[str, dict] = {}
+_DEEPDIVE_CACHE_TS: dict[str, float] = {}
+
+def _dd_cache_ttl() -> float:
+    try:
+        return float(os.getenv("DEEPDIVE_CACHE_TTL_S", "900"))
+                except Exception:
+        return 900.0
+
+def _dd_cache_key(url: str | None, pmid: str | None, title: str | None, objective: str) -> str:
+    base = (url or pmid or title or "").strip()
+    return f"dd::{base}::{hash(objective)}"
+
+# Cache versioning
+_DD_CACHE_MODEL_VER = os.getenv("APP_VERSION", "")
+
+def _dd_cache_maybe_invalidate():
+    global _DD_CACHE_MODEL_VER
+    cur = os.getenv("APP_VERSION", "")
+    if cur != _DD_CACHE_MODEL_VER:
+        _DEEPDIVE_CACHE.clear()
+        _DEEPDIVE_CACHE_TS.clear()
+        _DD_CACHE_MODEL_VER = cur
+
+def _infer_fig_id(text: str) -> str | None:
+    try:
+        m = re.search(r"(Fig\.?\s*\d+[A-Za-z]?|Figure\s*\d+[A-Za-z]?|Table\s*\d+)", text or "", flags=re.I)
+        return m.group(0) if m else None
+        except Exception:
+        return None
+
+def _augment_anchors(anchors: list[dict] | None, key_results: list[dict] | None) -> list[dict]:
+    if not isinstance(anchors, list):
+        return []
+    refs = set()
+    if isinstance(key_results, list):
+        for kr in key_results:
+            ref = (kr or {}).get("figure_table_ref")
+            if isinstance(ref, str) and ref:
+                refs.add(ref)
+    out: list[dict] = []
+    for a in anchors:
+        if not isinstance(a, dict):
+            continue
+        ev = a.get("evidence") or {}
+        if not isinstance(ev, dict):
+            ev = {}
+        quote = str(ev.get("quote", ""))
+        fig = _infer_fig_id(quote) or (next(iter(refs)) if refs else None)
+        conf = 0.6
+        if ev.get("pmid"): conf += 0.2
+        if len(quote) > 50: conf += 0.1
+        if fig: conf += 0.1
+        conf = max(0.0, min(1.0, conf))
+        out.append({
+            **a,
+            "evidence": { **ev, "figure_table_id": fig },
+            "confidence": round(conf, 2),
+        })
+    return out

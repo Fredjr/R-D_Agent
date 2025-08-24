@@ -77,6 +77,7 @@ def _coerce_methods(arr: object) -> List[Dict[str, object]]:
             "validation": str(it.get("validation", "")).strip(),
             "accession_ids": [str(x).strip() for x in acc if str(x).strip()],
             "fact_anchors": norm_anchors,
+            "controls_matrix": [],
         })
     return out
 

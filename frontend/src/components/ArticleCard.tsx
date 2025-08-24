@@ -4,6 +4,8 @@ import ScientificModelCard from '@/components/ScientificModelCard';
 import ExperimentalMethodsTable from '@/components/ExperimentalMethodsTable';
 import ResultsInterpretationCard from '@/components/ResultsInterpretationCard';
 import type { SearchResult } from '@/lib/dummy-data';
+import MiniFlow from '@/components/MiniFlow';
+import ObjectiveEvidence from '@/components/ObjectiveEvidence';
 
 type Props = { item: SearchResult };
 
@@ -22,26 +24,49 @@ export default function ArticleCard({ item }: Props) {
   const [deepDiveLoading, setDeepDiveLoading] = React.useState(false);
   const [deepDiveError, setDeepDiveError] = React.useState<string | null>(null);
   const [deepDiveData, setDeepDiveData] = React.useState<any | null>(null);
-  // Cache deep dive data by key (pmid||title)
+  // Cache deep dive data by key (pmid||title) in-memory
   const deepDiveCacheRef = React.useRef<Map<string, any>>(new Map());
+
+  function makeCacheKey(obj: string) {
+    const base = `${headerPmid || ''}||${headerTitle || ''}`;
+    return `deepDive::${base}::${obj.slice(0,128)}`;
+  }
 
   async function handleDeepDive() {
     setDeepDiveOpen(true);
     setDeepDiveError(null);
-    const key = `${headerPmid || ''}||${headerTitle || ''}`;
-    const cached = deepDiveCacheRef.current.get(key);
-    if (cached) {
-      setDeepDiveData({ ...cached });
+    const objective = (item as any)?.query || headerTitle || '';
+    const memKey = `${headerPmid || ''}||${headerTitle || ''}`;
+    const lsKey = makeCacheKey(objective || '');
+    // 1) local in-memory cache
+    const cachedMem = deepDiveCacheRef.current.get(memKey);
+    if (cachedMem) {
+      setDeepDiveData({ ...cachedMem });
       setDeepDiveLoading(false);
       return;
     }
+    // 2) localStorage cache
+    try {
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(lsKey) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          deepDiveCacheRef.current.set(memKey, parsed);
+          setDeepDiveData({ ...parsed });
+          setDeepDiveLoading(false);
+          return;
+        }
+      }
+    } catch {}
+    // 3) fetch fresh
     setDeepDiveLoading(true);
     setDeepDiveData(null);
     try {
       const url = headerUrl || undefined;
-      const data = await fetchDeepDive({ url, pmid: headerPmid, title: headerTitle, objective: (item as any)?.query || headerTitle });
+      const data = await fetchDeepDive({ url, pmid: headerPmid, title: headerTitle, objective });
       const enriched = { ...data, _activeTab: 'Model' };
-      deepDiveCacheRef.current.set(key, enriched);
+      deepDiveCacheRef.current.set(memKey, enriched);
+      try { if (typeof window !== 'undefined') window.localStorage.setItem(lsKey, JSON.stringify(enriched)); } catch {}
       setDeepDiveData(enriched);
     } catch (e: any) {
       setDeepDiveError(e?.message || 'Failed to perform deep dive');
@@ -331,11 +356,25 @@ export default function ArticleCard({ item }: Props) {
                         </span>
                       );
                     })()}
+                    {(() => {
+                      const d = (deepDiveData?.diagnostics||{}) as any;
+                      const refs: string[] = Array.isArray(d?.evidence_map?.results_refs) ? d.evidence_map.results_refs : [];
+                      if (!refs.length) return null;
+                      return (
+                        <span className="inline-flex items-center gap-1 ml-2 text-slate-700" title="Figures/Tables referenced in quantitative results">
+                          <span className="text-xs font-medium">Evidence:</span>
+                          <span className="text-xs">{refs.join(', ')}</span>
+                        </span>
+                      );
+                    })()}
                   </div>
-                  <nav className="-mb-px flex gap-4 text-sm">
+                  <nav className="-mb-px flex gap-4 text-sm" role="tablist" aria-label="Deep Dive Tabs">
                     {['Model','Methods','Results'].map((tab) => (
                       <button
                         key={tab}
+                        role="tab"
+                        tabIndex={0}
+                        aria-selected={deepDiveData._activeTab===tab}
                         className={`px-3 py-2 border-b-2 ${deepDiveData._activeTab===tab ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-600 hover:text-slate-900'}`}
                         onClick={() => setDeepDiveData({ ...deepDiveData, _activeTab: tab })}
                       >
@@ -347,7 +386,23 @@ export default function ArticleCard({ item }: Props) {
                 <div className="space-y-4 overflow-y-auto max-h-full">
                   {(!deepDiveData._activeTab || deepDiveData._activeTab==='Model') && (
                     deepDiveData.model_description_structured ? (
-                      <ScientificModelCard {...deepDiveData.model_description_structured} />
+                      <>
+                        <MiniFlow
+                          objective={(item as any)?.query || headerTitle}
+                          model={{ model_type: deepDiveData.model_description_structured.model_type, study_design: deepDiveData.model_description_structured.study_design }}
+                          methods={Array.isArray(deepDiveData.experimental_methods_structured) ? deepDiveData.experimental_methods_structured.map((r: any) => r.technique).filter(Boolean) : []}
+                          resultsSummary={deepDiveData.results_interpretation_structured?.hypothesis_alignment}
+                          hypothesisAlignment={deepDiveData.results_interpretation_structured?.hypothesis_alignment}
+                          evidenceRefs={Array.isArray(deepDiveData?.diagnostics?.evidence_map?.results_refs) ? deepDiveData.diagnostics.evidence_map.results_refs : []}
+                        />
+                        <ObjectiveEvidence
+                          objective={(item as any)?.query || headerTitle}
+                          modelAnchors={deepDiveData.model_description_structured?.fact_anchors}
+                          methodAnchors={Array.isArray(deepDiveData.experimental_methods_structured) ? deepDiveData.experimental_methods_structured.flatMap((r: any) => Array.isArray(r.fact_anchors) ? r.fact_anchors : []) : []}
+                          resultAnchors={deepDiveData.results_interpretation_structured?.fact_anchors}
+                        />
+                        <ScientificModelCard {...deepDiveData.model_description_structured} />
+                      </>
                     ) : (
                       <div className="p-3 rounded border border-slate-200 bg-slate-50 text-slate-700 text-sm">No model analysis available.</div>
                     )
