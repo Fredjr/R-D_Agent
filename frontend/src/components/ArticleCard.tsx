@@ -228,13 +228,39 @@ export default function ArticleCard({ item }: Props) {
         </div>
       ) : null}
 
-      <div className="mt-4 flex justify-end">
+      <div className="mt-4 flex gap-2 justify-end">
         <button
           className="rounded bg-indigo-600 text-white px-3 py-2 text-sm hover:bg-indigo-500"
           onClick={handleDeepDive}
         >
           Deep Dive
         </button>
+        <label className="inline-flex items-center text-sm text-indigo-700 cursor-pointer">
+          <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={async (e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            setDeepDiveOpen(true);
+            setDeepDiveLoading(true);
+            setDeepDiveError(null);
+            setDeepDiveData(null);
+            try {
+              const direct = (process.env.NEXT_PUBLIC_BACKEND_URL || '').trim();
+              const endpoint = direct ? `${direct.replace(/\/+$/, '')}/deep-dive-upload` : '/api/backend/deep-dive-upload';
+              const form = new FormData();
+              form.append('objective', (item as any)?.query || headerTitle);
+              form.append('file', f);
+              const res = await fetch(endpoint, { method: 'POST', body: form });
+              if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+              const data = await res.json();
+              setDeepDiveData({ ...data, _activeTab: 'Model' });
+            } catch (err: any) {
+              setDeepDiveError(err?.message || 'Upload deep dive failed');
+            } finally {
+              setDeepDiveLoading(false);
+            }
+          }} />
+          <span className="inline-block rounded border border-indigo-300 px-3 py-2 hover:bg-indigo-50">Upload PDF</span>
+        </label>
       </div>
 
       {deepDiveOpen && (
@@ -278,7 +304,7 @@ export default function ArticleCard({ item }: Props) {
                       ? <ExperimentalMethodsTable rows={deepDiveData.experimental_methods_structured} />
                       : (deepDiveLoading
                           ? <div className="p-3 rounded border border-slate-200 bg-slate-50 text-slate-700 text-sm">Loading methods…</div>
-                          : <div className="p-3 rounded border border-slate-200 bg-slate-50 text-slate-700 text-sm">No methods extracted.</div>
+                          : <div className="p-3 rounded border border-yellow-200 bg-yellow-50 text-yellow-900 text-sm">Methods require full text. Upload PDF or open OA version.</div>
                         )
                   )}
                   {(deepDiveData._activeTab==='Results') && (
@@ -286,9 +312,10 @@ export default function ArticleCard({ item }: Props) {
                       ? <ResultsInterpretationCard {...deepDiveData.results_interpretation_structured} />
                       : (deepDiveLoading
                           ? <div className="p-3 rounded border border-slate-200 bg-slate-50 text-slate-700 text-sm">Loading results…</div>
-                          : <div className="p-3 rounded border border-slate-200 bg-slate-50 text-slate-700 text-sm">No results interpretation available.</div>
+                          : <div className="p-3 rounded border border-yellow-200 bg-yellow-50 text-yellow-900 text-sm">Results interpretation requires full text. Upload PDF or open OA version.</div>
                         )
                   )}
+                  <div className="text-xs text-slate-600">Grounding: {deepDiveData?.diagnostics?.grounding || 'unknown'} {deepDiveData?.diagnostics?.grounding_source ? `· ${deepDiveData.diagnostics.grounding_source}` : ''}</div>
                 </div>
               </div>
             )}
