@@ -411,8 +411,7 @@ SUMMARY_JSON_SCHEMA = {
                     }
                 }
             }
-        }
-    },
+        },
 }
 
 def _validate_or_repair_summary(obj: Dict[str, object], objective: str, abstract: str) -> Dict[str, object]:
@@ -1603,17 +1602,17 @@ Prior Context: {memories}
     # Prefer deterministic per-corpus plan. Optionally augment with LLM strategist if enabled and valid.
     llm_plan: dict | None = None
     if STRATEGIST_LLM_ENABLED:
-    try:
+        try:
             prompt = PromptTemplate(template=strategist_template, input_variables=["objective", "memories", "molecule"])
-        chain = LLMChain(llm=llm_analyzer, prompt=prompt)
+            chain = LLMChain(llm=llm_analyzer, prompt=prompt)
             out = chain.invoke({"objective": objective[:400], "memories": memories_text[:400], "molecule": (molecule or "")[:200]})
-        txt = out.get("text", out) if isinstance(out, dict) else str(out)
-        if "```" in txt:
-            txt = txt.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
+            txt = out.get("text", out) if isinstance(out, dict) else str(out)
+            if "```" in txt:
+                txt = txt.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
             candidate = json.loads(txt)
             if isinstance(candidate, dict):
                 llm_plan = candidate
-    except Exception:
+        except Exception:
             llm_plan = None
     # Deterministic fallback (default path)
     obj = _normalize_entities(objective or "").strip()
