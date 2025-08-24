@@ -23,7 +23,7 @@ EXPERIMENTAL_METHODS_PROMPT = PromptTemplate(
         "- limitations_reproducibility: caveats and reproducibility notes.\n"
         "- validation: orthogonal validations or replication if any.\n"
         "- accession_ids: array of repository accessions (e.g., GEO/SRA) if present; else [].\n"
-        "- fact_anchors: 3-5 objects: {claim, evidence:{title,year,pmid,quote}} strictly from the text.\n"
+        "- fact_anchors: provide 3-5 items; each item must include a claim and an evidence object with fields title, year, pmid, and a direct quote from the text.\n"
     ),
     input_variables=["objective", "full_text"],
 )

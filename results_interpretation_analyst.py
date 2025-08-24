@@ -18,7 +18,7 @@ RESULTS_INTERPRETATION_PROMPT = PromptTemplate(
         "- hypothesis_alignment: one of confirm | partial | contradict, plus brief rationale (e.g., 'confirm: …').\n"
         "- key_results: array of objects with metric, value, unit, effect_size, p_value, fdr, ci, direction, figure_table_ref.\n"
         "- limitations_biases_in_results: array of brief strings.\n"
-        "- fact_anchors: 3-5 objects: {claim, evidence:{title,year,pmid,quote}} strictly from the text.\n"
+        "- fact_anchors: provide 3-5 items; each item must include a claim and an evidence object with fields title, year, pmid, and a direct quote from the text.\n"
     ),
     input_variables=["objective", "full_text"],
 )

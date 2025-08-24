@@ -49,7 +49,7 @@ _MODEL_ANALYST_PROMPT = PromptTemplate(
         "5) Strengths & Limitations of the chosen model/design.\n"
         "6) Rationale for model choice (justification) and explicit linkage to the objective.\n"
         "7) Taxonomy normalization and key metadata (model_type_taxonomy, study_design_taxonomy, sample_size, arms_groups, blinding_randomization, control_type, collection_timepoints).\n"
-        "8) Provide 3-5 fact_anchors: each is {claim, evidence:{title,year,pmid,quote}} with quotes present in text.\n\n"
+        "8) Provide 3-5 fact_anchors: each item must include a claim and an evidence object with fields title, year, pmid, and a direct quote from the text.\n\n"
         "Then OUTPUT ONLY one JSON object with EXACTLY these keys:\n"
         "model_type, study_design, population_description, protocol_summary, strengths, limitations, model_type_taxonomy, study_design_taxonomy, sample_size, arms_groups, blinding_randomization, control_type, collection_timepoints, justification, link_to_objective, fact_anchors."
     ),
