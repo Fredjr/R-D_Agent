@@ -12,3 +12,4 @@ langgraph
 langchain-huggingface
 sentence-transformers==2.2.2
 pdfminer.six
+python-multipart
