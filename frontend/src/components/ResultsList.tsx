@@ -32,6 +32,16 @@ export default function ResultsList({ results }: Props) {
               <span>Pool size: {d.pool_size}</span>
               <span>Shortlist size: {d.shortlist_size}</span>
               <span>Deep-dive count: {d.deep_dive_count}</span>
+              {d.dag_topped_up ? (
+                <span className="inline-flex items-center gap-1 text-xxs px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200" title="Results were topped up to meet target depth">
+                  topped up
+                </span>
+              ) : null}
+              {d.dag_fallback_v2 ? (
+                <span className="inline-flex items-center gap-1 text-xxs px-2 py-0.5 rounded bg-orange-50 text-orange-700 border border-orange-200" title="Fallback path was used to ensure completeness">
+                  fallback
+                </span>
+              ) : null}
             </div>
             {t ? (
               <div className="mt-1 text-xs text-slate-600">

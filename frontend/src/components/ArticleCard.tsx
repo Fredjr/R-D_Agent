@@ -1,4 +1,8 @@
 import React from 'react';
+import { fetchDeepDive } from '@/lib/api';
+import ScientificModelCard from '@/components/ScientificModelCard';
+import ExperimentalMethodsTable from '@/components/ExperimentalMethodsTable';
+import ResultsInterpretationCard from '@/components/ResultsInterpretationCard';
 import type { SearchResult } from '@/lib/dummy-data';
 
 type Props = { item: SearchResult };
@@ -14,6 +18,26 @@ export default function ArticleCard({ item }: Props) {
 
   const [expandSummary, setExpandSummary] = React.useState(false);
   const [expandAnchors, setExpandAnchors] = React.useState(false);
+  const [deepDiveOpen, setDeepDiveOpen] = React.useState(false);
+  const [deepDiveLoading, setDeepDiveLoading] = React.useState(false);
+  const [deepDiveError, setDeepDiveError] = React.useState<string | null>(null);
+  const [deepDiveData, setDeepDiveData] = React.useState<any | null>(null);
+
+  async function handleDeepDive() {
+    setDeepDiveOpen(true);
+    setDeepDiveLoading(true);
+    setDeepDiveError(null);
+    setDeepDiveData(null);
+    try {
+      const url = headerUrl || undefined;
+      const data = await fetchDeepDive({ url, pmid: headerPmid, title: headerTitle, objective: (item as any)?.query || headerTitle });
+      setDeepDiveData(data);
+    } catch (e: any) {
+      setDeepDiveError(e?.message || 'Failed to perform deep dive');
+    } finally {
+      setDeepDiveLoading(false);
+    }
+  }
   return (
     <article className="bg-white border border-gray-200 rounded-lg shadow-sm p-6 flex flex-col gap-4">
       <header className="flex items-start justify-between gap-4">
@@ -203,6 +227,74 @@ export default function ArticleCard({ item }: Props) {
           ))}
         </div>
       ) : null}
+
+      <div className="mt-4 flex justify-end">
+        <button
+          className="rounded bg-indigo-600 text-white px-3 py-2 text-sm hover:bg-indigo-500"
+          onClick={handleDeepDive}
+        >
+          Deep Dive
+        </button>
+      </div>
+
+      {deepDiveOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setDeepDiveOpen(false)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold">Deep Dive: Scientific Model</h3>
+              <button onClick={() => setDeepDiveOpen(false)} className="text-sm text-gray-600 hover:text-gray-900">Close</button>
+            </div>
+            {deepDiveLoading && (
+              <div className="p-3 rounded border border-slate-200 bg-slate-50 text-slate-700 text-sm">Analyzing article…</div>
+            )}
+            {deepDiveError && (
+              <div className="p-3 rounded border border-red-300 bg-red-50 text-red-700 text-sm">{deepDiveError}</div>
+            )}
+            {deepDiveData && (
+              <div>
+                <div className="border-b border-slate-200 mb-3 sticky top-0 bg-white z-10">
+                  <nav className="-mb-px flex gap-4 text-sm">
+                    {['Model','Methods','Results'].map((tab) => (
+                      <button
+                        key={tab}
+                        className={`px-3 py-2 border-b-2 ${deepDiveData._activeTab===tab ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-600 hover:text-slate-900'}`}
+                        onClick={() => setDeepDiveData({ ...deepDiveData, _activeTab: tab })}
+                      >
+                        {tab}
+                      </button>
+                    ))}
+                  </nav>
+                </div>
+                <div className="space-y-4">
+                  {(!deepDiveData._activeTab || deepDiveData._activeTab==='Model') && (
+                    deepDiveData.model_description_structured ? (
+                      <ScientificModelCard {...deepDiveData.model_description_structured} />
+                    ) : (
+                      <div className="p-3 rounded border border-slate-200 bg-slate-50 text-slate-700 text-sm">No model analysis available.</div>
+                    )
+                  )}
+                  {(deepDiveData._activeTab==='Methods') && (
+                    Array.isArray(deepDiveData.experimental_methods_structured)
+                      ? <ExperimentalMethodsTable rows={deepDiveData.experimental_methods_structured} />
+                      : (deepDiveLoading
+                          ? <div className="p-3 rounded border border-slate-200 bg-slate-50 text-slate-700 text-sm">Loading methods…</div>
+                          : <div className="p-3 rounded border border-slate-200 bg-slate-50 text-slate-700 text-sm">No methods extracted.</div>
+                        )
+                  )}
+                  {(deepDiveData._activeTab==='Results') && (
+                    deepDiveData.results_interpretation_structured
+                      ? <ResultsInterpretationCard {...deepDiveData.results_interpretation_structured} />
+                      : (deepDiveLoading
+                          ? <div className="p-3 rounded border border-slate-200 bg-slate-50 text-slate-700 text-sm">Loading results…</div>
+                          : <div className="p-3 rounded border border-slate-200 bg-slate-50 text-slate-700 text-sm">No results interpretation available.</div>
+                        )
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </article>
   );
 }
