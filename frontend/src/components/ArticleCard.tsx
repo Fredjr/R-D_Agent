@@ -22,16 +22,27 @@ export default function ArticleCard({ item }: Props) {
   const [deepDiveLoading, setDeepDiveLoading] = React.useState(false);
   const [deepDiveError, setDeepDiveError] = React.useState<string | null>(null);
   const [deepDiveData, setDeepDiveData] = React.useState<any | null>(null);
+  // Cache deep dive data by key (pmid||title)
+  const deepDiveCacheRef = React.useRef<Map<string, any>>(new Map());
 
   async function handleDeepDive() {
     setDeepDiveOpen(true);
-    setDeepDiveLoading(true);
     setDeepDiveError(null);
+    const key = `${headerPmid || ''}||${headerTitle || ''}`;
+    const cached = deepDiveCacheRef.current.get(key);
+    if (cached) {
+      setDeepDiveData({ ...cached });
+      setDeepDiveLoading(false);
+      return;
+    }
+    setDeepDiveLoading(true);
     setDeepDiveData(null);
     try {
       const url = headerUrl || undefined;
       const data = await fetchDeepDive({ url, pmid: headerPmid, title: headerTitle, objective: (item as any)?.query || headerTitle });
-      setDeepDiveData(data);
+      const enriched = { ...data, _activeTab: 'Model' };
+      deepDiveCacheRef.current.set(key, enriched);
+      setDeepDiveData(enriched);
     } catch (e: any) {
       setDeepDiveError(e?.message || 'Failed to perform deep dive');
     } finally {
@@ -39,7 +50,7 @@ export default function ArticleCard({ item }: Props) {
     }
   }
   return (
-    <article className="bg-white border border-gray-200 rounded-lg shadow-sm p-6 flex flex-col gap-4">
+    <article className="bg-white border border-gray-200 rounded-lg shadow-sm p-6 flex flex-col gap-4 text-black">
       <header className="flex items-start justify-between gap-4">
         <div className="flex-1">
           {item.source ? (
@@ -265,13 +276,13 @@ export default function ArticleCard({ item }: Props) {
 
       {deepDiveOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setDeepDiveOpen(false)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full p-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white text-black rounded-lg shadow-xl max-w-3xl w-full p-4 max-h-[85vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-lg font-semibold">Deep Dive: Scientific Model</h3>
-              <button onClick={() => setDeepDiveOpen(false)} className="text-sm text-gray-600 hover:text-gray-900">Close</button>
+              <button onClick={() => setDeepDiveOpen(false)} className="text-sm text-black hover:opacity-80">Close</button>
             </div>
             {deepDiveLoading && (
-              <div className="p-3 rounded border border-slate-200 bg-slate-50 text-slate-700 text-sm">Analyzing article…</div>
+              <div className="p-3 rounded border border-slate-200 bg-slate-50 text-black text-sm">Analyzing article…</div>
             )}
             {deepDiveError && (
               <div className="p-3 rounded border border-red-300 bg-red-50 text-red-700 text-sm">{deepDiveError}</div>
@@ -280,7 +291,7 @@ export default function ArticleCard({ item }: Props) {
               <div>
                 <div className="border-b border-slate-200 mb-3 sticky top-0 bg-white z-10">
                   {/* Source & coverage bar */}
-                  <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-slate-700">
+                  <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-black">
                     <span className="font-medium">Source:</span>
                     <span title="Selected (from results)">{headerTitle}{headerPmid ? ` · PMID ${headerPmid}` : ''}</span>
                     {(() => {
@@ -317,7 +328,7 @@ export default function ArticleCard({ item }: Props) {
                     ))}
                   </nav>
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-4 overflow-y-auto max-h-full">
                   {(!deepDiveData._activeTab || deepDiveData._activeTab==='Model') && (
                     deepDiveData.model_description_structured ? (
                       <ScientificModelCard {...deepDiveData.model_description_structured} />
