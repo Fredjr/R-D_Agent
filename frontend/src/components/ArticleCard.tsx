@@ -279,6 +279,32 @@ export default function ArticleCard({ item }: Props) {
             {deepDiveData && (
               <div>
                 <div className="border-b border-slate-200 mb-3 sticky top-0 bg-white z-10">
+                  {/* Source & coverage bar */}
+                  <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-slate-700">
+                    <span className="font-medium">Source:</span>
+                    <span title="Selected (from results)">{headerTitle}{headerPmid ? ` · PMID ${headerPmid}` : ''}</span>
+                    {(() => {
+                      const d = (deepDiveData?.diagnostics||{}) as any;
+                      const match = d && typeof d.mismatch === 'boolean' ? !d.mismatch : undefined;
+                      if (match === true) return (<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">match</span>);
+                      if (match === false) return (<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">mismatch</span>);
+                      return null;
+                    })()}
+                    {(() => {
+                      const d = (deepDiveData?.diagnostics||{}) as any;
+                      const rt = d?.resolved_title; const rp = d?.resolved_pmid; const rd = d?.resolved_doi; const rc = d?.resolved_pmcid;
+                      const src = d?.resolved_source; const lic = d?.license;
+                      if (!rt && !rp && !rd && !rc) return null;
+                      return (
+                        <span className="ml-2" title="Resolved">
+                          → {rt || ''}{rp ? ` · PMID ${rp}` : ''}{rc ? ` · PMCID ${rc}` : ''}{rd ? ` · DOI ${rd}` : ''}{src ? ` · ${src}` : ''}{lic ? ` · ${lic}` : ''}
+                        </span>
+                      );
+                    })()}
+                    <span className={`ml-auto inline-block px-2 py-0.5 rounded border ${deepDiveData?.diagnostics?.grounding==='full_text' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-yellow-50 text-yellow-800 border-yellow-200'}`}>
+                      {deepDiveData?.diagnostics?.grounding==='full_text' ? 'Full‑text grounded' : 'Abstract‑only'}
+                    </span>
+                  </div>
                   <nav className="-mb-px flex gap-4 text-sm">
                     {['Model','Methods','Results'].map((tab) => (
                       <button
