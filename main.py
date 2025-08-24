@@ -2945,6 +2945,24 @@ def _fetch_article_text_from_url(url: str, timeout: float = 20.0) -> str:
         return ""
 
 
+def _fetch_url_raw_text(url: str, timeout: float = 15.0) -> str:
+    try:
+        if not url or not url.startswith("http"):
+            return ""
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (DeepDiveBot)"})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            raw = r.read()
+            try:
+                return raw.decode("utf-8", errors="ignore")
+            except Exception:
+                try:
+                    return raw.decode("latin-1", errors="ignore")
+                except Exception:
+                    return raw.decode(errors="ignore")
+    except Exception:
+        return ""
+
+
 def _extract_pubmed_abstract(html_text: str) -> str:
     try:
         # Very lightweight extraction of abstract content block on PubMed
@@ -3102,10 +3120,11 @@ async def deep_dive(request: DeepDiveRequest):
     grounding = "none"
     grounding_source = "none"
     if request.url:
-        landing_html = _fetch_article_text_from_url(request.url)
+        # Use raw HTML for OA resolution and abstract parsing
+        landing_html = _fetch_url_raw_text(request.url)
         text, grounding, grounding_source = _resolve_oa_fulltext(request.pmid, landing_html, None)
         if not text:
-            text = landing_html
+            text = _strip_html(landing_html)
             if text:
                 grounding = "abstract_only" if "pubmed.ncbi.nlm.nih.gov" in (request.url or "") else "none"
                 grounding_source = "pubmed_abstract" if grounding == "abstract_only" else "none"
