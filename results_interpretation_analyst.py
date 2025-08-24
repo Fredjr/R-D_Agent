@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from typing import Dict
+from typing import Dict, List
+import re
 
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
@@ -85,7 +86,22 @@ def _coerce(obj: object) -> Dict[str, object]:
     }
 
 
-def analyze_results_interpretation(full_article_text: str, user_initial_objective: str, llm) -> Dict[str, str]:
+def _harvest_quant(text: str) -> List[Dict[str, str]]:
+    out: List[Dict[str, str]] = []
+    if not text:
+        return out
+    # Simple patterns for p-values and fold changes
+    for m in re.finditer(r"p\s*[<=>]\s*0\.?\d+", text, flags=re.I):
+        out.append({"metric": "p_value", "value": m.group(0), "unit": "", "effect_size": "", "p_value": m.group(0), "fdr": "", "ci": "", "direction": "", "figure_table_ref": ""})
+    for m in re.finditer(r"(\b\d+(\.\d+)?)\s*(fold|x)\s*(increase|decrease)?", text, flags=re.I):
+        out.append({"metric": "fold_change", "value": m.group(0), "unit": "", "effect_size": m.group(0), "p_value": "", "fdr": "", "ci": "", "direction": "", "figure_table_ref": ""})
+    # Figure/Table references
+    for m in re.finditer(r"(Fig\.?\s*\d+[A-Za-z]?|Table\s*\d+)", text, flags=re.I):
+        out.append({"metric": "reference", "value": "", "unit": "", "effect_size": "", "p_value": "", "fdr": "", "ci": "", "direction": "", "figure_table_ref": m.group(0)})
+    return out[:10]
+
+
+def analyze_results_interpretation(full_article_text: str, user_initial_objective: str, llm) -> Dict[str, object]:
     safe_text = (full_article_text or "")[:12000]
     chain = LLMChain(llm=llm, prompt=RESULTS_INTERPRETATION_PROMPT)
     raw = chain.invoke({"objective": (user_initial_objective or "")[:400], "full_text": safe_text})
@@ -95,5 +111,9 @@ def analyze_results_interpretation(full_article_text: str, user_initial_objectiv
         data = json.loads(cleaned)
     except Exception:
         data = {}
-    return _coerce(data)
+    obj = _coerce(data)
+    # Lightweight enrichment for missing quant fields
+    if isinstance(obj.get("key_results"), list) and len(obj["key_results"]) == 0:
+        obj["key_results"] = _harvest_quant(safe_text)
+    return obj
 

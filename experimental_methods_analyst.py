@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from typing import List, Dict
+import re
 
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
@@ -80,7 +81,48 @@ def _coerce_methods(arr: object) -> List[Dict[str, object]]:
     return out
 
 
-def analyze_experimental_methods(full_article_text: str, user_initial_objective: str, llm) -> List[Dict[str, str]]:
+def _harvest_accessions(text: str) -> List[str]:
+    ids: List[str] = []
+    if not text:
+        return ids
+    patterns = [
+        r"\bGSE\d+\b", r"\bGSM\d+\b", r"\bSRR\d+\b", r"\bSRS\d+\b", r"\bPRJNA\d+\b",
+        r"\bERP\d+\b", r"\bE-\w\w\w-\d+\b", r"\bPRJEB\d+\b"
+    ]
+    for pat in patterns:
+        for m in re.findall(pat, text):
+            if m not in ids:
+                ids.append(m)
+    return ids[:15]
+
+
+def _instruments_hints(text: str) -> str:
+    if not text:
+        return ""
+    hints = []
+    if re.search(r"flow cytometer|BD Accuri|FACS|Canto|Fortessa", text, flags=re.I):
+        hints.append("flow cytometer")
+    if re.search(r"microscope|Olympus|Nikon|Zeiss", text, flags=re.I):
+        hints.append("microscope")
+    if re.search(r"qPCR|RT-qPCR|ABI|QuantStudio|LightCycler", text, flags=re.I):
+        hints.append("qPCR")
+    return ", ".join(sorted(set(hints)))
+
+
+def _controls_hints(text: str) -> str:
+    if not text:
+        return ""
+    hints = []
+    if re.search(r"isotype control", text, flags=re.I):
+        hints.append("isotype control")
+    if re.search(r"replicate", text, flags=re.I):
+        hints.append("replicates")
+    if re.search(r"vehicle[- ]?treated|untreated|control group", text, flags=re.I):
+        hints.append("vehicle/untreated control")
+    return ", ".join(sorted(set(hints)))
+
+
+def analyze_experimental_methods(full_article_text: str, user_initial_objective: str, llm) -> List[Dict[str, object]]:
     safe_text = (full_article_text or "")[:12000]
     chain = LLMChain(llm=llm, prompt=EXPERIMENTAL_METHODS_PROMPT)
     raw = chain.invoke({"objective": (user_initial_objective or "")[:400], "full_text": safe_text})
@@ -90,5 +132,17 @@ def analyze_experimental_methods(full_article_text: str, user_initial_objective:
         data = json.loads(cleaned)
     except Exception:
         data = []
-    return _coerce_methods(data)
+    rows = _coerce_methods(data)
+    # Lightweight enrichment: accession ids and controls when missing
+    accs = _harvest_accessions(safe_text)
+    ctrl_hint = _controls_hints(safe_text)
+    inst_hint = _instruments_hints(safe_text)
+    for r in rows:
+        if isinstance(r.get("accession_ids"), list) and len(r["accession_ids"]) == 0 and accs:
+            r["accession_ids"] = accs
+        if not r.get("controls_validation") and ctrl_hint:
+            r["controls_validation"] = ctrl_hint
+        if inst_hint and not r.get("parameters"):
+            r["parameters"] = inst_hint
+    return rows
 
