@@ -305,16 +305,32 @@ export default function ArticleCard({ item }: Props) {
                       const d = (deepDiveData?.diagnostics||{}) as any;
                       const rt = d?.resolved_title; const rp = d?.resolved_pmid; const rd = d?.resolved_doi; const rc = d?.resolved_pmcid;
                       const src = d?.resolved_source; const lic = d?.license;
-                      if (!rt && !rp && !rd && !rc) return null;
+                      if (!rt && !rp && !rd && !rc && !lic) return null;
                       return (
                         <span className="ml-2" title="Resolved">
-                          → {rt || ''}{rp ? ` · PMID ${rp}` : ''}{rc ? ` · PMCID ${rc}` : ''}{rd ? ` · DOI ${rd}` : ''}{src ? ` · ${src}` : ''}{lic ? ` · ${lic}` : ''}
+                          → {rt || ''}{rp ? ` · PMID ${rp}` : ''}{rc ? ` · PMCID ${rc}` : ''}{rd ? ` · DOI ${rd}` : ''}{src ? ` · ${src}` : ''}
+                          {lic ? <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">{lic}</span> : null}
                         </span>
                       );
                     })()}
                     <span className={`ml-auto inline-block px-2 py-0.5 rounded border ${deepDiveData?.diagnostics?.grounding==='full_text' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-yellow-50 text-yellow-800 border-yellow-200'}`}>
                       {deepDiveData?.diagnostics?.grounding==='full_text' ? 'Full‑text grounded' : 'Abstract‑only'}
                     </span>
+                    {deepDiveData?.diagnostics?.qual_only ? (
+                      <span className="inline-block px-2 py-0.5 rounded border bg-yellow-50 text-yellow-800 border-yellow-200" title="Quantitative completeness not met; qualitative only">Qual‑only</span>
+                    ) : null}
+                    {(() => {
+                      const m1 = !!deepDiveData?.model_description_structured;
+                      const m2 = Array.isArray(deepDiveData?.experimental_methods_structured) && deepDiveData.experimental_methods_structured.length>0;
+                      const m3 = Array.isArray(deepDiveData?.results_interpretation_structured?.key_results) && deepDiveData.results_interpretation_structured.key_results.length>0;
+                      return (
+                        <span className="inline-flex items-center gap-2 ml-2">
+                          <span className={`px-2 py-0.5 rounded text-xs border ${m1?'bg-emerald-50 text-emerald-700 border-emerald-200':'bg-yellow-50 text-yellow-800 border-yellow-200'}`}>Model</span>
+                          <span className={`px-2 py-0.5 rounded text-xs border ${m2?'bg-emerald-50 text-emerald-700 border-emerald-200':'bg-yellow-50 text-yellow-800 border-yellow-200'}`}>Methods</span>
+                          <span className={`px-2 py-0.5 rounded text-xs border ${m3?'bg-emerald-50 text-emerald-700 border-emerald-200':'bg-yellow-50 text-yellow-800 border-yellow-200'}`}>Results</span>
+                        </span>
+                      );
+                    })()}
                   </div>
                   <nav className="-mb-px flex gap-4 text-sm">
                     {['Model','Methods','Results'].map((tab) => (
