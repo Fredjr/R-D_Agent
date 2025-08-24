@@ -3,7 +3,7 @@
 import React, { useState, FormEvent } from 'react';
 
 type Props = {
-  onGenerate?: (args: { molecule: string; objective: string; projectId?: string | null; clinicalMode?: boolean; preference?: 'precision' | 'recall'; dagMode?: boolean }) => void;
+  onGenerate?: (args: { molecule: string; objective: string; projectId?: string | null; clinicalMode?: boolean; preference?: 'precision' | 'recall'; dagMode?: boolean; fullTextOnly?: boolean }) => void;
 };
 
 export default function InputForm({ onGenerate }: Props) {
@@ -13,10 +13,11 @@ export default function InputForm({ onGenerate }: Props) {
   const [clinicalMode, setClinicalMode] = useState(false);
   const [preference, setPreference] = useState<'precision' | 'recall'>('precision');
   const [dagMode, setDagMode] = useState(false);
+  const [fullTextOnly, setFullTextOnly] = useState(false);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    onGenerate?.({ molecule, objective, projectId, clinicalMode, preference, dagMode });
+    onGenerate?.({ molecule, objective, projectId, clinicalMode, preference, dagMode, fullTextOnly });
   };
 
   return (
@@ -56,6 +57,12 @@ export default function InputForm({ onGenerate }: Props) {
           <label className="flex items-center gap-2 text-sm font-medium">
             <input type="checkbox" checked={dagMode} onChange={(e) => setDagMode(e.target.checked)} />
             Experimental DAG mode
+          </label>
+        </div>
+        <div>
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input type="checkbox" checked={fullTextOnly} onChange={(e) => setFullTextOnly(e.target.checked)} />
+            Only include full-text/OA articles (ensures Deep Dive fully populated)
           </label>
         </div>
       </div>

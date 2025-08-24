@@ -5,9 +5,10 @@ export type FetchReviewArgs = {
   clinicalMode?: boolean;
   preference?: 'precision' | 'recall';
   dagMode?: boolean;
+  fullTextOnly?: boolean;
 };
 
-function buildPayload({ molecule, objective, projectId, clinicalMode, preference, dagMode }: FetchReviewArgs) {
+function buildPayload({ molecule, objective, projectId, clinicalMode, preference, dagMode, fullTextOnly }: FetchReviewArgs) {
   return {
     molecule,
     objective,
@@ -15,6 +16,7 @@ function buildPayload({ molecule, objective, projectId, clinicalMode, preference
     clinicalMode: Boolean(clinicalMode),
     preference: preference ?? 'precision',
     dagMode: Boolean(dagMode),
+    fullTextOnly: Boolean(fullTextOnly),
   };
 }
 
