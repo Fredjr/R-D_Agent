@@ -81,7 +81,7 @@ else:
     app.add_middleware(
         CORSMiddleware,
         allow_origin_regex=os.getenv('ALLOW_ORIGIN_REGEX', '.*'),
-        allow_credentials=False,
+        allow_credentials=_ALLOW_CREDENTIALS.lower() not in ('0','false','no'),
         allow_methods=['*'],
         allow_headers=['*'],
     )
