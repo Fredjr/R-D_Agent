@@ -3056,6 +3056,131 @@ def _fetch_article_text_from_url(url: str, timeout: float = 20.0) -> str:
     except Exception:
         return ""
 
+@app.post("/deep-dive")
+async def deep_dive(request: DeepDiveRequest):
+    t0 = _now_ms()
+    url = str(getattr(request, "url", "") or "").strip()
+    pmid = str(getattr(request, "pmid", "") or "").strip()
+    title = getattr(request, "title", None)
+    objective = str(getattr(request, "objective", "") or "")
+    source = {"url": url or None, "pmid": pmid or None, "title": (title or "")}
+    text = ""
+    ft_ok = False
+    ft_meta: dict = {}
+    # Prefer direct full-text URL when provided
+    if url:
+        raw = _fetch_article_text_from_url(url, timeout=20.0)
+        text = _strip_html(raw)
+    elif pmid:
+        # Best-effort: check OA/full-text capability and fetch PubMed page as fallback
+        try:
+            ft_ok, ft_meta = _quick_fulltext_capability(pmid, title)
+        except Exception:
+            ft_ok, ft_meta = False, {}
+        source["_ft_ok"] = ft_ok
+        if ft_meta:
+            source["_ft_meta"] = ft_meta
+        try:
+            html = _fetch_article_text_from_url(f"https://pubmed.ncbi.nlm.nih.gov/{urllib.parse.quote(str(pmid))}/", timeout=15.0)
+            text = _strip_html(html)
+        except Exception:
+            text = ""
+    if not text.strip():
+        return {
+            "error": "Could not retrieve article text. Provide a direct full-text URL.",
+            "source": source,
+            "diagnostics": {"took_ms": _now_ms() - t0},
+        }
+
+    def _wrap_model(txt: str) -> dict:
+        try:
+            md = analyze_scientific_model(txt, objective, llm_summary)
+        except Exception:
+            md = {}
+        anchors = md.get("fact_anchors") if isinstance(md, dict) else []
+        parts: list[str] = []
+        for k in [
+            "model_type",
+            "study_design",
+            "population_description",
+            "sample_size",
+            "arms_groups",
+            "control_type",
+            "collection_timepoints",
+        ]:
+            try:
+                v = str((md or {}).get(k, "")).strip()
+            except Exception:
+                v = ""
+            if v:
+                parts.append(f"{k.replace('_',' ').title()}: {v}")
+        summary = " | ".join(parts)[:800]
+        rj = str((md or {}).get("link_to_objective", "")).strip()[:400]
+        return {"summary": summary, "relevance_justification": rj, "fact_anchors": anchors if isinstance(anchors, list) else []}
+
+    def _wrap_methods(txt: str) -> dict:
+        try:
+            rows = analyze_experimental_methods(txt, objective, llm_analyzer)
+        except Exception:
+            rows = []
+        anchors: list[dict] = []
+        lines: list[str] = []
+        if isinstance(rows, list):
+            for r in rows[:3]:
+                try:
+                    tech = str(r.get("technique", ""))
+                    meas = str(r.get("measurement", ""))
+                    role = str(r.get("role_in_study", ""))
+                    if tech or meas or role:
+                        lines.append(f"{tech}: {meas} ({role})".strip())
+                    if isinstance(r.get("fact_anchors"), list):
+                        anchors.extend([a for a in r.get("fact_anchors") if isinstance(a, dict)])
+                except Exception:
+                    continue
+        summary = "; ".join([s for s in lines if s])[:800]
+        return {"summary": summary, "relevance_justification": "", "fact_anchors": anchors[:5]}
+
+    def _wrap_results(txt: str) -> dict:
+        try:
+            rr = analyze_results_interpretation(txt, objective, llm_summary)
+        except Exception:
+            rr = {}
+        anchors = rr.get("fact_anchors") if isinstance(rr, dict) else []
+        lines: list[str] = []
+        try:
+            align = str(rr.get("hypothesis_alignment", "")).strip()
+            if align:
+                lines.append(f"Alignment: {align}")
+        except Exception:
+            pass
+        try:
+            kr = rr.get("key_results") if isinstance(rr, dict) else []
+            if isinstance(kr, list):
+                for d in kr[:3]:
+                    if isinstance(d, dict):
+                        metric = str(d.get("metric", "")).strip()
+                        value = str(d.get("value", "")).strip()
+                        unit = str(d.get("unit", "")).strip()
+                        comp = f"{metric}: {value} {unit}".strip()
+                        if comp:
+                            lines.append(comp)
+        except Exception:
+            pass
+        summary = "; ".join([s for s in lines if s])[:800]
+        return {"summary": summary, "relevance_justification": "", "fact_anchors": anchors if isinstance(anchors, list) else []}
+
+    model_desc = _wrap_model(text)
+    methods_desc = _wrap_methods(text)
+    results_desc = _wrap_results(text)
+    resp = {
+        "source": source,
+        "model_description": model_desc,
+        "experimental_methods": methods_desc,
+        "results_interpretation": results_desc,
+        "diagnostics": {"full_text_len": len(text), "took_ms": _now_ms() - t0},
+    }
+    return resp
+
 @app.post("/generate-review")
 async def generate_review(request: ReviewRequest):
     req_start = _now_ms()
