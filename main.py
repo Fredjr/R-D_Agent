@@ -3083,3 +3083,25 @@ async def generate_review(request: ReviewRequest):
     except Exception as e:
         # Minimal error response
         return {"error": str(e)[:200], "diagnostics": {"route": "generate-review", "v2_failed": True}}
+
+def _project_interest_vector(memories: list[dict]) -> np.ndarray | None:
+    """Compute a simple interest vector from project memories (mean embedding)."""
+    try:
+        if not memories:
+            return None
+        vecs: list[np.ndarray] = []
+        for m in memories:
+            txt = str((m.get("text") or "")).strip()
+            if not txt:
+                continue
+            try:
+                v = np.array(EMBED_CACHE.get_or_compute(txt), dtype=float)
+                if v.size:
+                    vecs.append(v)
+            except Exception:
+                continue
+        if not vecs:
+            return None
+        return np.mean(vecs, axis=0)
+    except Exception:
+        return None
