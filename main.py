@@ -3055,3 +3055,31 @@ def _fetch_article_text_from_url(url: str, timeout: float = 20.0) -> str:
             return text
     except Exception:
         return ""
+
+@app.post("/generate-review")
+async def generate_review(request: ReviewRequest):
+    req_start = _now_ms()
+    try:
+        # Retrieve project memories (if any)
+        memories = _retrieve_memories(getattr(request, "project_id", None), getattr(request, "objective", ""))
+    except Exception:
+        memories = []
+    # Prefer V2 orchestrated flow
+    try:
+        v2 = await orchestrate_v2(request, memories)
+        resp = {
+            "molecule": getattr(request, "molecule", None),
+            "objective": getattr(request, "objective", ""),
+            "project_id": getattr(request, "project_id", None),
+            "queries": v2.get("queries", []),
+            "results": v2.get("results", []),
+            "diagnostics": v2.get("diagnostics", {}),
+            "executive_summary": v2.get("executive_summary", ""),
+            "memories": memories,
+        }
+        took = _now_ms() - req_start
+        _metrics_inc("latency_ms_sum", took)
+        return resp
+    except Exception as e:
+        # Minimal error response
+        return {"error": str(e)[:200], "diagnostics": {"route": "generate-review", "v2_failed": True}}
