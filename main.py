@@ -65,7 +65,7 @@ load_dotenv()
 
 app = FastAPI()
 
-# Enable CORS for frontend dev (broad for local dev)
+# Enable CORS
 _ALLOW_ORIGINS = os.getenv('ALLOW_ORIGINS')  # comma-separated list of origins
 _ALLOW_CREDENTIALS = os.getenv('ALLOW_CREDENTIALS', 'false')
 if _ALLOW_ORIGINS:
@@ -85,9 +85,6 @@ else:
         allow_methods=['*'],
         allow_headers=['*'],
     )
-
-
-# Enable CORS for frontend dev
 
 # Initialize the Gemini Pro model with API key
 # Prefer a dedicated Gemini key if provided; fall back to GOOGLE_API_KEY
@@ -1984,6 +1981,18 @@ def _triage_rank(
         # Boost GLP-1 mechanistic context
         if is_glp1_context and any(term in text for term in glp1_lexicon):
             score += 0.1
+        # Cardiovascular vs GI domain steering based on objective
+        cardio_terms = [
+            "cardio", "cardiovascular", "coronary", "myocardial", "atherosclerosis",
+            "ischemia", "heart", "mi", "hf", "stroke", "endothelial"
+        ]
+        gi_terms = ["gastric", "stomach", "mucosa", "mucosal", "ulcer", "enteric", "intestinal"]
+        is_cardio_objective = any(k in (objective or "").lower() for k in cardio_terms)
+        if is_cardio_objective:
+            if any(k in text for k in cardio_terms):
+                score += 0.15
+            if any(k in text for k in gi_terms) and not any(k in text for k in cardio_terms):
+                score -= 0.25
         return score
     for a in candidates:
         try:
@@ -2387,12 +2396,46 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
             _metrics_inc("controller_recall_deep", deep_cap)
     except Exception:
         pass
-    top_k = shortlist[:deep_cap]
+    # Guarantee minimum deep-dive attempt if shortlist allows
+    min_precision = 10
+    min_recall = 13
+    min_target = min_recall if pref == "recall" else min_precision
+    deep_cap = max(deep_cap, min_target)
+    top_k = shortlist[: min(len(shortlist), deep_cap)]
     triage_ms = _now_ms() - _t0
 
     # Deep-dive
     _t0 = _now_ms()
     deep = await _deep_dive_articles(request.objective, top_k, memories, deadline)
+    # If OA+clinical gating under-filled, relax OA at triage-time and retry once within remaining time
+    try:
+        if bool(getattr(request, "full_text_only", False)) and len(deep) < (3 if pref == "precision" else 5) and _time_left(deadline) > 8.0:
+            plan2 = dict(plan)
+            plan2 = _apply_fulltext_only_filters(plan2, False)
+            arts2: list[dict] = []
+            pubmed_items2: list[dict] = []
+            for key in ("review_query", "mechanism_query", "recall_mechanism_query"):
+                q2 = plan2.get(key)
+                if q2:
+                    pubmed_items2 += _harvest_pubmed(q2, deadline)
+                if len(pubmed_items2) >= PUBMED_POOL_MAX:
+                    break
+            arts2 += pubmed_items2[:PUBMED_POOL_MAX]
+            norm2 = _normalize_candidates(arts2)
+            # Post-hoc OA check keeps Deep Dive coverage honest
+            verified2: list[dict] = []
+            for a in norm2:
+                ok, meta = _quick_fulltext_capability(a.get("pmid"), a.get("title"))
+                if ok:
+                    a = { **a, "_ft_ok": True, "_ft_meta": meta }
+                    verified2.append(a)
+            shortlist2 = _triage_rank(request.objective, verified2 or norm2, TRIAGE_TOP_K, proj_vec, mol_tokens, getattr(request, "preference", None))
+            top_k2 = shortlist2[: min(len(shortlist2), min_target)]
+            deep2 = await _deep_dive_articles(request.objective, top_k2, memories, deadline)
+            if len(deep2) > len(deep):
+                deep = deep2
+    except Exception:
+        pass
     deepdive_ms = _now_ms() - _t0
     # Assemble into sections compatible with UI (each as a primary section)
     results_sections: list[dict] = []
@@ -3113,12 +3156,10 @@ def _fetch_article_text_from_url(url: str, timeout: float = 20.0) -> str:
             if "application/pdf" in ctype:
                 if _HAS_PDF:
                     try:
-                        # Attempt to extract PDF text
                         return pdf_extract_text(io.BytesIO(raw))[:200000]
                     except Exception:
                         return ""
                 return ""
-            # Assume HTML or text
             try:
                 text = raw.decode("utf-8", errors="ignore")
             except Exception:
@@ -3139,14 +3180,11 @@ async def deep_dive(request: DeepDiveRequest):
     objective = str(getattr(request, "objective", "") or "")
     source = {"url": url or None, "pmid": pmid or None, "title": (title or "")}
     text = ""
-    ft_ok = False
-    ft_meta: dict = {}
     # Prefer direct full-text URL when provided
     if url:
         raw = _fetch_article_text_from_url(url, timeout=20.0)
         text = _strip_html(raw)
     elif pmid:
-        # Best-effort: check OA/full-text capability and fetch PubMed page as fallback
         try:
             ft_ok, ft_meta = _quick_fulltext_capability(pmid, title)
         except Exception:
@@ -3155,7 +3193,10 @@ async def deep_dive(request: DeepDiveRequest):
         if ft_meta:
             source["_ft_meta"] = ft_meta
         try:
-            html = _fetch_article_text_from_url(f"https://pubmed.ncbi.nlm.nih.gov/{urllib.parse.quote(str(pmid))}/", timeout=15.0)
+            html = _fetch_article_text_from_url(
+                f"https://pubmed.ncbi.nlm.nih.gov/{urllib.parse.quote(str(pmid))}/",
+                timeout=15.0,
+            )
             text = _strip_html(html)
         except Exception:
             text = ""
