@@ -66,13 +66,25 @@ load_dotenv()
 app = FastAPI()
 
 # Enable CORS for frontend dev (broad for local dev)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origin_regex=os.getenv('ALLOW_ORIGIN_REGEX', '.*'),
-    allow_credentials=False,
-    allow_methods=['*'],
-    allow_headers=['*'],
-)
+_ALLOW_ORIGINS = os.getenv('ALLOW_ORIGINS')  # comma-separated list of origins
+_ALLOW_CREDENTIALS = os.getenv('ALLOW_CREDENTIALS', 'false')
+if _ALLOW_ORIGINS:
+    _ORIGINS = [o.strip() for o in _ALLOW_ORIGINS.split(',') if o.strip()]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_ORIGINS,
+        allow_credentials=_ALLOW_CREDENTIALS.lower() not in ('0','false','no'),
+        allow_methods=['*'],
+        allow_headers=['*'],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=os.getenv('ALLOW_ORIGIN_REGEX', '.*'),
+        allow_credentials=False,
+        allow_methods=['*'],
+        allow_headers=['*'],
+    )
 
 
 # Enable CORS for frontend dev
