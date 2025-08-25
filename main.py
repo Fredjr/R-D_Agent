@@ -642,6 +642,34 @@ def _expand_molecule_synonyms(molecule: str, limit: int = 6) -> list[str]:
         seen.add(ss.lower())
         out.append(ss)
     _add(base)
+    # Seed with common aliases for better recall before API lookups
+    seeds = {
+        "pembrolizumab": ["keytruda", "mk-3475"],
+        "nivolumab": ["opdivo", "bms-936558"],
+        "tiragolumab": ["anti-tigit"],
+        "relatlimab": ["anti-lag-3", "anti-lag3"],
+        "durvalumab": ["imfinzi"],
+        "tremelimumab": ["ctla-4 antibody", "anti-ctla-4"],
+        "olaparib": ["azd2281", "lynparza"],
+        "niraparib": ["mk-4827", "zejula"],
+        "sotorasib": ["amg-510", "amg 510"],
+        "adagrasib": ["mrtx849", "krazati"],
+        "osimertinib": ["azd9291", "tagrisso"],
+        "selpercatinib": ["loxo-292", "lxo-292", "reldesemtiv"],
+        "pemigatinib": ["infigratinib", "fgfr2 inhibitor"],
+        "tirzepatide": ["mounjaro", "zepisign"],
+        "lecanemab": ["ban2401", "leqembi"],
+        "inclisiran": ["aln-pcsk9", "leqvio"],
+        "atezolizumab": ["tecentriq"],
+        "bevacizumab": ["avastin"],
+        "talimogene laherparepvec": ["t-vec", "t vec", "tvEC"],
+        "vedolizumab": ["entyvio"],
+        "dapagliflozin": ["farxiga"],
+    }
+    for k, vals in seeds.items():
+        if base.lower() == k.lower():
+            for v in vals:
+                _add(_sanitize_molecule_name(v))
     try:
         for s in _fetch_pubchem_synonyms(base)[:limit*3]:
             cand = _sanitize_molecule_name(s)
@@ -716,6 +744,17 @@ def _normalize_entities(text: str) -> str:
             "parpi": "PARP inhibitor",
             "glp 1": "GLP-1",
             "glp1": "GLP-1",
+            "azd9291": "osimertinib",
+            "lynparza": "olaparib",
+            "azd2281": "olaparib",
+            "amg-510": "sotorasib",
+            "amg 510": "sotorasib",
+            "lxo-292": "selpercatinib",
+            "loxo-292": "selpercatinib",
+            "tvEC": "talimogene laherparepvec",
+            "t vec": "talimogene laherparepvec",
+            "t-vec": "talimogene laherparepvec",
+            "keynote": "pembrolizumab",
         }
         for k, v in mapping.items():
             t = re.sub(rf"\b{re.escape(k)}\b", v, t, flags=re.IGNORECASE)
