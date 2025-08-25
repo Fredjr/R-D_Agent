@@ -2218,6 +2218,11 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
     _t0 = _now_ms()
     plan = _build_query_plan(request.objective, mem_txt, deadline, getattr(request, "molecule", None))
     plan = _inject_molecule_into_plan(plan, getattr(request, "molecule", None))
+    # Apply clinical bias when requested (prefer humans, exclude plants/fungi)
+    try:
+        plan = _apply_clinical_bias(plan, bool(getattr(request, "clinical_mode", False)))
+    except Exception:
+        pass
     # Apply OA/full-text filters when requested
     try:
         plan = _apply_fulltext_only_filters(plan, bool(getattr(request, "full_text_only", False)))
@@ -2334,7 +2339,7 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
         pref = str(getattr(request, "preference", "precision") or "precision").lower()
     except Exception:
         pref = "precision"
-    desired = 13 if pref == "recall" else 8
+    desired = 13 if pref == "recall" else 10
     deep_cap = min(len(shortlist), max(DEEPDIVE_TOP_K, desired))
     try:
         if pref == "precision":
@@ -2586,6 +2591,24 @@ def _apply_fulltext_only_filters(plan: dict, full_text_only: bool) -> dict:
         # Trials query does not guarantee OA article text; skip when strict
         if "clinical_query" in plan:
             plan["clinical_query"] = None
+        return plan
+    except Exception:
+        return plan
+
+def _apply_clinical_bias(plan: dict, clinical: bool) -> dict:
+    try:
+        if not clinical or not isinstance(plan, dict):
+            return plan
+        def bias(q: str | None) -> str | None:
+            if not q or not isinstance(q, str) or not q.strip():
+                return q
+            # Prefer Humans[mesh]; exclude plants/fungi
+            bias_clause = "(Humans[mesh]) NOT (Fungi[mesh] OR Plants[mesh])"
+            return f"({q}) AND {bias_clause}"
+        for key in ("review_query", "mechanism_query", "recall_mechanism_query", "broad_query", "recall_broad_query"):
+            if key in plan and isinstance(plan.get(key), str) and plan.get(key):
+                plan[key] = bias(plan.get(key))
+        # Clinical trials query already targets humans; leave as-is
         return plan
     except Exception:
         return plan
