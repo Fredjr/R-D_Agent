@@ -21,7 +21,7 @@ METHODS_BASE_PROMPT = PromptTemplate(
 RESULTS_BASE_PROMPT = PromptTemplate(
     template=(
         "Using ONLY the article full text, summarize main outcomes and provide an initial quantitative list if present.\n"
-        "Return ONLY one JSON object with keys: hypothesis_alignment (string), key_results (array of {metric,value,unit}).\n\n"
+        "Return ONLY one JSON object with keys: hypothesis_alignment (string), key_results (array of {metric,value,unit,effect_size,p_value,fdr,ci,direction,figure_table_ref}).\n\n"
         "User Objective: {objective}\nFull Text: {full_text}"
     ),
     input_variables=["objective", "full_text"],
