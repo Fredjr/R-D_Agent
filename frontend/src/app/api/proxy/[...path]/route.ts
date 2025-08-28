@@ -1,17 +1,16 @@
-import { NextRequest } from "next/server";
-
 const BACKEND_BASE = (process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || "").replace(/\/+$/, "");
 
-function buildTargetUrl(req: NextRequest, path: string[]): string {
+function buildTargetUrl(req: Request, path: string[]): string {
   const suffix = encodeURI(path.join("/"));
-  const search = req.nextUrl.search;
+  const url = new URL(req.url);
+  const search = url.search;
   if (!BACKEND_BASE) {
     throw new Error("Backend base URL is not configured");
   }
   return `${BACKEND_BASE}/${suffix}${search}`;
 }
 
-async function proxy(req: NextRequest, { params }: { params: { path: string[] } }) {
+async function proxy(req: Request, { params }: { params: { path: string[] } }) {
   const target = buildTargetUrl(req, params.path || []);
 
   const headers = new Headers(req.headers);
@@ -23,8 +22,7 @@ async function proxy(req: NextRequest, { params }: { params: { path: string[] } 
   const init: RequestInit = {
     method: req.method,
     headers,
-    // For GET/HEAD, the body must be undefined
-    body: req.method === "GET" || req.method === "HEAD" ? undefined : (req.body as unknown as ReadableStream<Uint8Array>),
+    body: req.method === "GET" || req.method === "HEAD" ? undefined : await req.arrayBuffer(),
     redirect: "manual",
   };
 
@@ -43,23 +41,23 @@ async function proxy(req: NextRequest, { params }: { params: { path: string[] } 
   });
 }
 
-export async function GET(req: NextRequest, ctx: { params: { path: string[] } }) {
+export async function GET(req: Request, ctx: { params: { path: string[] } }) {
   return proxy(req, ctx);
 }
 
-export async function POST(req: NextRequest, ctx: { params: { path: string[] } }) {
+export async function POST(req: Request, ctx: { params: { path: string[] } }) {
   return proxy(req, ctx);
 }
 
-export async function PUT(req: NextRequest, ctx: { params: { path: string[] } }) {
+export async function PUT(req: Request, ctx: { params: { path: string[] } }) {
   return proxy(req, ctx);
 }
 
-export async function PATCH(req: NextRequest, ctx: { params: { path: string[] } }) {
+export async function PATCH(req: Request, ctx: { params: { path: string[] } }) {
   return proxy(req, ctx);
 }
 
-export async function DELETE(req: NextRequest, ctx: { params: { path: string[] } }) {
+export async function DELETE(req: Request, ctx: { params: { path: string[] } }) {
   return proxy(req, ctx);
 }
 
