@@ -21,13 +21,8 @@ function buildPayload({ molecule, objective, projectId, clinicalMode, preference
 }
 
 function getEndpoint(): string {
-  const direct = (process.env.NEXT_PUBLIC_BACKEND_URL || '').trim();
-  if (direct) {
-    // Call Cloud Run directly in production to avoid Vercel function timeouts
-    return `${direct.replace(/\/+$/, '')}`;
-  }
-  // Fallback to Next.js API proxy in local dev
-  return '/api/backend';
+  // Always go through our proxy to avoid CORS
+  return '/api/proxy';
 }
 
 export async function fetchReview(args: FetchReviewArgs): Promise<any> {

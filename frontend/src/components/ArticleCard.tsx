@@ -255,8 +255,7 @@ export default function ArticleCard({ item }: Props) {
             setDeepDiveError(null);
             setDeepDiveData(null);
             try {
-              const direct = (process.env.NEXT_PUBLIC_BACKEND_URL || '').trim();
-              const endpoint = direct ? `${direct.replace(/\/+$/, '')}/deep-dive-upload` : '/api/backend/deep-dive-upload';
+              const endpoint = '/api/proxy/deep-dive-upload';
               const form = new FormData();
               form.append('objective', (item as any)?.query || headerTitle);
               form.append('file', f);
