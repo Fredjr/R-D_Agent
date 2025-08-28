@@ -191,10 +191,13 @@ def run_results_pipeline(full_text: str, objective: str, llm, pmcid: str | None)
     base = LLMChain(llm=llm, prompt=RESULTS_BASE_PROMPT).invoke({"objective": objective[:400], "full_text": safe_text})
     try:
         import json
-        obj = json.loads(base.get("text", base) if isinstance(base, dict) else str(base))
+        raw_text = base.get("text", base) if isinstance(base, dict) else str(base)
+        print(f"DEBUG: AI raw output: {raw_text[:500]}")  # Debug the raw AI output
+        obj = json.loads(raw_text)
         if not isinstance(obj, dict):
             obj = {}
-    except Exception:
+    except Exception as e:
+        print(f"DEBUG: JSON parsing failed: {e}, raw text: {raw_text[:200] if 'raw_text' in locals() else 'N/A'}")
         obj = {}
     # Ensure keys
     obj.setdefault("hypothesis_alignment", "")
