@@ -3428,6 +3428,26 @@ async def _run_deepdive_chain(prompt: PromptTemplate, objective: str, full_text:
     return data
 
 
+@app.post("/generate-review")
+async def generate_review(request: ReviewRequest) -> dict:
+    t0 = _now_ms()
+    try:
+        # Initialize empty memories list (could be extended to support memory persistence)
+        memories: list[dict] = []
+
+        # Call the main orchestration function
+        result = await orchestrate_v2(request, memories)
+
+        # Add total processing time
+        total_ms = _now_ms() - t0
+        if "diagnostics" in result and "timings_ms" in result["diagnostics"]:
+            result["diagnostics"]["timings_ms"]["total_ms"] = int(total_ms)
+
+        return result
+    except Exception as e:
+        return {"error": str(e)[:500], "results": [], "diagnostics": {"pool_size": 0, "shortlist_size": 0, "deep_dive_count": 0}}
+
+
 @app.post("/deep-dive")
 async def deep_dive(request: DeepDiveRequest):
     t0 = _now_ms()
