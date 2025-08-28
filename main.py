@@ -3545,7 +3545,18 @@ async def deep_dive(request: DeepDiveRequest):
                 "DeepDiveResults",
                 retries=0,
             )
-            mth, res = await asyncio.gather(mth_task, res_task)
+            # Do not fail the whole endpoint if one sub-pipeline errors out
+            gathered = await asyncio.gather(mth_task, res_task, return_exceptions=True)
+            mth, res = gathered[0], gathered[1]
+            if isinstance(mth, Exception):
+                mth = []
+            if isinstance(res, Exception) or not isinstance(res, dict):
+                res = {
+                    "hypothesis_alignment": "",
+                    "key_results": [],
+                    "limitations_biases_in_results": [],
+                    "fact_anchors": [],
+                }
         except Exception as e:
             return {"error": str(e)[:200], "source": source_info}
         took = _now_ms() - t0
