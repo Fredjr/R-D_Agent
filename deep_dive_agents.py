@@ -192,19 +192,16 @@ def run_results_pipeline(full_text: str, objective: str, llm, pmcid: str | None)
     try:
         import json
         raw_text = base.get("text", base) if isinstance(base, dict) else str(base)
-        print(f"DEBUG: AI raw output: {raw_text[:500]}")  # Debug the raw AI output
         obj = json.loads(raw_text)
         if not isinstance(obj, dict):
             obj = {}
-        print(f"DEBUG: Successfully parsed JSON with keys: {list(obj.keys()) if obj else 'empty'}")
     except Exception as e:
-        print(f"DEBUG: JSON parsing failed: {e}, raw text: {raw_text[:200] if 'raw_text' in locals() else 'N/A'}")
         obj = {}
-        print("DEBUG: Returning empty dict due to parsing failure")
 
     # Ensure keys exist with proper defaults
     obj.setdefault("hypothesis_alignment", "")
     obj.setdefault("key_results", [])
+    obj.setdefault("limitations_biases_in_results", [])
     if not isinstance(obj["key_results"], list):
         obj["key_results"] = []
 
@@ -222,7 +219,10 @@ def run_results_pipeline(full_text: str, objective: str, llm, pmcid: str | None)
         obj["key_results"][i].setdefault("direction", "")
         obj["key_results"][i].setdefault("figure_table_ref", "")
 
-    print(f"DEBUG: Final result keys: {list(obj.keys())}, key_results count: {len(obj.get('key_results', []))}")
+    # Ensure limitations_biases_in_results is a list
+    if not isinstance(obj["limitations_biases_in_results"], list):
+        obj["limitations_biases_in_results"] = []
+
     return obj
     # Heuristic harvest when sparse
     if len(obj["key_results"]) == 0:
