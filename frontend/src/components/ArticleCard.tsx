@@ -39,7 +39,8 @@ export default function ArticleCard({ item }: Props) {
     setDeepDiveData(null);
     try {
       const url = headerUrl || undefined;
-      const data = await fetchDeepDive({ url, pmid: headerPmid, title: headerTitle, objective: (item as any)?.query || headerTitle });
+      const objective = (item as any)?._objective || (item as any)?.query || headerTitle;
+      const data = await fetchDeepDive({ url, pmid: headerPmid, title: headerTitle, objective });
       const enriched = { ...data, _activeTab: 'Model' };
       deepDiveCacheRef.current.set(key, enriched);
       setDeepDiveData(enriched);

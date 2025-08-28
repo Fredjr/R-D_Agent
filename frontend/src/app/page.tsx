@@ -24,7 +24,9 @@ export default function Home() {
     try {
       const data = await fetchReview({ molecule, objective, projectId: projectId ?? null, clinicalMode, preference, dagMode, fullTextOnly });
       const arr = Array.isArray(data?.results) ? data.results : [];
-      setResults(arr);
+      // Attach the original objective for downstream Deep Dive calls
+      const enriched = arr.map((it: any) => ({ ...it, _objective: objective, query: objective }));
+      setResults(enriched);
       setDiagnostics(data?.diagnostics ?? null);
       setQueries(Array.isArray(data?.queries) ? data.queries : null);
     } catch (e: any) {
