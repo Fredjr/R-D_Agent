@@ -196,14 +196,34 @@ def run_results_pipeline(full_text: str, objective: str, llm, pmcid: str | None)
         obj = json.loads(raw_text)
         if not isinstance(obj, dict):
             obj = {}
+        print(f"DEBUG: Successfully parsed JSON with keys: {list(obj.keys()) if obj else 'empty'}")
     except Exception as e:
         print(f"DEBUG: JSON parsing failed: {e}, raw text: {raw_text[:200] if 'raw_text' in locals() else 'N/A'}")
         obj = {}
-    # Ensure keys
+        print("DEBUG: Returning empty dict due to parsing failure")
+
+    # Ensure keys exist with proper defaults
     obj.setdefault("hypothesis_alignment", "")
     obj.setdefault("key_results", [])
     if not isinstance(obj["key_results"], list):
         obj["key_results"] = []
+
+    # Ensure each key_results item has all required fields
+    for i, item in enumerate(obj["key_results"]):
+        if not isinstance(item, dict):
+            obj["key_results"][i] = {}
+        obj["key_results"][i].setdefault("metric", "")
+        obj["key_results"][i].setdefault("value", "")
+        obj["key_results"][i].setdefault("unit", "")
+        obj["key_results"][i].setdefault("effect_size", "")
+        obj["key_results"][i].setdefault("p_value", "")
+        obj["key_results"][i].setdefault("fdr", "")
+        obj["key_results"][i].setdefault("ci", "")
+        obj["key_results"][i].setdefault("direction", "")
+        obj["key_results"][i].setdefault("figure_table_ref", "")
+
+    print(f"DEBUG: Final result keys: {list(obj.keys())}, key_results count: {len(obj.get('key_results', []))}")
+    return obj
     # Heuristic harvest when sparse
     if len(obj["key_results"]) == 0:
         # HTML-based quick harvest
