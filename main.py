@@ -42,6 +42,7 @@ from tools import PubMedSearchTool, WebSearchTool, PatentsSearchTool
 from scientific_model_analyst import analyze_scientific_model
 from experimental_methods_analyst import analyze_experimental_methods
 from results_interpretation_analyst import analyze_results_interpretation
+from deep_dive_agents import run_methods_pipeline, run_results_pipeline
 from langchain.agents import AgentType, initialize_agent
 from scoring import calculate_publication_score
 
