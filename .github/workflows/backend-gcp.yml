@@ -145,5 +145,12 @@ jobs:
             fi
           done
 
+      - name: Route traffic to latest revision
+        run: |
+          gcloud run services update-traffic ${{ secrets.BACKEND_SERVICE }} \
+            --region ${{ secrets.GCP_REGION }} \
+            --to-latest \
+            --quiet
+
       - name: Output backend URL
         run: gcloud run services describe ${{ secrets.BACKEND_SERVICE }} --region ${{ secrets.GCP_REGION }} --format='value(status.url)'
