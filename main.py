@@ -1324,6 +1324,40 @@ def _build_dag_app():
                         results_sections.append(sec)
                 except Exception:
                     pass
+            # OA backfill to guarantee >=9 for precision+fullTextOnly
+            try:
+                req = state.get("request")
+                is_precision = str(getattr(req, "preference", "precision") or "precision").lower() == "precision"
+                full_text_only = bool(getattr(req, "full_text_only", False))
+            except Exception:
+                is_precision, full_text_only = True, False
+            if is_precision and full_text_only and len(results_sections) < 9:
+                art_list = []
+                for sec in results_sections:
+                    try:
+                        art_list += sec.get("articles") or []
+                    except Exception:
+                        pass
+                topped = _oa_backfill_topup(request.objective, art_list, minimum=9, deadline=_now_ms() + 8000.0)
+                rebuilt = []
+                seen_titles = set()
+                for a in topped:
+                    try:
+                        t = a.get("title") or ""
+                        if t in seen_titles: continue
+                        seen_titles.add(t)
+                        ta = {"title": a.get("title"), "pmid": a.get("pmid"), "url": a.get("url"),
+                              "citation_count": a.get("citation_count"), "pub_year": a.get("pub_year")}
+                        res_shell = {"summary": a.get("abstract") or "", "confidence_score": 60,
+                                     "methodologies": [], "fact_anchors": [], "score_breakdown": {}}
+                        _ensure_score_breakdown(res_shell, request.objective, a.get("abstract") or "", ta)
+                        _ensure_relevance_fields(res_shell, getattr(req, "molecule",""), getattr(req, "objective",""), ta)
+                        rebuilt.append({"query": request.objective, "result": res_shell,
+                                        "articles": [a], "top_article": ta, "source": "primary", "memories_used": 0})
+                    except Exception:
+                        pass
+                if rebuilt:
+                    results_sections = rebuilt[:max(9, len(results_sections))]
             # Always populate diagnostics, even if some earlier nodes returned empty, to avoid missing fields in UI
             diagnostics = {
                 "pool_size": int(len(state.get("norm") or [])),
@@ -1393,25 +1427,12 @@ def _ensure_relevance_fields(structured: Dict[str, object], molecule: str, objec
         year = (top_article or {}).get("pub_year") or ""
         mol = (molecule or "the molecule").strip()
         obj_txt = (objective or "").strip()
-        # Matched tokens between objective and abstract
-        def _tokenize(txt: str) -> list[str]:
-            return [t for t in re.split(r"[^a-zA-Z0-9\-]+", (txt or "").lower()) if len(t) >= 4]
-        abs_tokens = set(_tokenize(abs_text))
-        obj_tokens = set(_tokenize(obj_txt))
-        # Expand objective token set with molecule/target lexicon for better hits
-        lex_extra = set()
-        try:
-            mol_lc = (mol or "").lower()
-            if mol_lc:
-                lex_extra.add(mol_lc)
-                for syn in _expand_molecule_synonyms(mol_lc, limit=6):
-                    lex_extra.add((syn or "").lower())
-        except Exception:
-            pass
-        # domain lexicon (generic, non-oncology specific)
-        lex_extra.update(["glp-1", "glp1", "glp-1r", "gipr", "camp", "pka", "sirt1", "glut4", "insulin", "glucagon"])
-        obj_all = obj_tokens | lex_extra
-        matched_tokens = sorted(list((obj_all & abs_tokens)))[:8]
+        # Expand matched tokens using synonyms from objective
+        obj_tokens = [t for t in re.split(r"[^a-zA-Z0-9\-]+", (obj_txt or "").lower()) if len(t) >= 4]
+        obj_tokens += _expand_objective_synonyms(obj_txt)
+        abs_tokens = [t for t in re.split(r"[^a-zA-Z0-9\-]+", (abs_text or "").lower()) if len(t) >= 4]
+        abs_set = set(abs_tokens)
+        matched_tokens = sorted(list(dict.fromkeys([t for t in obj_tokens if t in abs_set])))[:12]
         matched_part = ", ".join(matched_tokens) if matched_tokens else "—"
         # Signals from objective and abstract
         sigs = []
@@ -1422,27 +1443,20 @@ def _ensure_relevance_fields(structured: Dict[str, object], molecule: str, objec
         except Exception:
             pass
         signals_part = ", ".join(dict.fromkeys(sigs)) if sigs else "—"
-        # Why selected: based on impact/recency/contextual match if present
+        # Why selected: based on impact/recency/contextual match and domain alignment
         sb = structured.get("score_breakdown") or {}
-        try:
-            ctx = float(sb.get("contextual_match_score", 0) or 0)
-        except Exception:
-            ctx = 0.0
-        try:
-            rec = float(sb.get("recency_score", 0) or 0)
-        except Exception:
-            rec = 0.0
-        try:
-            imp = float(sb.get("impact_score", 0) or 0)
-        except Exception:
-            imp = 0.0
+        try: ctx = float(sb.get("contextual_match_score", 0) or 0)
+        except Exception: ctx = 0.0
+        try: rec = float(sb.get("recency_score", 0) or 0)
+        except Exception: rec = 0.0
+        try: imp = float(sb.get("impact_score", 0) or 0)
+        except Exception: imp = 0.0
         why_bits: list[str] = []
-        if ctx >= 70:  # strong alignment
-            why_bits.append("mechanistic alignment")
-        if imp >= 70:
-            why_bits.append("high impact")
-        if rec >= 60:
-            why_bits.append("recent")
+        if ctx >= 60: why_bits.append("mechanistic alignment")
+        if imp >= 50: why_bits.append("impact")
+        if rec >= 50: why_bits.append("recent")
+        if any(k in abs_text for k in ["cox","prostaglandin","thromboxane","pge2"]):
+            why_bits.append("COX/prostaglandin pathway")
         why_part = ", ".join(why_bits) if why_bits else "balanced evidence"
         # Limitation heuristic
         limitation = "older review" if rec < 30 else ("broad scope" if ctx < 30 else "")
@@ -1933,6 +1947,20 @@ def _triage_rank(
         # Boost GLP-1 mechanistic context
         if is_glp1_context and any(term in text for term in glp1_lexicon):
             score += 0.1
+        # Strengthen triage gating for precision mode
+        objective_lower = (objective or "").lower()
+        needed = [
+            "cardiovascular","cvd","heart","coronary","atherosclerosis","mi","stroke","endothelial",
+            "inflammation","anti-inflammatory","cox","prostaglandin","thromboxane"
+        ]
+        domain_hits = sum(1 for nt in needed if nt in objective_lower and nt in text)
+        if pref_l == "precision":
+            if domain_hits == 0:
+                score -= 0.25
+            elif domain_hits == 1:
+                score -= 0.12
+            if not has_molecule:
+                score -= 0.15
         return score
     for a in candidates:
         try:
@@ -3114,6 +3142,27 @@ def _fetch_json(url: str, timeout: float = 10.0) -> dict:
         return {}
 
 
+def _expand_objective_synonyms(objective: str) -> list[str]:
+    """Expand objective domain with safe synonyms to improve relevance grounding.
+    Kept compact to avoid topic drift; extend per domain as needed."""
+    try:
+        obj = (objective or "").lower()
+        synonyms: set[str] = set()
+        domain: dict[str, list[str]] = {
+            "cardiovascular": ["cv","cvd","heart","coronary","atherosclerosis","mi","stroke","endothelial"],
+            "inflammation": ["anti-inflammatory","antiinflammatory","inflammatory","cox","prostaglandin","thromboxane"],
+            "mechanism": ["moa","mechanism of action","pathway","signaling","pharmacodynamic"],
+        }
+        for key, vals in domain.items():
+            if key in obj:
+                synonyms.update(vals)
+        if ("anti-inflammatory" in obj) or ("inflammation" in obj):
+            synonyms.update(["cox-1","cox-2","pge2","pgd2","ltc4","platelet","thromboxane a2"])
+        return sorted(synonyms)
+    except Exception:
+        return []
+
+
 def _resolve_via_eupmc(pmid: str | None, doi: str | None) -> tuple[str, dict]:
     """Try Europe PMC for OA full text. Returns (text, meta)."""
     try:
@@ -3150,6 +3199,46 @@ def _resolve_via_eupmc(pmid: str | None, doi: str | None) -> tuple[str, dict]:
     except Exception:
         pass
     return "", {}
+
+
+def _oa_backfill_topup(objective: str, current: list[dict], minimum: int, deadline: float) -> list[dict]:
+    """Fetch additional OA articles from Europe PMC and re-rank to ensure minimum count for precision+fullTextOnly."""
+    if len(current) >= minimum or _time_left(deadline) < 3.0:
+        return current
+    try:
+        q = urllib.parse.quote((objective or "").strip()[:200])
+        url = f"https://www.ebi.ac.uk/europepmc/webservices/rest/search?query={q}+OPEN_ACCESS:y&format=json&pageSize=25"
+        data = _fetch_json(url, timeout=8.0)
+        items = (((data.get("resultList") or {}).get("result")) or [])
+        harvested: list[dict] = []
+        for it in items:
+            try:
+                title = str(it.get("title") or "").strip()
+                pmid = str(it.get("pmid") or it.get("id") or "").strip() or None
+                year = int(it.get("pubYear") or 0)
+                ft = (it.get("fullTextUrlList") or {}).get("fullTextUrl", []) or []
+                url0 = ""
+                for f in ft:
+                    if f.get("availability") == "Open access" and f.get("url"):
+                        url0 = f.get("url"); break
+                if not title or not url0: continue
+                harvested.append({"title": title, "abstract": it.get("abstractText") or "", "pub_year": year,
+                                  "pmid": pmid, "url": url0, "citation_count": int(it.get("citedByCount") or 0),
+                                  "source": "europe_pmc", "source_query": objective})
+            except Exception:
+                continue
+        merged = current + harvested
+        norm = _normalize_candidates(merged)
+        ranked = _triage_rank(objective, norm, max_keep=max(minimum+4, minimum), molecule_tokens=[], preference="precision")
+        keep, seen = [], set()
+        for a in ranked:
+            key = f"{a.get('pmid') or ''}||{a.get('title') or ''}"
+            if key in seen: continue
+            seen.add(key); keep.append(a)
+            if len(keep) >= max(minimum, 10): break
+        return keep
+    except Exception:
+        return current
 
 
 def _normalize_title(title: str | None) -> str:
