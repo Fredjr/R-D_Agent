@@ -74,6 +74,14 @@ jobs:
       - name: Enable Docker auth
         run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev -q
 
+      - name: Preflight - route traffic to latest (best-effort)
+        continue-on-error: true
+        run: |
+          gcloud run services update-traffic ${{ secrets.BACKEND_SERVICE }} \
+            --region ${{ secrets.GCP_REGION }} \
+            --to-latest \
+            --quiet
+
       - name: Docker login to Artifact Registry
         run: |
           REGION=${{ secrets.GCP_REGION }}
@@ -98,7 +106,7 @@ jobs:
           docker push $IMAGE
         working-directory: .
 
-      - name: Deploy to Cloud Run
+      - name: Deploy to Cloud Run (no-traffic)
         run: |
           set -euo pipefail
           GCP_PROJECT_ID="${{ secrets.GCP_PROJECT_ID }}"
@@ -125,6 +133,7 @@ jobs:
               --allow-unauthenticated \
               --cpu 1 --memory 2Gi --min-instances 1 \
               --timeout 300 \
+              --no-traffic \
               --set-env-vars=GEMINI_MAIN_MODEL=gemini-1.5-pro,GEMINI_SMALL_MODEL=gemini-1.5-flash \
               --set-env-vars=TOTAL_BUDGET_S=120,HARVEST_BUDGET_S=30,TRIAGE_BUDGET_S=10,DEEPDIVE_BUDGET_S=75,SYNTH_BUDGET_S=8,ENTAILMENT_BUDGET_S=3.0,TRIAGE_TOP_K=20,DEEPDIVE_TOP_K=8 \
               --set-env-vars=ALLOW_ORIGIN_REGEX="$ALLOW_ORIGIN_REGEX_VAL" \
