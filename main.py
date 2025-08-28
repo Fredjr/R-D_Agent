@@ -1618,17 +1618,17 @@ Prior Context: {memories}
     # Prefer deterministic per-corpus plan. Optionally augment with LLM strategist if enabled and valid.
     llm_plan: dict | None = None
     if STRATEGIST_LLM_ENABLED:
-        try:
+    try:
             prompt = PromptTemplate(template=strategist_template, input_variables=["objective", "memories", "molecule"])
-            chain = LLMChain(llm=llm_analyzer, prompt=prompt)
+        chain = LLMChain(llm=llm_analyzer, prompt=prompt)
             out = chain.invoke({"objective": objective[:400], "memories": memories_text[:400], "molecule": (molecule or "")[:200]})
-            txt = out.get("text", out) if isinstance(out, dict) else str(out)
-            if "```" in txt:
-                txt = txt.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
+        txt = out.get("text", out) if isinstance(out, dict) else str(out)
+        if "```" in txt:
+            txt = txt.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
             candidate = json.loads(txt)
             if isinstance(candidate, dict):
                 llm_plan = candidate
-        except Exception:
+    except Exception:
             llm_plan = None
     # Deterministic fallback (default path)
     obj = _normalize_entities(objective or "").strip()
@@ -1848,6 +1848,21 @@ def _filter_by_molecule(candidates: list[dict], molecule: str | None) -> list[di
             continue
     return filtered if filtered else candidates
 
+def _project_interest_vector(memories: list[dict]) -> np.ndarray | None:
+    """Generate project interest vector from memories. Returns None if no memories."""
+    if not memories:
+        return None
+    try:
+        # Simple implementation: combine memory texts into a single vector
+        texts = [m.get("text", "") for m in memories if isinstance(m, dict) and m.get("text")]
+        if not texts:
+            return None
+        combined_text = " ".join(texts)
+        return np.array(EMBED_CACHE.get_or_compute(combined_text, dtype=float))
+    except Exception:
+        return None
+
+
 def _triage_rank(
     objective: str,
     candidates: list[dict],
@@ -2023,7 +2038,7 @@ Abstract: {abstract}
         if _time_left(deadline) < 20.0 and (target_deep - len(extracted_results)) > 0:
             # if little time left, stop early once we have at least 9 items
             if len(extracted_results) >= 9:
-                break
+            break
         abstract = art.get("abstract", "")
         extracted = {}
         if abstract.strip() and _time_left(deadline) > 12.0:
@@ -2044,9 +2059,9 @@ Abstract: {abstract}
             # Per-article ceiling to keep latency bounded
             grounded = await asyncio.wait_for(
                 run_in_threadpool(summarization_chain.invoke, {
-                    "objective": objective,
-                    "abstract": enriched_abstract,
-                    "memory_context": memory_context,
+                "objective": objective,
+                "abstract": enriched_abstract,
+                "memory_context": memory_context,
                 }),
                 timeout=min(PER_ARTICLE_BUDGET_S, max(2.0, _time_left(deadline) - 2.0))
             )
@@ -2074,7 +2089,7 @@ Abstract: {abstract}
                     # Normalize quotes to avoid ellipsis-truncated snippets
                     try:
                         structured["fact_anchors"] = _normalize_anchor_quotes(abstract, structured["fact_anchors"])  # type: ignore
-                    except Exception:
+        except Exception:
                         pass
                     # If anchors remain weak, synthesize light fallback anchors
                     try:
@@ -3028,7 +3043,7 @@ async def ready() -> dict:
     except Exception as e:
         try:
             log_event({"ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "event": "pinecone_ready_exception", "error": str(e)})
-        except Exception:
+    except Exception:
             pass
         pc_ok = False
     keys_ok = bool(os.getenv("GOOGLE_API_KEY")) and bool(os.getenv("GOOGLE_CSE_ID")) and bool(os.getenv("PINECONE_API_KEY"))
@@ -3053,7 +3068,7 @@ def _strip_html(html: str) -> str:
         # Collapse whitespace
         t = re.sub(r"\s+", " ", t).strip()
         return t
-    except Exception:
+        except Exception:
         return html
 
 
@@ -3070,7 +3085,7 @@ def _fetch_article_text_from_url(url: str, timeout: float = 20.0) -> str:
                     try:
                         # Attempt to extract PDF text
                         return pdf_extract_text(io.BytesIO(raw))[:200000]
-                    except Exception:
+    except Exception:
                         return ""
                 return ""
             # Assume HTML or text
@@ -3079,7 +3094,7 @@ def _fetch_article_text_from_url(url: str, timeout: float = 20.0) -> str:
             except Exception:
                 try:
                     text = raw.decode("latin-1", errors="ignore")
-                except Exception:
+        except Exception:
                     text = raw.decode(errors="ignore")
             return _strip_html(text)
     except Exception:
@@ -3095,10 +3110,10 @@ def _fetch_url_raw_text(url: str, timeout: float = 15.0) -> str:
             raw = r.read()
             try:
                 return raw.decode("utf-8", errors="ignore")
-            except Exception:
-                try:
+        except Exception:
+        try:
                     return raw.decode("latin-1", errors="ignore")
-                except Exception:
+        except Exception:
                     return raw.decode(errors="ignore")
     except Exception:
         return ""
@@ -3113,7 +3128,7 @@ def _extract_pubmed_abstract(html_text: str) -> str:
             m = re.search(r"<section[^>]*id=\"abstract\"[\s\S]*?</section>", html_text, flags=re.IGNORECASE)
         if m:
             return _strip_html(m.group(0))[:200000]
-    except Exception:
+        except Exception:
         pass
     return ""
 
@@ -3128,18 +3143,18 @@ def _extract_doi_from_html(html_text: str) -> str:
         m = re.search(r"doi:\s*(10\.\S+)", html_text, flags=re.IGNORECASE)
         if m:
             return m.group(1).strip().rstrip('.')
-    except Exception:
-        pass
+            except Exception:
+                pass
     return ""
 
 
 def _fetch_json(url: str, timeout: float = 10.0) -> dict:
-    try:
+        try:
         with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"}), timeout=timeout) as r:
             raw = r.read().decode("utf-8", errors="ignore")
             import json as _json
             return _json.loads(raw)
-    except Exception:
+        except Exception:
         return {}
 
 
@@ -3160,7 +3175,7 @@ def _expand_objective_synonyms(objective: str) -> list[str]:
         if ("anti-inflammatory" in obj) or ("inflammation" in obj):
             synonyms.update(["cox-1","cox-2","pge2","pgd2","ltc4","platelet","thromboxane a2"])
         return sorted(synonyms)
-    except Exception:
+            except Exception:
         return []
 
 
@@ -3197,8 +3212,8 @@ def _resolve_via_eupmc(pmid: str | None, doi: str | None) -> tuple[str, dict]:
                     "resolved_source": "europe_pmc",
                 }
                 return txt, meta
-    except Exception:
-        pass
+            except Exception:
+                pass
     return "", {}
 
 
@@ -3226,7 +3241,7 @@ def _oa_backfill_topup(objective: str, current: list[dict], minimum: int, deadli
                 harvested.append({"title": title, "abstract": it.get("abstractText") or "", "pub_year": year,
                                   "pmid": pmid, "url": url0, "citation_count": int(it.get("citedByCount") or 0),
                                   "source": "europe_pmc", "source_query": objective})
-            except Exception:
+                    except Exception:
                 continue
         merged = current + harvested
         norm = _normalize_candidates(merged)
@@ -3238,7 +3253,7 @@ def _oa_backfill_topup(objective: str, current: list[dict], minimum: int, deadli
             seen.add(key); keep.append(a)
             if len(keep) >= max(minimum, 10): break
         return keep
-    except Exception:
+                    except Exception:
         return current
 
 
@@ -3249,7 +3264,7 @@ def _normalize_title(title: str | None) -> str:
         s = re.sub(r"[^a-z0-9\s]", "", s)
         s = re.sub(r"\s+", " ", s).strip()
         return s
-    except Exception:
+            except Exception:
         return (title or "").strip().lower()
 
 
@@ -3268,8 +3283,8 @@ def _extract_title_from_html(html_text: str) -> str:
         m = re.search(r"<title>([\s\S]*?)</title>", html_text, flags=re.IGNORECASE)
         if m:
             return _strip_html(m.group(0)).strip()
-    except Exception:
-        pass
+            except Exception:
+                pass
     return ""
 
 
@@ -3295,7 +3310,7 @@ def _verify_source_match(req_title: str | None, req_pmid: str | None, meta: dict
         try:
             if req_pmid and resolved.get("resolved_pmid"):
                 pmid_match = str(req_pmid).strip() == str(resolved.get("resolved_pmid")).strip()
-        except Exception:
+            except Exception:
             pmid_match = False
         mismatch = False
         # If any identifier provided, require equality; else rely on title when available
@@ -3306,7 +3321,7 @@ def _verify_source_match(req_title: str | None, req_pmid: str | None, meta: dict
         else:
             mismatch = False
         return { **resolved, "mismatch": bool(mismatch) }
-    except Exception:
+                except Exception:
         return { **({k: meta.get(k) for k in ("resolved_title","resolved_pmid","resolved_pmcid","resolved_doi","license","resolved_source")}), "mismatch": False }
 
 
@@ -3329,8 +3344,8 @@ def _resolve_oa_fulltext(pmid: str | None, landing_html: str, doi_hint: str | No
                     html = _fetch_article_text_from_url(pmc_url)
                     if html and len(html) > 2000:
                         return (html, "full_text", "pmc", {"resolved_pmcid": pmcid, "resolved_source": "pmc"})
-    except Exception:
-        pass
+                except Exception:
+                    pass
     # 2) Unpaywall via DOI
     try:
         doi = (doi_hint or _extract_doi_from_html(landing_html)).strip()
@@ -3345,23 +3360,23 @@ def _resolve_oa_fulltext(pmid: str | None, landing_html: str, doi_hint: str | No
                     if txt and len(txt) > 1000:
                         src = "publisher" if "publisher" in (best.get("host_type") or "") else "repository"
                         return (txt, "full_text", src, {"resolved_doi": doi, "license": best.get("license"), "resolved_source": src})
-    except Exception:
-        pass
+                    except Exception:
+                        pass
     # 2b) Europe PMC fallback
     try:
         doi2 = doi_hint or _extract_doi_from_html(landing_html)
         txt2, meta2 = _resolve_via_eupmc(pmid, doi2)
         if txt2:
             return (txt2, "full_text", meta2.get("resolved_source", "europe_pmc"), meta2)
-    except Exception:
-        pass
+                        except Exception:
+                            pass
     # 3) Abstract-only fallback for PubMed landing pages
     try:
         ab = _extract_pubmed_abstract(landing_html)
         if ab:
             return (ab, "abstract_only", "pubmed_abstract", {})
-    except Exception:
-        pass
+                        except Exception:
+                            pass
     return ("", "none", "none", {})
 
 
@@ -3444,7 +3459,7 @@ async def generate_review(request: ReviewRequest) -> dict:
             result["diagnostics"]["timings_ms"]["total_ms"] = int(total_ms)
 
         return result
-    except Exception as e:
+                except Exception as e:
         return {"error": str(e)[:500], "results": [], "diagnostics": {"pool_size": 0, "shortlist_size": 0, "deep_dive_count": 0}}
 
 
@@ -3472,7 +3487,7 @@ async def deep_dive(request: DeepDiveRequest):
                 if grounding != "full_text":
                     try:
                         doi_guess = _extract_doi_from_html(landing_html or "")
-                    except Exception:
+            except Exception:
                         doi_guess = ""
                     try:
                         txt2, meta2 = _resolve_via_eupmc(request.pmid, doi_guess or None)
@@ -3496,8 +3511,8 @@ async def deep_dive(request: DeepDiveRequest):
                                         text = t
                                         grounding = "full_text"
                                         grounding_source = "pmc_jats"
-                        except Exception:
-                            pass
+                    except Exception:
+                        pass
                 if not text and landing_html:
                     text = _strip_html(landing_html)
                     if text:
@@ -3516,7 +3531,7 @@ async def deep_dive(request: DeepDiveRequest):
                 meta = _verify_source_match(request.title, request.pmid, meta or {}, landing_html)
             else:
                 meta = _verify_source_match(request.title, request.pmid, meta or {}, landing_html)
-        except Exception:
+                            except Exception:
             meta = meta or {}
         # Run three specialist modules in parallel
         try:
@@ -3598,12 +3613,12 @@ async def deep_dive(request: DeepDiveRequest):
                     ch_ct = sum(1 for r in rows if isinstance(r, dict) and str(r.get("metric","")) in ("change","fold_change"))
                     ref_ct = sum(1 for r in rows if isinstance(r, dict) and str(r.get("metric","")) in ("reference",))
                     quant_ok = (p_ct >= 1) or (ch_ct >= 2 and ref_ct >= 1)
-                except Exception:
+                        except Exception:
                     quant_ok = has_results
                 diagnostics["quant_minimum_met"] = bool(quant_ok)
                 diagnostics["qual_only"] = bool(not quant_ok)
-        except Exception:
-            pass
+                    except Exception:
+                        pass
         return {
             "source": source_info,
             "model_description_structured": md_structured,
@@ -3626,13 +3641,13 @@ def _fetch_pmc_jats_xml(pmcid: str) -> str:
         )
         with urllib.request.urlopen(url, timeout=12) as r:
             return r.read().decode("utf-8", errors="ignore")
-    except Exception:
-        try:
+                    except Exception:
+                        try:
             # Fallback: PMC HTML with format=xml sometimes works
             url2 = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/?page=1&format=xml"
             with urllib.request.urlopen(url2, timeout=12) as r2:
                 return r2.read().decode("utf-8", errors="ignore")
-        except Exception:
+                        except Exception:
             return ""
 
 def _harvest_quant_from_jats(jats_xml: str) -> list[dict]:
@@ -3643,8 +3658,8 @@ def _harvest_quant_from_jats(jats_xml: str) -> list[dict]:
         # Remove namespaces for simpler XPath
         try:
             jats_xml = re.sub(r"xmlns(:\w+)?=\"[^\"]+\"", "", jats_xml)
-        except Exception:
-            pass
+                        except Exception:
+                            pass
         root = ET.fromstring(jats_xml)
         text_blobs: list[str] = []
         # Collect paragraph text
@@ -3652,7 +3667,7 @@ def _harvest_quant_from_jats(jats_xml: str) -> list[dict]:
             try:
                 if t.text and t.tag.lower().endswith(('{p}', 'p')):
                     text_blobs.append(t.text)
-            except Exception:
+                        except Exception:
                 continue
         big = "\n".join(text_blobs)[:200000]
         # p-values
@@ -3686,7 +3701,7 @@ def _harvest_quant_from_jats(jats_xml: str) -> list[dict]:
         for t in root.iter():
             try:
                 tag = t.tag.lower()
-            except Exception:
+                        except Exception:
                 tag = ""
             if tag.endswith('fig') or tag.endswith('table-wrap'):
                 label = None
@@ -3755,5 +3770,5 @@ def _harvest_tables_from_jats(jats_xml: str) -> list[dict]:
             for m in re.finditer(r"(95% CI|CI)\s*[:\(]?\s*[-\d\.]+\s*[-,]\s*[-\d\.]+", blob, flags=re.I):
                 out.append({"metric":"ci","value":m.group(0),"unit":"","effect_size":"","p_value":"","fdr":"","ci":m.group(0),"direction":"","figure_table_ref": label or 'Table'})
         return out[:25]
-    except Exception:
+        except Exception:
         return out[:10]
