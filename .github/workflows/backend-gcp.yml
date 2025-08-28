@@ -154,12 +154,32 @@ jobs:
             fi
           done
 
-      - name: Route traffic to latest revision
+      - name: Route traffic if new revision is Ready
         run: |
-          gcloud run services update-traffic ${{ secrets.BACKEND_SERVICE }} \
-            --region ${{ secrets.GCP_REGION }} \
-            --to-latest \
-            --quiet
+          set -euo pipefail
+          SERVICE="${{ secrets.BACKEND_SERVICE }}"
+          REGION="${{ secrets.GCP_REGION }}"
+
+          NEW_REV=$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.latestCreatedRevisionName)')
+          echo "Latest created revision: $NEW_REV"
+          if [ -z "$NEW_REV" ]; then
+            echo "No latest created revision found; leaving traffic unchanged"
+            exit 0
+          fi
+
+          echo "Waiting for revision to become Ready..."
+          for i in $(seq 1 40); do
+            READY=$(gcloud run revisions describe "$NEW_REV" --region "$REGION" --format='json' | jq -r '.status.conditions[] | select(.type=="Ready") | .status' || true)
+            if [ "$READY" = "True" ]; then
+              echo "Revision is Ready. Updating traffic to $NEW_REV"
+              gcloud run services update-traffic "$SERVICE" --region "$REGION" --to-revisions="$NEW_REV=100" --quiet
+              exit 0
+            fi
+            echo "Not ready yet (status=$READY). Sleeping..."
+            sleep 6
+          done
+          echo "Revision did not become Ready in time; leaving traffic on current healthy revision."
+          exit 0
 
       - name: Output backend URL
         run: gcloud run services describe ${{ secrets.BACKEND_SERVICE }} --region ${{ secrets.GCP_REGION }} --format='value(status.url)'
