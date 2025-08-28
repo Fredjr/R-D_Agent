@@ -41,23 +41,23 @@ async function proxy(req: Request, { params }: { params: { path: string[] } }) {
   });
 }
 
-export async function GET(req: Request, ctx: { params: { path: string[] } }) {
+export async function GET(req: Request, ctx: any) {
   return proxy(req, ctx);
 }
 
-export async function POST(req: Request, ctx: { params: { path: string[] } }) {
+export async function POST(req: Request, ctx: any) {
   return proxy(req, ctx);
 }
 
-export async function PUT(req: Request, ctx: { params: { path: string[] } }) {
+export async function PUT(req: Request, ctx: any) {
   return proxy(req, ctx);
 }
 
-export async function PATCH(req: Request, ctx: { params: { path: string[] } }) {
+export async function PATCH(req: Request, ctx: any) {
   return proxy(req, ctx);
 }
 
-export async function DELETE(req: Request, ctx: { params: { path: string[] } }) {
+export async function DELETE(req: Request, ctx: any) {
   return proxy(req, ctx);
 }
 
