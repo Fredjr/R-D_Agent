@@ -40,13 +40,20 @@ jobs:
         run: |
           set -euo pipefail
           npm ci --no-audit --no-fund
+          # Use the improved backend with OA backfill and precision improvements
           BACKEND_PUBLIC_URL="${{ secrets.BACKEND_PUBLIC_URL }}"
-          if [ -z "${BACKEND_PUBLIC_URL}" ]; then
+          IMPROVED_BACKEND_URL="https://rd-backend-v3-537209831678.us-central1.run.app"
+          # Use improved backend if available, fallback to configured URL
+          if curl -s --max-time 5 "$IMPROVED_BACKEND_URL/version" >/dev/null 2>&1; then
+            echo "Using improved backend: $IMPROVED_BACKEND_URL"
+            echo "NEXT_PUBLIC_BACKEND_URL=$IMPROVED_BACKEND_URL" >> "$GITHUB_ENV"
+          elif [ -n "${BACKEND_PUBLIC_URL}" ]; then
+            echo "Using configured backend: $BACKEND_PUBLIC_URL"
+            echo "NEXT_PUBLIC_BACKEND_URL=${BACKEND_PUBLIC_URL}" >> "$GITHUB_ENV"
+          else
             echo "BACKEND_PUBLIC_URL secret is required. Please set it to your backend Cloud Run URL." >&2
             exit 1
           fi
-          echo "NEXT_PUBLIC_BACKEND_URL=${BACKEND_PUBLIC_URL}" >> "$GITHUB_ENV"
-          echo "Using NEXT_PUBLIC_BACKEND_URL set in GITHUB_ENV" || true
           npm run build
 
       - name: Build & Push image
