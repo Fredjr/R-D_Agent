@@ -3447,6 +3447,36 @@ async def deep_dive(request: DeepDiveRequest):
                 meta = {"resolved_source": "pmc"}
             else:
                 text, grounding, grounding_source, meta = _resolve_oa_fulltext(request.pmid, landing_html, None)
+                # Aggressive OA fallback: Europe PMC by DOI/PMID, then PMC JATS by PMCID
+                if grounding != "full_text":
+                    try:
+                        doi_guess = _extract_doi_from_html(landing_html or "")
+                    except Exception:
+                        doi_guess = ""
+                    try:
+                        txt2, meta2 = _resolve_via_eupmc(request.pmid, doi_guess or None)
+                        if txt2 and len(txt2) > 1000:
+                            text = txt2
+                            grounding = "full_text"
+                            grounding_source = "europe_pmc"
+                            m0 = meta or {}
+                            m0.update(meta2 or {})
+                            meta = m0
+                    except Exception:
+                        pass
+                    if grounding != "full_text":
+                        try:
+                            pmcid = (meta or {}).get("resolved_pmcid")
+                            if pmcid:
+                                jats = _fetch_pmc_jats_xml(str(pmcid))
+                                if jats:
+                                    t = _strip_html(jats)
+                                    if t and len(t) > 1000:
+                                        text = t
+                                        grounding = "full_text"
+                                        grounding_source = "pmc_jats"
+                        except Exception:
+                            pass
                 if not text and landing_html:
                     text = _strip_html(landing_html)
                     if text:
@@ -3550,8 +3580,9 @@ async def deep_dive(request: DeepDiveRequest):
             "results_interpretation_structured": res if grounding == "full_text" else None,
             "diagnostics": diagnostics,
         }
+    except Exception as e:
+        return {"error": str(e)[:500], "source": {"url": getattr(request, 'url', ''), "pmid": getattr(request, 'pmid', ''), "title": getattr(request, 'title', '')}}
 
-import xml.etree.ElementTree as ET
 
 def _fetch_pmc_jats_xml(pmcid: str) -> str:
     try:
