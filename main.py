@@ -2275,6 +2275,12 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
     # Normalize and triage
     _t0 = _now_ms()
     norm = _normalize_candidates(arts)
+    # Recall fallback: if nothing harvested, try Europe PMC OA by objective keywords
+    try:
+        if not norm and _time_left(deadline) > 6.0:
+            norm = _oa_backfill_topup(request.objective or "", [], 10, deadline)
+    except Exception:
+        pass
     # Enforce acceptance gating for full-text-only: drop items that are unlikely to have OA/full text
     try:
         if bool(getattr(request, "full_text_only", False)):
