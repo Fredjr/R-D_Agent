@@ -2315,6 +2315,13 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
         pass
     # Time-aware caps
     triage_cap = min(TRIAGE_TOP_K, 50)
+    # For precision/full-text flows, keep a slightly larger shortlist to ensure >=8 deep dives
+    try:
+        pref_tmp = str(getattr(request, "preference", "precision") or "precision").lower()
+        if pref_tmp == "precision":
+            triage_cap = max(triage_cap, 30)
+    except Exception:
+        pass
     if _time_left(deadline) < 15.0:
         triage_cap = min(triage_cap, 24)
     proj_vec = _project_interest_vector(memories)
@@ -2360,6 +2367,15 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
     except Exception:
         pass
     top_k = shortlist[:deep_cap]
+    # Ensure at least 8 deep-dive candidates by OA backfill if needed and time allows
+    try:
+        need_min = 8
+        if len(top_k) < need_min and _time_left(deadline) > 6.0:
+            topped = _oa_backfill_topup(request.objective or "", top_k, need_min, deadline)
+            if isinstance(topped, list) and len(topped) >= len(top_k):
+                top_k = topped[:max(need_min, len(top_k))]
+    except Exception:
+        pass
     triage_ms = _now_ms() - _t0
 
     # Deep-dive
