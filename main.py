@@ -42,7 +42,6 @@ from tools import PubMedSearchTool, WebSearchTool, PatentsSearchTool
 from scientific_model_analyst import analyze_scientific_model
 from experimental_methods_analyst import analyze_experimental_methods
 from results_interpretation_analyst import analyze_results_interpretation
-from deep_dive_agents import run_methods_pipeline, run_results_pipeline
 from langchain.agents import AgentType, initialize_agent
 from scoring import calculate_publication_score
 
@@ -1618,17 +1617,17 @@ Prior Context: {memories}
     # Prefer deterministic per-corpus plan. Optionally augment with LLM strategist if enabled and valid.
     llm_plan: dict | None = None
     if STRATEGIST_LLM_ENABLED:
-    try:
+        try:
             prompt = PromptTemplate(template=strategist_template, input_variables=["objective", "memories", "molecule"])
-        chain = LLMChain(llm=llm_analyzer, prompt=prompt)
+            chain = LLMChain(llm=llm_analyzer, prompt=prompt)
             out = chain.invoke({"objective": objective[:400], "memories": memories_text[:400], "molecule": (molecule or "")[:200]})
-        txt = out.get("text", out) if isinstance(out, dict) else str(out)
-        if "```" in txt:
-            txt = txt.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
+            txt = out.get("text", out) if isinstance(out, dict) else str(out)
+            if "```" in txt:
+                txt = txt.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
             candidate = json.loads(txt)
             if isinstance(candidate, dict):
                 llm_plan = candidate
-    except Exception:
+        except Exception:
             llm_plan = None
     # Deterministic fallback (default path)
     obj = _normalize_entities(objective or "").strip()
@@ -1848,21 +1847,6 @@ def _filter_by_molecule(candidates: list[dict], molecule: str | None) -> list[di
             continue
     return filtered if filtered else candidates
 
-def _project_interest_vector(memories: list[dict]) -> np.ndarray | None:
-    """Generate project interest vector from memories. Returns None if no memories."""
-    if not memories:
-        return None
-    try:
-        # Simple implementation: combine memory texts into a single vector
-        texts = [m.get("text", "") for m in memories if isinstance(m, dict) and m.get("text")]
-        if not texts:
-            return None
-        combined_text = " ".join(texts)
-        return np.array(EMBED_CACHE.get_or_compute(combined_text, dtype=float))
-    except Exception:
-        return None
-
-
 def _triage_rank(
     objective: str,
     candidates: list[dict],
@@ -2038,7 +2022,7 @@ Abstract: {abstract}
         if _time_left(deadline) < 20.0 and (target_deep - len(extracted_results)) > 0:
             # if little time left, stop early once we have at least 9 items
             if len(extracted_results) >= 9:
-            break
+                break
         abstract = art.get("abstract", "")
         extracted = {}
         if abstract.strip() and _time_left(deadline) > 12.0:
@@ -2059,9 +2043,9 @@ Abstract: {abstract}
             # Per-article ceiling to keep latency bounded
             grounded = await asyncio.wait_for(
                 run_in_threadpool(summarization_chain.invoke, {
-                "objective": objective,
-                "abstract": enriched_abstract,
-                "memory_context": memory_context,
+                    "objective": objective,
+                    "abstract": enriched_abstract,
+                    "memory_context": memory_context,
                 }),
                 timeout=min(PER_ARTICLE_BUDGET_S, max(2.0, _time_left(deadline) - 2.0))
             )
@@ -2089,7 +2073,7 @@ Abstract: {abstract}
                     # Normalize quotes to avoid ellipsis-truncated snippets
                     try:
                         structured["fact_anchors"] = _normalize_anchor_quotes(abstract, structured["fact_anchors"])  # type: ignore
-        except Exception:
+                    except Exception:
                         pass
                     # If anchors remain weak, synthesize light fallback anchors
                     try:
@@ -3043,7 +3027,7 @@ async def ready() -> dict:
     except Exception as e:
         try:
             log_event({"ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "event": "pinecone_ready_exception", "error": str(e)})
-    except Exception:
+        except Exception:
             pass
         pc_ok = False
     keys_ok = bool(os.getenv("GOOGLE_API_KEY")) and bool(os.getenv("GOOGLE_CSE_ID")) and bool(os.getenv("PINECONE_API_KEY"))
@@ -3068,7 +3052,7 @@ def _strip_html(html: str) -> str:
         # Collapse whitespace
         t = re.sub(r"\s+", " ", t).strip()
         return t
-        except Exception:
+    except Exception:
         return html
 
 
@@ -3085,7 +3069,7 @@ def _fetch_article_text_from_url(url: str, timeout: float = 20.0) -> str:
                     try:
                         # Attempt to extract PDF text
                         return pdf_extract_text(io.BytesIO(raw))[:200000]
-    except Exception:
+                    except Exception:
                         return ""
                 return ""
             # Assume HTML or text
@@ -3094,7 +3078,7 @@ def _fetch_article_text_from_url(url: str, timeout: float = 20.0) -> str:
             except Exception:
                 try:
                     text = raw.decode("latin-1", errors="ignore")
-        except Exception:
+                except Exception:
                     text = raw.decode(errors="ignore")
             return _strip_html(text)
     except Exception:
@@ -3110,10 +3094,10 @@ def _fetch_url_raw_text(url: str, timeout: float = 15.0) -> str:
             raw = r.read()
             try:
                 return raw.decode("utf-8", errors="ignore")
-        except Exception:
-        try:
+            except Exception:
+                try:
                     return raw.decode("latin-1", errors="ignore")
-        except Exception:
+                except Exception:
                     return raw.decode(errors="ignore")
     except Exception:
         return ""
@@ -3128,7 +3112,7 @@ def _extract_pubmed_abstract(html_text: str) -> str:
             m = re.search(r"<section[^>]*id=\"abstract\"[\s\S]*?</section>", html_text, flags=re.IGNORECASE)
         if m:
             return _strip_html(m.group(0))[:200000]
-        except Exception:
+    except Exception:
         pass
     return ""
 
@@ -3143,18 +3127,18 @@ def _extract_doi_from_html(html_text: str) -> str:
         m = re.search(r"doi:\s*(10\.\S+)", html_text, flags=re.IGNORECASE)
         if m:
             return m.group(1).strip().rstrip('.')
-            except Exception:
-                pass
+    except Exception:
+        pass
     return ""
 
 
 def _fetch_json(url: str, timeout: float = 10.0) -> dict:
-        try:
+    try:
         with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"}), timeout=timeout) as r:
             raw = r.read().decode("utf-8", errors="ignore")
             import json as _json
             return _json.loads(raw)
-        except Exception:
+    except Exception:
         return {}
 
 
@@ -3175,7 +3159,7 @@ def _expand_objective_synonyms(objective: str) -> list[str]:
         if ("anti-inflammatory" in obj) or ("inflammation" in obj):
             synonyms.update(["cox-1","cox-2","pge2","pgd2","ltc4","platelet","thromboxane a2"])
         return sorted(synonyms)
-            except Exception:
+    except Exception:
         return []
 
 
@@ -3212,8 +3196,8 @@ def _resolve_via_eupmc(pmid: str | None, doi: str | None) -> tuple[str, dict]:
                     "resolved_source": "europe_pmc",
                 }
                 return txt, meta
-            except Exception:
-                pass
+    except Exception:
+        pass
     return "", {}
 
 
@@ -3241,7 +3225,7 @@ def _oa_backfill_topup(objective: str, current: list[dict], minimum: int, deadli
                 harvested.append({"title": title, "abstract": it.get("abstractText") or "", "pub_year": year,
                                   "pmid": pmid, "url": url0, "citation_count": int(it.get("citedByCount") or 0),
                                   "source": "europe_pmc", "source_query": objective})
-                    except Exception:
+            except Exception:
                 continue
         merged = current + harvested
         norm = _normalize_candidates(merged)
@@ -3253,7 +3237,7 @@ def _oa_backfill_topup(objective: str, current: list[dict], minimum: int, deadli
             seen.add(key); keep.append(a)
             if len(keep) >= max(minimum, 10): break
         return keep
-                    except Exception:
+    except Exception:
         return current
 
 
@@ -3264,7 +3248,7 @@ def _normalize_title(title: str | None) -> str:
         s = re.sub(r"[^a-z0-9\s]", "", s)
         s = re.sub(r"\s+", " ", s).strip()
         return s
-            except Exception:
+    except Exception:
         return (title or "").strip().lower()
 
 
@@ -3283,8 +3267,8 @@ def _extract_title_from_html(html_text: str) -> str:
         m = re.search(r"<title>([\s\S]*?)</title>", html_text, flags=re.IGNORECASE)
         if m:
             return _strip_html(m.group(0)).strip()
-            except Exception:
-                pass
+    except Exception:
+        pass
     return ""
 
 
@@ -3310,7 +3294,7 @@ def _verify_source_match(req_title: str | None, req_pmid: str | None, meta: dict
         try:
             if req_pmid and resolved.get("resolved_pmid"):
                 pmid_match = str(req_pmid).strip() == str(resolved.get("resolved_pmid")).strip()
-            except Exception:
+        except Exception:
             pmid_match = False
         mismatch = False
         # If any identifier provided, require equality; else rely on title when available
@@ -3321,7 +3305,7 @@ def _verify_source_match(req_title: str | None, req_pmid: str | None, meta: dict
         else:
             mismatch = False
         return { **resolved, "mismatch": bool(mismatch) }
-                except Exception:
+    except Exception:
         return { **({k: meta.get(k) for k in ("resolved_title","resolved_pmid","resolved_pmcid","resolved_doi","license","resolved_source")}), "mismatch": False }
 
 
@@ -3344,8 +3328,8 @@ def _resolve_oa_fulltext(pmid: str | None, landing_html: str, doi_hint: str | No
                     html = _fetch_article_text_from_url(pmc_url)
                     if html and len(html) > 2000:
                         return (html, "full_text", "pmc", {"resolved_pmcid": pmcid, "resolved_source": "pmc"})
-                except Exception:
-                    pass
+    except Exception:
+        pass
     # 2) Unpaywall via DOI
     try:
         doi = (doi_hint or _extract_doi_from_html(landing_html)).strip()
@@ -3360,23 +3344,23 @@ def _resolve_oa_fulltext(pmid: str | None, landing_html: str, doi_hint: str | No
                     if txt and len(txt) > 1000:
                         src = "publisher" if "publisher" in (best.get("host_type") or "") else "repository"
                         return (txt, "full_text", src, {"resolved_doi": doi, "license": best.get("license"), "resolved_source": src})
-                    except Exception:
-                        pass
+    except Exception:
+        pass
     # 2b) Europe PMC fallback
     try:
         doi2 = doi_hint or _extract_doi_from_html(landing_html)
         txt2, meta2 = _resolve_via_eupmc(pmid, doi2)
         if txt2:
             return (txt2, "full_text", meta2.get("resolved_source", "europe_pmc"), meta2)
-                        except Exception:
-                            pass
+    except Exception:
+        pass
     # 3) Abstract-only fallback for PubMed landing pages
     try:
         ab = _extract_pubmed_abstract(landing_html)
         if ab:
             return (ab, "abstract_only", "pubmed_abstract", {})
-                        except Exception:
-                            pass
+    except Exception:
+        pass
     return ("", "none", "none", {})
 
 
@@ -3443,26 +3427,6 @@ async def _run_deepdive_chain(prompt: PromptTemplate, objective: str, full_text:
     return data
 
 
-@app.post("/generate-review")
-async def generate_review(request: ReviewRequest) -> dict:
-    t0 = _now_ms()
-    try:
-        # Initialize empty memories list (could be extended to support memory persistence)
-        memories: list[dict] = []
-
-        # Call the main orchestration function
-        result = await orchestrate_v2(request, memories)
-
-        # Add total processing time
-        total_ms = _now_ms() - t0
-        if "diagnostics" in result and "timings_ms" in result["diagnostics"]:
-            result["diagnostics"]["timings_ms"]["total_ms"] = int(total_ms)
-
-        return result
-                except Exception as e:
-        return {"error": str(e)[:500], "results": [], "diagnostics": {"pool_size": 0, "shortlist_size": 0, "deep_dive_count": 0}}
-
-
 @app.post("/deep-dive")
 async def deep_dive(request: DeepDiveRequest):
     t0 = _now_ms()
@@ -3472,7 +3436,6 @@ async def deep_dive(request: DeepDiveRequest):
         text = ""
         grounding = "none"
         grounding_source = "none"
-        meta: dict = {}
         if request.url:
             # Use raw HTML for OA resolution and abstract parsing
             landing_html = _fetch_url_raw_text(request.url)
@@ -3480,45 +3443,13 @@ async def deep_dive(request: DeepDiveRequest):
             if "ncbi.nlm.nih.gov/pmc/articles/" in (request.url or "") and landing_html:
                 text = _strip_html(landing_html)
                 grounding, grounding_source = "full_text", "pmc"
-                meta = {"resolved_source": "pmc"}
             else:
                 text, grounding, grounding_source, meta = _resolve_oa_fulltext(request.pmid, landing_html, None)
-                # Aggressive OA fallback: Europe PMC by DOI/PMID, then PMC JATS by PMCID
-                if grounding != "full_text":
-                    try:
-                        doi_guess = _extract_doi_from_html(landing_html or "")
-            except Exception:
-                        doi_guess = ""
-                    try:
-                        txt2, meta2 = _resolve_via_eupmc(request.pmid, doi_guess or None)
-                        if txt2 and len(txt2) > 1000:
-                            text = txt2
-                            grounding = "full_text"
-                            grounding_source = "europe_pmc"
-                            m0 = meta or {}
-                            m0.update(meta2 or {})
-                            meta = m0
-                    except Exception:
-                        pass
-                    if grounding != "full_text":
-                        try:
-                            pmcid = (meta or {}).get("resolved_pmcid")
-                            if pmcid:
-                                jats = _fetch_pmc_jats_xml(str(pmcid))
-                                if jats:
-                                    t = _strip_html(jats)
-                                    if t and len(t) > 1000:
-                                        text = t
-                                        grounding = "full_text"
-                                        grounding_source = "pmc_jats"
-                    except Exception:
-                        pass
                 if not text and landing_html:
                     text = _strip_html(landing_html)
                     if text:
                         grounding = "abstract_only" if "pubmed.ncbi.nlm.nih.gov" in (request.url or "") else "none"
                         grounding_source = "pubmed_abstract" if grounding == "abstract_only" else "none"
-                        meta = {}
         if not text:
             return {
                 "error": "Unable to fetch or parse article content. Provide full-text URL or upload PDF.",
@@ -3526,13 +3457,14 @@ async def deep_dive(request: DeepDiveRequest):
             }
         # Source verification diagnostics
         try:
+            meta = {}
             if grounding == "full_text":
-                # Use resolved meta from OA resolver and enrich via landing page
-                meta = _verify_source_match(request.title, request.pmid, meta or {}, landing_html)
+                # Gather resolved meta from last OA resolver call if available (not retained here), fallback to landing page
+                meta = _verify_source_match(request.title, request.pmid, meta, landing_html)
             else:
-                meta = _verify_source_match(request.title, request.pmid, meta or {}, landing_html)
-                            except Exception:
-            meta = meta or {}
+                meta = _verify_source_match(request.title, request.pmid, {}, landing_html)
+        except Exception:
+            meta = {}
         # Run three specialist modules in parallel
         try:
             # Module 1 with timeout
@@ -3549,29 +3481,18 @@ async def deep_dive(request: DeepDiveRequest):
             }
             # Modules 2 and 3 with timeouts (structured)
             mth_task = _with_timeout(
-                run_in_threadpool(run_methods_pipeline, text, request.objective, llm_analyzer),
+                run_in_threadpool(analyze_experimental_methods, text, request.objective, llm_analyzer),
                 12.0,
                 "DeepDiveMethods",
                 retries=0,
             )
             res_task = _with_timeout(
-                run_in_threadpool(run_results_pipeline, text, request.objective, llm_analyzer, (meta.get("resolved_pmcid") if isinstance(meta, dict) else None)),
+                run_in_threadpool(analyze_results_interpretation, text, request.objective, llm_analyzer),
                 12.0,
                 "DeepDiveResults",
                 retries=0,
             )
-            # Do not fail the whole endpoint if one sub-pipeline errors out
-            gathered = await asyncio.gather(mth_task, res_task, return_exceptions=True)
-            mth, res = gathered[0], gathered[1]
-            if isinstance(mth, Exception):
-                mth = []
-            if isinstance(res, Exception) or not isinstance(res, dict):
-                res = {
-                    "hypothesis_alignment": "",
-                    "key_results": [],
-                    "limitations_biases_in_results": [],
-                    "fact_anchors": [],
-                }
+            mth, res = await asyncio.gather(mth_task, res_task)
         except Exception as e:
             return {"error": str(e)[:200], "source": source_info}
         took = _now_ms() - t0
@@ -3582,43 +3503,6 @@ async def deep_dive(request: DeepDiveRequest):
             "latency_ms": took,
             **({k: v for k, v in (meta or {}).items() if v is not None}),
         }
-        # Quantitative completeness heuristic: require at least one key_result and one methods row when full text
-        try:
-            if grounding == "full_text":
-                has_methods = isinstance(mth, list) and len(mth) > 0
-                has_results = isinstance(res, dict) and isinstance(res.get("key_results"), list) and len(res.get("key_results") or []) > 0
-                # If no quantitative rows, try JATS harvesting via PMCID
-                if (not has_results) and isinstance(meta.get("resolved_pmcid"), str):
-                    jats = _fetch_pmc_jats_xml(meta.get("resolved_pmcid"))
-                    harvested = _harvest_quant_from_jats(jats)
-                    # also parse tables for metrics/units/CI
-                    trows = _harvest_tables_from_jats(jats)
-                    if trows:
-                        harvested = (harvested or []) + trows
-                    if harvested:
-                        try:
-                            if isinstance(res, dict):
-                                res.setdefault("key_results", [])
-                                res["key_results"] = (res.get("key_results") or []) + harvested
-                                has_results = True
-                        except Exception:
-                            pass
-                diagnostics["coverage_methods"] = bool(has_methods)
-                diagnostics["coverage_results_quant"] = bool(has_results)
-                # Minimal quantitative completeness: p-value present OR (>=2 changes AND >=1 figure/table ref)
-                quant_ok = False
-                try:
-                    rows = (res.get("key_results") or []) if isinstance(res, dict) else []
-                    p_ct = sum(1 for r in rows if isinstance(r, dict) and str(r.get("metric","")) == "p_value")
-                    ch_ct = sum(1 for r in rows if isinstance(r, dict) and str(r.get("metric","")) in ("change","fold_change"))
-                    ref_ct = sum(1 for r in rows if isinstance(r, dict) and str(r.get("metric","")) in ("reference",))
-                    quant_ok = (p_ct >= 1) or (ch_ct >= 2 and ref_ct >= 1)
-                        except Exception:
-                    quant_ok = has_results
-                diagnostics["quant_minimum_met"] = bool(quant_ok)
-                diagnostics["qual_only"] = bool(not quant_ok)
-                    except Exception:
-                        pass
         return {
             "source": source_info,
             "model_description_structured": md_structured,
@@ -3628,147 +3512,1344 @@ async def deep_dive(request: DeepDiveRequest):
             "diagnostics": diagnostics,
         }
     except Exception as e:
-        return {"error": str(e)[:500], "source": {"url": getattr(request, 'url', ''), "pmid": getattr(request, 'pmid', ''), "title": getattr(request, 'title', '')}}
+        # Catch any unexpected errors and return structured error response
+        import traceback
+        error_detail = str(e)[:300]
+        if "Missing some input keys" in error_detail:
+            error_detail = "LLM validation error: " + error_detail
+        return {
+            "error": f"Deep dive processing failed: {error_detail}",
+            "source": {"url": request.url, "pmid": request.pmid, "title": request.title},
+            "diagnostics": {"error_type": type(e).__name__, "traceback": traceback.format_exc()[:500]}
+        }
 
 
-def _fetch_pmc_jats_xml(pmcid: str) -> str:
+@app.post("/deep-dive-upload")
+async def deep_dive_upload(objective: str = Form(...), file: UploadFile = File(...)):
+    t0 = _now_ms()
     try:
-        ident = f"oai:pubmedcentral.nih.gov:{pmcid}"
-        url = (
-            "https://www.ncbi.nlm.nih.gov/pmc/oai/oai.cgi?verb=GetRecord&identifier="
-            + urllib.parse.quote(ident)
-            + "&metadataPrefix=pmc"
-        )
-        with urllib.request.urlopen(url, timeout=12) as r:
-            return r.read().decode("utf-8", errors="ignore")
-                    except Exception:
-                        try:
-            # Fallback: PMC HTML with format=xml sometimes works
-            url2 = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/?page=1&format=xml"
-            with urllib.request.urlopen(url2, timeout=12) as r2:
-                return r2.read().decode("utf-8", errors="ignore")
-                        except Exception:
-            return ""
-
-def _harvest_quant_from_jats(jats_xml: str) -> list[dict]:
-    if not jats_xml:
-        return []
-    out: list[dict] = []
+        raw = await file.read()
+    except Exception as e:
+        return {"error": f"Failed to read file: {str(e)[:120]}"}
+    text = ""
+    grounding = "none"
+    grounding_source = "upload"
     try:
-        # Remove namespaces for simpler XPath
-        try:
-            jats_xml = re.sub(r"xmlns(:\w+)?=\"[^\"]+\"", "", jats_xml)
-                        except Exception:
-                            pass
-        root = ET.fromstring(jats_xml)
-        text_blobs: list[str] = []
-        # Collect paragraph text
-        for t in root.iter():
+        ctype = (file.content_type or "").lower()
+        if "pdf" in ctype and _HAS_PDF:
+            text = pdf_extract_text(io.BytesIO(raw))[:200000]
+            grounding = "full_text"
+        else:
+            # Assume text/markdown/rtf-like
             try:
-                if t.text and t.tag.lower().endswith(('{p}', 'p')):
-                    text_blobs.append(t.text)
-                        except Exception:
-                continue
-        big = "\n".join(text_blobs)[:200000]
-        # p-values
-        for m in re.finditer(r"p\s*[<=>]\s*0\.?\d+", big, flags=re.I):
-            out.append({
-                "metric": "p_value",
-                "value": m.group(0),
-                "unit": "",
-                "effect_size": "",
-                "p_value": m.group(0),
-                "fdr": "",
-                "ci": "",
-                "direction": "",
-                "figure_table_ref": "",
-            })
-        # Fold-changes / percents
-        for m in re.finditer(r"(\b\d+(\.\d+)?)\s*(%|percent|fold|x)\b.*?(increase|decrease|up|down)?", big, flags=re.I):
-            out.append({
-                "metric": "change",
-                "value": m.group(0),
-                "unit": "",
-                "effect_size": m.group(0),
-                "p_value": "",
-                "fdr": "",
-                "ci": "",
-                "direction": "",
-                "figure_table_ref": "",
-            })
-        # Figure/Table labels
-        caps: list[str] = []
-        for t in root.iter():
-            try:
-                tag = t.tag.lower()
-                        except Exception:
-                tag = ""
-            if tag.endswith('fig') or tag.endswith('table-wrap'):
-                label = None
-                caption = None
-                for ch in list(t):
-                    nm = (getattr(ch, 'tag', '') or '').lower()
-                    if nm.endswith('label') and ch.text:
-                        label = ch.text.strip()
-                    if nm.endswith('caption') and ch.text:
-                        caption = ch.text.strip()
-                if label:
-                    caps.append(f"{label}{(': '+caption) if caption else ''}")
-        for c in caps[:10]:
-            out.append({
-                "metric": "reference",
-                "value": "",
-                "unit": "",
-                "effect_size": "",
-                "p_value": "",
-                "fdr": "",
-                "ci": "",
-                "direction": "",
-                "figure_table_ref": c,
-            })
+                text = raw.decode("utf-8", errors="ignore")
+            except Exception:
+                text = raw.decode("latin-1", errors="ignore")
+            text = _strip_html(text)
+            grounding = "full_text" if len(text) > 1000 else "none"
     except Exception:
-        return out[:10]
-    return out[:15]
-
-def _harvest_tables_from_jats(jats_xml: str) -> list[dict]:
-    if not jats_xml:
-        return []
-    out: list[dict] = []
+        text = ""
+    if not text:
+        return {"error": "Unable to parse uploaded file"}
+    # Run modules (same as /deep-dive)
     try:
+        md_structured = await _with_timeout(
+            run_in_threadpool(analyze_scientific_model, text, objective, llm_analyzer), 12.0, "DeepDiveModel", retries=0
+        )
+        md_json = {"summary": md_structured.get("protocol_summary", ""), "relevance_justification": "", "fact_anchors": []}
+        mth_task = _with_timeout(
+            run_in_threadpool(analyze_experimental_methods, text, objective, llm_analyzer), 12.0, "DeepDiveMethods", retries=0
+        )
+        res_task = _with_timeout(
+            run_in_threadpool(analyze_results_interpretation, text, objective, llm_analyzer), 12.0, "DeepDiveResults", retries=0
+        )
+        mth, res = await asyncio.gather(mth_task, res_task)
+    except Exception as e:
+        return {"error": str(e)[:200]}
+    took = _now_ms() - t0
+    return {
+        "source": {"upload_name": file.filename},
+        "model_description_structured": md_structured,
+        "model_description": md_json,
+        "experimental_methods_structured": mth,
+        "results_interpretation_structured": res,
+        "diagnostics": {"ingested_chars": len(text), "grounding": grounding, "grounding_source": grounding_source, "latency_ms": took},
+    }
+
+
+def _retrieve_memories(project_id: str | None, objective: str) -> list[dict]:
+    if not project_id:
+        return []
+    index = _get_pinecone_index()
+    if index is None:
+        return []
+    # Embed objective
+    vector = EMBED_CACHE.get_or_compute(objective)
+    # Read-after-write retries
+    for attempt in range(3):
         try:
-            jats_xml = re.sub(r"xmlns(:\w+)?=\"[^\"]+\"", "", jats_xml)
+            res = index.query(vector=vector, top_k=3, filter={"project_id": {"$eq": project_id}}, include_metadata=True)
+            items: list[dict] = []
+            for match in res.get("matches", []) or []:
+                meta = match.get("metadata") or {}
+                items.append({"text": meta.get("text", ""), "score": match.get("score", 0)})
+            if items:
+                return items
+            time.sleep(0.2 * (attempt + 1))
+        except Exception:
+            time.sleep(0.2 * (attempt + 1))
+    return []
+
+def _project_interest_vector(memories: list[dict]) -> np.ndarray | None:
+    """Compute a simple interest vector from project memories (mean embedding)."""
+    if not memories:
+        return None
+    vecs: list[np.ndarray] = []
+    for m in memories:
+        txt = (m.get("text") or "").strip()
+        if not txt:
+            continue
+        try:
+            v = np.array(EMBED_CACHE.get_or_compute(txt), dtype=float)
+            if v.size:
+                vecs.append(v)
+        except Exception:
+            continue
+    if not vecs:
+        return None
+    try:
+        mean = np.mean(vecs, axis=0)
+        return mean
+    except Exception:
+        return None
+
+def _fetch_pubchem_synonyms(name: str) -> list[str]:
+    key = f"syn:{name.strip().lower()}"
+    if ENABLE_CACHING:
+        cached = synonyms_cache.get(key)
+        if cached is not None:
+            return cached  # type: ignore
+    out: list[str] = []
+    try:
+        q = urllib.parse.quote(name.strip())
+        url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{q}/synonyms/JSON"
+        with urllib.request.urlopen(url, timeout=10) as r:
+            data = json.loads(r.read().decode())
+            info_list = (data.get("InformationList") or {}).get("Information") or []
+            if info_list and isinstance(info_list, list):
+                syns = (info_list[0] or {}).get("Synonym") or []
+                if isinstance(syns, list):
+                    out = [s for s in syns if isinstance(s, str)][:20]
+    except Exception:
+        out = []
+    if ENABLE_CACHING:
+        synonyms_cache.set(key, out)
+    return out
+
+async def _run_pubmed_with_retry(query: str, attempts: int = 3) -> list[dict]:
+    """Run PubMed tool with retries and jitter in a threadpool, parse JSON."""
+    for i in range(attempts):
+        try:
+            pubmed_tool = PubMedSearchTool()
+            raw = await run_in_threadpool(pubmed_tool._run, query)
+            _metrics_inc("pubmed_calls_total", 1)
+            import json as _json
+            return _json.loads(raw) if isinstance(raw, str) else (raw or [])
+        except Exception:
+            await asyncio.sleep(0.2 + random.random() * 0.3)
+    return []
+
+def _negative_terms_for_objective(objective: str, clinical_mode: bool) -> list[str]:
+    obj_l = (objective or "").lower()
+    mech = "mechan" in obj_l  # mechanism/mechanistic
+    neg = []
+    if clinical_mode or mech:
+        neg += ["formulation", "assay", "analytical", "sers", "raman"]
+    return neg
+
+def _fetch_chembl_synonyms(name: str) -> list[str]:
+    key = f"chembl:{name.strip().lower()}"
+    if ENABLE_CACHING:
+        cached = synonyms_cache.get(key)
+        if cached is not None:
+            return cached  # type: ignore
+    out: list[str] = []
+    try:
+        q = urllib.parse.quote(name.strip())
+        # Search molecule by name
+        url = f"https://www.ebi.ac.uk/chembl/api/data/molecule/search.json?q={q}"
+        with urllib.request.urlopen(url, timeout=10) as r:
+            data = json.loads(r.read().decode())
+            mols = (data.get("molecules") or [])
+            chembl_id = None
+            if mols and isinstance(mols, list):
+                chembl_id = (mols[0] or {}).get("molecule_chembl_id")
+            if chembl_id:
+                syn_url = f"https://www.ebi.ac.uk/chembl/api/data/molecule_synonyms.json?molecule_chembl_id={chembl_id}"
+                with urllib.request.urlopen(syn_url, timeout=10) as r2:
+                    sdata = json.loads(r2.read().decode())
+                    syns = [row.get("synonyms", "") for row in (sdata.get("molecule_synonyms") or [])]
+                    out = [s for s in syns if isinstance(s, str) and s]
+    except Exception:
+        out = []
+    if ENABLE_CACHING:
+        synonyms_cache.set(key, out)
+    return out
+
+
+@app.post("/feedback")
+async def feedback(payload: dict):
+    """Store positive feedback into Pinecone memory.
+    Expected payload: { project_id: str, article_data: {pmid,title,abstract,...}, feedback: 'relevant' }
+    """
+    project_id = payload.get("project_id")
+    article = payload.get("article_data") or {}
+    feedback = payload.get("feedback")
+    if not (project_id and feedback == "relevant" and article.get("abstract")):
+        return {"status": "ignored"}
+    text = article.get("abstract", "")
+    vec = EMBED_CACHE.get_or_compute(text)
+    try:
+        index = _get_pinecone_index()
+        if index is None:
+            return {"status": "disabled", "message": "Pinecone not configured"}
+        index.upsert(vectors=[{
+            "id": f"{project_id}:{article.get('pmid') or article.get('title')}",
+            "values": vec,
+            "metadata": {"project_id": project_id, "text": text}
+        }])
+        return {"status": "stored"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/generate-review")
+async def generate_review(request: ReviewRequest):
+    req_start = _now_ms()
+    _metrics_inc("requests_total", 1)
+    deadline = time.time() + TOTAL_BUDGET_S
+
+    def time_left_s() -> float:
+        return max(0.0, deadline - time.time())
+    # Response cache lookup
+    cache_key = None
+    if ENABLE_CACHING:
+        try:
+            # Adapt TTL by objective length
+            obj_len = len((request.objective or "").split())
+            ttl_hint = 300 if obj_len < 6 else (900 if obj_len < 20 else 1800)
+            cache_key = json.dumps({
+                "molecule": request.molecule,
+                "objective": request.objective,
+                "project_id": request.project_id,
+                "clinical": getattr(request, "clinical_mode", False),
+                "preference": request.preference or "precision",
+            }, sort_keys=True)
+            cached = response_cache.get(cache_key)
+            if cached is not None:
+                _metrics_inc("response_cached_hits", 1)
+                log_event({"event": "response_cache_hit", "molecule": request.molecule})
+                return cached
         except Exception:
             pass
-        root = ET.fromstring(jats_xml)
-        # Iterate table-wraps
-        for tw in root.iter():
-            tag = (getattr(tw, 'tag', '') or '').lower()
-            if not tag.endswith('table-wrap'):
-                continue
-            label = ''
-            caption = ''
-            # gather label and caption
-            for ch in list(tw):
-                nm = (getattr(ch, 'tag', '') or '').lower()
-                if nm.endswith('label') and getattr(ch, 'text', None):
-                    label = (ch.text or '').strip()
-                if nm.endswith('caption') and getattr(ch, 'text', None):
-                    caption = (ch.text or '').strip()
-            table_text = []
-            # Collect cell texts
-            for cell in tw.iter():
-                cn = (getattr(cell, 'tag', '') or '').lower()
-                if cn.endswith('td') or cn.endswith('th'):
-                    if getattr(cell, 'text', None):
-                        table_text.append((cell.text or '').strip())
-            blob = (' | '.join(table_text) + ' ' + caption)[:10000]
-            # Extract p-values, percents, fold and CI
-            for m in re.finditer(r"p\s*[<=>]\s*0\.?\d+", blob, flags=re.I):
-                out.append({"metric":"p_value","value":m.group(0),"unit":"","effect_size":"","p_value":m.group(0),"fdr":"","ci":"","direction":"","figure_table_ref": label or 'Table'})
-            for m in re.finditer(r"(\b\d+(\.\d+)?)\s*(%|percent|fold|x)\b", blob, flags=re.I):
-                out.append({"metric":"change","value":m.group(0),"unit":"","effect_size":m.group(0),"p_value":"","fdr":"","ci":"","direction":"","figure_table_ref": label or 'Table'})
-            for m in re.finditer(r"(95% CI|CI)\s*[:\(]?\s*[-\d\.]+\s*[-,]\s*[-\d\.]+", blob, flags=re.I):
-                out.append({"metric":"ci","value":m.group(0),"unit":"","effect_size":"","p_value":"","fdr":"","ci":m.group(0),"direction":"","figure_table_ref": label or 'Table'})
-        return out[:25]
+    # Retrieve memory if available
+    memories = _retrieve_memories(request.project_id, request.objective)
+    memory_hint = ""
+    if memories:
+        hints = " | ".join(m.get("text", "")[:200] for m in memories)
+        memory_hint = f"\nContext: Prior relevant topics for project {request.project_id}: {hints}\n"
+
+    # Branch to V2 orchestrated flow when enabled
+    if MULTISOURCE_ENABLED and not getattr(request, "dag_mode", False):
+        try:
+            v2 = await orchestrate_v2(request, memories)
+            resp = {
+                "molecule": request.molecule,
+                "objective": request.objective,
+                "project_id": request.project_id,
+                "queries": v2.get("queries", []),
+                "results": v2.get("results", []),
+                "diagnostics": v2.get("diagnostics", {}),
+                "executive_summary": v2.get("executive_summary", ""),
+                "memories": memories,
+            }
+            took = _now_ms() - req_start
+            _metrics_inc("latency_ms_sum", took)
+            log_event({"event": "generate_review_v2", "sections": len(resp["results"]), "latency_ms": took})
+            return resp
+        except Exception as e:
+            log_event({"event": "v2_error_fallback_v1", "error": str(e)[:200]})
+
+    # If DAG requested but graph unavailable, run V2 instead
+    if getattr(request, "dag_mode", False) and (StateGraph is None) and MULTISOURCE_ENABLED:
+        try:
+            v2 = await orchestrate_v2(request, memories)
+            resp = {
+                "molecule": request.molecule,
+                "objective": request.objective,
+                "project_id": request.project_id,
+                "queries": v2.get("queries", []),
+                "results": v2.get("results", []),
+                "diagnostics": {**(v2.get("diagnostics", {}) or {}), "dag_unavailable": True},
+                "executive_summary": v2.get("executive_summary", ""),
+                "memories": memories,
+            }
+            took = _now_ms() - req_start
+            _metrics_inc("latency_ms_sum", took)
+            log_event({"event": "generate_review_v2_dag_unavailable", "sections": len(resp["results"]), "latency_ms": took})
+            return resp
+        except Exception as e:
+            log_event({"event": "v2_error_dag_unavailable", "error": str(e)[:200]})
+
+    # Optional: DAG orchestration path
+    if getattr(request, "dag_mode", False) and StateGraph is not None:
+        try:
+            # Build and run the DAG
+            global _DAG_APP
+            if _DAG_APP is None:
+                _DAG_APP = _build_dag_app()
+            state = {
+                "request": request,
+                "memories": memories,
+                "deadline": time.time() + TOTAL_BUDGET_S,
+            }
+            if _DAG_APP is None:
+                raise RuntimeError("DAG graph unavailable")
+            out = await _DAG_APP.ainvoke(state)
+            results_sections = out.get("results_sections", [])
+            # If DAG produced fewer sections than desired (e.g., 13 for recall, 8 for precision), top-up from V2 results
+            try:
+                pref_str = str(getattr(request, "preference", "precision") or "precision").lower()
+            except Exception:
+                pref_str = "precision"
+            desired_min = 13 if pref_str == "recall" else 8
+            try:
+                if MULTISOURCE_ENABLED and results_sections and (len(results_sections) < desired_min):
+                    v2_extra = await orchestrate_v2(request, memories)
+                    existing_keys = set()
+                    for sec in results_sections:
+                        top = (sec.get("top_article") or {})
+                        existing_keys.add(f"{top.get('pmid')}||{top.get('title')}")
+                    for sec in (v2_extra.get("results") or []):
+                        if len(results_sections) >= desired_min:
+                            break
+                        top = (sec.get("top_article") or {})
+                        key = f"{top.get('pmid')}||{top.get('title')}"
+                        if key in existing_keys:
+                            continue
+                        existing_keys.add(key)
+                        results_sections.append(sec)
+                    # If diagnostics existed, annotate and update deep count
+                    try:
+                        diag = out.get("diagnostics") or {}
+                        diag = {**diag, "deep_dive_count": int(len(results_sections)), "dag_topped_up": True, "desired_min": desired_min}
+                        out["diagnostics"] = diag
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            # Synthesize minimal diagnostics if Scorecard didn't run
+            if "diagnostics" not in out:
+                try:
+                    out["diagnostics"] = {
+                        "pool_size": int(len(out.get("norm") or [])),
+                        "shortlist_size": int(len(out.get("shortlist") or [])),
+                        "deep_dive_count": int(len(out.get("deep") or [])),
+                        "timings_ms": {},
+                        "pool_caps": {"pubmed": PUBMED_POOL_MAX, "trials": TRIALS_POOL_MAX, "patents": PATENTS_POOL_MAX},
+                        "dag_missing_scorecard": True,
+                    }
+                except Exception:
+                    out["diagnostics"] = {"dag_missing_scorecard": True}
+            # If diagnostics exists but is empty, also synthesize
+            try:
+                if not out.get("diagnostics"):
+                    out["diagnostics"] = {
+                        "pool_size": int(len(out.get("norm") or [])),
+                        "shortlist_size": int(len(out.get("shortlist") or [])),
+                        "deep_dive_count": int(len(out.get("deep") or [])),
+                        "timings_ms": {},
+                        "pool_caps": {"pubmed": PUBMED_POOL_MAX, "trials": TRIALS_POOL_MAX, "patents": PATENTS_POOL_MAX},
+                        "dag_synth_diagnostics": True,
+                    }
+            except Exception:
+                pass
+            # If DAG produced no sections or had empty shortlist/deep, fall back to V2
+            try:
+                norm_n = int(len(out.get("norm") or []))
+                short_n = int(len(out.get("shortlist") or []))
+                deep_n = int(len(out.get("deep") or []))
+            except Exception:
+                norm_n = short_n = deep_n = 0
+            if (not results_sections) or short_n == 0 or deep_n == 0:
+                try:
+                    v2 = await orchestrate_v2(request, memories)
+                    md = out.get("diagnostics") or {}
+                    resp = {
+                        "molecule": request.molecule,
+                        "objective": request.objective,
+                        "project_id": request.project_id,
+                        "queries": v2.get("queries", []),
+                        "results": v2.get("results", []),
+                        "diagnostics": {**md, **(v2.get("diagnostics") or {}), "dag_fallback_v2": True, "dag_incomplete": True, "dag_norm": norm_n, "dag_shortlist": short_n, "dag_deep": deep_n},
+                        "executive_summary": v2.get("executive_summary", ""),
+                        "memories": memories,
+                    }
+                    took = _now_ms() - req_start
+                    _metrics_inc("latency_ms_sum", took)
+                    log_event({"event": "generate_review_dag_incomplete_fallback_v2", "sections": len(resp["results"]), "latency_ms": took})
+                    return resp
+                except Exception as e2:
+                    log_event({"event": "dag_incomplete_v2_error", "error": str(e2)[:200]})
+            # If DAG produced no results, fall back to V2 to avoid empty responses
+            if not results_sections:
+                try:
+                    v2 = await orchestrate_v2(request, memories)
+                    resp = {
+                        "molecule": request.molecule,
+                        "objective": request.objective,
+                        "project_id": request.project_id,
+                        "queries": v2.get("queries", []),
+                        "results": v2.get("results", []),
+                        "diagnostics": {**(out.get("diagnostics", {}) or {}), "dag_fallback_v2": True, "dag_empty": True},
+                        "executive_summary": v2.get("executive_summary", ""),
+                        "memories": memories,
+                    }
+                    took = _now_ms() - req_start
+                    _metrics_inc("latency_ms_sum", took)
+                    log_event({"event": "generate_review_dag_fallback_v2", "sections": len(resp["results"]), "latency_ms": took})
+                    return resp
+                except Exception as e2:
+                    log_event({"event": "dag_empty_v2_error", "error": str(e2)[:200]})
+                    # Return minimal diagnostics instead of empty
+                    md = out.get("diagnostics") or {}
+                    resp = {
+                        "molecule": request.molecule,
+                        "objective": request.objective,
+                        "project_id": request.project_id,
+                        "queries": [v for k, v in (out.get("plan") or {}).items() if isinstance(v, str)],
+                        "results": [],
+                        "diagnostics": {**md, "dag_empty": True, "dag_fallback_v2_error": True},
+                        "executive_summary": "",
+                        "memories": memories,
+                    }
+                    took = _now_ms() - req_start
+                    _metrics_inc("latency_ms_sum", took)
+                    return resp
+
+            resp = {
+                "molecule": request.molecule,
+                "objective": request.objective,
+                "project_id": request.project_id,
+                "queries": [v for k, v in (out.get("plan") or {}).items() if isinstance(v, str)],
+                "results": results_sections,
+                "diagnostics": out.get("diagnostics", {}),
+                "executive_summary": out.get("executive_summary", ""),
+                "memories": memories,
+            }
+            # Final safety net: if results are under desired minimum, top-up from V2 here as well
+            try:
+                pref_str_final = str(getattr(request, "preference", "precision") or "precision").lower()
+            except Exception:
+                pref_str_final = "precision"
+            desired_min_final = 13 if pref_str_final == "recall" else 8
+            try:
+                if MULTISOURCE_ENABLED and len(resp.get("results") or []) < desired_min_final:
+                    v2_pad = await orchestrate_v2(request, memories)
+                    existing_keys_final = set()
+                    for sec in (resp.get("results") or []):
+                        top = (sec.get("top_article") or {})
+                        existing_keys_final.add(f"{top.get('pmid')}||{top.get('title')}")
+                    for sec in (v2_pad.get("results") or []):
+                        if len(resp["results"]) >= desired_min_final:
+                            break
+                        top = (sec.get("top_article") or {})
+                        key = f"{top.get('pmid')}||{top.get('title')}"
+                        if key in existing_keys_final:
+                            continue
+                        existing_keys_final.add(key)
+                        resp["results"].append(sec)
+                    # annotate diagnostics
+                    diag_f = resp.get("diagnostics") or {}
+                    diag_f["deep_dive_count"] = int(len(resp["results"]))
+                    diag_f["dag_topped_up"] = True
+                    diag_f["desired_min"] = desired_min_final
+                    resp["diagnostics"] = diag_f
+            except Exception:
+                pass
+            took = _now_ms() - req_start
+            _metrics_inc("latency_ms_sum", took)
+            log_event({"event": "generate_review_dag", "sections": len(resp["results"]), "latency_ms": took})
+            return resp
+        except Exception as e:
+            log_event({"event": "dag_error_fallback_v1", "error": str(e)[:200]})
+            # Hard fallback to V2 on any DAG exception
+            if MULTISOURCE_ENABLED:
+                try:
+                    v2 = await orchestrate_v2(request, memories)
+                    resp = {
+                        "molecule": request.molecule,
+                        "objective": request.objective,
+                        "project_id": request.project_id,
+                        "queries": v2.get("queries", []),
+                        "results": v2.get("results", []),
+                        "diagnostics": {**(v2.get("diagnostics", {}) or {}), "dag_exception": True},
+                        "executive_summary": v2.get("executive_summary", ""),
+                        "memories": memories,
+                    }
+                    took = _now_ms() - req_start
+                    _metrics_inc("latency_ms_sum", took)
+                    return resp
+                except Exception:
+                    pass
+
+    # Use memory as slight prefix to objective for query generation (V1 flow)
+    objective_with_memory = (request.objective + memory_hint) if memory_hint else request.objective
+
+    # Objective analyzer to extract mechanisms/methods to guide query building
+    analyzer_template = """
+Extract structured fields from a biomedical research objective.
+Return ONLY JSON with keys: molecule (string), mechanisms (array of strings), methods (array of strings), disease_context (array of strings), keywords (array of strings).
+Objective: {objective}
+"""
+    analyzer_prompt = PromptTemplate(template=analyzer_template + "\nExamples:\n- Objective: 'mechanism of action of aspirin in inflammation' -> mechanisms: ['COX inhibition','SPMs'], methods: ['ELISA','WB']\n- Objective: 'clinical effects of propranolol in hypertension' -> mechanisms: ['beta-adrenergic blockade'], methods: ['RCT','meta-analysis']\n", input_variables=["objective"])
+    analyzer_chain = LLMChain(llm=llm_analyzer, prompt=analyzer_prompt)
+    analyzed_mechs: list[str] = []
+    analyzed_methods: list[str] = []
+    analyzed_diseases: list[str] = []
+    try:
+        # Analyzer cache
+        analysis_text = None
+        if ENABLE_CACHING:
+            ck = f"analyzer:{hash(request.objective)}"
+            cached = analyzer_cache.get(ck)
+            if cached:
+                analysis_text = cached
+        if analysis_text is None:
+            analysis_raw = analyzer_chain.invoke({"objective": request.objective})
+            _metrics_inc("llm_calls_total", 1)
+            analysis_text = analysis_raw.get("text", analysis_raw) if isinstance(analysis_raw, dict) else str(analysis_raw)
+            if ENABLE_CACHING:
+                analyzer_cache.set(ck, analysis_text)
+        if "```" in analysis_text:
+            analysis_text = analysis_text.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
+        parsed = json.loads(analysis_text)
+        if isinstance(parsed, dict):
+            analyzed_mechs = parsed.get("mechanisms") or []
+            analyzed_methods = parsed.get("methods") or []
+            analyzed_diseases = parsed.get("disease_context") or []
+            if not isinstance(analyzed_mechs, list):
+                analyzed_mechs = []
+            if not isinstance(analyzed_methods, list):
+                analyzed_methods = []
+            if not isinstance(analyzed_diseases, list):
+                analyzed_diseases = []
+    except Exception:
+        analyzed_mechs = []
+        analyzed_methods = []
+        analyzed_diseases = []
+
+    # Build deterministic queries (skip per-query agent)
+    queries: List[str] = []
+    if request.molecule:
+        # Build a stricter PubMed-style fielded query when possible
+        mech_term = analyzed_mechs[0] if analyzed_mechs else "mechanism"
+        # Expand synonyms (PubChem) to improve recall
+        synonyms = []
+        try:
+            synonyms = _fetch_pubchem_synonyms(request.molecule)[:5]
         except Exception:
-        return out[:10]
+            synonyms = []
+        try:
+            if len(synonyms) < 8:
+                syn2 = _fetch_chembl_synonyms(request.molecule)
+                synonyms += [s for s in syn2 if s not in synonyms][:8-len(synonyms)]
+        except Exception:
+            pass
+        # Build PubMed eUtils-friendly fielded clauses
+        mol_tokens = [request.molecule] + (synonyms or [])
+        mol_clause_tiab = "(" + " OR ".join([f'"{t}"[tiab]' for t in mol_tokens if t]) + ")"
+        # Review query (simple, valid)
+        review_query = f"({mol_clause_tiab} AND (review[pt] OR systematic[sb]) AND (2015:3000[dp]))"
+        if getattr(request, "clinical_mode", False):
+            review_query += " AND humans[mesh] NOT plants[mesh] NOT fungi[mesh]"
+        # Mechanism lexicon; split into simpler queries
+        mech_lex = [mech_term, "mechanism of action", "mechanism", "signaling", "pathway"]
+        # If GLP-1 context, enrich
+        obj_l = (request.objective or "").lower()
+        if any(k in obj_l for k in ["glp-1", "glp1", "semaglutide", "incretin"]):
+            mech_lex += ["glp-1 receptor", "cAMP", "PKA", "insulin secretion", "gastric emptying", "beta-cell"]
+        mech_queries = []
+        for term in mech_lex[:6]:
+            q = f"({mol_clause_tiab} AND \"{term}\"[tiab])"
+            if getattr(request, "clinical_mode", False):
+                q += " AND humans[mesh] NOT plants[mesh] NOT fungi[mesh]"
+            mech_queries.append(q)
+        # Title-biased precision query
+        mol_clause_title = "(" + " OR ".join([f'"{t}"[Title]' for t in mol_tokens if t]) + ")"
+        title_query = f"({mol_clause_title} AND (\"{mech_term}\"[Title] OR mechanism[Title]))"
+        if getattr(request, "clinical_mode", False):
+            title_query += " AND humans[mesh] NOT plants[mesh] NOT fungi[mesh]"
+        # Assembled
+        queries = [review_query, title_query] + mech_queries[:3]
+    else:
+        # Fall back to objective-only variants when molecule missing
+        base = (request.objective or "").strip()
+        queries = [base, f"ti:({base})"]
+    results = []
+    # Pre-compute objective embedding for cosine similarity
+    try:
+        objective_vec = np.array(EMBED_CACHE.get_or_compute(request.objective or ""), dtype=float)
+        obj_norm = np.linalg.norm(objective_vec) or 1.0
+    except Exception:
+        objective_vec = None
+        obj_norm = 1.0
+
+    # Parallelize PubMed fetches per query
+    # Explicit shortlist controller goals: precision=24–28, recall=40–50 → widen queries accordingly
+    try:
+        _pref_local = (request.preference or "precision").lower()
+    except Exception:
+        _pref_local = "precision"
+    queries = queries[:4] if _pref_local == "recall" else queries[:3]
+    fetch_tasks = [asyncio.create_task(_run_pubmed_with_retry(q, attempts=2)) for q in queries]
+    seen_pmids_global: set[str] = set()
+    seen_titles_global: set[str] = set()
+    for idx, q in enumerate(queries):
+        if time_left_s() <= 1.0:
+            break
+        try:
+            output = await run_in_threadpool(agent_executor.run, q)
+            _metrics_inc("llm_calls_total", 1)
+        except Exception as e:
+            output = f"Error running agent: {e}"
+
+        # Fetch PubMed articles and score (from parallel task)
+        try:
+            articles = await fetch_tasks[idx]
+        except Exception:
+            articles = []
+
+        structured = ensure_json_response(output)
+        pub_score = 0.0
+        for a in articles:
+            try:
+                pub_score = max(pub_score, calculate_publication_score(a))
+            except Exception:
+                pass
+        try:
+            llm_conf = float(structured.get("confidence_score", 0))
+        except Exception:
+            llm_conf = 0.0
+        overall = 0.6 * llm_conf + 0.4 * pub_score
+
+        structured["publication_score"] = round(pub_score, 1)
+        structured["overall_relevance_score"] = round(overall, 1)
+        # Rank articles by combined mechanism relevance, cosine similarity, citations per year, recency, review bias
+        mech_lexicon = [
+            "cox", "cox-1", "cox-2", "cyclooxygenase", "nf-kb", "nf-κb", "p65", "rela",
+            "hmgb1", "tlr4", "lipoxin", "15-epi-lipoxin a4", "resolvin", "spm", "specialized pro-resolving",
+            "cytokine", "il-6", "tnf-α", "tnf-alpha", "pge2", "pla2", "arachidonic acid",
+        ]
+        # Include analyzer-derived tokens (lowercased)
+        mech_lexicon += [m.lower() for m in analyzed_mechs if isinstance(m, str)]
+        mech_lexicon += [m.lower() for m in analyzed_methods if isinstance(m, str)]
+        mech_lexicon += [d.lower() for d in analyzed_diseases if isinstance(d, str)]
+
+        def _score_article(a: dict) -> float:
+            text = f"{a.get('title','')} {a.get('abstract','')}".lower()
+            mech_hits = sum(1 for kw in mech_lexicon if kw and kw in text)
+            # Cosine similarity using embeddings
+            try:
+                if objective_vec is not None:
+                    abs_vec = np.array(EMBED_CACHE.get_or_compute(a.get('abstract') or a.get('title') or ""), dtype=float)
+                    sim = float(np.dot(objective_vec, abs_vec) / ((obj_norm) * (np.linalg.norm(abs_vec) or 1.0)))
+                    # Clamp to [0,1]
+                    similarity = max(0.0, min(1.0, (sim + 1.0) / 2.0))  # in case model returns negative values
+                else:
+                    similarity = 0.0
+            except Exception:
+                similarity = 0.0
+            year = int(a.get('pub_year') or 0)
+            nowy = datetime.utcnow().year
+            recency = max(0.0, min(1.0, (year - 2015) / (nowy - 2015 + 1))) if year else 0.0
+            cites = float(a.get('citation_count') or 0.0)
+            cpy = cites / max(1, (nowy - year + 1)) if year else 0.0
+            review_flag = 1.0 if 'review' in text else 0.0
+            # Penalize history-only reviews when objective asks for mechanisms
+            history_pen = -0.05 if (('history' in text) and ('mechan' in (request.objective or '').lower())) else 0.0
+            # Generic penalties/boosts (molecule-agnostic)
+            mol = (request.molecule or "").lower()
+            has_molecule = bool(mol) and (mol in text)
+            non_mol_pen = -0.2 if (mol and (f"non-{mol}" in text) and ("non-" + mol not in (request.objective or "").lower())) else 0.0
+            drift_terms = ["hypersensitivity", "allergy"]
+            detect_terms = [
+                "detection", "quantitative", "assay", "sers", "raman", "hplc", "lc-ms", "formulation",
+                "nanoparticle", "mesomorphism", "nmr", "ssnmr", "oleate", "analytical"
+            ]
+            # Non-biomedical/agricultural drift (penalize unless requested)
+            agri_terms = [
+                "fungicide", "phytopathology", "crop", "agricultur", "field trial", "barley", "wheat",
+                "maize", "rice", "magnarpthe oryzae", "magnaporthe oryzae", "arabidopsis"
+            ]
+            drift_pen = -0.15 if any(dt in text for dt in drift_terms) and not any(dt in (request.objective or "").lower() for dt in drift_terms) else 0.0
+            detect_pen = -0.15 if any(dt in text for dt in detect_terms) and not any(dt in (request.objective or "").lower() for dt in detect_terms) else 0.0
+            agri_pen = -0.2 if any(dt in text for dt in agri_terms) and not any(dt in (request.objective or "").lower() for dt in agri_terms) else 0.0
+            prox_boost = 0.1 if (has_molecule and mech_hits > 0) else 0.0
+            # Component appraisers for transparent scorecard
+            objective_similarity_score = round(100.0 * similarity, 1)
+            recency_score = round(60.0 * max(0.0, min(1.0, recency)), 1)
+            impact_score = round(40.0 * (1.0 - math.exp(-max(0.0, cpy))), 1)
+
+            score = 0.5 * similarity + 0.2 * (min(mech_hits, 5) / 5.0) + 0.15 * (cpy / 100.0) + 0.1 * recency + 0.05 * review_flag
+            score += prox_boost + non_mol_pen + drift_pen + detect_pen + agri_pen + history_pen
+            a["score_breakdown"] = {
+                "similarity": round(similarity, 3),
+                "mechanism_hits": mech_hits,
+                "citations_per_year": round(cpy, 2),
+                "recency": round(recency, 3),
+                "review": review_flag,
+                "molecule_match": 1 if has_molecule else 0,
+                "non_molecule_penalty": non_mol_pen,
+                "domain_drift_penalty": drift_pen,
+                "proximity_boost": prox_boost,
+                "analytical_penalty": detect_pen,
+                "agri_penalty": agri_pen,
+                "history_penalty": history_pen,
+                # Appraiser raw components for UI scorecard
+                "objective_similarity_score": objective_similarity_score,
+                "recency_score": recency_score,
+                "impact_score": impact_score,
+            }
+            a["score"] = round(score, 3)
+            return score
+
+        selected_top_for_summary = None
+        if articles:
+            try:
+                articles = sorted(articles, key=_score_article, reverse=True)
+                # Cross-encoder re-rank top 30 for sharper order (skip if budget nearly spent)
+                if cross_encoder is not None and time_left_s() > 10.0:
+                    pairs = [(request.objective or "", (a.get('title') or '') + ". " + (a.get('abstract') or '')) for a in articles[:30]]
+                    scores = cross_encoder.predict(pairs)
+                    for i, s in enumerate(scores):
+                        articles[i]["score_breakdown"]["cross_score"] = float(s)
+                        # blend: 80% original + 20% cross
+                        articles[i]["score"] = round(0.8 * float(articles[i]["score"]) + 0.2 * float(s), 3)
+                    articles = sorted(articles, key=lambda a: a.get("score", 0), reverse=True)
+            except Exception:
+                pass
+            # Normalize scores to 0..1 and drop marginal results below threshold if any
+            try:
+                # score only top 12 for efficiency
+                articles = articles[:12]
+                scores = [float(a.get("score", 0.0)) for a in articles]
+                if scores:
+                    mn, mx = min(scores), max(scores)
+                    rng = (mx - mn) or 1.0
+                    for a in articles:
+                        a["score_norm"] = round((float(a.get("score", 0.0)) - mn) / rng, 3)
+                    # Filter if we have enough results
+                    # Eligibility: must mention molecule (including synonyms) and some mechanism indication
+                    mol = (request.molecule or "").lower()
+                    # Include synonyms as molecule tokens (lowercased)
+                    syn_l = []
+                    try:
+                        syn_l = [s.lower() for s in (synonyms or []) if isinstance(s, str)]
+                    except Exception:
+                        syn_l = []
+                    mol_tokens = [mol] + [s for s in syn_l if s]
+                    # Preference-based threshold
+                    try:
+                        _pref_local = (request.preference or "precision").lower()
+                    except Exception:
+                        _pref_local = "precision"
+                    primary_thresh = 0.35 if _pref_local == "precision" else 0.30
+                    def eligible(a: dict) -> bool:
+                        text_l = f"{a.get('title','')} {a.get('abstract','')}".lower()
+                        mech_flag = (a.get('score_breakdown', {}).get('mechanism_hits', 0) or 0) > 0 or ("mechanism" in text_l) or any((m or "").lower() in text_l for m in (analyzed_mechs or []))
+                        mol_flag = (bool(mol) and any(tok and tok in text_l for tok in mol_tokens)) if mol else True
+                        return mol_flag and mech_flag
+                    filtered = [a for a in articles if a.get("score_norm", 0.0) >= primary_thresh and eligible(a)]
+                    # If filtering removes everything, keep top 2-3 to avoid empty sections
+                    if filtered:
+                        articles = filtered
+            except Exception:
+                pass
+        # If objective is vague (very short) or articles exist, generate a grounded summary from the top article
+        if articles and time_left_s() > 5.0:
+            try:
+                # Safety net: prefer explicit "mechanism of action" titles including molecule if available
+                mol = (request.molecule or "").lower()
+                moa_idx = None
+                for idx, aa in enumerate(articles):
+                    title_l = (aa.get("title") or "").lower()
+                    if ("mechanism of action" in title_l) and (not mol or mol in title_l):
+                        moa_idx = idx
+                        break
+                top = articles[moa_idx] if moa_idx is not None else articles[0]
+                selected_top_for_summary = top
+                abstract_text = top.get("abstract", "")
+                if abstract_text.strip():
+                    memory_context = " | ".join(m.get("text", "")[:200] for m in memories) if memories else ""
+                    grounded = await run_in_threadpool(summarization_chain.invoke, {
+                        "objective": request.objective,
+                        "abstract": abstract_text,
+                        "memory_context": memory_context,
+                    })
+                    _metrics_inc("llm_calls_total", 1)
+                    grounded_text = grounded.get("text", grounded) if isinstance(grounded, dict) else str(grounded)
+                    try:
+                        text_for_parse = grounded_text
+                        # Strip possible code fences like ```json ... ```
+                        if "```" in text_for_parse:
+                            text_for_parse = text_for_parse.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
+                        # Try direct JSON parse
+                        _parsed = json.loads(text_for_parse) if isinstance(text_for_parse, str) else text_for_parse
+                        # If that failed previously, attempt extracting first JSON object substring
+                        if not isinstance(_parsed, dict):
+                            raise ValueError("not a dict")
+                        if isinstance(_parsed, dict):
+                            if _parsed.get("summary"):
+                                structured["summary"] = _parsed["summary"].strip()
+                            if _parsed.get("relevance_justification"):
+                                structured["relevance_justification"] = _parsed["relevance_justification"].strip()
+                            # Self-correct via critic chain
+                            corrected = await run_in_threadpool(critic_refine_chain.invoke, {
+                                "objective": request.objective,
+                                "abstract": abstract_text,
+                                "draft_json": json.dumps({
+                                    "summary": structured.get("summary", ""),
+                                    "relevance_justification": structured.get("relevance_justification", ""),
+                                })
+                            })
+                            _metrics_inc("llm_calls_total", 1)
+                            corr_text = corrected.get("text", corrected) if isinstance(corrected, dict) else str(corrected)
+                            try:
+                                corr_parsed = json.loads(corr_text)
+                                if isinstance(corr_parsed, dict):
+                                    structured["summary"] = corr_parsed.get("summary", structured.get("summary", "")).strip()
+                                    structured["relevance_justification"] = corr_parsed.get("relevance_justification", structured.get("relevance_justification", "")).strip()
+                            except Exception:
+                                pass
+                    except Exception:
+                        # Last-resort attempt: extract between first { and last }
+                        try:
+                            s = grounded_text
+                            if "```" in s:
+                                s = s.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
+                            start = s.find("{")
+                            end = s.rfind("}")
+                            if start != -1 and end != -1 and end > start:
+                                candidate = s[start:end+1]
+                                obj = json.loads(candidate)
+                                if isinstance(obj, dict):
+                                    structured["summary"] = obj.get("summary", structured.get("summary", "")).strip()
+                                    structured["relevance_justification"] = obj.get("relevance_justification", structured.get("relevance_justification", "")).strip()
+                                else:
+                                    structured["summary"] = str(grounded_text).strip()
+                            else:
+                                structured["summary"] = str(grounded_text).strip()
+                        except Exception:
+                            # Fallback: keep the raw grounded text as summary
+                            structured["summary"] = str(grounded_text).strip()
+                        # Fallback: keep the raw grounded text as summary
+                        structured["summary"] = str(grounded_text).strip()
+            except Exception:
+                pass
+
+        # Attach the exact top article used (if computed) so UI can header-link it
+        top_article_payload = None
+        if articles:
+            try:
+                top = selected_top_for_summary or articles[0]
+                top_article_payload = {
+                    "title": top.get("title"),
+                    "pmid": top.get("pmid"),
+                    "url": top.get("url") or (f"https://pubmed.ncbi.nlm.nih.gov/{top.get('pmid')}/" if top.get('pmid') else ""),
+                    "citation_count": top.get("citation_count"),
+                    "pub_year": top.get("pub_year"),
+                }
+            except Exception:
+                top_article_payload = None
+
+        # Only include sections that actually have articles and a usable top article
+        if articles and top_article_payload and not _is_duplicate_section(top_article_payload, seen_pmids_global, seen_titles_global):
+            try:
+                _ensure_relevance_fields(structured, request.molecule, request.objective, top_article_payload)
+            except Exception:
+                pass
+            try:
+                _ensure_relevance_fields(structured, request.molecule, request.objective, {
+                    "title": top_article_payload.get("title"),
+                    "pub_year": top_article_payload.get("pub_year"),
+                    "abstract": (articles[0] or {}).get("abstract", "") if isinstance(articles, list) and articles else "",
+                })
+            except Exception:
+                pass
+            results.append({
+                "query": q,
+                "result": structured,
+                "articles": articles,
+                "top_article": top_article_payload,
+                "source": "primary",
+                "memories_used": len(memories or []),
+            })
+            _mark_seen(top_article_payload, seen_pmids_global, seen_titles_global)
+
+    # If no primary sections were produced, try one conditional broader primary query before fallback
+    try:
+        if time_left_s() > 5.0 and not any(sec.get("source") == "primary" for sec in results):
+            q = conditional_broad_query
+            # Run agent best-effort (non-blocking if it fails)
+            try:
+                output = await run_in_threadpool(agent_executor.run, q)
+                _metrics_inc("llm_calls_total", 1)
+            except Exception as e:
+                output = f"Error running agent: {e}"
+            # Fetch PubMed with retry
+            try:
+                articles = await _run_pubmed_with_retry(q, attempts=2)
+            except Exception:
+                articles = []
+            structured = ensure_json_response(output)
+            pub_score = 0.0
+            for a in articles:
+                try:
+                    pub_score = max(pub_score, calculate_publication_score(a))
+                except Exception:
+                    pass
+            try:
+                llm_conf = float(structured.get("confidence_score", 0))
+            except Exception:
+                llm_conf = 0.0
+            overall = 0.6 * llm_conf + 0.4 * pub_score
+            structured["publication_score"] = round(pub_score, 1)
+            structured["overall_relevance_score"] = round(overall, 1)
+            if articles:
+                try:
+                    articles = sorted(articles, key=_score_article, reverse=True)[:12]
+                    scores = [float(a.get("score", 0.0)) for a in articles]
+                    if scores:
+                        mn, mx = min(scores), max(scores)
+                        rng = (mx - mn) or 1.0
+                        for a in articles:
+                            a["score_norm"] = round((float(a.get("score", 0.0)) - mn) / rng, 3)
+                except Exception:
+                    pass
+                # Choose top for header
+                try:
+                    top = articles[0]
+                    top_article_payload = {
+                        "title": top.get("title"),
+                        "pmid": top.get("pmid"),
+                        "url": top.get("url") or (f"https://pubmed.ncbi.nlm.nih.gov/{top.get('pmid')}/" if top.get('pmid') else ""),
+                        "citation_count": top.get("citation_count"),
+                        "pub_year": top.get("pub_year"),
+                    }
+                except Exception:
+                    top_article_payload = None
+                if top_article_payload and not _is_duplicate_section(top_article_payload, seen_pmids_global, seen_titles_global):
+                    try:
+                        _ensure_relevance_fields(structured, request.molecule, request.objective, top_article_payload)
+                    except Exception:
+                        pass
+                    results.append({
+                        "query": q,
+                        "result": structured,
+                        "articles": articles,
+                        "top_article": top_article_payload,
+                        "source": "primary",
+                        "memories_used": len(memories or []),
+                    })
+                    _mark_seen(top_article_payload, seen_pmids_global, seen_titles_global)
+    except Exception:
+        pass
+
+    # Optional aggressive-primary: if we still have <3 primary sections and have time, try up to 1 extra broad primary query
+    try:
+        if AGGRESSIVE_PRIMARY_ENABLED and time_left_s() > 12.0:
+            primary_sections = [sec for sec in results if sec.get("source") == "primary"]
+            if len(primary_sections) < 3:
+                q = conditional_broad_query
+                if all(sec.get("query") != q for sec in results):
+                    try:
+                        output = await run_in_threadpool(agent_executor.run, q)
+                        _metrics_inc("llm_calls_total", 1)
+                    except Exception as e:
+                        output = f"Error running agent: {e}"
+                    try:
+                        articles = await _run_pubmed_with_retry(q, attempts=2)
+                    except Exception:
+                        articles = []
+                    structured = ensure_json_response(output)
+                    if articles:
+                        try:
+                            articles = sorted(articles, key=_score_article, reverse=True)[:12]
+                        except Exception:
+                            pass
+                        top = articles[0]
+                        top_article_payload = {
+                            "title": top.get("title"),
+                            "pmid": top.get("pmid"),
+                            "url": top.get("url") or (f"https://pubmed.ncbi.nlm.nih.gov/{top.get('pmid')}/" if top.get('pmid') else ""),
+                            "citation_count": top.get("citation_count"),
+                            "pub_year": top.get("pub_year"),
+                        }
+                        try:
+                            _ensure_relevance_fields(structured, request.molecule, request.objective, top_article_payload)
+                        except Exception:
+                            pass
+                        if not _is_duplicate_section(top_article_payload, seen_pmids_global, seen_titles_global):
+                            _mark_seen(top_article_payload, seen_pmids_global, seen_titles_global)
+                            results.append({
+                            "query": q,
+                            "result": structured,
+                            "articles": articles,
+                            "top_article": top_article_payload,
+                            "source": "primary",
+                            "memories_used": len(memories or []),
+                            })
+    except Exception:
+        pass
+
+    # Min-3 sections fallback and low-recall augmentation
+    try:
+        # Stats from primary pass
+        initial_sections = len(results)
+        total_articles = sum(len(sec.get("articles") or []) for sec in results)
+        seen_pmids: set[str] = set()
+        for sec in results:
+            for a in sec.get("articles", []) or []:
+                pm = a.get("pmid")
+                if pm:
+                    seen_pmids.add(str(pm))
+
+        # Ensure minimum sections based on preference: precision>=8, recall>=13
+        try:
+            _pref_local = (request.preference or "precision").lower()
+        except Exception:
+            _pref_local = "precision"
+        target_sections = 13 if (_pref_local == "recall") else 8
+        need_sections = max(0, target_sections - initial_sections)
+        low_recall = total_articles <= 3 or len(seen_pmids) <= 3
+        if need_sections > 0 or low_recall:
+            # Build targeted fallback candidates (molecule + top analyzer mechanisms); if no molecule, use objective
+            def _quote(term: str) -> str:
+                term = (term or "").strip()
+                if not term:
+                    return ""
+                return f'"{term}"' if (" " in term or "-" in term) else term
+            mol = (request.molecule or "").strip()
+            # Broaden candidates: analyzer mechs + generic mechanism lexicon
+            generic_terms = [
+                "mechanism of action", "mechanism", "signaling pathway", "signal transduction",
+                "receptor antagonism", "enzyme inhibition", "inflammation resolution",
+                "cyclooxygenase", "NF-κB", "NF-kB", "resolvin", "lipoxin"
+            ]
+            mech_terms = [t for t in analyzed_mechs if isinstance(t, str) and t.strip()][:8] or []
+            if len(mech_terms) < 8:
+                for gt in generic_terms:
+                    if gt not in mech_terms:
+                        mech_terms.append(gt)
+                    if len(mech_terms) >= 8:
+                        break
+            candidates: list[str] = []
+            for mt in mech_terms:
+                if mol:
+                    candidates.append(f'("{mol}"[tiab] AND ("{_quote(mt)}"[tiab]))')
+                else:
+                    candidates.append(f'("{_quote(request.objective)}"[tiab] AND ("{_quote(mt)}"[tiab]))')
+            # De-duplicate against existing queries
+            existing = {sec.get("query") for sec in results}
+            cand = [q for q in candidates if q and q not in existing]
+            # Issue fallbacks until we reach 3 sections or run out
+            for fallback_query in cand:
+                if len(results) >= 3:
+                    break
+                try:
+                    output = await run_in_threadpool(agent_executor.run, fallback_query)
+                    _metrics_inc("llm_calls_total", 1)
+                except Exception as e:
+                    output = f"Error running agent: {e}"
+                # Fetch and score
+                try:
+                    pubmed_tool = PubMedSearchTool()
+                    raw_articles = pubmed_tool._run(fallback_query)
+                    _metrics_inc("pubmed_calls_total", 1)
+                    import json as _json
+                    articles = _json.loads(raw_articles) if isinstance(raw_articles, str) else (raw_articles or [])
+                except Exception:
+                    articles = []
+                structured = ensure_json_response(output)
+        pub_score = 0.0
+        for a in articles:
+            try:
+                pub_score = max(pub_score, calculate_publication_score(a))
+            except Exception:
+                pass
+        try:
+            llm_conf = float(structured.get("confidence_score", 0))
+        except Exception:
+            llm_conf = 0.0
+        overall = 0.6 * llm_conf + 0.4 * pub_score
+        structured["publication_score"] = round(pub_score, 1)
+        structured["overall_relevance_score"] = round(overall, 1)
+        # Score and filter
+        if articles:
+            try:
+                articles = sorted(articles, key=_score_article, reverse=True)
+            except Exception:
+                pass
+            try:
+                scores = [float(a.get("score", 0.0)) for a in articles]
+                if scores:
+                    mn, mx = min(scores), max(scores)
+                    rng = (mx - mn) or 1.0
+                    for a in articles:
+                        a["score_norm"] = round((float(a.get("score", 0.0)) - mn) / rng, 3)
+                    mol_l = (request.molecule or "").lower()
+                    def eligible(a: dict) -> bool:
+                        text_l = f"{a.get('title','')} {a.get('abstract','')}".lower()
+                        mech_hits = a.get('score_breakdown', {}).get('mechanism_hits', 0) or 0
+                        strong_mech = mech_hits >= 3 or ("mechanism of action" in text_l)
+                        mech_flag = mech_hits > 0 or ("mechanism" in text_l) or any(m.lower() in text_l for m in (analyzed_mechs or []))
+                        mol_flag = bool(mol_l) and (mol_l in text_l) if mol_l else True
+                        # Loosen molecule requirement if mechanism evidence is strong
+                        mol_or_strong_mech = mol_flag or strong_mech
+                        return mol_or_strong_mech and mech_flag
+                    filtered = [a for a in articles if a.get("score_norm", 0.0) >= 0.25 and eligible(a)]
+                    if filtered:
+                        articles = filtered
+            except Exception:
+                pass
+                # Grounded summary only if we have articles
+                top_article_payload = None
+                if articles:
+                    try:
+                        mol_l = (request.molecule or "").lower()
+                        moa_idx = None
+                        for idx, aa in enumerate(articles):
+                            title_l = (aa.get("title") or "").lower()
+                            if ("mechanism of action" in title_l) and (not mol_l or mol_l in title_l):
+                                moa_idx = idx
+                                break
+                        top = articles[moa_idx] if moa_idx is not None else articles[0]
+                        abstract_text = top.get("abstract", "")
+                        if abstract_text.strip():
+                            memory_context = " | ".join(m.get("text", "")[:200] for m in memories) if memories else ""
+                            grounded = await run_in_threadpool(summarization_chain.invoke, {
+                                "objective": request.objective,
+                                "abstract": abstract_text,
+                                "memory_context": memory_context,
+                            })
+                            _metrics_inc("llm_calls_total", 1)
+                            grounded_text = grounded.get("text", grounded) if isinstance(grounded, dict) else str(grounded)
+                            try:
+                                s_txt = grounded_text.replace("```json", "").replace("```JSON", "").replace("```", "") if "```" in grounded_text else grounded_text
+                                obj = json.loads(s_txt)
+                                if isinstance(obj, dict):
+                                    structured["summary"] = obj.get("summary", structured.get("summary", "")).strip()
+                                    structured["relevance_justification"] = obj.get("relevance_justification", structured.get("relevance_justification", "")).strip()
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+                    try:
+                        top = max(articles, key=lambda a: float(a.get("citation_count", 0) or 0))
+                        top_article_payload = {
+                            "title": top.get("title"),
+                            "pmid": top.get("pmid"),
+                            "url": top.get("url") or (f"https://pubmed.ncbi.nlm.nih.gov/{top.get('pmid')}/" if top.get('pmid') else ""),
+                            "citation_count": top.get("citation_count"),
+                            "pub_year": top.get("pub_year"),
+                        }
+                    except Exception:
+                        top_article_payload = None
+                if articles and top_article_payload:
+                    try:
+                        # Compute publication/overall scores and enforce relevance fields
+                        try:
+                            pub_score = calculate_publication_score({
+                                "pub_year": top_article_payload.get("pub_year"),
+                                "citation_count": top_article_payload.get("citation_count"),
+                            })
+                        except Exception:
+                            pub_score = 0.0
+                        try:
+                            llm_conf = float(structured.get("confidence_score", 0))
+                        except Exception:
+                            llm_conf = 0.0
+                        overall = 0.6 * llm_conf + 0.4 * pub_score
+                        structured["publication_score"] = round(pub_score, 1)
+                        structured["overall_relevance_score"] = round(overall, 1)
+                        _ensure_relevance_fields(structured, request.molecule, request.objective, top_article_payload)
+                    except Exception:
+                        pass
+                    results.append({
+                        "query": fallback_query,
+                        "result": structured,
+                        "articles": articles,
+                        "top_article": top_article_payload,
+                        "source": "fallback",
+                        "memories_used": len(memories or []),
+                    })
+
+            # Final review-only fallback to ensure 3 sections if still short
+            if len(results) < target_sections:
+                if mol:
+                    review_query = f'("{mol}"[tiab] AND (mechanism[tiab] OR "mechanism of action"[tiab])) AND (review[pt] OR systematic[sb])'
+                else:
+                    review_query = f'("{_quote(request.objective)}"[tiab] AND (review[pt] OR systematic[sb]))'
+                if review_query not in existing:
+                    try:
+                        output = await run_in_threadpool(agent_executor.run, review_query)
+                        _metrics_inc("llm_calls_total", 1)
+                    except Exception as e:
+                        output = f"Error running agent: {e}"
+                    try:
+                        pubmed_tool = PubMedSearchTool()
+                        raw_articles = pubmed_tool._run(review_query)
+                        _metrics_inc("pubmed_calls_total", 1)
+                        import json as _json
+                        articles = _json.loads(raw_articles) if isinstance(raw_articles, str) else (raw_articles or [])
+                    except Exception:
+                        articles = []
+                    structured = ensure_json_response(output)
+                    pub_score = 0.0
+                    for a in articles:
+                        try:
+                            pub_score = max(pub_score, calculate_publication_score(a))
+                        except Exception:
+                            pass
+                    try:
+                        llm_conf = float(structured.get("confidence_score", 0))
+                    except Exception:
+                        llm_conf = 0.0
+                    overall = 0.6 * llm_conf + 0.4 * pub_score
+                    structured["publication_score"] = round(pub_score, 1)
+                    structured["overall_relevance_score"] = round(overall, 1)
+                    if articles:
+                        try:
+                            articles = sorted(articles, key=_score_article, reverse=True)
+                        except Exception:
+                            pass
+                        try:
+                            scores = [float(a.get("score", 0.0)) for a in articles]
+                            if scores:
+                                mn, mx = min(scores), max(scores)
+                                rng = (mx - mn) or 1.0
+                                for a in articles:
+                                    a["score_norm"] = round((float(a.get("score", 0.0)) - mn) / rng, 3)
+                                mol_l = (request.molecule or "").lower()
+                                def eligible(a: dict) -> bool:
+                                    text_l = f"{a.get('title','')} {a.get('abstract','')}".lower()
+                                    mech_hits = a.get('score_breakdown', {}).get('mechanism_hits', 0) or 0
+                                    # Tighten mechanism specificity: require PD-1/PD-L1 or molecule mention, or strong mechanism hits
+                                    pd_flag = ("pd-1" in text_l) or ("pd1" in text_l) or ("pd-l1" in text_l) or ("pdl1" in text_l)
+                                    mol_flag = ((mol_l in text_l) if mol_l else True)
+                                    mech_flag = (mech_hits >= 2) or ("mechanism of action" in text_l) or ("mechanism" in text_l)
+                                    return (pd_flag or mol_flag) and mech_flag
+                                # Final relaxation to 0.20 for review-only
+                                filtered = [a for a in articles if a.get("score_norm", 0.0) >= 0.20 and eligible(a)]
+                                if filtered:
+                                    articles = filtered
+                        except Exception:
+                            pass
+                    top_article_payload = None
+                    if articles:
+                        try:
+                            top = max(articles, key=lambda a: float(a.get("citation_count", 0) or 0))
+                            top_article_payload = {
+                                "title": top.get("title"),
+                                "pmid": top.get("pmid"),
+                                "url": top.get("url") or (f"https://pubmed.ncbi.nlm.nih.gov/{top.get('pmid')}/" if top.get('pmid') else ""),
+                                "citation_count": top.get("citation_count"),
+                                "pub_year": top.get("pub_year"),
+                            }
+                        except Exception:
+                            top_article_payload = None
+                    if articles and top_article_payload:
+                        try:
+                            _ensure_relevance_fields(structured, request.molecule, request.objective, top_article_payload)
+                        except Exception:
+                            pass
+                        results.append({
+                            "query": review_query,
+                            "result": structured,
+                            "articles": articles,
+                            "top_article": top_article_payload,
+                            "source": "fallback",
+                            "memories_used": len(memories or []),
+                        })
+    except Exception as e:
+        _metrics_inc("requests_errors", 1)
+        log_event({"event": "generate_review_error", "error": str(e)[:300]})
+
+    # If still no sections, run a relaxed single-query fallback to avoid empty UI
+    if not results and (request.molecule or request.objective):
+        try:
+            base_mol = (request.molecule or "").strip()
+            mech_term = (analyzed_mechs[0] if analyzed_mechs else "mechanism")
+            if base_mol:
+                fallback_q = f"tiab:({base_mol} AND ({mech_term} OR mechanism)) AND 2010:3000[dp]"
+            else:
+                fallback_q = (request.objective or "").strip()
+            arts = await _run_pubmed_with_retry(fallback_q, attempts=2)
+            if arts:
+                # score and take top few
+                try:
+                    arts = sorted(arts, key=_score_article, reverse=True)[:8]
+                except Exception:
+                    arts = arts[:8]
+                # choose top for header
+                top = arts[0]
+                top_article_payload = {
+                    "title": top.get("title"),
+                    "pmid": top.get("pmid"),
+                    "url": top.get("url") or (f"https://pubmed.ncbi.nlm.nih.gov/{top.get('pmid')}/" if top.get('pmid') else ""),
+                    "citation_count": top.get("citation_count"),
+                    "pub_year": top.get("pub_year"),
+                }
+                # minimal structured result
+                structured = {"summary": "", "confidence_score": 60, "methodologies": [], "publication_score": 0, "overall_relevance_score": 60}
+                results.append({"query": fallback_q, "result": structured, "articles": arts[:3], "top_article": top_article_payload, "source": "fallback", "memories_used": len(memories or [])})
+        except Exception:
+            pass
+    resp = {
+        "molecule": request.molecule,
+        "objective": request.objective,
+        "project_id": request.project_id,
+        "queries": queries,
+        "results": results,
+        "memories": memories,
+    }
+    # Cache response
+    if ENABLE_CACHING and cache_key:
+        try:
+            obj_len = len((request.objective or "").split())
+            ttl_hint = 300 if obj_len < 6 else (900 if obj_len < 20 else 1800)
+            response_cache.set_with_ttl(cache_key, resp, ttl_hint)
+        except Exception:
+            pass
+    # Latency metric and structured log
+    took = _now_ms() - req_start
+    _metrics_inc("latency_ms_sum", took)
+    log_event({
+        "event": "generate_review",
+        "molecule": request.molecule,
+        "objective": request.objective[:120],
+        "sections": len(results),
+        "latency_ms": took,
+        "fallback_sections": sum(1 for r in results if r.get("source") == "fallback"),
+    })
+    return resp
+
+
+@app.options("/generate-review")
+async def preflight_generate_review() -> Response:
+    return Response(status_code=200, headers={
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "*",
+    })
