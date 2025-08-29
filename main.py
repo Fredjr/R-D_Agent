@@ -2281,6 +2281,13 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
             norm = _oa_backfill_topup(request.objective or "", [], 10, deadline)
     except Exception:
         pass
+    # PubMed OA fallback if still empty
+    try:
+        if not norm and _time_left(deadline) > 6.0:
+            mol_try = getattr(request, "molecule", None)
+            norm = _normalize_candidates(_pubmed_fallback_oa(request.objective or "", mol_try, retmax=40))
+    except Exception:
+        pass
     # Enforce acceptance gating for full-text-only: drop items that are unlikely to have OA/full text
     try:
         if bool(getattr(request, "full_text_only", False)):
@@ -3162,6 +3169,58 @@ def _fetch_json(url: str, timeout: float = 10.0) -> dict:
             return _json.loads(raw)
     except Exception:
         return {}
+
+
+def _pubmed_fallback_oa(objective: str, molecule: str | None, retmax: int = 40, since_year: int = 2015) -> list[dict]:
+    """Lightweight PubMed fallback restricted to OA/free full text.
+    Returns a list of minimal article dicts with at least title, pmid, url, pub_year.
+    """
+    try:
+        obj = (objective or "").strip()
+        mol = (molecule or "").strip()
+        terms: list[str] = []
+        if mol:
+            safe = re.sub(r"\s+", " ", mol)
+            terms.append(f"(\"{safe}\"[tiab] OR \"{safe}\"[Title])")
+        if obj:
+            # Use a broad tiab clause from objective words
+            obj_words = [w for w in re.split(r"\W+", obj) if len(w) > 2][:6]
+            if obj_words:
+                terms.append("(" + " AND ".join([f"{w}[tiab]" for w in obj_words]) + ")")
+        terms.append(f"({since_year}:3000[dp])")
+        terms.append("(free full text[filter] OR pmc[filter])")
+        term = " AND ".join(terms) if terms else "(free full text[filter])"
+        base = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+        esearch = f"{base}/esearch.fcgi?db=pubmed&retmode=json&retmax={retmax}&term={urllib.parse.quote(term)}"
+        data = _fetch_json(esearch, timeout=8.0)
+        pmids = ((data.get("esearchresult") or {}).get("idlist") or [])
+        if not pmids:
+            return []
+        ids = ",".join(pmids)
+        esum = _fetch_json(f"{base}/esummary.fcgi?db=pubmed&retmode=json&id={urllib.parse.quote(ids)}", timeout=8.0)
+        res: list[dict] = []
+        summ = (esum.get("result") or {})
+        for pid in pmids:
+            it = summ.get(pid) or {}
+            title = (it.get("title") or "").strip()
+            # Try to parse year
+            try:
+                py = int(str(it.get("pubdate") or "").split()[0][:4])
+            except Exception:
+                py = 0
+            if title:
+                res.append({
+                    "title": title,
+                    "pmid": pid,
+                    "url": f"https://pubmed.ncbi.nlm.nih.gov/{pid}/",
+                    "pub_year": py,
+                    "citation_count": 0,
+                    "source": "pubmed",
+                    "source_query": term,
+                })
+        return res
+    except Exception:
+        return []
 
 
 def _expand_objective_synonyms(objective: str) -> list[str]:
