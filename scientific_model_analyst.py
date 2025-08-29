@@ -43,15 +43,16 @@ _MODEL_ANALYST_PROMPT = PromptTemplate(
         "Article Full Text: {full_text}\n\n"
         "First, think step-by-step about:\n"
         "1) Model Identification (e.g., in vitro, in vivo, clinical, review, computational modeling).\n"
-        "2) Population/Sample (cells, animals, patients, dataset; include specific characteristics when present).\n"
+        "2) Population/Sample: SPECIFIC DETAILS REQUIRED - for in vitro: exact cell lines (e.g., HEK293, MCF-7, primary human endothelial cells); for in vivo: exact animal strain and characteristics (e.g., C57BL/6 mice, Sprague-Dawley rats, age, weight, sex); for clinical: patient demographics, inclusion/exclusion criteria.\n"
         "3) Study Design Classification (e.g., randomized trial, observational, meta-analysis).\n"
         "4) Protocol Summary (concise, grounded).\n"
-        "5) Strengths & Limitations of the chosen model/design.\n"
-        "6) Rationale for model choice (justification) and explicit linkage to the objective.\n"
-        "7) Taxonomy normalization and key metadata (model_type_taxonomy, study_design_taxonomy, sample_size, arms_groups, blinding_randomization, control_type, collection_timepoints).\n"
-        "8) Provide 3-5 fact_anchors: each item must include a claim and an evidence object with fields title, year, pmid, and a direct quote from the text.\n\n"
+        "5) Model Rationale: EXPLICITLY explain WHY this model was chosen over alternatives - what specific biological question does it address?\n"
+        "6) Bias Assessment: IDENTIFY SPECIFIC potential biases (e.g., selection bias in patient recruitment, species differences in animal models, immortalization artifacts in cell lines).\n"
+        "7) Strengths & Limitations of the chosen model/design.\n"
+        "8) Taxonomy normalization and key metadata (model_type_taxonomy, study_design_taxonomy, sample_size, arms_groups, blinding_randomization, control_type, collection_timepoints).\n"
+        "9) Provide 3-5 fact_anchors: each item must include a claim and an evidence object with fields title, year, pmid, and a direct quote from the text.\n\n"
         "Then OUTPUT ONLY one JSON object with EXACTLY these keys:\n"
-        "model_type, study_design, population_description, protocol_summary, strengths, limitations, model_type_taxonomy, study_design_taxonomy, sample_size, arms_groups, blinding_randomization, control_type, collection_timepoints, justification, link_to_objective, fact_anchors."
+        "model_type, study_design, population_description, protocol_summary, model_rationale, bias_assessment, strengths, limitations, model_type_taxonomy, study_design_taxonomy, sample_size, arms_groups, blinding_randomization, control_type, collection_timepoints, justification, link_to_objective, fact_anchors."
     ),
     input_variables=["objective", "full_text"],
 )
@@ -67,18 +68,18 @@ def _strip_code_fences(text: str) -> str:
 def _coerce_schema(obj: Dict[str, object]) -> Dict[str, str]:
     out: Dict[str, str] = {}
     keys = [
-        "model_type","study_design","population_description","protocol_summary","strengths","limitations",
+        "model_type","study_design","population_description","protocol_summary","model_rationale","bias_assessment","strengths","limitations",
         "model_type_taxonomy","study_design_taxonomy","sample_size","arms_groups","blinding_randomization","control_type","collection_timepoints","justification","link_to_objective"
     ]
     for k in keys:
         v = obj.get(k)
         out[k] = ("" if v is None else str(v)).strip()
-    
+
     # Handle fact_anchors more robustly
     anchors = obj.get("fact_anchors")
     if not isinstance(anchors, list):
         anchors = []
-    
+
     # Validate and normalize each anchor
     normalized_anchors = []
     for anchor in anchors:
@@ -87,11 +88,11 @@ def _coerce_schema(obj: Dict[str, object]) -> Dict[str, str]:
         claim = str(anchor.get("claim", "")).strip()
         if not claim:
             continue
-            
+
         evidence = anchor.get("evidence")
         if not isinstance(evidence, dict):
             evidence = {}
-            
+
         normalized_anchor = {
             "claim": claim,
             "evidence": {
@@ -102,7 +103,7 @@ def _coerce_schema(obj: Dict[str, object]) -> Dict[str, str]:
             }
         }
         normalized_anchors.append(normalized_anchor)
-    
+
     return {**out, "fact_anchors": normalized_anchors}
 
 

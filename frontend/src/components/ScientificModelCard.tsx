@@ -5,6 +5,8 @@ export interface ScientificModelCardProps {
   study_design: string;
   population_description: string;
   protocol_summary: string;
+  model_rationale?: string;
+  bias_assessment?: string;
   strengths: string;
   limitations: string;
   model_type_taxonomy?: string;
@@ -23,6 +25,8 @@ export const ScientificModelCard: React.FC<ScientificModelCardProps> = ({
   study_design,
   population_description,
   protocol_summary,
+  model_rationale,
+  bias_assessment,
   strengths,
   limitations,
   model_type_taxonomy,
@@ -99,10 +103,16 @@ export const ScientificModelCard: React.FC<ScientificModelCardProps> = ({
             <h4 className="text-sm font-semibold text-black">Limitations</h4>
             <p className="mt-1 text-sm text-black whitespace-pre-line">{NA(limitations)}</p>
           </div>
-          {(justification || link_to_objective) && (
+          {(model_rationale || justification || link_to_objective) && (
             <div>
-              <h4 className="text-sm font-semibold text-black">Rationale & Link to Objective</h4>
-              <p className="mt-1 text-sm text-black whitespace-pre-line">{[justification || '', link_to_objective || ''].filter(Boolean).join('\n\n') || 'Not reported'}</p>
+              <h4 className="text-sm font-semibold text-black">Model Rationale & Link to Objective</h4>
+              <p className="mt-1 text-sm text-black whitespace-pre-line">{[model_rationale || '', justification || '', link_to_objective || ''].filter(Boolean).join('\n\n') || 'Not reported'}</p>
+            </div>
+          )}
+          {bias_assessment && (
+            <div>
+              <h4 className="text-sm font-semibold text-red-700">Bias Assessment</h4>
+              <p className="mt-1 text-sm text-red-800 whitespace-pre-line">{NA(bias_assessment)}</p>
             </div>
           )}
         </div>
