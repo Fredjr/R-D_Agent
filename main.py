@@ -2337,7 +2337,14 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
         pass
     if _time_left(deadline) < 15.0:
         triage_cap = min(triage_cap, 24)
-    proj_vec = _project_interest_vector(memories)
+    try:
+        proj_vec = _project_interest_vector(memories)
+    except NameError:  # Backward/older deployments without the helper defined
+        try:
+            # Fallback alias if function exists without underscore in some versions
+            proj_vec = project_interest_vector(memories)  # type: ignore[name-defined]
+        except Exception:
+            proj_vec = None
     # Build molecule tokens for generalization across molecules
     mol_tokens: list[str] = []
     try:
