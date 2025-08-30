@@ -3745,25 +3745,29 @@ def _retrieve_memories(project_id: str | None, objective: str) -> list[dict]:
 
 def _project_interest_vector(memories: list[dict]) -> np.ndarray | None:
     """Compute a simple interest vector from project memories (mean embedding)."""
-    if not memories:
-        return None
-    vecs: list[np.ndarray] = []
-    for m in memories:
-        txt = (m.get("text") or "").strip()
-        if not txt:
-            continue
-        try:
-            v = np.array(EMBED_CACHE.get_or_compute(txt), dtype=float)
-            if v.size:
-                vecs.append(v)
-        except Exception:
-            continue
-    if not vecs:
-        return None
     try:
-        mean = np.mean(vecs, axis=0)
-        return mean
+        if not memories:
+            return None
+        vecs: list[np.ndarray] = []
+        for m in memories:
+            txt = (m.get("text") or "").strip()
+            if not txt:
+                continue
+            try:
+                v = np.array(EMBED_CACHE.get_or_compute(txt), dtype=float)
+                if v.size:
+                    vecs.append(v)
+            except Exception:
+                continue
+        if not vecs:
+            return None
+        try:
+            mean = np.mean(vecs, axis=0)
+            return mean
+        except Exception:
+            return None
     except Exception:
+        # Nuclear fallback: if anything goes wrong, return None
         return None
 
 
