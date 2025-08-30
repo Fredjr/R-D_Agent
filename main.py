@@ -2338,13 +2338,9 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
     if _time_left(deadline) < 15.0:
         triage_cap = min(triage_cap, 24)
     try:
-    proj_vec = _project_interest_vector(memories)
-    except NameError:  # Backward/older deployments without the helper defined
-        try:
-            # Fallback alias if function exists without underscore in some versions
-            proj_vec = project_interest_vector(memories)  # type: ignore[name-defined]
-        except Exception:
-            proj_vec = None
+        proj_vec = _project_interest_vector(memories)
+    except (NameError, AttributeError):  # Function not defined or not accessible
+        proj_vec = None  # Safe fallback to None
     # Build molecule tokens for generalization across molecules
     mol_tokens: list[str] = []
     try:
@@ -3770,10 +3766,6 @@ def _project_interest_vector(memories: list[dict]) -> np.ndarray | None:
     except Exception:
         return None
 
-# Global fallback to ensure function is always available
-def project_interest_vector(memories: list[dict]) -> np.ndarray | None:
-    """Fallback alias for _project_interest_vector."""
-    return _project_interest_vector(memories)
 
 def _fetch_pubchem_synonyms(name: str) -> list[str]:
     key = f"syn:{name.strip().lower()}"
