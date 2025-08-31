@@ -347,14 +347,14 @@ export default function ArticleCard({ item }: Props) {
                 <div className="space-y-4 overflow-y-auto max-h-full">
                   {(!deepDiveData._activeTab || deepDiveData._activeTab==='Model') && (
                     deepDiveData.model_description_structured ? (
-                      <ScientificModelCard {...deepDiveData.model_description_structured} />
+                      <ScientificModelCard data={deepDiveData.model_description_structured} />
                     ) : (
                       <div className="p-3 rounded border border-slate-200 bg-slate-50 text-slate-700 text-sm">No model analysis available.</div>
                     )
                   )}
                   {(deepDiveData._activeTab==='Methods') && (
                     Array.isArray(deepDiveData.experimental_methods_structured)
-                      ? <ExperimentalMethodsTable rows={deepDiveData.experimental_methods_structured} />
+                      ? <ExperimentalMethodsTable data={deepDiveData.experimental_methods_structured} />
                       : (deepDiveLoading
                           ? <div className="p-3 rounded border border-slate-200 bg-slate-50 text-slate-700 text-sm">Loading methods…</div>
                           : <div className="p-3 rounded border border-yellow-200 bg-yellow-50 text-yellow-900 text-sm">Methods require full text. Upload PDF or open OA version.</div>
@@ -362,7 +362,7 @@ export default function ArticleCard({ item }: Props) {
                   )}
                   {(deepDiveData._activeTab==='Results') && (
                     deepDiveData.results_interpretation_structured
-                      ? <ResultsInterpretationCard {...deepDiveData.results_interpretation_structured} />
+                      ? <ResultsInterpretationCard data={deepDiveData.results_interpretation_structured} />
                       : (deepDiveLoading
                           ? <div className="p-3 rounded border border-slate-200 bg-slate-50 text-slate-700 text-sm">Loading results…</div>
                           : <div className="p-3 rounded border border-yellow-200 bg-yellow-50 text-yellow-900 text-sm">Results interpretation requires full text. Upload PDF or open OA version.</div>
