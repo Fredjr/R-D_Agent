@@ -1,6 +1,7 @@
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Response, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import UploadFile, File, Form
+from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from langchain_google_genai import ChatGoogleGenerativeAI
 import os
@@ -12,7 +13,7 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 import json
 import re
-from typing import List
+from typing import List, Optional
 import time
 import threading
 from datetime import datetime
@@ -44,6 +45,12 @@ from experimental_methods_analyst import analyze_experimental_methods
 from results_interpretation_analyst import analyze_results_interpretation
 from langchain.agents import AgentType, initialize_agent
 from scoring import calculate_publication_score
+
+# Database imports
+from database import (
+    get_db, init_db, User, Project, ProjectCollaborator, 
+    Report, DeepDiveAnalysis, Annotation
+)
 
 # Embeddings and Pinecone
 from langchain.embeddings import HuggingFaceEmbeddings
@@ -3042,6 +3049,56 @@ class DeepDiveResponse(BaseModel):
     results_interpretation: DeepDiveModuleResult | None
     diagnostics: dict
 
+# Project Management Models
+class ProjectCreate(BaseModel):
+    project_name: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = None
+
+class ProjectResponse(BaseModel):
+    project_id: str
+    project_name: str
+    description: Optional[str]
+    owner_user_id: str
+    created_at: datetime
+    updated_at: datetime
+    
+class ProjectListResponse(BaseModel):
+    projects: List[ProjectResponse]
+
+class ProjectDetailResponse(BaseModel):
+    project_id: str
+    project_name: str
+    description: Optional[str]
+    owner_user_id: str
+    created_at: datetime
+    updated_at: datetime
+    reports: List[dict]
+    collaborators: List[dict]
+    annotations: List[dict]
+
+class CollaboratorInvite(BaseModel):
+    email: str
+    role: str = Field(default="viewer", pattern="^(owner|editor|viewer)$")
+
+class AnnotationCreate(BaseModel):
+    content: str = Field(..., min_length=1)
+    article_pmid: Optional[str] = None
+    report_id: Optional[str] = None
+    analysis_id: Optional[str] = None
+
+class AnnotationResponse(BaseModel):
+    annotation_id: str
+    content: str
+    author_id: str
+    created_at: datetime
+    article_pmid: Optional[str]
+    report_id: Optional[str]
+    analysis_id: Optional[str]
+
+# Initialize database on startup
+@app.on_event("startup")
+async def startup_event():
+    init_db()
 
 @app.get("/")
 async def root():
@@ -3070,6 +3127,332 @@ async def ready() -> dict:
 async def version() -> dict:
     return {"version": APP_VERSION, "git": GIT_SHA}
 
+# Utility function for getting current user (placeholder for now)
+def get_current_user() -> str:
+    """Get current user ID. For now, return a default user."""
+    # TODO: Implement proper authentication
+    return "default_user"
+
+# Project Management Endpoints
+
+@app.post("/projects", response_model=ProjectResponse)
+async def create_project(
+    project_data: ProjectCreate,
+    db: Session = Depends(get_db)
+):
+    """Create a new project"""
+    current_user = get_current_user()
+    
+    # Ensure user exists
+    user = db.query(User).filter(User.user_id == current_user).first()
+    if not user:
+        # Create default user if doesn't exist
+        user = User(
+            user_id=current_user,
+            username=current_user,
+            email=f"{current_user}@example.com"
+        )
+        db.add(user)
+        db.commit()
+    
+    # Create project
+    project_id = str(uuid.uuid4())
+    project = Project(
+        project_id=project_id,
+        project_name=project_data.project_name,
+        description=project_data.description,
+        owner_user_id=current_user
+    )
+    
+    db.add(project)
+    db.commit()
+    db.refresh(project)
+    
+    return ProjectResponse(
+        project_id=project.project_id,
+        project_name=project.project_name,
+        description=project.description,
+        owner_user_id=project.owner_user_id,
+        created_at=project.created_at,
+        updated_at=project.updated_at
+    )
+
+@app.get("/projects", response_model=ProjectListResponse)
+async def list_projects(db: Session = Depends(get_db)):
+    """List all projects for the current user"""
+    current_user = get_current_user()
+    
+    # Get projects owned by user
+    owned_projects = db.query(Project).filter(
+        Project.owner_user_id == current_user,
+        Project.is_active == True
+    ).all()
+    
+    # Get projects where user is a collaborator
+    collaborated_projects = db.query(Project).join(ProjectCollaborator).filter(
+        ProjectCollaborator.user_id == current_user,
+        ProjectCollaborator.is_active == True,
+        Project.is_active == True
+    ).all()
+    
+    # Combine and deduplicate
+    all_projects = list({p.project_id: p for p in owned_projects + collaborated_projects}.values())
+    
+    project_responses = [
+        ProjectResponse(
+            project_id=p.project_id,
+            project_name=p.project_name,
+            description=p.description,
+            owner_user_id=p.owner_user_id,
+            created_at=p.created_at,
+            updated_at=p.updated_at
+        ) for p in all_projects
+    ]
+    
+    return ProjectListResponse(projects=project_responses)
+
+@app.get("/projects/{project_id}", response_model=ProjectDetailResponse)
+async def get_project(project_id: str, db: Session = Depends(get_db)):
+    """Get project details with associated reports and collaborators"""
+    current_user = get_current_user()
+    
+    # Check if user has access to this project
+    project = db.query(Project).filter(Project.project_id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Check permissions
+    has_access = (
+        project.owner_user_id == current_user or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+    
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Get associated data
+    reports = db.query(Report).filter(Report.project_id == project_id).all()
+    collaborators = db.query(ProjectCollaborator).join(User).filter(
+        ProjectCollaborator.project_id == project_id,
+        ProjectCollaborator.is_active == True
+    ).all()
+    annotations = db.query(Annotation).filter(Annotation.project_id == project_id).all()
+    
+    return ProjectDetailResponse(
+        project_id=project.project_id,
+        project_name=project.project_name,
+        description=project.description,
+        owner_user_id=project.owner_user_id,
+        created_at=project.created_at,
+        updated_at=project.updated_at,
+        reports=[{
+            "report_id": r.report_id,
+            "title": r.title,
+            "objective": r.objective,
+            "created_at": r.created_at.isoformat(),
+            "created_by": r.created_by
+        } for r in reports],
+        collaborators=[{
+            "user_id": c.user_id,
+            "username": c.user.username,
+            "role": c.role,
+            "invited_at": c.invited_at.isoformat()
+        } for c in collaborators],
+        annotations=[{
+            "annotation_id": a.annotation_id,
+            "content": a.content,
+            "author_id": a.author_id,
+            "created_at": a.created_at.isoformat(),
+            "article_pmid": a.article_pmid,
+            "report_id": a.report_id
+        } for a in annotations]
+    )
+
+# Collaboration Endpoints
+
+@app.post("/projects/{project_id}/collaborators")
+async def invite_collaborator(
+    project_id: str,
+    invite_data: CollaboratorInvite,
+    db: Session = Depends(get_db)
+):
+    """Invite a user to collaborate on a project"""
+    current_user = get_current_user()
+    
+    # Check if current user owns the project
+    project = db.query(Project).filter(
+        Project.project_id == project_id,
+        Project.owner_user_id == current_user
+    ).first()
+    
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found or access denied")
+    
+    # Check if user exists, create if not
+    invited_user = db.query(User).filter(User.email == invite_data.email).first()
+    if not invited_user:
+        invited_user = User(
+            user_id=str(uuid.uuid4()),
+            username=invite_data.email.split('@')[0],
+            email=invite_data.email
+        )
+        db.add(invited_user)
+        db.commit()
+    
+    # Check if collaboration already exists
+    existing = db.query(ProjectCollaborator).filter(
+        ProjectCollaborator.project_id == project_id,
+        ProjectCollaborator.user_id == invited_user.user_id
+    ).first()
+    
+    if existing:
+        if existing.is_active:
+            raise HTTPException(status_code=400, detail="User is already a collaborator")
+        else:
+            # Reactivate existing collaboration
+            existing.is_active = True
+            existing.role = invite_data.role
+            db.commit()
+            return {"message": "Collaborator re-invited successfully"}
+    
+    # Create new collaboration
+    collaboration = ProjectCollaborator(
+        project_id=project_id,
+        user_id=invited_user.user_id,
+        role=invite_data.role
+    )
+    
+    db.add(collaboration)
+    db.commit()
+    
+    return {"message": "Collaborator invited successfully"}
+
+@app.delete("/projects/{project_id}/collaborators/{user_id}")
+async def remove_collaborator(
+    project_id: str,
+    user_id: str,
+    db: Session = Depends(get_db)
+):
+    """Remove a collaborator from a project"""
+    current_user = get_current_user()
+    
+    # Check if current user owns the project
+    project = db.query(Project).filter(
+        Project.project_id == project_id,
+        Project.owner_user_id == current_user
+    ).first()
+    
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found or access denied")
+    
+    # Find and deactivate collaboration
+    collaboration = db.query(ProjectCollaborator).filter(
+        ProjectCollaborator.project_id == project_id,
+        ProjectCollaborator.user_id == user_id
+    ).first()
+    
+    if not collaboration:
+        raise HTTPException(status_code=404, detail="Collaborator not found")
+    
+    collaboration.is_active = False
+    db.commit()
+    
+    return {"message": "Collaborator removed successfully"}
+
+# Annotation Endpoints
+
+@app.post("/projects/{project_id}/annotations", response_model=AnnotationResponse)
+async def create_annotation(
+    project_id: str,
+    annotation_data: AnnotationCreate,
+    db: Session = Depends(get_db)
+):
+    """Create a new annotation in a project"""
+    current_user = get_current_user()
+    
+    # Check project access
+    has_access = (
+        db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == current_user
+        ).first() is not None or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+    
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Create annotation
+    annotation_id = str(uuid.uuid4())
+    annotation = Annotation(
+        annotation_id=annotation_id,
+        project_id=project_id,
+        content=annotation_data.content,
+        article_pmid=annotation_data.article_pmid,
+        report_id=annotation_data.report_id,
+        analysis_id=annotation_data.analysis_id,
+        author_id=current_user
+    )
+    
+    db.add(annotation)
+    db.commit()
+    db.refresh(annotation)
+    
+    return AnnotationResponse(
+        annotation_id=annotation.annotation_id,
+        content=annotation.content,
+        author_id=annotation.author_id,
+        created_at=annotation.created_at,
+        article_pmid=annotation.article_pmid,
+        report_id=annotation.report_id,
+        analysis_id=annotation.analysis_id
+    )
+
+@app.get("/projects/{project_id}/annotations")
+async def get_annotations(project_id: str, db: Session = Depends(get_db)):
+    """Get all annotations for a project"""
+    current_user = get_current_user()
+    
+    # Check project access
+    has_access = (
+        db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == current_user
+        ).first() is not None or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+    
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    annotations = db.query(Annotation).join(User).filter(
+        Annotation.project_id == project_id
+    ).order_by(Annotation.created_at.desc()).all()
+    
+    return {
+        "annotations": [{
+            "annotation_id": a.annotation_id,
+            "content": a.content,
+            "author_id": a.author_id,
+            "author_username": a.author.username,
+            "created_at": a.created_at.isoformat(),
+            "article_pmid": a.article_pmid,
+            "report_id": a.report_id,
+            "analysis_id": a.analysis_id
+        } for a in annotations]
+    }
 
 def _strip_html(html: str) -> str:
     try:
@@ -3541,7 +3924,7 @@ async def _run_deepdive_chain(prompt: PromptTemplate, objective: str, full_text:
 
 
 @app.post("/deep-dive")
-async def deep_dive(request: DeepDiveRequest):
+async def deep_dive(request: DeepDiveRequest, db: Session = Depends(get_db)):
     t0 = _now_ms()
     try:
         source_info = {"url": request.url, "pmid": request.pmid, "title": request.title}
@@ -3646,7 +4029,8 @@ async def deep_dive(request: DeepDiveRequest):
             "latency_ms": took,
             **({k: v for k, v in (meta or {}).items() if v is not None}),
         }
-        return {
+        
+        response_data = {
             "source": source_info,
             "model_description_structured": md_structured,
             "model_description": md_json,
@@ -3654,6 +4038,50 @@ async def deep_dive(request: DeepDiveRequest):
             "results_interpretation_structured": res if grounding == "full_text" else None,
             "diagnostics": diagnostics,
         }
+        
+        # Save deep dive analysis to database if project_id is provided
+        if hasattr(request, 'project_id') and request.project_id:
+            try:
+                current_user = get_current_user()
+                
+                # Verify project exists and user has access
+                project = db.query(Project).filter(Project.project_id == request.project_id).first()
+                if project:
+                    has_access = (
+                        project.owner_user_id == current_user or
+                        db.query(ProjectCollaborator).filter(
+                            ProjectCollaborator.project_id == request.project_id,
+                            ProjectCollaborator.user_id == current_user,
+                            ProjectCollaborator.is_active == True
+                        ).first() is not None
+                    )
+                    
+                    if has_access:
+                        # Create deep dive analysis record
+                        analysis_id = str(uuid.uuid4())
+                        analysis = DeepDiveAnalysis(
+                            analysis_id=analysis_id,
+                            project_id=request.project_id,
+                            article_pmid=request.pmid,
+                            article_url=request.url,
+                            article_title=request.title or "Unknown Article",
+                            scientific_model_analysis=json.dumps(md_json) if md_json else None,
+                            experimental_methods_analysis=json.dumps(mth) if mth else None,
+                            results_interpretation_analysis=json.dumps(res) if res else None,
+                            created_by=current_user,
+                            processing_status="completed"
+                        )
+                        
+                        db.add(analysis)
+                        db.commit()
+                        
+                        # Add analysis_id to response
+                        response_data["analysis_id"] = analysis_id
+            except Exception as e:
+                # Don't fail the request if saving fails, just log it
+                print(f"Failed to save deep dive analysis to database: {e}")
+        
+        return response_data
     except Exception as e:
         # Catch any unexpected errors and return structured error response
         import traceback
@@ -3872,7 +4300,7 @@ async def feedback(payload: dict):
 
 
 @app.post("/generate-review")
-async def generate_review(request: ReviewRequest):
+async def generate_review(request: ReviewRequest, db: Session = Depends(get_db)):
     req_start = _now_ms()
     _metrics_inc("requests_total", 1)
     deadline = time.time() + TOTAL_BUDGET_S
@@ -4972,6 +5400,44 @@ Objective: {objective}
         "results": results,
         "memories": memories,
     }
+    # Save report to database if project_id is provided
+    if request.project_id:
+        try:
+            current_user = get_current_user()
+            
+            # Verify project exists and user has access
+            project = db.query(Project).filter(Project.project_id == request.project_id).first()
+            if project:
+                has_access = (
+                    project.owner_user_id == current_user or
+                    db.query(ProjectCollaborator).filter(
+                        ProjectCollaborator.project_id == request.project_id,
+                        ProjectCollaborator.user_id == current_user,
+                        ProjectCollaborator.is_active == True
+                    ).first() is not None
+                )
+                
+                if has_access:
+                    # Create report
+                    report_id = str(uuid.uuid4())
+                    report = Report(
+                        report_id=report_id,
+                        project_id=request.project_id,
+                        title=f"Research Report: {request.molecule}",
+                        objective=request.objective,
+                        content=json.dumps(resp),
+                        created_by=current_user
+                    )
+                    
+                    db.add(report)
+                    db.commit()
+                    
+                    # Add report_id to response
+                    resp["report_id"] = report_id
+        except Exception as e:
+            # Don't fail the request if saving fails, just log it
+            print(f"Failed to save report to database: {e}")
+    
     # Cache response
     if ENABLE_CACHING and cache_key:
         try:

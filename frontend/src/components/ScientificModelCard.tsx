@@ -1,126 +1,225 @@
 import React from 'react';
+import { AcademicCapIcon, BeakerIcon, ChartBarIcon, LinkIcon } from '@heroicons/react/24/outline';
 
-export interface ScientificModelCardProps {
+interface FactAnchor {
+  claim: string;
+  evidence: {
+    title: string;
+    year?: number;
+    pmid?: string;
+    quote: string;
+  };
+}
+
+interface ScientificModelData {
   model_type: string;
   study_design: string;
   population_description: string;
   protocol_summary: string;
-  model_rationale?: string;
-  bias_assessment?: string;
+  model_rationale: string;
+  bias_assessment: string;
   strengths: string;
   limitations: string;
-  model_type_taxonomy?: string;
-  study_design_taxonomy?: string;
-  sample_size?: string;
-  arms_groups?: string;
-  blinding_randomization?: string;
-  control_type?: string;
-  collection_timepoints?: string;
-  justification?: string;
-  link_to_objective?: string;
+  model_type_taxonomy: string;
+  study_design_taxonomy: string;
+  sample_size: string;
+  arms_groups: string;
+  blinding_randomization: string;
+  control_type: string;
+  collection_timepoints: string;
+  justification: string;
+  link_to_objective: string;
+  fact_anchors: FactAnchor[];
 }
 
-export const ScientificModelCard: React.FC<ScientificModelCardProps> = ({
-  model_type,
-  study_design,
-  population_description,
-  protocol_summary,
-  model_rationale,
-  bias_assessment,
-  strengths,
-  limitations,
-  model_type_taxonomy,
-  study_design_taxonomy,
-  sample_size,
-  arms_groups,
-  blinding_randomization,
-  control_type,
-  collection_timepoints,
-  justification,
-  link_to_objective,
-}) => {
-  const NA = (s: string) => (s && s.trim().length > 0 ? s : 'Not reported');
+interface ScientificModelCardProps {
+  data: ScientificModelData;
+  className?: string;
+}
+
+export default function ScientificModelCard({ data, className = '' }: ScientificModelCardProps) {
+  const splitStringToArray = (str: string): string[] => {
+    if (!str) return [];
+    // Try to split by common delimiters
+    return str.split(/[;,\n]/).map(s => s.trim()).filter(s => s.length > 0);
+  };
+
   return (
-    <div className="border rounded-lg shadow-sm p-4 bg-white text-black">
-      <h3 className="text-lg font-semibold mb-3 text-black">Scientific Model</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <dl className="divide-y divide-gray-200">
-            <div className="py-2">
-              <dt className="text-sm font-medium text-black">Model Type</dt>
-              <dd className="mt-1 text-sm text-black">{NA(model_type)}</dd>
-            </div>
-            <div className="py-2">
-              <dt className="text-sm font-medium text-black">Study Design</dt>
-              <dd className="mt-1 text-sm text-black">{NA(study_design)}</dd>
-            </div>
-            <div className="py-2">
-              <dt className="text-sm font-medium text-black">Population & Sample</dt>
-              <dd className="mt-1 text-sm text-black">{NA(population_description)}</dd>
-            </div>
-            {model_type_taxonomy && (
-              <div className="py-2">
-                <dt className="text-sm font-medium text-black">Model Taxonomy</dt>
-                <dd className="mt-1 text-sm text-black">{NA(model_type_taxonomy)}</dd>
-              </div>
-            )}
-            {study_design_taxonomy && (
-              <div className="py-2">
-                <dt className="text-sm font-medium text-black">Study Design Taxonomy</dt>
-                <dd className="mt-1 text-sm text-black">{NA(study_design_taxonomy)}</dd>
-              </div>
-            )}
-            {(sample_size || arms_groups) && (
-              <div className="py-2">
-                <dt className="text-sm font-medium text-black">Sample Size · Arms</dt>
-                <dd className="mt-1 text-sm text-black">{[sample_size, arms_groups].filter(Boolean).join(' · ') || 'Not reported'}</dd>
-              </div>
-            )}
-            {(blinding_randomization || control_type) && (
-              <div className="py-2">
-                <dt className="text-sm font-medium text-black">Blinding/Randomization · Controls</dt>
-                <dd className="mt-1 text-sm text-black">{[blinding_randomization, control_type].filter(Boolean).join(' · ') || 'Not reported'}</dd>
-              </div>
-            )}
-            {collection_timepoints && (
-              <div className="py-2">
-                <dt className="text-sm font-medium text-black">Collection Timepoints</dt>
-                <dd className="mt-1 text-sm text-black">{NA(collection_timepoints)}</dd>
-              </div>
-            )}
-          </dl>
+    <div className={`bg-white rounded-lg shadow-md border border-gray-200 ${className}`}>
+      <div className="p-6">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 bg-blue-100 rounded-lg">
+            <AcademicCapIcon className="h-6 w-6 text-blue-600" />
+          </div>
+          <div>
+            <h3 className="text-xl font-semibold text-gray-900">Scientific Model Analysis</h3>
+            <p className="text-sm text-gray-600">Study design and methodology assessment</p>
+          </div>
         </div>
-        <div className="space-y-4">
-          <div>
-            <h4 className="text-sm font-semibold text-black">Protocol Summary</h4>
-            <p className="mt-1 text-sm text-black whitespace-pre-line">{NA(protocol_summary)}</p>
-          </div>
-          <div>
-            <h4 className="text-sm font-semibold text-black">Strengths</h4>
-            <p className="mt-1 text-sm text-black whitespace-pre-line">{NA(strengths)}</p>
-          </div>
-          <div>
-            <h4 className="text-sm font-semibold text-black">Limitations</h4>
-            <p className="mt-1 text-sm text-black whitespace-pre-line">{NA(limitations)}</p>
-          </div>
-          {(model_rationale || justification || link_to_objective) && (
+
+        {/* Study Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="space-y-3">
             <div>
-              <h4 className="text-sm font-semibold text-black">Model Rationale & Link to Objective</h4>
-              <p className="mt-1 text-sm text-black whitespace-pre-line">{[model_rationale || '', justification || '', link_to_objective || ''].filter(Boolean).join('\n\n') || 'Not reported'}</p>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Model Type</label>
+              <span className="inline-block px-3 py-1 bg-blue-50 text-blue-800 rounded-full text-sm">
+                {data.model_type}
+              </span>
             </div>
-          )}
-          {bias_assessment && (
+            
             <div>
-              <h4 className="text-sm font-semibold text-red-700">Bias Assessment</h4>
-              <p className="mt-1 text-sm text-red-800 whitespace-pre-line">{NA(bias_assessment)}</p>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Study Design</label>
+              <p className="text-sm text-gray-900">{data.study_design}</p>
             </div>
-          )}
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sample Size</label>
+              <p className="text-sm text-gray-900">{data.sample_size}</p>
+            </div>
+          </div>
+          
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Control Type</label>
+              <span className="inline-block px-3 py-1 bg-green-50 text-green-800 rounded-full text-sm">
+                {data.control_type || 'Not specified'}
+              </span>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Blinding/Randomization</label>
+              <p className="text-sm text-gray-900">{data.blinding_randomization || 'Not specified'}</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Arms/Groups</label>
+              <p className="text-sm text-gray-900">{data.arms_groups || 'Not specified'}</p>
+            </div>
+          </div>
         </div>
+
+        {/* Population Description */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Population Description</label>
+          <div className="p-3 bg-gray-50 rounded-lg">
+            <p className="text-sm text-gray-900">{data.population_description}</p>
+          </div>
+        </div>
+
+        {/* Protocol Summary */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Protocol Summary</label>
+          <div className="p-3 bg-blue-50 rounded-lg">
+            <p className="text-sm text-gray-900">{data.protocol_summary}</p>
+          </div>
+        </div>
+
+        {/* Model Rationale */}
+        {data.model_rationale && (
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Model Rationale</label>
+            <div className="p-3 bg-purple-50 rounded-lg border-l-4 border-purple-400">
+              <p className="text-sm text-gray-900">{data.model_rationale}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Link to Objective */}
+        {data.link_to_objective && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-2">
+              <LinkIcon className="h-5 w-5 text-blue-600" />
+              <label className="block text-sm font-medium text-gray-700">Link to Objective</label>
+            </div>
+            <div className="p-3 bg-blue-50 rounded-lg">
+              <p className="text-sm text-gray-900">{data.link_to_objective}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Strengths and Limitations */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          {/* Strengths */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <ChartBarIcon className="h-5 w-5 text-green-600" />
+              <label className="block text-sm font-medium text-gray-700">Strengths</label>
+            </div>
+            <div className="space-y-2">
+              {splitStringToArray(data.strengths).map((strength, index) => (
+                <div key={index} className="flex items-start gap-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
+                  <span className="text-sm text-gray-700">{strength}</span>
+                </div>
+              ))}
+              {splitStringToArray(data.strengths).length === 0 && (
+                <p className="text-sm text-gray-500 italic">No specific strengths identified</p>
+              )}
+            </div>
+          </div>
+
+          {/* Limitations */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <BeakerIcon className="h-5 w-5 text-red-600" />
+              <label className="block text-sm font-medium text-gray-700">Limitations</label>
+            </div>
+            <div className="space-y-2">
+              {splitStringToArray(data.limitations).map((limitation, index) => (
+                <div key={index} className="flex items-start gap-2">
+                  <div className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></div>
+                  <span className="text-sm text-gray-700">{limitation}</span>
+                </div>
+              ))}
+              {splitStringToArray(data.limitations).length === 0 && (
+                <p className="text-sm text-gray-500 italic">No specific limitations identified</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Bias Assessment */}
+        {data.bias_assessment && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-2">
+              <BeakerIcon className="h-5 w-5 text-yellow-600" />
+              <label className="block text-sm font-medium text-gray-700">Bias Assessment</label>
+            </div>
+            <div className="p-3 bg-yellow-50 rounded-lg border-l-4 border-yellow-400">
+              <p className="text-sm text-gray-900">{data.bias_assessment}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Fact Anchors */}
+        {data.fact_anchors && data.fact_anchors.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">Supporting Evidence</label>
+            <div className="space-y-3">
+              {data.fact_anchors.map((anchor, index) => (
+                <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <p className="text-sm font-medium text-gray-900 mb-2">{anchor.claim}</p>
+                  <div className="text-xs text-gray-600">
+                    {anchor.evidence.title && (
+                      <p><strong>Title:</strong> {anchor.evidence.title}</p>
+                    )}
+                    {anchor.evidence.year && (
+                      <p><strong>Year:</strong> {anchor.evidence.year}</p>
+                    )}
+                    {anchor.evidence.pmid && (
+                      <p><strong>PMID:</strong> {anchor.evidence.pmid}</p>
+                    )}
+                    {anchor.evidence.quote && (
+                      <p className="mt-1 italic">"{anchor.evidence.quote}"</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
-};
-
-export default ScientificModelCard;
-
-
+}

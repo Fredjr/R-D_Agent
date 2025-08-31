@@ -4,12 +4,13 @@ import React, { useState, FormEvent } from 'react';
 
 type Props = {
   onGenerate?: (args: { molecule: string; objective: string; projectId?: string | null; clinicalMode?: boolean; preference?: 'precision' | 'recall'; dagMode?: boolean; fullTextOnly?: boolean }) => void;
+  defaultProjectId?: string | null;
 };
 
-export default function InputForm({ onGenerate }: Props) {
+export default function InputForm({ onGenerate, defaultProjectId }: Props) {
   const [molecule, setMolecule] = useState('');
   const [objective, setObjective] = useState('');
-  const [projectId, setProjectId] = useState('');
+  const [projectId, setProjectId] = useState(defaultProjectId || '');
   const [clinicalMode, setClinicalMode] = useState(false);
   const [preference, setPreference] = useState<'precision' | 'recall'>('precision');
   const [dagMode, setDagMode] = useState(false);
