@@ -30,16 +30,29 @@ export default function Dashboard() {
     fetchProjects();
   }, []);
 
+  // Auto-dismiss errors after 10 seconds
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        setError(null);
+      }, 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
   const fetchProjects = async () => {
     try {
+      setError(null); // Clear any existing errors
       const response = await fetch('/api/proxy/projects');
       if (!response.ok) {
-        throw new Error('Failed to fetch projects');
+        const errorText = await response.text().catch(() => '');
+        throw new Error(`Failed to fetch projects (${response.status}): ${errorText}`);
       }
       const data: ProjectListResponse = await response.json();
       setProjects(data.projects);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
+      console.error('Failed to fetch projects:', err);
+      setError(err instanceof Error ? err.message : 'Unknown error occurred while fetching projects');
     } finally {
       setLoading(false);
     }
@@ -50,6 +63,8 @@ export default function Dashboard() {
     if (!newProjectName.trim()) return;
 
     setCreating(true);
+    setError(null); // Clear any existing errors
+    
     try {
       const response = await fetch('/api/proxy/projects', {
         method: 'POST',
@@ -63,7 +78,9 @@ export default function Dashboard() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create project');
+        const errorText = await response.text().catch(() => '');
+        console.error('Project creation failed:', response.status, errorText);
+        throw new Error(`Failed to create project (${response.status}): ${errorText || 'Unknown server error'}`);
       }
 
       const newProject = await response.json();
@@ -71,8 +88,12 @@ export default function Dashboard() {
       setShowCreateModal(false);
       setNewProjectName('');
       setNewProjectDescription('');
+      
+      // Auto-dismiss any success state after a brief moment
+      setTimeout(() => setError(null), 100);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create project');
+      console.error('Project creation error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create project due to an unknown error');
     } finally {
       setCreating(false);
     }
@@ -122,13 +143,29 @@ export default function Dashboard() {
         {/* Error Display */}
         {error && (
           <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-800">{error}</p>
-            <button
-              onClick={() => setError(null)}
-              className="mt-2 text-sm text-red-600 hover:text-red-800"
-            >
-              Dismiss
-            </button>
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <p className="text-red-800 font-medium">Error:</p>
+                <p className="text-red-700 text-sm mt-1">{error}</p>
+                <div className="mt-2 text-xs text-red-600">
+                  Backend URL: {process.env.NEXT_PUBLIC_BACKEND_URL || 'Not configured'}
+                </div>
+              </div>
+              <button
+                onClick={() => setError(null)}
+                className="ml-4 text-sm text-red-600 hover:text-red-800 font-medium"
+              >
+                Dismiss
+              </button>
+            </div>
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={fetchProjects}
+                className="text-xs px-3 py-1 bg-red-100 text-red-800 rounded hover:bg-red-200"
+              >
+                Retry
+              </button>
+            </div>
           </div>
         )}
 

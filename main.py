@@ -5438,6 +5438,8 @@ Objective: {objective}
             # Don't fail the request if saving fails, just log it
             print(f"Failed to save report to database: {e}")
     
+
+
     # Cache response
     if ENABLE_CACHING and cache_key:
         try:

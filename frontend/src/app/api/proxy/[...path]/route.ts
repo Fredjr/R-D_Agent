@@ -5,41 +5,62 @@ function buildTargetUrl(req: Request, path: string[]): string {
   const url = new URL(req.url);
   const search = url.search;
   if (!BACKEND_BASE) {
+    console.error("Backend base URL is not configured. Available env vars:", {
+      NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL,
+      BACKEND_URL: process.env.BACKEND_URL
+    });
     throw new Error("Backend base URL is not configured");
   }
-  return `${BACKEND_BASE}/${suffix}${search}`;
+  const targetUrl = `${BACKEND_BASE}/${suffix}${search}`;
+  console.log("Proxying request to:", targetUrl);
+  return targetUrl;
 }
 
 async function proxy(req: Request, { params }: { params: Promise<{ path: string[] }> }) {
-  const resolvedParams = await params;
-  const target = buildTargetUrl(req, resolvedParams.path || []);
+  try {
+    const resolvedParams = await params;
+    const target = buildTargetUrl(req, resolvedParams.path || []);
 
-  const headers = new Headers(req.headers);
-  headers.delete("host");
-  headers.delete("connection");
-  headers.delete("content-length");
-  headers.delete("accept-encoding");
+    const headers = new Headers(req.headers);
+    headers.delete("host");
+    headers.delete("connection");
+    headers.delete("content-length");
+    headers.delete("accept-encoding");
 
-  const init: RequestInit = {
-    method: req.method,
-    headers,
-    body: req.method === "GET" || req.method === "HEAD" ? undefined : await req.arrayBuffer(),
-    redirect: "manual",
-  };
+    const init: RequestInit = {
+      method: req.method,
+      headers,
+      body: req.method === "GET" || req.method === "HEAD" ? undefined : await req.arrayBuffer(),
+      redirect: "manual",
+    };
 
-  const upstream = await fetch(target, init);
+    const upstream = await fetch(target, init);
 
-  const respHeaders = new Headers(upstream.headers);
-  // Ensure responses are cache-bypassed and CORS-safe on same-origin
-  respHeaders.set("Access-Control-Allow-Origin", "*");
-  respHeaders.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  respHeaders.set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+    const respHeaders = new Headers(upstream.headers);
+    // Ensure responses are cache-bypassed and CORS-safe on same-origin
+    respHeaders.set("Access-Control-Allow-Origin", "*");
+    respHeaders.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    respHeaders.set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
 
-  return new Response(upstream.body, {
-    status: upstream.status,
-    statusText: upstream.statusText,
-    headers: respHeaders,
-  });
+    return new Response(upstream.body, {
+      status: upstream.status,
+      statusText: upstream.statusText,
+      headers: respHeaders,
+    });
+  } catch (error) {
+    console.error("Proxy error:", error);
+    return new Response(JSON.stringify({
+      error: "Proxy configuration error",
+      message: error instanceof Error ? error.message : "Unknown proxy error",
+      backend_url: BACKEND_BASE || "Not configured"
+    }), {
+      status: 500,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  }
 }
 
 export async function GET(req: Request, ctx: any) {
