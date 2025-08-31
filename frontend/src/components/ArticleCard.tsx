@@ -51,7 +51,7 @@ export default function ArticleCard({ item }: Props) {
     }
   }
   return (
-    <article className="bg-white border border-gray-200 rounded-lg shadow-sm p-6 flex flex-col gap-4 text-black">
+    <article className="bg-white border border-gray-200 rounded-lg shadow-sm p-4 sm:p-6 flex flex-col gap-3 sm:gap-4 text-black">
       <header className="flex items-start justify-between gap-4">
         <div className="flex-1">
           {item.source ? (
@@ -240,14 +240,14 @@ export default function ArticleCard({ item }: Props) {
         </div>
       ) : null}
 
-      <div className="mt-4 flex gap-2 justify-end">
+      <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:justify-end">
         <button
-          className="rounded bg-indigo-600 text-white px-3 py-2 text-sm hover:bg-indigo-500"
+          className="w-full sm:w-auto rounded bg-indigo-600 text-white px-4 py-2 text-sm hover:bg-indigo-500 transition-colors"
           onClick={handleDeepDive}
         >
-          Deep Dive
+          Deep Dive Analysis
         </button>
-        <label className="inline-flex items-center text-sm text-indigo-700 cursor-pointer">
+        <label className="w-full sm:w-auto inline-flex items-center justify-center text-sm text-indigo-700 cursor-pointer">
           <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={async (e) => {
             const f = e.target.files?.[0];
             if (!f) return;
@@ -270,7 +270,7 @@ export default function ArticleCard({ item }: Props) {
               setDeepDiveLoading(false);
             }
           }} />
-          <span className="inline-block rounded border border-indigo-300 px-3 py-2 hover:bg-indigo-50">Upload PDF</span>
+          <span className="w-full sm:w-auto inline-block rounded border border-indigo-300 px-4 py-2 hover:bg-indigo-50 text-center transition-colors">Upload PDF</span>
         </label>
       </div>
 

@@ -32,6 +32,9 @@ export default function Home() {
     setIsLoading(true);
     setError(null);
     setResults([]);
+    setDiagnostics(null);
+    setQueries(null);
+    
     try {
       const data = await fetchReview({ molecule, objective, projectId: projectId ?? null, clinicalMode, preference, dagMode, fullTextOnly });
       const arr = Array.isArray(data?.results) ? data.results : [];
@@ -41,7 +44,8 @@ export default function Home() {
       setDiagnostics(data?.diagnostics ?? null);
       setQueries(Array.isArray(data?.queries) ? data.queries : null);
     } catch (e: any) {
-      setError(e?.message || 'Failed to fetch results');
+      console.error('Research generation error:', e);
+      setError(e?.message || 'Failed to fetch results. Please try again with a more specific query.');
     } finally {
       setIsLoading(false);
     }
@@ -52,37 +56,38 @@ export default function Home() {
       {/* Navigation Header */}
       <nav className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-4">
+          <div className="flex justify-between items-center h-14 sm:h-16">
+            <div className="flex items-center gap-2 sm:gap-4">
               <Image
-                className="dark:invert"
                 src="/next.svg"
                 alt="R&D Agent logo"
-                width={120}
-                height={24}
+                width={100}
+                height={20}
                 priority
+                className="w-20 h-4 sm:w-24 sm:h-5 dark:invert"
               />
-              <span className="text-xl font-semibold text-gray-900">R&D Agent</span>
+              <span className="text-lg sm:text-xl font-semibold text-gray-900 hidden xs:block">R&D Agent</span>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
               <Link
                 href="/dashboard"
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="inline-flex items-center px-3 py-2 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
               >
-                <FolderIcon className="h-5 w-5 mr-2" />
-                My Projects
+                <FolderIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">My Projects</span>
+                <span className="sm:hidden">Projects</span>
               </Link>
             </div>
           </div>
         </div>
       </nav>
 
-      <main className="max-w-4xl mx-auto p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+        <div className="text-center mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-3 sm:mb-4">
             AI-Powered Research Analysis
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto px-4">
             Get comprehensive literature reviews and deep analysis of scientific articles with our advanced AI agents.
           </p>
         </div>
@@ -93,18 +98,36 @@ export default function Home() {
           isLoading={isLoading}
         />
 
+        {isLoading && (
+          <div className="mt-4 sm:mt-6 p-4 sm:p-6 bg-blue-50 border border-blue-200 rounded-lg mx-4 sm:mx-0">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+              <h3 className="font-medium text-blue-900 text-sm sm:text-base">Analyzing Research...</h3>
+            </div>
+            <p className="text-blue-800 text-xs sm:text-sm">
+              This may take 1-2 minutes as we search literature databases and perform AI analysis on the most relevant articles.
+            </p>
+            <div className="mt-3 text-xs text-blue-700">
+              💡 <strong>Tip:</strong> More specific queries typically process faster and yield better results.
+            </div>
+          </div>
+        )}
+
         {error && (
-          <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-800">{error}</p>
+          <div className="mt-4 sm:mt-6 p-4 bg-red-50 border border-red-200 rounded-lg mx-4 sm:mx-0">
+            <p className="text-red-800 text-sm sm:text-base">{error}</p>
+            <div className="mt-2 text-xs text-red-700">
+              💡 Try making your query more specific or check your internet connection.
+            </div>
           </div>
         )}
 
         {queries && queries.length > 0 ? (
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <h3 className="font-medium text-blue-900 mb-2">Generated Queries:</h3>
-            <ul className="text-sm text-blue-800 space-y-1">
+          <div className="mt-4 sm:mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg mx-4 sm:mx-0">
+            <h3 className="font-medium text-blue-900 mb-2 text-sm sm:text-base">Generated Queries:</h3>
+            <ul className="text-xs sm:text-sm text-blue-800 space-y-2">
               {queries.map((q, i) => (
-                <li key={i} className="font-mono bg-blue-100 p-2 rounded">
+                <li key={i} className="font-mono bg-blue-100 p-2 sm:p-3 rounded text-xs sm:text-sm break-words">
                   {q}
                 </li>
               ))}
@@ -113,9 +136,9 @@ export default function Home() {
         ) : null}
 
         {diagnostics ? (
-          <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-            <h3 className="font-medium text-gray-900 mb-2">Analysis Details:</h3>
-            <div className="text-sm text-gray-700 space-y-1">
+          <div className="mt-4 sm:mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg mx-4 sm:mx-0">
+            <h3 className="font-medium text-gray-900 mb-2 text-sm sm:text-base">Analysis Details:</h3>
+            <div className="text-xs sm:text-sm text-gray-700 space-y-1">
               <p>Pool size: {diagnostics.pool_size}</p>
               <p>Deep dive count: {diagnostics.deep_dive_count}</p>
               <p>Processing time: {diagnostics.timings_ms?.deepdive_ms}ms</p>
