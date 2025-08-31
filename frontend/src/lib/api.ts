@@ -29,18 +29,39 @@ export async function fetchReview(args: FetchReviewArgs): Promise<any> {
   const url = `${getEndpoint()}/generate-review`;
   const payload = buildPayload(args);
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  // Create AbortController for timeout handling
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes timeout
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`Failed to fetch review from the server. Status ${res.status}. ${text}`);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`Failed to fetch review from the server. Status ${res.status}. ${text}`);
+    }
+
+    return res.json();
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    
+    if (error.name === 'AbortError') {
+      throw new Error('Request timed out. The analysis is taking longer than expected. Please try again or use a more specific query.');
+    }
+    
+    if (error.message?.includes('ERR_NETWORK_IO_SUSPENDED')) {
+      throw new Error('Network connection was suspended. This may be due to a long-running analysis. Please try again with a more specific query.');
+    }
+    
+    throw error;
   }
-
-  return res.json();
 }
 
 export type FetchDeepDiveArgs = {
@@ -65,16 +86,37 @@ export async function fetchDeepDive(args: FetchDeepDiveArgs): Promise<any> {
   const url = `${getEndpoint()}/deep-dive`;
   const payload = buildDeepDivePayload(args);
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  // Create AbortController for timeout handling
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 90000); // 90 seconds timeout for deep dive
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`Failed to fetch deep dive. Status ${res.status}. ${text}`);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`Failed to fetch deep dive. Status ${res.status}. ${text}`);
+    }
+
+    return res.json();
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    
+    if (error.name === 'AbortError') {
+      throw new Error('Deep dive analysis timed out. Please try uploading a PDF for better analysis or try again.');
+    }
+    
+    if (error.message?.includes('ERR_NETWORK_IO_SUSPENDED')) {
+      throw new Error('Network connection was suspended during deep dive analysis. Please try again.');
+    }
+    
+    throw error;
   }
-
-  return res.json();
 }
