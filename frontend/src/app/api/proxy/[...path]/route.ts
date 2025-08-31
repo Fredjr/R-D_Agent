@@ -10,8 +10,9 @@ function buildTargetUrl(req: Request, path: string[]): string {
   return `${BACKEND_BASE}/${suffix}${search}`;
 }
 
-async function proxy(req: Request, { params }: { params: { path: string[] } }) {
-  const target = buildTargetUrl(req, params.path || []);
+async function proxy(req: Request, { params }: { params: Promise<{ path: string[] }> }) {
+  const resolvedParams = await params;
+  const target = buildTargetUrl(req, resolvedParams.path || []);
 
   const headers = new Headers(req.headers);
   headers.delete("host");

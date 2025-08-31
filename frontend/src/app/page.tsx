@@ -88,9 +88,9 @@ export default function Home() {
         </div>
 
         <InputForm 
-          onSubmit={handleGenerateReview} 
+          onGenerate={handleGenerateReview} 
+          defaultProjectId={selectedProjectId}
           isLoading={isLoading}
-          selectedProjectId={selectedProjectId}
         />
 
         {error && (
