@@ -5,9 +5,10 @@ import React, { useState, FormEvent } from 'react';
 type Props = {
   onGenerate?: (args: { molecule: string; objective: string; projectId?: string | null; clinicalMode?: boolean; preference?: 'precision' | 'recall'; dagMode?: boolean; fullTextOnly?: boolean }) => void;
   defaultProjectId?: string | null;
+  isLoading?: boolean;
 };
 
-export default function InputForm({ onGenerate, defaultProjectId }: Props) {
+export default function InputForm({ onGenerate, defaultProjectId, isLoading = false }: Props) {
   const [molecule, setMolecule] = useState('');
   const [objective, setObjective] = useState('');
   const [projectId, setProjectId] = useState(defaultProjectId || '');
@@ -100,9 +101,10 @@ export default function InputForm({ onGenerate, defaultProjectId }: Props) {
       <div>
         <button
           type="submit"
-          className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+          disabled={isLoading}
+          className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          Generate Review
+          {isLoading ? 'Generating...' : 'Generate Review'}
         </button>
       </div>
     </form>
