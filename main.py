@@ -5407,7 +5407,14 @@ Objective: {objective}
             
             # Verify project exists and user has access
             project = db.query(Project).filter(Project.project_id == request.project_id).first()
-            if project:
+            if not project:
+                log_event({
+                    "event": "report_save_failed",
+                    "project_id": request.project_id,
+                    "error": "Project not found"
+                })
+                print(f"Project not found: {request.project_id}")
+            else:
                 has_access = (
                     project.owner_user_id == current_user or
                     db.query(ProjectCollaborator).filter(
@@ -5417,13 +5424,22 @@ Objective: {objective}
                     ).first() is not None
                 )
                 
-                if has_access:
+                if not has_access:
+                    log_event({
+                        "event": "report_save_failed",
+                        "project_id": request.project_id,
+                        "error": f"Access denied for user {current_user}"
+                    })
+                    print(f"Access denied for user {current_user} to project {request.project_id}")
+                else:
                     # Create report
                     report_id = str(uuid.uuid4())
+                    title = f"{request.molecule} - {request.objective[:50]}..." if len(request.objective) > 50 else f"{request.molecule} - {request.objective}"
+                    
                     report = Report(
                         report_id=report_id,
                         project_id=request.project_id,
-                        title=f"Research Report: {request.molecule}",
+                        title=title,
                         objective=request.objective,
                         content=json.dumps(resp),
                         created_by=current_user
@@ -5434,9 +5450,24 @@ Objective: {objective}
                     
                     # Add report_id to response
                     resp["report_id"] = report_id
+                    
+                    log_event({
+                        "event": "report_saved_successfully",
+                        "project_id": request.project_id,
+                        "report_id": report_id,
+                        "molecule": request.molecule
+                    })
+                    print(f"Report saved successfully: {report_id} to project {request.project_id}")
         except Exception as e:
             # Don't fail the request if saving fails, just log it
+            log_event({
+                "event": "report_save_exception",
+                "project_id": request.project_id,
+                "error": str(e)[:200]
+            })
             print(f"Failed to save report to database: {e}")
+            import traceback
+            traceback.print_exc()
     
 
 
