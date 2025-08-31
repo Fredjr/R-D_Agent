@@ -11,7 +11,6 @@ interface Article { title: string; pub_year: number; citation_count: number; pmi
 interface AgentResult { summary: string; confidence_score: number; methodologies: string[]; publication_score: number; overall_relevance_score: number }
 export interface ResultData { query?: string; result: AgentResult; articles: Article[] }
 
-
 export default function Home() {
   const [results, setResults] = useState<ResultData[]>([]);
   const [diagnostics, setDiagnostics] = useState<any | null>(null);
@@ -58,133 +57,74 @@ export default function Home() {
               <Image
                 className="dark:invert"
                 src="/next.svg"
-                alt="R&D Agent"
+                alt="R&D Agent logo"
                 width={120}
-                height={25}
+                height={24}
+                priority
               />
-              <span className="text-lg font-semibold text-gray-900">R&D Agent</span>
+              <span className="text-xl font-semibold text-gray-900">R&D Agent</span>
             </div>
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <FolderIcon className="h-5 w-5 mr-2" />
-              My Projects
-            </Link>
+            <div className="flex items-center gap-4">
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <FolderIcon className="h-5 w-5 mr-2" />
+                My Projects
+              </Link>
+            </div>
           </div>
         </div>
       </nav>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <main className="flex flex-col gap-8">
-          {/* Page Header */}
-          <div className="text-center">
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">AI-Powered Research Analysis</h1>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Generate comprehensive literature reviews and perform deep dive analysis on scientific articles
-            </p>
-          </div>
+      <main className="max-w-4xl mx-auto p-8">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+            AI-Powered Research Analysis
+          </h1>
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            Get comprehensive literature reviews and deep analysis of scientific articles with our advanced AI agents.
+          </p>
+        </div>
 
-          {/* Project Selection Notice */}
-          {selectedProjectId && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-blue-800">
-                <strong>Project Mode:</strong> Results will be saved to your selected project.
-              </p>
-            </div>
-          )}
+        <InputForm 
+          onSubmit={handleGenerateReview} 
+          isLoading={isLoading}
+          selectedProjectId={selectedProjectId}
+        />
 
-          {/* Research Form */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <InputForm 
-              onGenerate={handleGenerateReview} 
-              defaultProjectId={selectedProjectId}
-            />
-          </div>
-
-        {isLoading && (
-          <div className="mt-4 p-4 rounded-md border border-slate-200 bg-slate-50 text-slate-700">
-            Loading results...
-          </div>
-        )}
         {error && (
-          <div className="mt-4 p-4 rounded-md border border-red-300 bg-red-50 text-red-700">
-            {error}
+          <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-800">{error}</p>
           </div>
         )}
+
+        {queries && queries.length > 0 ? (
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h3 className="font-medium text-blue-900 mb-2">Generated Queries:</h3>
+            <ul className="text-sm text-blue-800 space-y-1">
+              {queries.map((q, i) => (
+                <li key={i} className="font-mono bg-blue-100 p-2 rounded">
+                  {q}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         {diagnostics ? (
-          <div className="w-full max-w-3xl mx-auto mt-4 p-4 rounded-md border border-slate-200 bg-slate-50 text-slate-800">
-            <details>
-              <summary className="cursor-pointer font-medium">Run details</summary>
-              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                <div>Pool size: {diagnostics.pool_size}</div>
-                <div>Shortlist size: {diagnostics.shortlist_size}</div>
-                <div>Deep-dive count: {diagnostics.deep_dive_count}</div>
-                {diagnostics.timings_ms ? (
-                  <div className="sm:col-span-2 text-xs text-slate-700">
-                    Timings (ms): plan {diagnostics.timings_ms.plan_ms} · harvest {diagnostics.timings_ms.harvest_ms} · triage {diagnostics.timings_ms.triage_ms} · deepdive {diagnostics.timings_ms.deepdive_ms}
-                  </div>
-                ) : null}
-                {Array.isArray(queries) && queries.length ? (
-                  <div className="sm:col-span-2 text-xs text-slate-700">
-                    Queries: {queries.join(' | ')}
-                  </div>
-                ) : null}
-              </div>
-            </details>
+          <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+            <h3 className="font-medium text-gray-900 mb-2">Analysis Details:</h3>
+            <div className="text-sm text-gray-700 space-y-1">
+              <p>Pool size: {diagnostics.pool_size}</p>
+              <p>Deep dive count: {diagnostics.deep_dive_count}</p>
+              <p>Processing time: {diagnostics.timings_ms?.deepdive_ms}ms</p>
+            </div>
           </div>
         ) : null}
 
         <ResultsList results={results} />
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org
-        </a>
-      </footer>
     </div>
   );
 }
