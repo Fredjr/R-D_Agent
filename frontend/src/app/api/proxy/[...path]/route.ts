@@ -5,18 +5,20 @@ const BACKEND_BASE = (
 ).replace(/\/+$/, "");
 
 function buildTargetUrl(req: Request, path: string[]): string {
-  const suffix = encodeURI(path.join("/"));
+  const suffix = path.join("/");
   const url = new URL(req.url);
   const search = url.search;
-  if (!BACKEND_BASE) {
-    console.error("Backend base URL is not configured. Available env vars:", {
-      NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL,
-      BACKEND_URL: process.env.BACKEND_URL
-    });
-    throw new Error("Backend base URL is not configured");
-  }
-  const targetUrl = `${BACKEND_BASE}/${suffix}${search}`;
-  console.log("Proxying request to:", targetUrl);
+  
+  // Always use the production backend as primary
+  const backend = BACKEND_BASE || "https://rd-backend-new-537209831678.us-central1.run.app";
+  const targetUrl = `${backend}/${suffix}${search}`;
+  
+  console.log("Proxying request to:", targetUrl, {
+    env_backend: BACKEND_BASE,
+    path: path,
+    search: search
+  });
+  
   return targetUrl;
 }
 
@@ -38,7 +40,9 @@ async function proxy(req: Request, { params }: { params: Promise<{ path: string[
       redirect: "manual",
     };
 
+    console.log("Making request to:", target);
     const upstream = await fetch(target, init);
+    console.log("Upstream response:", upstream.status, upstream.statusText);
 
     const respHeaders = new Headers(upstream.headers);
     // Ensure responses are cache-bypassed and CORS-safe on same-origin
