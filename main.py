@@ -3127,11 +3127,54 @@ async def ready() -> dict:
 async def version() -> dict:
     return {"version": APP_VERSION, "git": GIT_SHA}
 
-# Utility function for getting current user (placeholder for now)
+# Global variable to store current user (in production, use session management)
+_current_user_id = "default_user"
+
 def get_current_user() -> str:
-    """Get current user ID. For now, return a default user."""
-    # TODO: Implement proper authentication
-    return "default_user"
+    """Get current user ID."""
+    global _current_user_id
+    return _current_user_id
+
+def set_current_user(user_id: str):
+    """Set current user ID."""
+    global _current_user_id
+    _current_user_id = user_id
+
+# Authentication Endpoints
+
+class AuthRequest(BaseModel):
+    email: str = Field(..., description="User email address")
+    username: Optional[str] = Field(None, description="Display name")
+
+@app.post("/auth/login")
+async def auth_login(auth_data: AuthRequest, db: Session = Depends(get_db)):
+    """Authenticate or create user"""
+    try:
+        # Check if user exists
+        user = db.query(User).filter(User.email == auth_data.email).first()
+        
+        if not user:
+            # Create new user
+            user = User(
+                user_id=auth_data.email,  # Use email as user_id
+                username=auth_data.username or auth_data.email.split('@')[0],
+                email=auth_data.email
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        
+        # Set current user
+        set_current_user(user.user_id)
+        
+        return {
+            "user_id": user.user_id,
+            "username": user.username,
+            "email": user.email,
+            "created_at": user.created_at.isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Authentication failed: {str(e)}")
 
 # Project Management Endpoints
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   ArrowLeftIcon, 
   PlusIcon, 
@@ -15,7 +16,7 @@ import {
   ShareIcon,
   TrashIcon,
   BookmarkIcon,
-  ExternalLinkIcon
+  ArrowTopRightOnSquareIcon
 } from '@heroicons/react/24/outline';
 
 interface ProjectDetail {
@@ -60,9 +61,17 @@ interface Annotation {
 }
 
 export default function ProjectWorkspace() {
+  const { user, isLoading: authLoading } = useAuth();
   const params = useParams();
   const router = useRouter();
   const projectId = params.projectId as string;
+
+  // Redirect to home if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/');
+    }
+  }, [user, authLoading, router]);
   
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
@@ -231,15 +240,22 @@ export default function ProjectWorkspace() {
     router.push('/');
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading project...</p>
+          <p className="mt-4 text-gray-600">
+            {authLoading ? 'Authenticating...' : 'Loading project...'}
+          </p>
         </div>
       </div>
     );
+  }
+
+  // Don't render project workspace if not authenticated
+  if (!user) {
+    return null;
   }
 
   if (error) {
@@ -450,7 +466,7 @@ export default function ProjectWorkspace() {
                         rel="noopener noreferrer"
                         className="inline-flex items-center text-blue-600 hover:text-blue-800"
                       >
-                        <ExternalLinkIcon className="h-3 w-3 mr-1" />
+                        <ArrowTopRightOnSquareIcon className="h-3 w-3 mr-1" />
                         View
                       </a>
                     )}

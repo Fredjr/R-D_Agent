@@ -3,21 +3,25 @@ import Image from "next/image";
 import Link from "next/link";
 import InputForm from "@/components/InputForm";
 import ResultsList from "@/components/ResultsList";
+import AuthModal from "@/components/AuthModal";
 import { fetchReview } from "@/lib/api";
 import { useState, useEffect } from "react";
-import { FolderIcon } from '@heroicons/react/24/outline';
+import { FolderIcon, UserIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Article { title: string; pub_year: number; citation_count: number; pmid?: string }
 interface AgentResult { summary: string; confidence_score: number; methodologies: string[]; publication_score: number; overall_relevance_score: number }
 export interface ResultData { query?: string; result: AgentResult; articles: Article[] }
 
 export default function Home() {
+  const { user, logout, isLoading: authLoading } = useAuth();
   const [results, setResults] = useState<ResultData[]>([]);
   const [diagnostics, setDiagnostics] = useState<any | null>(null);
   const [queries, setQueries] = useState<string[] | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   // Get project ID from URL params if provided
   useEffect(() => {
@@ -69,24 +73,46 @@ export default function Home() {
               <span className="text-lg sm:text-xl font-semibold text-gray-900 hidden xs:block">R&D Agent</span>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
-              {selectedProjectId && (
-                <Link
-                  href={`/project/${selectedProjectId}`}
-                  className="inline-flex items-center px-3 py-2 sm:px-4 sm:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm sm:text-base"
+              {user ? (
+                <>
+                  {selectedProjectId && (
+                    <Link
+                      href={`/project/${selectedProjectId}`}
+                      className="inline-flex items-center px-3 py-2 sm:px-4 sm:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm sm:text-base"
+                    >
+                      <FolderIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">Back to Project</span>
+                      <span className="sm:hidden">Project</span>
+                    </Link>
+                  )}
+                  <Link
+                    href="/dashboard"
+                    className="inline-flex items-center px-3 py-2 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
+                  >
+                    <FolderIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
+                    <span className="hidden sm:inline">My Projects</span>
+                    <span className="sm:hidden">Projects</span>
+                  </Link>
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowAuthModal(true)}
+                      className="inline-flex items-center px-3 py-2 text-gray-700 hover:text-gray-900 text-sm"
+                      title={`Signed in as ${user.username}`}
+                    >
+                      <UserIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-1" />
+                      <span className="hidden sm:inline">{user.username}</span>
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <button
+                  onClick={() => setShowAuthModal(true)}
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
                 >
-                  <FolderIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
-                  <span className="hidden sm:inline">Back to Project</span>
-                  <span className="sm:hidden">Project</span>
-                </Link>
+                  <UserIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  Sign In
+                </button>
               )}
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center px-3 py-2 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
-              >
-                <FolderIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">My Projects</span>
-                <span className="sm:hidden">Projects</span>
-              </Link>
             </div>
           </div>
         </div>
@@ -127,11 +153,27 @@ export default function Home() {
           </p>
         </div>
 
-        <InputForm 
-          onGenerate={handleGenerateReview} 
-          defaultProjectId={selectedProjectId}
-          isLoading={isLoading}
-        />
+        {user ? (
+          <InputForm 
+            onGenerate={handleGenerateReview} 
+            defaultProjectId={selectedProjectId}
+            isLoading={isLoading}
+          />
+        ) : (
+          <div className="max-w-4xl mx-auto bg-white p-6 sm:p-8 rounded-lg shadow-md text-center">
+            <h3 className="text-xl font-semibold text-gray-900 mb-4">Sign In to Start Research</h3>
+            <p className="text-gray-600 mb-6">
+              Access your personalized research workspace, save projects, and collaborate with your team.
+            </p>
+            <button
+              onClick={() => setShowAuthModal(true)}
+              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              <UserIcon className="h-5 w-5 mr-2" />
+              Sign In / Sign Up
+            </button>
+          </div>
+        )}
 
         {isLoading && (
           <div className="mt-4 sm:mt-6 p-4 sm:p-6 bg-blue-50 border border-blue-200 rounded-lg mx-4 sm:mx-0">
@@ -201,6 +243,68 @@ export default function Home() {
           </div>
         )}
       </main>
+
+      {/* Authentication Modal */}
+      <AuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)} 
+      />
+
+      {/* User Profile Modal */}
+      {user && showAuthModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">User Profile</h2>
+              <button
+                onClick={() => setShowAuthModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                <p className="text-gray-900">{user.username}</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <p className="text-gray-900">{user.email}</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Member Since</label>
+                <p className="text-gray-900">{new Date(user.created_at).toLocaleDateString()}</p>
+              </div>
+            </div>
+            
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setShowAuthModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  logout();
+                  setShowAuthModal(false);
+                  setResults([]);
+                  setDiagnostics(null);
+                  setQueries(null);
+                  setSelectedProjectId(null);
+                }}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
