@@ -5543,3 +5543,260 @@ async def preflight_generate_review() -> Response:
         "Access-Control-Allow-Methods": "POST, OPTIONS",
         "Access-Control-Allow-Headers": "*",
     })
+
+# =============================================================================
+# DATABASE DEBUG AND INITIALIZATION
+# =============================================================================
+
+@app.get("/debug/database")
+async def debug_database():
+    """Debug endpoint to check database configuration"""
+    import os
+    from database import DATABASE_URL, engine, test_connection
+    
+    connection_test = test_connection()
+    
+    db_info = {
+        "database_url_env": os.getenv("DATABASE_URL", "NOT_SET"),
+        "postgres_url_env": os.getenv("POSTGRES_URL", "NOT_SET"), 
+        "effective_database_url": DATABASE_URL,
+        "database_type": "PostgreSQL" if DATABASE_URL.startswith(("postgresql://", "postgres://")) else "SQLite",
+        "engine_url": str(engine.url),
+        "environment": os.getenv("ENVIRONMENT", "unknown"),
+        "connection_test": "SUCCESS" if connection_test else "FAILED"
+    }
+    
+    return db_info
+
+# Initialize database on startup
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database and create tables on startup"""
+    try:
+        from database import init_db, test_connection
+        
+        if test_connection():
+            init_db()
+            print("✅ Database initialized successfully on startup")
+        else:
+            print("❌ Database connection failed on startup")
+    except Exception as e:
+        print(f"⚠️ Database initialization error: {e}")
+
+# =============================================================================
+# USER MANAGEMENT ENDPOINTS
+# =============================================================================
+
+@app.post("/users")
+async def create_user(user_data: dict, db: Session = Depends(get_db)):
+    """Create a new user"""
+    try:
+        from database import User
+        import uuid
+        
+        user_id = user_data.get("user_id") or str(uuid.uuid4())
+        username = user_data.get("username")
+        email = user_data.get("email")
+        
+        if not username or not email:
+            raise HTTPException(status_code=400, detail="Username and email are required")
+        
+        # Check if user already exists
+        existing_user = db.query(User).filter(
+            (User.email == email) | (User.username == username)
+        ).first()
+        
+        if existing_user:
+            return existing_user.__dict__
+        
+        # Create new user
+        new_user = User(
+            user_id=user_id,
+            username=username,
+            email=email,
+            preferences=user_data.get("preferences", {})
+        )
+        
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        
+        return {
+            "user_id": new_user.user_id,
+            "username": new_user.username,
+            "email": new_user.email,
+            "created_at": new_user.created_at.isoformat(),
+            "preferences": new_user.preferences
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error creating user: {str(e)}")
+
+@app.get("/users/{user_id}")
+async def get_user(user_id: str, db: Session = Depends(get_db)):
+    """Get user by ID"""
+    try:
+        from database import User
+        
+        user = db.query(User).filter(User.user_id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        return {
+            "user_id": user.user_id,
+            "username": user.username,
+            "email": user.email,
+            "created_at": user.created_at.isoformat(),
+            "preferences": user.preferences
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving user: {str(e)}")
+
+# =============================================================================
+# PROJECT MANAGEMENT ENDPOINTS
+# =============================================================================
+
+@app.post("/projects")
+async def create_project(project_data: dict, db: Session = Depends(get_db)):
+    """Create a new project"""
+    try:
+        from database import Project, User
+        import uuid
+        
+        project_id = str(uuid.uuid4())
+        project_name = project_data.get("project_name")
+        description = project_data.get("description", "")
+        owner_user_id = project_data.get("owner_user_id", "default_user")
+        
+        if not project_name:
+            raise HTTPException(status_code=400, detail="Project name is required")
+        
+        # Ensure user exists
+        user = db.query(User).filter(User.user_id == owner_user_id).first()
+        if not user:
+            # Create default user if doesn't exist
+            user = User(
+                user_id=owner_user_id,
+                username=owner_user_id,
+                email=f"{owner_user_id}@example.com"
+            )
+            db.add(user)
+            db.commit()
+        
+        # Create new project
+        new_project = Project(
+            project_id=project_id,
+            project_name=project_name,
+            description=description,
+            owner_user_id=owner_user_id,
+            tags=project_data.get("tags", []),
+            settings=project_data.get("settings", {})
+        )
+        
+        db.add(new_project)
+        db.commit()
+        db.refresh(new_project)
+        
+        return {
+            "project_id": new_project.project_id,
+            "project_name": new_project.project_name,
+            "description": new_project.description,
+            "owner_user_id": new_project.owner_user_id,
+            "created_at": new_project.created_at.isoformat(),
+            "tags": new_project.tags,
+            "settings": new_project.settings
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error creating project: {str(e)}")
+
+@app.get("/projects")
+async def list_projects(user_id: str = "default_user", db: Session = Depends(get_db)):
+    """List all projects for a user"""
+    try:
+        from database import Project
+        
+        projects = db.query(Project).filter(
+            Project.owner_user_id == user_id,
+            Project.is_active == True
+        ).order_by(Project.updated_at.desc()).all()
+        
+        return {
+            "projects": [
+                {
+                    "project_id": p.project_id,
+                    "project_name": p.project_name,
+                    "description": p.description,
+                    "owner_user_id": p.owner_user_id,
+                    "created_at": p.created_at.isoformat(),
+                    "updated_at": p.updated_at.isoformat(),
+                    "tags": p.tags,
+                    "report_count": len(p.reports) if p.reports else 0,
+                    "analysis_count": len(p.deep_dive_analyses) if p.deep_dive_analyses else 0
+                }
+                for p in projects
+            ]
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error listing projects: {str(e)}")
+
+@app.get("/projects/{project_id}")
+async def get_project(project_id: str, db: Session = Depends(get_db)):
+    """Get project details with related data"""
+    try:
+        from database import Project
+        
+        project = db.query(Project).filter(Project.project_id == project_id).first()
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+        
+        return {
+            "project_id": project.project_id,
+            "project_name": project.project_name,
+            "description": project.description,
+            "owner_user_id": project.owner_user_id,
+            "created_at": project.created_at.isoformat(),
+            "updated_at": project.updated_at.isoformat(),
+            "tags": project.tags,
+            "settings": project.settings,
+            "reports": [
+                {
+                    "report_id": r.report_id,
+                    "title": r.title,
+                    "objective": r.objective,
+                    "created_at": r.created_at.isoformat(),
+                    "created_by": r.created_by,
+                    "status": r.status,
+                    "article_count": r.article_count
+                }
+                for r in project.reports
+            ],
+            "collaborators": [
+                {
+                    "user_id": c.user_id,
+                    "role": c.role,
+                    "invited_at": c.invited_at.isoformat()
+                }
+                for c in project.collaborators
+            ],
+            "annotations": [
+                {
+                    "annotation_id": a.annotation_id,
+                    "content": a.content,
+                    "author_id": a.author_id,
+                    "created_at": a.created_at.isoformat()
+                }
+                for a in project.annotations
+            ]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving project: {str(e)}")
