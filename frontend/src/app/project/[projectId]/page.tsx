@@ -13,7 +13,9 @@ import {
   CalendarIcon,
   EyeIcon,
   ShareIcon,
-  TrashIcon
+  TrashIcon,
+  BookmarkIcon,
+  ExternalLinkIcon
 } from '@heroicons/react/24/outline';
 
 interface ProjectDetail {
@@ -72,12 +74,32 @@ export default function ProjectWorkspace() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'viewer' | 'editor'>('viewer');
   const [inviting, setInviting] = useState(false);
+  const [pinnedArticles, setPinnedArticles] = useState<any[]>([]);
 
   useEffect(() => {
     if (projectId) {
       fetchProjectDetails();
       fetchAnnotations();
+      loadPinnedArticles();
     }
+  }, [projectId]);
+
+  const loadPinnedArticles = () => {
+    if (projectId) {
+      const pinnedKey = `pinned_articles_${projectId}`;
+      const existing = JSON.parse(localStorage.getItem(pinnedKey) || '[]');
+      setPinnedArticles(existing);
+    }
+  };
+
+  // Refresh pinned articles when page regains focus (user returns from research page)
+  useEffect(() => {
+    const handleFocus = () => {
+      loadPinnedArticles();
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, [projectId]);
 
   const fetchProjectDetails = async () => {
@@ -385,6 +407,56 @@ export default function ProjectWorkspace() {
               <p className="text-xs text-blue-700 mt-2">
                 Viewers can see project content. Editors can add reports and annotations.
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* Pinned Articles Section */}
+        {pinnedArticles.length > 0 && (
+          <div className="mb-8 bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-center gap-2 mb-6">
+              <BookmarkIcon className="h-5 w-5 text-yellow-600" />
+              <h2 className="text-xl font-semibold text-gray-900">Pinned Articles</h2>
+              <span className="text-sm text-gray-500">{pinnedArticles.length} article{pinnedArticles.length !== 1 ? 's' : ''}</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {pinnedArticles.map((article, index) => (
+                <div key={index} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="font-medium text-gray-900 text-sm line-clamp-2">{article.title}</h3>
+                    <button
+                      onClick={() => {
+                        const filtered = pinnedArticles.filter((_, i) => i !== index);
+                        setPinnedArticles(filtered);
+                        const pinnedKey = `pinned_articles_${projectId}`;
+                        localStorage.setItem(pinnedKey, JSON.stringify(filtered));
+                      }}
+                      className="ml-2 p-1 text-gray-400 hover:text-red-600"
+                      title="Remove from pinned"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-600 mb-3 line-clamp-3">{article.summary}</p>
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <div className="flex gap-2">
+                      <span>Score: {article.publication_score}</span>
+                      <span>Confidence: {article.confidence_score}</span>
+                    </div>
+                    {article.url && (
+                      <a
+                        href={article.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center text-blue-600 hover:text-blue-800"
+                      >
+                        <ExternalLinkIcon className="h-3 w-3 mr-1" />
+                        View
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
