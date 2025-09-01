@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { PlusIcon, FolderIcon, UsersIcon, CalendarIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, FolderIcon, UsersIcon, CalendarIcon, BeakerIcon } from '@heroicons/react/24/outline';
 
 interface Project {
   project_id: string;
@@ -123,20 +123,37 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-start">
             <div>
+              <div className="flex items-center gap-4 mb-4">
+                <Link
+                  href="/"
+                  className="inline-flex items-center text-gray-600 hover:text-gray-900 text-sm"
+                >
+                  ← Back to Research Hub
+                </Link>
+              </div>
               <h1 className="text-3xl font-bold text-gray-900">Research Projects</h1>
               <p className="mt-2 text-gray-600">
                 Manage your research projects and collaborate with your team
               </p>
             </div>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <PlusIcon className="h-5 w-5 mr-2" />
-              New Project
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Link
+                href="/"
+                className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <BeakerIcon className="h-5 w-5 mr-2" />
+                Research Hub
+              </Link>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <PlusIcon className="h-5 w-5 mr-2" />
+                New Project
+              </button>
+            </div>
           </div>
         </div>
 
