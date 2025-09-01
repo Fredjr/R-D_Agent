@@ -54,28 +54,28 @@ export default function Dashboard() {
   const fetchProjects = async () => {
     try {
       setError(null); // Clear any existing errors
-      console.log('Fetching projects...');
+      console.log('🔄 Fetching projects from Google Cloud SQL database...');
       
-      // Try dedicated projects endpoint first, fallback to proxy
-      let response;
-      try {
-        response = await fetch('/api/projects');
-      } catch (err) {
-        console.log('Dedicated endpoint failed, trying proxy:', err);
-        response = await fetch('/api/proxy/projects');
-      }
+      // Use the database-connected proxy route
+      const user_id = user?.user_id || 'default_user';
+      const response = await fetch(`/api/proxy/projects?user_id=${user_id}`, {
+        headers: {
+          'User-ID': user_id,
+          'Content-Type': 'application/json',
+        },
+      });
       
       if (!response.ok) {
         const errorText = await response.text().catch(() => '');
-        console.error('Projects fetch failed:', response.status, errorText);
+        console.error('❌ Projects fetch failed:', response.status, errorText);
         throw new Error(`Failed to fetch projects (${response.status}): ${errorText}`);
       }
       
       const data: ProjectListResponse = await response.json();
-      console.log('Projects loaded:', data.projects?.length || 0);
+      console.log('✅ Projects loaded from database:', data.projects?.length || 0);
       setProjects(data.projects || []);
     } catch (err) {
-      console.error('Failed to fetch projects:', err);
+      console.error('❌ Failed to fetch projects:', err);
       setError(err instanceof Error ? err.message : 'Unknown error occurred while fetching projects');
     } finally {
       setLoading(false);
@@ -90,27 +90,25 @@ export default function Dashboard() {
     setError(null); // Clear any existing errors
     
     try {
-      // Try dedicated projects endpoint first, fallback to proxy
-      let response;
+      console.log('🔄 Creating project in Google Cloud SQL database...');
+      
+      const user_id = user?.user_id || 'default_user';
       const projectData = {
         project_name: newProjectName.trim(),
         description: newProjectDescription.trim() || null,
+        owner_user_id: user_id,
+        tags: [],
+        settings: {},
       };
       
-      try {
-        response = await fetch('/api/projects', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(projectData),
-        });
-      } catch (err) {
-        console.log('Dedicated endpoint failed, trying proxy:', err);
-        response = await fetch('/api/proxy/projects', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(projectData),
-        });
-      }
+      const response = await fetch('/api/proxy/projects', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'User-ID': user_id,
+        },
+        body: JSON.stringify(projectData),
+      });
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => '');
@@ -247,14 +245,12 @@ export default function Dashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map((project) => (
-              <div
+              <Link
                 key={project.project_id}
+                href={`/project/${project.project_id}`}
                 className="block"
               >
-                <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200 opacity-60">
-                  <div className="mb-2 text-sm text-orange-600 font-medium">
-                    🚧 Project pages coming soon - implementing database persistence
-                  </div>
+                <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow p-6 border border-gray-200">
                   <div className="flex items-start justify-between mb-4">
                     <FolderIcon className="h-8 w-8 text-blue-600 flex-shrink-0" />
                     <span className="text-xs text-gray-500 flex items-center">
@@ -280,7 +276,7 @@ export default function Dashboard() {
                     </span>
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}
