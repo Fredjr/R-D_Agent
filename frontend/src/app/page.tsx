@@ -76,11 +76,14 @@ export default function Home() {
               {user ? (
                 <>
                   {selectedProjectId && (
-                    <div className="inline-flex items-center px-3 py-2 sm:px-4 sm:py-2 bg-gray-400 text-white rounded-lg opacity-60 text-sm sm:text-base cursor-not-allowed">
+                    <Link
+                      href={`/project/${selectedProjectId}`}
+                      className="inline-flex items-center px-3 py-2 sm:px-4 sm:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm sm:text-base"
+                    >
                       <FolderIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
-                      <span className="hidden sm:inline">Project Pages Coming Soon</span>
-                      <span className="sm:hidden">Coming Soon</span>
-                    </div>
+                      <span className="hidden sm:inline">Back to Project</span>
+                      <span className="sm:hidden">Project</span>
+                    </Link>
                   )}
                   <Link
                     href="/dashboard"
@@ -129,9 +132,9 @@ export default function Home() {
                 <>
                   <li>/</li>
                   <li>
-                    <span className="text-gray-400 cursor-not-allowed">
-                      Project (Coming Soon)
-                    </span>
+                    <Link href={`/project/${selectedProjectId}`} className="hover:text-gray-700">
+                      Project
+                    </Link>
                   </li>
                 </>
               )}
