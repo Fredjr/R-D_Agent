@@ -54,13 +54,26 @@ export default function Dashboard() {
   const fetchProjects = async () => {
     try {
       setError(null); // Clear any existing errors
-      const response = await fetch('/api/proxy/projects');
+      console.log('Fetching projects...');
+      
+      // Try dedicated projects endpoint first, fallback to proxy
+      let response;
+      try {
+        response = await fetch('/api/projects');
+      } catch (err) {
+        console.log('Dedicated endpoint failed, trying proxy:', err);
+        response = await fetch('/api/proxy/projects');
+      }
+      
       if (!response.ok) {
         const errorText = await response.text().catch(() => '');
+        console.error('Projects fetch failed:', response.status, errorText);
         throw new Error(`Failed to fetch projects (${response.status}): ${errorText}`);
       }
+      
       const data: ProjectListResponse = await response.json();
-      setProjects(data.projects);
+      console.log('Projects loaded:', data.projects?.length || 0);
+      setProjects(data.projects || []);
     } catch (err) {
       console.error('Failed to fetch projects:', err);
       setError(err instanceof Error ? err.message : 'Unknown error occurred while fetching projects');
@@ -77,16 +90,27 @@ export default function Dashboard() {
     setError(null); // Clear any existing errors
     
     try {
-      const response = await fetch('/api/proxy/projects', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          project_name: newProjectName.trim(),
-          description: newProjectDescription.trim() || null,
-        }),
-      });
+      // Try dedicated projects endpoint first, fallback to proxy
+      let response;
+      const projectData = {
+        project_name: newProjectName.trim(),
+        description: newProjectDescription.trim() || null,
+      };
+      
+      try {
+        response = await fetch('/api/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(projectData),
+        });
+      } catch (err) {
+        console.log('Dedicated endpoint failed, trying proxy:', err);
+        response = await fetch('/api/proxy/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(projectData),
+        });
+      }
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => '');
