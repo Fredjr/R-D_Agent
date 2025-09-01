@@ -247,12 +247,14 @@ export default function Dashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map((project) => (
-              <Link
+              <div
                 key={project.project_id}
-                href={`/project/${project.project_id}`}
                 className="block"
               >
-                <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow p-6 border border-gray-200">
+                <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200 opacity-60">
+                  <div className="mb-2 text-sm text-orange-600 font-medium">
+                    🚧 Project pages coming soon - implementing database persistence
+                  </div>
                   <div className="flex items-start justify-between mb-4">
                     <FolderIcon className="h-8 w-8 text-blue-600 flex-shrink-0" />
                     <span className="text-xs text-gray-500 flex items-center">
@@ -278,7 +280,7 @@ export default function Dashboard() {
                     </span>
                   </div>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         )}
