@@ -3,6 +3,8 @@ import { fetchDeepDive } from '@/lib/api';
 import ScientificModelCard from '@/components/ScientificModelCard';
 import ExperimentalMethodsTable from '@/components/ExperimentalMethodsTable';
 import ResultsInterpretationCard from '@/components/ResultsInterpretationCard';
+import { BookmarkIcon } from '@heroicons/react/24/outline';
+import { BookmarkIcon as BookmarkSolidIcon } from '@heroicons/react/24/solid';
 import type { SearchResult } from '@/lib/dummy-data';
 
 type Props = { item: SearchResult };
@@ -22,6 +24,8 @@ export default function ArticleCard({ item }: Props) {
   const [deepDiveLoading, setDeepDiveLoading] = React.useState(false);
   const [deepDiveError, setDeepDiveError] = React.useState<string | null>(null);
   const [deepDiveData, setDeepDiveData] = React.useState<any | null>(null);
+  const [isPinned, setIsPinned] = React.useState(false);
+  const [pinning, setPinning] = React.useState(false);
   // Cache deep dive data by key (pmid||title)
   const deepDiveCacheRef = React.useRef<Map<string, any>>(new Map());
 
@@ -50,6 +54,61 @@ export default function ArticleCard({ item }: Props) {
       setDeepDiveLoading(false);
     }
   }
+
+  async function handlePin() {
+    setPinning(true);
+    try {
+      // For now, we'll store pinned articles in localStorage
+      // In a full implementation, this would be a backend API call
+      const projectId = new URLSearchParams(window.location.search).get('projectId');
+      if (!projectId) {
+        alert('Please select a project first to pin articles');
+        return;
+      }
+
+      const pinnedKey = `pinned_articles_${projectId}`;
+      const existing = JSON.parse(localStorage.getItem(pinnedKey) || '[]');
+      
+      const articleData = {
+        title: headerTitle,
+        pmid: headerPmid,
+        url: headerUrl,
+        summary: summary.substring(0, 200) + '...',
+        publication_score,
+        confidence_score,
+        pinned_at: new Date().toISOString()
+      };
+
+      if (isPinned) {
+        // Unpin
+        const filtered = existing.filter((a: any) => a.pmid !== headerPmid || a.title !== headerTitle);
+        localStorage.setItem(pinnedKey, JSON.stringify(filtered));
+        setIsPinned(false);
+      } else {
+        // Pin
+        const updated = [articleData, ...existing];
+        localStorage.setItem(pinnedKey, JSON.stringify(updated));
+        setIsPinned(true);
+      }
+    } catch (error) {
+      console.error('Failed to pin article:', error);
+    } finally {
+      setPinning(false);
+    }
+  }
+
+  // Check if article is already pinned on mount
+  React.useEffect(() => {
+    const projectId = new URLSearchParams(window.location.search).get('projectId');
+    if (projectId) {
+      const pinnedKey = `pinned_articles_${projectId}`;
+      const existing = JSON.parse(localStorage.getItem(pinnedKey) || '[]');
+      const isCurrentlyPinned = existing.some((a: any) => 
+        a.pmid === headerPmid || (a.title === headerTitle && headerTitle)
+      );
+      setIsPinned(isCurrentlyPinned);
+    }
+  }, [headerPmid, headerTitle]);
   return (
     <article className="bg-white border border-gray-200 rounded-lg shadow-sm p-4 sm:p-6 flex flex-col gap-3 sm:gap-4 text-black">
       <header className="flex items-start justify-between gap-4">
@@ -240,38 +299,58 @@ export default function ArticleCard({ item }: Props) {
         </div>
       ) : null}
 
-      <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:justify-end">
+      <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:justify-between">
         <button
-          className="w-full sm:w-auto rounded bg-indigo-600 text-white px-4 py-2 text-sm hover:bg-indigo-500 transition-colors"
-          onClick={handleDeepDive}
+          onClick={handlePin}
+          disabled={pinning}
+          className={`inline-flex items-center px-3 py-2 rounded-lg text-sm transition-colors ${
+            isPinned 
+              ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' 
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+          title={isPinned ? 'Unpin from workspace' : 'Pin to workspace'}
         >
-          Deep Dive Analysis
+          {isPinned ? (
+            <BookmarkSolidIcon className="h-4 w-4 mr-1" />
+          ) : (
+            <BookmarkIcon className="h-4 w-4 mr-1" />
+          )}
+          {pinning ? 'Saving...' : (isPinned ? 'Pinned' : 'Pin')}
         </button>
-        <label className="w-full sm:w-auto inline-flex items-center justify-center text-sm text-indigo-700 cursor-pointer">
-          <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={async (e) => {
-            const f = e.target.files?.[0];
-            if (!f) return;
-            setDeepDiveOpen(true);
-            setDeepDiveLoading(true);
-            setDeepDiveError(null);
-            setDeepDiveData(null);
-            try {
-              const endpoint = '/api/proxy/deep-dive-upload';
-              const form = new FormData();
-              form.append('objective', (item as any)?.query || headerTitle);
-              form.append('file', f);
-              const res = await fetch(endpoint, { method: 'POST', body: form });
-              if (!res.ok) throw new Error(`Upload failed (${res.status})`);
-              const data = await res.json();
-              setDeepDiveData({ ...data, _activeTab: 'Model' });
-            } catch (err: any) {
-              setDeepDiveError(err?.message || 'Upload deep dive failed');
-            } finally {
-              setDeepDiveLoading(false);
-            }
-          }} />
-          <span className="w-full sm:w-auto inline-block rounded border border-indigo-300 px-4 py-2 hover:bg-indigo-50 text-center transition-colors">Upload PDF</span>
-        </label>
+        
+        <div className="flex flex-col sm:flex-row gap-2">
+          <button
+            className="w-full sm:w-auto rounded bg-indigo-600 text-white px-4 py-2 text-sm hover:bg-indigo-500 transition-colors"
+            onClick={handleDeepDive}
+          >
+            Deep Dive Analysis
+          </button>
+          <label className="w-full sm:w-auto inline-flex items-center justify-center text-sm text-indigo-700 cursor-pointer">
+            <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={async (e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              setDeepDiveOpen(true);
+              setDeepDiveLoading(true);
+              setDeepDiveError(null);
+              setDeepDiveData(null);
+              try {
+                const endpoint = '/api/proxy/deep-dive-upload';
+                const form = new FormData();
+                form.append('objective', (item as any)?.query || headerTitle);
+                form.append('file', f);
+                const res = await fetch(endpoint, { method: 'POST', body: form });
+                if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+                const data = await res.json();
+                setDeepDiveData({ ...data, _activeTab: 'Model' });
+              } catch (err: any) {
+                setDeepDiveError(err?.message || 'Upload deep dive failed');
+              } finally {
+                setDeepDiveLoading(false);
+              }
+            }} />
+            <span className="w-full sm:w-auto inline-block rounded border border-indigo-300 px-4 py-2 hover:bg-indigo-50 text-center transition-colors">Upload PDF</span>
+          </label>
+        </div>
       </div>
 
       {deepDiveOpen && (
