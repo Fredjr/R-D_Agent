@@ -1,4 +1,8 @@
-const BACKEND_BASE = (process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || "").replace(/\/+$/, "");
+const BACKEND_BASE = (
+  process.env.NEXT_PUBLIC_BACKEND_URL || 
+  process.env.BACKEND_URL || 
+  "https://rd-backend-new-537209831678.us-central1.run.app" // Fallback to your production backend
+).replace(/\/+$/, "");
 
 function buildTargetUrl(req: Request, path: string[]): string {
   const suffix = encodeURI(path.join("/"));

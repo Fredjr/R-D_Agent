@@ -30,8 +30,10 @@ export async function fetchReview(args: FetchReviewArgs): Promise<any> {
   const payload = buildPayload(args);
 
   // Create AbortController for timeout handling
+  // Use longer timeout for recall mode (which processes more articles)
+  const timeoutDuration = args.preference === 'recall' ? 240000 : 120000; // 4 minutes for recall, 2 minutes for precision
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes timeout
+  const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
 
   try {
     const res = await fetch(url, {

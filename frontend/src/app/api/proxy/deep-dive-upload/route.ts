@@ -1,6 +1,10 @@
 export const runtime = 'edge';
 
-const BACKEND_BASE = (process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || "").replace(/\/+$/, "");
+const BACKEND_BASE = (
+  process.env.NEXT_PUBLIC_BACKEND_URL || 
+  process.env.BACKEND_URL || 
+  "https://rd-backend-new-537209831678.us-central1.run.app" // Fallback to your production backend
+).replace(/\/+$/, "");
 
 export async function POST(req: Request) {
   if (!BACKEND_BASE) return new Response("Backend not configured", { status: 500 });

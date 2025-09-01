@@ -69,6 +69,16 @@ export default function Home() {
               <span className="text-lg sm:text-xl font-semibold text-gray-900 hidden xs:block">R&D Agent</span>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
+              {selectedProjectId && (
+                <Link
+                  href={`/project/${selectedProjectId}`}
+                  className="inline-flex items-center px-3 py-2 sm:px-4 sm:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm sm:text-base"
+                >
+                  <FolderIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Back to Project</span>
+                  <span className="sm:hidden">Project</span>
+                </Link>
+              )}
               <Link
                 href="/dashboard"
                 className="inline-flex items-center px-3 py-2 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
@@ -83,6 +93,31 @@ export default function Home() {
       </nav>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+        {/* Breadcrumb Navigation */}
+        {(selectedProjectId || results.length > 0) && (
+          <nav className="mb-4 sm:mb-6">
+            <ol className="flex items-center space-x-2 text-sm text-gray-500">
+              <li>
+                <Link href="/dashboard" className="hover:text-gray-700">
+                  Projects
+                </Link>
+              </li>
+              {selectedProjectId && (
+                <>
+                  <li>/</li>
+                  <li>
+                    <Link href={`/project/${selectedProjectId}`} className="hover:text-gray-700">
+                      Project
+                    </Link>
+                  </li>
+                </>
+              )}
+              <li>/</li>
+              <li className="text-gray-900 font-medium">Research Analysis</li>
+            </ol>
+          </nav>
+        )}
+
         <div className="text-center mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-3 sm:mb-4">
             AI-Powered Research Analysis
@@ -105,10 +140,10 @@ export default function Home() {
               <h3 className="font-medium text-blue-900 text-sm sm:text-base">Analyzing Research...</h3>
             </div>
             <p className="text-blue-800 text-xs sm:text-sm">
-              This may take 1-2 minutes as we search literature databases and perform AI analysis on the most relevant articles.
+              This may take 1-2 minutes for precision mode or up to 4 minutes for recall mode as we search literature databases and perform AI analysis.
             </p>
             <div className="mt-3 text-xs text-blue-700">
-              💡 <strong>Tip:</strong> More specific queries typically process faster and yield better results.
+              💡 <strong>Tip:</strong> Precision mode is faster and yields focused results. Recall mode is more comprehensive but takes longer.
             </div>
           </div>
         )}
@@ -147,6 +182,24 @@ export default function Home() {
         ) : null}
 
         <ResultsList results={results} />
+        
+        {/* New Research Button when results are shown */}
+        {results.length > 0 && (
+          <div className="mt-8 text-center">
+            <button
+              onClick={() => {
+                setResults([]);
+                setDiagnostics(null);
+                setQueries(null);
+                setError(null);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              + Start New Research
+            </button>
+          </div>
+        )}
       </main>
     </div>
   );

@@ -205,6 +205,10 @@ export default function ProjectWorkspace() {
     router.push(`/?projectId=${projectId}`);
   };
 
+  const goToResearchPage = () => {
+    router.push('/');
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -280,13 +284,20 @@ export default function ProjectWorkspace() {
               </div>
             </div>
             
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               <button
                 onClick={() => setShowCollaborators(!showCollaborators)}
                 className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
               >
                 <ShareIcon className="h-5 w-5 mr-2" />
                 Collaborate
+              </button>
+              <button
+                onClick={goToResearchPage}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                <BeakerIcon className="h-5 w-5 mr-2" />
+                Research Hub
               </button>
               <button
                 onClick={startNewResearch}
