@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { PlusIcon, FolderIcon, UsersIcon, CalendarIcon, BeakerIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, FolderIcon, UsersIcon, CalendarIcon, BeakerIcon, UserIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
 
 interface Project {
   project_id: string;
@@ -18,6 +20,8 @@ interface ProjectListResponse {
 }
 
 export default function Dashboard() {
+  const { user, isLoading: authLoading } = useAuth();
+  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +29,13 @@ export default function Dashboard() {
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectDescription, setNewProjectDescription] = useState('');
   const [creating, setCreating] = useState(false);
+
+  // Redirect to home if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/');
+    }
+  }, [user, authLoading, router]);
 
   useEffect(() => {
     fetchProjects();
@@ -107,15 +118,22 @@ export default function Dashboard() {
     });
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading your projects...</p>
+          <p className="mt-4 text-gray-600">
+            {authLoading ? 'Authenticating...' : 'Loading your projects...'}
+          </p>
         </div>
       </div>
     );
+  }
+
+  // Don't render dashboard if not authenticated
+  if (!user) {
+    return null;
   }
 
   return (
