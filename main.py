@@ -7,6 +7,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 import os
 from dotenv import load_dotenv
 from fastapi.concurrency import run_in_threadpool
+import bcrypt
 
 # Step 2.2.1: Import LangChain components for prompt-driven chain
 from langchain.prompts import PromptTemplate
@@ -64,13 +65,26 @@ try:
     from sentence_transformers import CrossEncoder
     _HAS_CROSS = True
 except Exception:
-    CrossEncoder = None  # type: ignore
     _HAS_CROSS = False
+except Exception:
+    CrossEncoder = None  # type: ignore
 
 # Load environment variables
 load_dotenv()
 
-app = FastAPI()
+# Password hashing utilities
+def hash_password(password: str) -> str:
+    """Hash a password using bcrypt"""
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return hashed.decode('utf-8')
+
+def verify_password(password: str, hashed: str) -> bool:
+    """Verify a password against its hash"""
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+
+# Initialize FastAPI app
+app = FastAPI(title="R&D Agent API", version="1.0.0")
 
 # Enable CORS for frontend dev (broad for local dev)
 app.add_middleware(
@@ -3104,6 +3118,25 @@ async def startup_event():
 async def root():
     return {"status": "ok"}
 
+@app.get("/health")
+async def health_check(db: Session = Depends(get_db)):
+    """Health check endpoint with database connectivity"""
+    try:
+        # Test database connection
+        db.execute(text("SELECT 1"))
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy", 
+            "database": "disconnected",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
 
 @app.get("/ready")
 async def ready() -> dict:
@@ -3173,8 +3206,9 @@ async def auth_signin(auth_data: AuthRequest, db: Session = Depends(get_db)):
         if not user.registration_completed:
             raise HTTPException(status_code=400, detail="Registration not completed")
         
-        # TODO: Add password verification here
-        # For now, we'll skip password verification
+        # Verify password
+        if not verify_password(auth_data.password, user.password_hash):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
         
         return {
             "user_id": user.user_id,
@@ -3199,12 +3233,12 @@ async def auth_signup(auth_data: SignUpRequest, db: Session = Depends(get_db)):
         if existing_user:
             raise HTTPException(status_code=400, detail="User already exists")
         
-        # Create incomplete user record
+        # Create incomplete user record with hashed password
         user = User(
             user_id=auth_data.email,
             username=auth_data.email.split('@')[0],
             email=auth_data.email,
-            password_hash=auth_data.password,  # TODO: Hash this properly
+            password_hash=hash_password(auth_data.password),
             first_name="",  # Will be filled in step 2
             last_name="",
             category="",
