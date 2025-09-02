@@ -44,6 +44,7 @@ def test_complete_registration(user_id):
     print("📝 Testing Complete Registration...")
     
     registration_data = {
+        "user_id": user_id,  # Include user_id in request
         "first_name": "Test",
         "last_name": "User",
         "category": "Academic",
@@ -55,8 +56,6 @@ def test_complete_registration(user_id):
     }
     
     try:
-        # Note: This would normally require authentication
-        # For testing, we'll simulate the request
         response = requests.post(f"{BACKEND_URL}/auth/complete-registration", json=registration_data)
         print(f"Complete Registration Response Status: {response.status_code}")
         
