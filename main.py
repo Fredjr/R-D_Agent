@@ -5826,11 +5826,19 @@ async def create_project(project_data: dict, db: Session = Depends(get_db)):
         # Ensure user exists
         user = db.query(User).filter(User.user_id == owner_user_id).first()
         if not user:
-            # Create default user if doesn't exist
+            # Create default user if doesn't exist with required fields
             user = User(
                 user_id=owner_user_id,
-                username=owner_user_id,
-                email=f"{owner_user_id}@example.com"
+                username=owner_user_id.split('@')[0] if '@' in owner_user_id else owner_user_id,
+                email=owner_user_id if '@' in owner_user_id else f"{owner_user_id}@example.com",
+                first_name="User",
+                last_name="Name",
+                category="Academic",
+                role="Researcher", 
+                institution="Unknown",
+                subject_area="General",
+                how_heard_about_us="Direct",
+                registration_completed=False
             )
             db.add(user)
             db.commit()
