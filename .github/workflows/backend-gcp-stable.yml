@@ -1,0 +1,134 @@
+name: Backend Deploy (Cloud Run - Stable)
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: 'Git reference to deploy (commit SHA, tag, or branch)'
+        required: true
+        default: 'main'
+
+concurrency:
+  group: backend-deploy-stable
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.git_ref }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Set gcloud project
+        run: gcloud config set project ${{ secrets.GCP_PROJECT_ID }} -q
+
+      - name: Enable required services (idempotent)
+        run: |
+          gcloud services enable run.googleapis.com artifactregistry.googleapis.com secretmanager.googleapis.com iamcredentials.googleapis.com -q
+
+      - name: Ensure Pinecone index exists and get host
+        continue-on-error: true
+        id: pinecone
+        env:
+          PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
+          PINECONE_INDEX: ${{ secrets.PINECONE_INDEX }}
+          PINECONE_HOST: ${{ secrets.PINECONE_HOST }}
+        run: |
+          set -euo pipefail
+          IDX="${PINECONE_INDEX:-rd-agent-memory}"
+          if [ -n "${PINECONE_HOST:-}" ]; then
+            echo "host=${PINECONE_HOST}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          CODE=$(curl -sS -w "%{http_code}" -o list.json -H "Api-Key: $PINECONE_API_KEY" https://api.pinecone.io/indexes || true)
+          if [ "$CODE" != "200" ] || ! jq -e . list.json >/dev/null 2>&1; then
+            echo "host=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          if ! jq -e --arg n "$IDX" '.indexes // [] | map(.name) | index($n)' list.json >/dev/null; then
+            echo "Creating Pinecone index $IDX"
+            CODE=$(curl -sS -w "%{http_code}" -o create.json -X POST https://api.pinecone.io/indexes \
+              -H "Api-Key: $PINECONE_API_KEY" -H "Content-Type: application/json" \
+              -d "{\"name\":\"$IDX\",\"dimension\":384,\"metric\":\"cosine\",\"spec\":{\"serverless\":{\"cloud\":\"aws\",\"region\":\"us-east-1\"}}}" || true)
+            if [ "$CODE" = "201" ] || [ "$CODE" = "200" ]; then
+              sleep 5
+            fi
+          fi
+          CODE=$(curl -sS -w "%{http_code}" -o desc.json -H "Api-Key: $PINECONE_API_KEY" https://api.pinecone.io/indexes/$IDX || true)
+          if [ "$CODE" = "200" ] && jq -e . desc.json >/dev/null 2>&1; then
+            HOST=$(jq -r '.host // empty' desc.json)
+            echo "host=$HOST" >> $GITHUB_OUTPUT
+          else
+            echo "host=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Enable Docker auth
+        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev -q
+
+      - name: Docker login to Artifact Registry
+        run: |
+          REGION=${{ secrets.GCP_REGION }}
+          gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://$REGION-docker.pkg.dev
+
+      - name: Ensure Artifact Registry repository exists
+        run: |
+          AR_REPO="${{ secrets.AR_REPO }}"; if [ -z "$AR_REPO" ]; then AR_REPO='rd-agent'; fi
+          gcloud artifacts repositories create "$AR_REPO" \
+            --repository-format=docker --location=${{ secrets.GCP_REGION }} \
+            --description="RD Agent images" || true
+
+      - name: Build & Push image
+        run: |
+          set -euo pipefail
+          GCP_PROJECT_ID="${{ secrets.GCP_PROJECT_ID }}"
+          AR_REPO="${{ secrets.AR_REPO }}"; if [ -z "$AR_REPO" ]; then AR_REPO='rd-agent'; fi
+          REGION="${{ secrets.GCP_REGION }}"
+          REPO="$GCP_PROJECT_ID/$AR_REPO"
+          IMAGE="$REGION-docker.pkg.dev/$REPO/backend-stable:$(git rev-parse --short HEAD)"
+          docker build -t $IMAGE .
+          docker push $IMAGE
+        working-directory: .
+
+      - name: Deploy to Cloud Run (stable)
+        run: |
+          set -euo pipefail
+          GCP_PROJECT_ID="${{ secrets.GCP_PROJECT_ID }}"
+          AR_REPO="${{ secrets.AR_REPO }}"; if [ -z "$AR_REPO" ]; then AR_REPO='rd-agent'; fi
+          REGION="${{ secrets.GCP_REGION }}"
+          REPO="$GCP_PROJECT_ID/$AR_REPO"
+          IMAGE="$REGION-docker.pkg.dev/$REPO/backend-stable:$(git rev-parse --short HEAD)"
+          HEAD=$(git rev-parse --short HEAD)
+          ALLOW_ORIGIN_REGEX_VAL="${{ secrets.ALLOW_ORIGIN_REGEX }}"; if [ -z "$ALLOW_ORIGIN_REGEX_VAL" ]; then ALLOW_ORIGIN_REGEX_VAL='.*'; fi
+          PINECONE_HOST_VAL="${{ secrets.PINECONE_HOST }}"
+          if [ -z "$PINECONE_HOST_VAL" ]; then PINECONE_HOST_VAL="${{ secrets.PINECOST_HOST }}"; fi
+          if [ -z "$PINECONE_HOST_VAL" ]; then PINECONE_HOST_VAL="${{ steps.pinecone.outputs.host }}"; fi
+
+          gcloud run deploy ${{ secrets.BACKEND_SERVICE_STABLE }} \
+            --image $IMAGE \
+            --region ${{ secrets.GCP_REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --cpu 1 --memory 2Gi --min-instances 1 \
+            --timeout 300 \
+            --set-env-vars=GEMINI_MAIN_MODEL=gemini-1.5-pro,GEMINI_SMALL_MODEL=gemini-1.5-flash \
+            --set-env-vars=TOTAL_BUDGET_S=120,HARVEST_BUDGET_S=30,TRIAGE_BUDGET_S=10,DEEPDIVE_BUDGET_S=75,SYNTH_BUDGET_S=8,ENTAILMENT_BUDGET_S=3.0,TRIAGE_TOP_K=20,DEEPDIVE_TOP_K=8 \
+            --set-env-vars=ALLOW_ORIGIN_REGEX="$ALLOW_ORIGIN_REGEX_VAL" \
+            --set-env-vars=GOOGLE_GENAI_API_KEY="${{ secrets.GOOGLE_GENAI_API_KEY }}",GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}",GOOGLE_CSE_ID="${{ secrets.GOOGLE_CSE_ID }}" \
+            --set-env-vars=PINECONE_API_KEY="${{ secrets.PINECONE_API_KEY }}",PINECONE_INDEX="${{ secrets.PINECONE_INDEX }}",PINECONE_HOST="$PINECONE_HOST_VAL",PUBMED_RETMAX=25 \
+            --set-env-vars=APP_VERSION=$HEAD,GIT_SHA=$HEAD,UNPAYWALL_EMAIL="${{ secrets.UNPAYWALL_EMAIL }}" \
+            --set-env-vars=DB_HOST="${{ secrets.DB_HOST_STABLE }}",DB_PORT="${{ secrets.DB_PORT_STABLE }}",DB_NAME="${{ secrets.DB_NAME_STABLE }}",DB_USER="${{ secrets.DB_USER_STABLE }}",DB_PASSWORD="${{ secrets.DB_PASSWORD_STABLE }}"
+
+      - name: Output backend URL
+        run: gcloud run services describe ${{ secrets.BACKEND_SERVICE_STABLE }} --region ${{ secrets.GCP_REGION }} --format='value(status.url)'
