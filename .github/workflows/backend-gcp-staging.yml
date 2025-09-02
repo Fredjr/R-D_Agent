@@ -21,20 +21,17 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
-          service_account: rd-deployer@rd-agent-dev.iam.gserviceaccount.com
-          create_credentials_file: true
-          export_environment_variables: false
+          project_id: rd-agent-dev
 
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v0
-        with:
-          skip_install: false
+        uses: google-github-actions/setup-gcloud@v2
 
-      - name: Set gcloud project explicitly
+      - name: Verify authentication and set config
         run: |
           gcloud config set project rd-agent-dev -q
           gcloud config set compute/region us-central1 -q
           echo "Current project: $(gcloud config get-value project)"
+          echo "Current account: $(gcloud auth list --filter=status:ACTIVE --format='value(account)')"
 
       - name: Enable required services (idempotent)
         run: |
