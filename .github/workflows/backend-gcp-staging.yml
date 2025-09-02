@@ -134,8 +134,6 @@ jobs:
               --container-arg main:app \
               --container-arg --host \
               --container-arg 0.0.0.0 \
-              --container-arg --port \
-              --container-arg 8080 \
               --container-arg --timeout-keep-alive \
               --container-arg 75 \
               --container-arg --workers \
