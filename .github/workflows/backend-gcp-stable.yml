@@ -22,8 +22,8 @@ jobs:
       
       - name: Checkout specific commit
         run: |
-          git fetch origin
-          git checkout ${{ github.event.inputs.git_ref }}
+          git fetch --all
+          git checkout ${{ github.event.inputs.git_ref }} || git checkout -b temp-deploy ${{ github.event.inputs.git_ref }}
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
