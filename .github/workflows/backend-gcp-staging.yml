@@ -9,6 +9,15 @@ concurrency:
   group: backend-deploy
   cancel-in-progress: true
 
+env:
+  GCP_PROJECT_ID: rd-agent-staging
+  GCP_REGION: us-central1
+  AR_REPO: rd-agent
+  BACKEND_SERVICE: rd-agent-backend-staging
+  PINECONE_INDEX: rd-agent-memory
+  PINECONE_HOST: rd-agent-memory-staging.svc.us-east-1.pinecone.io
+  ALLOW_ORIGIN_REGEX: .*
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -18,16 +27,16 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          project_id: ${{ env.GCP_PROJECT_ID }}
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
         with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          project_id: ${{ env.GCP_PROJECT_ID }}
 
       - name: Set gcloud project
-        run: gcloud config set project ${{ secrets.GCP_PROJECT_ID }} -q
+        run: gcloud config set project ${{ env.GCP_PROJECT_ID }} -q
 
       - name: Enable required services (idempotent)
         run: |
@@ -38,8 +47,8 @@ jobs:
         id: pinecone
         env:
           PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
-          PINECONE_INDEX: ${{ secrets.PINECONE_INDEX }}
-          PINECONE_HOST: ${{ secrets.PINECONE_HOST }}
+          PINECONE_INDEX: ${{ env.PINECONE_INDEX }}
+          PINECONE_HOST: ${{ env.PINECONE_HOST }}
         run: |
           set -euo pipefail
           IDX="${PINECONE_INDEX:-rd-agent-memory}"
@@ -72,26 +81,26 @@ jobs:
           fi
 
       - name: Enable Docker auth
-        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev -q
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev -q
 
       - name: Preflight - route traffic to latest (best-effort)
         continue-on-error: true
         run: |
-          gcloud run services update-traffic ${{ secrets.BACKEND_SERVICE }} \
-            --region ${{ secrets.GCP_REGION }} \
+          gcloud run services update-traffic ${{ env.BACKEND_SERVICE }} \
+            --region ${{ env.GCP_REGION }} \
             --to-latest \
             --quiet
 
       - name: Docker login to Artifact Registry
         run: |
-          REGION=${{ secrets.GCP_REGION }}
+          REGION=${{ env.GCP_REGION }}
           gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://$REGION-docker.pkg.dev
 
       - name: Ensure Artifact Registry repository exists
         run: |
-          AR_REPO="${{ secrets.AR_REPO }}"; if [ -z "$AR_REPO" ]; then AR_REPO='rd-agent'; fi
+          AR_REPO="${{ env.AR_REPO }}"; if [ -z "$AR_REPO" ]; then AR_REPO='rd-agent'; fi
           gcloud artifacts repositories create "$AR_REPO" \
-            --repository-format=docker --location=${{ secrets.GCP_REGION }} \
+            --repository-format=docker --location=${{ env.GCP_REGION }} \
             --description="RD Agent images" || true
 
       - name: Build & Push image
@@ -116,19 +125,19 @@ jobs:
           IMAGE="$REGION-docker.pkg.dev/$REPO/backend:$(git rev-parse --short HEAD)"
           HEAD=$(git rev-parse --short HEAD)
           # Safely handle regex with special chars like <, > by quoting
-          ALLOW_ORIGIN_REGEX_VAL="${{ secrets.ALLOW_ORIGIN_REGEX }}"; if [ -z "$ALLOW_ORIGIN_REGEX_VAL" ]; then ALLOW_ORIGIN_REGEX_VAL='.*'; fi
+          ALLOW_ORIGIN_REGEX_VAL="${{ env.ALLOW_ORIGIN_REGEX }}"; if [ -z "$ALLOW_ORIGIN_REGEX_VAL" ]; then ALLOW_ORIGIN_REGEX_VAL='.*'; fi
           # Prefer explicit PINECONE_HOST secret; then (optional) typo fallback; then step output
-          PINECONE_HOST_VAL="${{ secrets.PINECONE_HOST }}"
-          if [ -z "$PINECONE_HOST_VAL" ]; then PINECONE_HOST_VAL="${{ secrets.PINECOST_HOST }}"; fi
+          PINECONE_HOST_VAL="${{ env.PINECONE_HOST }}"
+          if [ -z "$PINECONE_HOST_VAL" ]; then PINECONE_HOST_VAL="${{ env.PINECONE_HOST }}"; fi
           if [ -z "$PINECONE_HOST_VAL" ]; then PINECONE_HOST_VAL="${{ steps.pinecone.outputs.host }}"; fi
 
           # Retry wrapper to avoid ABORTED etag/version conflicts on the service
           attempts=4
           for i in $(seq 1 $attempts); do
             set +e
-            gcloud run deploy ${{ secrets.BACKEND_SERVICE }} \
+            gcloud run deploy ${{ github.env.BACKEND_SERVICE }} \
               --image $IMAGE \
-              --region ${{ secrets.GCP_REGION }} \
+              --region ${{ github.env.GCP_REGION }} \
               --platform managed \
               --allow-unauthenticated \
               --cpu 1 --memory 2Gi --min-instances 1 \
@@ -157,7 +166,7 @@ jobs:
               --set-env-vars=TOTAL_BUDGET_S=300,HARVEST_BUDGET_S=60,TRIAGE_BUDGET_S=20,DEEPDIVE_BUDGET_S=200,SYNTH_BUDGET_S=15,ENTAILMENT_BUDGET_S=8.0,TRIAGE_TOP_K=20,DEEPDIVE_TOP_K=8 \
               --set-env-vars=ALLOW_ORIGIN_REGEX="$ALLOW_ORIGIN_REGEX_VAL" \
               --set-env-vars=GOOGLE_GENAI_API_KEY="${{ secrets.GOOGLE_GENAI_API_KEY }}",GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}",GOOGLE_CSE_ID="${{ secrets.GOOGLE_CSE_ID }}" \
-              --set-env-vars=PINECONE_API_KEY="${{ secrets.PINECONE_API_KEY }}",PINECONE_INDEX="${{ secrets.PINECONE_INDEX }}",PINECONE_HOST="$PINECONE_HOST_VAL",PUBMED_RETMAX=25 \
+              --set-env-vars=PINECONE_API_KEY="${{ secrets.PINECONE_API_KEY }}",PINECONE_INDEX="${{ env.PINECONE_INDEX }}",PINECONE_HOST="$PINECONE_HOST_VAL",PUBMED_RETMAX=25 \
               --set-env-vars=APP_VERSION=$HEAD,GIT_SHA=$HEAD,UNPAYWALL_EMAIL="${{ secrets.UNPAYWALL_EMAIL }}" \
               --set-env-vars=DATABASE_URL="postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@${{ secrets.DB_HOST }}:${{ secrets.DB_PORT }}/${{ secrets.DB_NAME }}",DB_HOST="${{ secrets.DB_HOST }}",DB_PORT="${{ secrets.DB_PORT }}",DB_NAME="${{ secrets.DB_NAME }}",DB_USER="${{ secrets.DB_USER }}",DB_PASSWORD="${{ secrets.DB_PASSWORD }}"
             rc=$?
@@ -177,8 +186,8 @@ jobs:
       - name: Route traffic if new revision is Ready
         run: |
           set -euo pipefail
-          SERVICE="${{ secrets.BACKEND_SERVICE }}"
-          REGION="${{ secrets.GCP_REGION }}"
+          SERVICE="${{ env.BACKEND_SERVICE }}"
+          REGION="${{ env.GCP_REGION }}"
 
           NEW_REV=$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.latestCreatedRevisionName)')
           echo "Latest created revision: $NEW_REV"
@@ -202,4 +211,4 @@ jobs:
           exit 0
 
       - name: Output backend URL
-        run: gcloud run services describe ${{ secrets.BACKEND_SERVICE }} --region ${{ secrets.GCP_REGION }} --format='value(status.url)'
+        run: gcloud run services describe ${{ env.BACKEND_SERVICE }} --region ${{ env.GCP_REGION }} --format='value(status.url)'
