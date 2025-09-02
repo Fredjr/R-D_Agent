@@ -18,8 +18,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.git_ref }}
           fetch-depth: 0
+      
+      - name: Checkout specific commit
+        run: git checkout ${{ github.event.inputs.git_ref }}
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
