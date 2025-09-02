@@ -137,6 +137,22 @@ jobs:
               --port 8080 \
               --cpu-boost \
               --startup-cpu-boost \
+              --execution-environment gen2 \
+              --min-instances 1 \
+              --use-http2 \
+              --container-command "uvicorn" \
+              --container-arg main:app \
+              --container-arg --host \
+              --container-arg 0.0.0.0 \
+              --container-arg --port \
+              --container-arg 8080 \
+              --container-arg --timeout-keep-alive \
+              --container-arg 75 \
+              --container-arg --workers \
+              --container-arg 2 \
+              --startup-probe-period 10s \
+              --startup-probe-timeout 5s \
+              --startup-probe-failure-threshold 30 \
               --set-env-vars=GEMINI_MAIN_MODEL=gemini-1.5-pro,GEMINI_SMALL_MODEL=gemini-1.5-flash \
               --set-env-vars=TOTAL_BUDGET_S=300,HARVEST_BUDGET_S=60,TRIAGE_BUDGET_S=20,DEEPDIVE_BUDGET_S=200,SYNTH_BUDGET_S=15,ENTAILMENT_BUDGET_S=8.0,TRIAGE_TOP_K=20,DEEPDIVE_TOP_K=8 \
               --set-env-vars=ALLOW_ORIGIN_REGEX="$ALLOW_ORIGIN_REGEX_VAL" \
