@@ -1,16 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
-    const response = await fetch(`${backendUrl}/auth/complete-registration`, {
+    // Add user_id to the request body for the backend
+    const requestBody = {
+      user_id: body.user_id || body.email, // Use email as fallback user_id
+      first_name: body.first_name,
+      last_name: body.last_name,
+      category: body.category,
+      role: body.role,
+      institution: body.institution,
+      subject_area: body.subject_area,
+      how_heard_about_us: body.how_heard_about_us,
+      join_mailing_list: body.join_mailing_list || false
+    };
+    
+    const response = await fetch(`${BACKEND_URL}/auth/complete-registration`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(requestBody),
     });
 
     const data = await response.json();
