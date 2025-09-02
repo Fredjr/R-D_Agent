@@ -132,7 +132,7 @@ jobs:
               --use-http2 \
               --set-env-vars="GEMINI_MAIN_MODEL=gemini-1.5-pro,GEMINI_SMALL_MODEL=gemini-1.5-flash,TOTAL_BUDGET_S=300,HARVEST_BUDGET_S=60,TRIAGE_BUDGET_S=20,DEEPDIVE_BUDGET_S=200,SYNTH_BUDGET_S=15,ENTAILMENT_BUDGET_S=8.0,TRIAGE_TOP_K=20,DEEPDIVE_TOP_K=8,ALLOW_ORIGIN_REGEX=.*,PINECONE_INDEX=rd-agent-staging,PINECONE_HOST=gcp-starter.pinecone.io,PUBMED_RETMAX=25" \
               --set-env-vars="GOOGLE_GENAI_API_KEY=${{ secrets.GOOGLE_GENAI_API_KEY }},GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }},GOOGLE_CSE_ID=${{ secrets.GOOGLE_CSE_ID }},PINECONE_API_KEY=${{ secrets.PINECONE_API_KEY }},UNPAYWALL_EMAIL=${{ secrets.UNPAYWALL_EMAIL }},DATABASE_URL=${{ secrets.DATABASE_URL }}" \
-              --set-env-vars="APP_VERSION=$HEAD,GIT_SHA=$HEAD" \
+              --set-env-vars="APP_VERSION=$HEAD,GIT_SHA=$HEAD"
             rc=$?
             set -e
             if [ $rc -eq 0 ]; then
