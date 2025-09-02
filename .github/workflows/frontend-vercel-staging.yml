@@ -27,14 +27,15 @@ jobs:
           NEXT_PUBLIC_BACKEND_URL: ${{ secrets.BACKEND_PUBLIC_URL }}
         run: npm run build
 
-      - name: Deploy to Vercel Staging
+      - name: Deploy to Vercel
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_STAGING }}
           NEXT_PUBLIC_BACKEND_URL: ${{ secrets.BACKEND_PUBLIC_URL }}
         run: |
+          cd frontend
           npx vercel --version | cat
-          npx vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
+          npx vercel pull --yes --environment=preview --token "$VERCEL_TOKEN"
           npx vercel build --token "$VERCEL_TOKEN"
-          npx vercel deploy --prebuilt --prod --token "$VERCEL_TOKEN"
+          npx vercel deploy --prebuilt --token "$VERCEL_TOKEN"
