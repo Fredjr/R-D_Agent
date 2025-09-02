@@ -7,6 +7,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 import os
 from dotenv import load_dotenv
 from fastapi.concurrency import run_in_threadpool
+from sqlalchemy import text
 import bcrypt
 
 # Step 2.2.1: Import LangChain components for prompt-driven chain
