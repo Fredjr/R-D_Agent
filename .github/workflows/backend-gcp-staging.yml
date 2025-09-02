@@ -21,14 +21,14 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
-          project_id: rd-agent-dev
+          project_id: r-and-d-agent-mvp
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Verify authentication and set config
         run: |
-          gcloud config set project rd-agent-dev -q
+          gcloud config set project r-and-d-agent-mvp -q
           gcloud config set compute/region us-central1 -q
           echo "Current project: $(gcloud config get-value project)"
           echo "Current account: $(gcloud auth list --filter=status:ACTIVE --format='value(account)')"
@@ -99,7 +99,7 @@ jobs:
       - name: Build & Push image
         run: |
           set -euo pipefail
-          IMAGE="us-central1-docker.pkg.dev/rd-agent-dev/rd-agent/backend:$(git rev-parse --short HEAD)"
+          IMAGE="us-central1-docker.pkg.dev/r-and-d-agent-mvp/rd-agent/backend:$(git rev-parse --short HEAD)"
           docker build -t $IMAGE .
           docker push $IMAGE
         working-directory: .
@@ -107,7 +107,7 @@ jobs:
       - name: Deploy to Cloud Run (no-traffic)
         run: |
           set -euo pipefail
-          IMAGE="us-central1-docker.pkg.dev/rd-agent-dev/rd-agent/backend:$(git rev-parse --short HEAD)"
+          IMAGE="us-central1-docker.pkg.dev/r-and-d-agent-mvp/rd-agent/backend:$(git rev-parse --short HEAD)"
           HEAD=$(git rev-parse --short HEAD)
           # Safely handle regex with special chars like <, > by quoting
           ALLOW_ORIGIN_REGEX_VAL=".*"; if [ -z "$ALLOW_ORIGIN_REGEX_VAL" ]; then ALLOW_ORIGIN_REGEX_VAL='.*'; fi
