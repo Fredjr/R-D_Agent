@@ -3144,37 +3144,142 @@ def set_current_user(user_id: str):
 
 class AuthRequest(BaseModel):
     email: str = Field(..., description="User email address")
-    username: Optional[str] = Field(None, description="Display name")
+    password: str = Field(..., description="User password")
 
-@app.post("/auth/login")
-async def auth_login(auth_data: AuthRequest, db: Session = Depends(get_db)):
-    """Authenticate or create user"""
+class SignUpRequest(BaseModel):
+    email: str = Field(..., description="User email address")
+    password: str = Field(..., description="User password")
+
+class UserDetailsRequest(BaseModel):
+    first_name: str = Field(..., description="User first name")
+    last_name: str = Field(..., description="User last name")
+    category: str = Field(..., description="User category: Student, Academic, Industry")
+    role: str = Field(..., description="User role based on category")
+    institution: str = Field(..., description="User institution")
+    subject_area: str = Field(..., description="Subject area of focus")
+    how_heard_about_us: str = Field(..., description="How user heard about the platform")
+    join_mailing_list: bool = Field(default=False, description="Join mailing list")
+
+@app.post("/auth/signin")
+async def auth_signin(auth_data: AuthRequest, db: Session = Depends(get_db)):
+    """Sign in existing user"""
     try:
-        # Check if user exists
+        # Check if user exists and registration is complete
         user = db.query(User).filter(User.email == auth_data.email).first()
         
         if not user:
-            # Create new user
-            user = User(
-                user_id=auth_data.email,  # Use email as user_id
-                username=auth_data.username or auth_data.email.split('@')[0],
-                email=auth_data.email
-            )
-            db.add(user)
-            db.commit()
-            db.refresh(user)
+            raise HTTPException(status_code=404, detail="User not found")
         
-        # Set current user
-        set_current_user(user.user_id)
+        if not user.registration_completed:
+            raise HTTPException(status_code=400, detail="Registration not completed")
+        
+        # TODO: Add password verification here
+        # For now, we'll skip password verification
         
         return {
             "user_id": user.user_id,
             "username": user.username,
             "email": user.email,
-            "created_at": user.created_at.isoformat()
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "created_at": user.created_at.isoformat(),
+            "registration_completed": user.registration_completed
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Authentication failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Sign in failed: {str(e)}")
+
+@app.post("/auth/signup")
+async def auth_signup(auth_data: SignUpRequest, db: Session = Depends(get_db)):
+    """Create new user account (step 1)"""
+    try:
+        # Check if user already exists
+        existing_user = db.query(User).filter(User.email == auth_data.email).first()
+        if existing_user:
+            raise HTTPException(status_code=400, detail="User already exists")
+        
+        # Create incomplete user record
+        user = User(
+            user_id=auth_data.email,
+            username=auth_data.email.split('@')[0],
+            email=auth_data.email,
+            password_hash=auth_data.password,  # TODO: Hash this properly
+            first_name="",  # Will be filled in step 2
+            last_name="",
+            category="",
+            role="",
+            institution="",
+            subject_area="",
+            how_heard_about_us="",
+            registration_completed=False
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        
+        return {
+            "user_id": user.user_id,
+            "email": user.email,
+            "registration_completed": False,
+            "message": "Account created. Please complete your profile."
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Sign up failed: {str(e)}")
+
+@app.post("/auth/complete-registration")
+async def complete_registration(user_details: UserDetailsRequest, db: Session = Depends(get_db)):
+    """Complete user registration with detailed information"""
+    try:
+        # Get current user from context (you'll need to pass user_id)
+        current_user = get_current_user_id()
+        if not current_user:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        user = db.query(User).filter(User.user_id == current_user).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Update user with complete information
+        user.first_name = user_details.first_name
+        user.last_name = user_details.last_name
+        user.category = user_details.category
+        user.role = user_details.role
+        user.institution = user_details.institution
+        user.subject_area = user_details.subject_area
+        user.how_heard_about_us = user_details.how_heard_about_us
+        user.join_mailing_list = user_details.join_mailing_list
+        user.registration_completed = True
+        user.username = f"{user_details.first_name} {user_details.last_name}"
+        
+        db.commit()
+        db.refresh(user)
+        
+        return {
+            "user_id": user.user_id,
+            "username": user.username,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "category": user.category,
+            "role": user.role,
+            "institution": user.institution,
+            "subject_area": user.subject_area,
+            "created_at": user.created_at.isoformat(),
+            "registration_completed": True,
+            "message": "Registration completed successfully!"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Registration completion failed: {str(e)}")
+
+@app.post("/auth/login")
+async def auth_login(auth_data: AuthRequest, db: Session = Depends(get_db)):
+    """Legacy login endpoint - redirects to signin"""
+    return await auth_signin(auth_data, db)
 
 # Project Management Endpoints
 
