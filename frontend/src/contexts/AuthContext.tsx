@@ -125,22 +125,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const completeRegistration = async (userDetails: any) => {
     setIsLoading(true);
     try {
+      // Get current user from localStorage to get user_id
+      const currentUser = localStorage.getItem('rd_agent_user');
+      let user_id = userDetails.user_id;
+      
+      if (!user_id && currentUser) {
+        const parsedUser = JSON.parse(currentUser);
+        user_id = parsedUser.user_id || parsedUser.email;
+      }
+
+      const requestData = {
+        ...userDetails,
+        user_id: user_id
+      };
+
       const response = await fetch('/api/proxy/auth/complete-registration', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userDetails),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestData),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Registration completion failed');
+        const error = await response.json();
+        throw new Error(error.detail || 'Registration completion failed');
       }
 
       const userData = await response.json();
       setUser(userData);
       localStorage.setItem('rd_agent_user', JSON.stringify(userData));
+      return userData;
     } catch (error) {
       console.error('Registration completion failed:', error);
       throw error;

@@ -3229,30 +3229,37 @@ async def auth_signup(auth_data: SignUpRequest, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Sign up failed: {str(e)}")
 
+class CompleteRegistrationRequest(BaseModel):
+    user_id: str
+    first_name: str
+    last_name: str
+    category: str
+    role: str
+    institution: str
+    subject_area: str
+    how_heard_about_us: str
+    join_mailing_list: bool = False
+
 @app.post("/auth/complete-registration")
-async def complete_registration(user_details: UserDetailsRequest, db: Session = Depends(get_db)):
+async def complete_registration(request: CompleteRegistrationRequest, db: Session = Depends(get_db)):
     """Complete user registration with detailed information"""
     try:
-        # Get current user from context (you'll need to pass user_id)
-        current_user = get_current_user_id()
-        if not current_user:
-            raise HTTPException(status_code=401, detail="Not authenticated")
-        
-        user = db.query(User).filter(User.user_id == current_user).first()
+        # Find user by user_id from request
+        user = db.query(User).filter(User.user_id == request.user_id).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         
         # Update user with complete information
-        user.first_name = user_details.first_name
-        user.last_name = user_details.last_name
-        user.category = user_details.category
-        user.role = user_details.role
-        user.institution = user_details.institution
-        user.subject_area = user_details.subject_area
-        user.how_heard_about_us = user_details.how_heard_about_us
-        user.join_mailing_list = user_details.join_mailing_list
+        user.first_name = request.first_name
+        user.last_name = request.last_name
+        user.category = request.category
+        user.role = request.role
+        user.institution = request.institution
+        user.subject_area = request.subject_area
+        user.how_heard_about_us = request.how_heard_about_us
+        user.join_mailing_list = request.join_mailing_list
         user.registration_completed = True
-        user.username = f"{user_details.first_name} {user_details.last_name}"
+        user.username = f"{request.first_name} {request.last_name}"
         
         db.commit()
         db.refresh(user)
