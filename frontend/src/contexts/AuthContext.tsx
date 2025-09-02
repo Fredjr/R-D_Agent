@@ -6,12 +6,22 @@ interface User {
   user_id: string;
   username: string;
   email: string;
+  first_name?: string;
+  last_name?: string;
+  category?: string;
+  role?: string;
+  institution?: string;
+  subject_area?: string;
   created_at: string;
+  registration_completed?: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
   login: (email: string, username?: string) => Promise<void>;
+  signin: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string) => Promise<void>;
+  completeRegistration: (userDetails: any) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -48,29 +58,92 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         created_at: new Date().toISOString()
       };
 
-      // Save to backend (create user if doesn't exist)
-      try {
-        const response = await fetch('/api/proxy/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, username: userData.username }),
-        });
-        
-        if (response.ok) {
-          const backendUser = await response.json();
-          setUser(backendUser);
-          localStorage.setItem('rd_agent_user', JSON.stringify(backendUser));
-        } else {
-          // Fallback to client-side user
-          setUser(userData);
-          localStorage.setItem('rd_agent_user', JSON.stringify(userData));
-        }
-      } catch (error) {
-        // Fallback to client-side user if backend fails
-        console.warn('Backend auth failed, using client-side auth:', error);
-        setUser(userData);
-        localStorage.setItem('rd_agent_user', JSON.stringify(userData));
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+    } catch (error) {
+      console.error('Login failed:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const signin = async (email: string, password: string) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/proxy/auth/signin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Sign in failed');
       }
+
+      const userData = await response.json();
+      setUser(userData);
+      localStorage.setItem('rd_agent_user', JSON.stringify(userData));
+    } catch (error) {
+      console.error('Sign in failed:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const signup = async (email: string, password: string) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/proxy/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Sign up failed');
+      }
+
+      const userData = await response.json();
+      setUser(userData);
+      localStorage.setItem('rd_agent_user', JSON.stringify(userData));
+    } catch (error) {
+      console.error('Sign up failed:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const completeRegistration = async (userDetails: any) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/proxy/auth/complete-registration', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userDetails),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Registration completion failed');
+      }
+
+      const userData = await response.json();
+      setUser(userData);
+      localStorage.setItem('rd_agent_user', JSON.stringify(userData));
+    } catch (error) {
+      console.error('Registration completion failed:', error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -82,7 +155,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, login, signin, signup, completeRegistration, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

@@ -105,13 +105,13 @@ export default function Home() {
                   </div>
                 </>
               ) : (
-                <button
-                  onClick={() => setShowAuthModal(true)}
+                <Link
+                  href="/auth"
                   className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
                 >
                   <UserIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                   Sign In
-                </button>
+                </Link>
               )}
             </div>
           </div>
@@ -165,13 +165,13 @@ export default function Home() {
             <p className="text-gray-600 mb-6">
               Access your personalized research workspace, save projects, and collaborate with your team.
             </p>
-            <button
-              onClick={() => setShowAuthModal(true)}
+            <Link
+              href="/auth"
               className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
             >
               <UserIcon className="h-5 w-5 mr-2" />
-              Sign In / Sign Up
-            </button>
+              Get Started
+            </Link>
           </div>
         )}
 

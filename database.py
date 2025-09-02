@@ -46,10 +46,27 @@ class User(Base):
     user_id = Column(String, primary_key=True)  # Can be email or UUID
     username = Column(String, unique=True, nullable=False)
     email = Column(String, unique=True, nullable=False)
-    password_hash = Column(String, nullable=True)  # For future authentication
+    password_hash = Column(String, nullable=True)  # For authentication
+    
+    # Personal information
+    first_name = Column(String, nullable=False)
+    last_name = Column(String, nullable=False)
+    
+    # Professional information
+    category = Column(String, nullable=False)  # Student, Academic, Industry
+    role = Column(String, nullable=False)  # Role based on category
+    institution = Column(String, nullable=False)
+    subject_area = Column(String, nullable=False)
+    
+    # Marketing and communication
+    how_heard_about_us = Column(String, nullable=False)
+    join_mailing_list = Column(Boolean, default=False)
+    
+    # System fields
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     is_active = Column(Boolean, default=True)
+    registration_completed = Column(Boolean, default=False)  # Track if full registration is complete
     
     # User preferences
     preferences = Column(JSON, default=dict)  # Store user settings

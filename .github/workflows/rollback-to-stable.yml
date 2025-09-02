@@ -1,0 +1,74 @@
+name: 🚨 Emergency Rollback to Stable
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_rollback:
+        description: 'Type "rollback" to confirm emergency rollback to stable baseline'
+        required: true
+        type: string
+      rollback_reason:
+        description: 'Reason for rollback (optional)'
+        required: false
+        type: string
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm_rollback == 'rollback'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for tags
+
+      - name: Rollback to stable baseline
+        run: |
+          set -euo pipefail
+          
+          # Configure git
+          git config --global user.name 'GitHub Actions (Rollback)'
+          git config --global user.email 'actions@github.com'
+          
+          # Checkout stable baseline
+          git checkout stable-baseline-v1.0
+          
+          # Create rollback branch
+          ROLLBACK_BRANCH="rollback-$(date +%Y%m%d-%H%M%S)"
+          git checkout -b "$ROLLBACK_BRANCH"
+          
+          # Force push to main (emergency rollback)
+          git push origin HEAD:main --force
+          
+          echo "✅ Emergency rollback completed"
+          echo "📝 Reason: ${{ github.event.inputs.rollback_reason }}"
+          echo "🏷️ Rolled back to: stable-baseline-v1.0"
+          echo "🌿 Rollback branch: $ROLLBACK_BRANCH"
+
+      - name: Create rollback issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const reason = '${{ github.event.inputs.rollback_reason }}' || 'No reason provided';
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🚨 Emergency Rollback Performed',
+              body: `## Rollback Details
+              
+              **Timestamp**: ${new Date().toISOString()}
+              **Rolled back to**: stable-baseline-v1.0
+              **Reason**: ${reason}
+              **Triggered by**: @${context.actor}
+              
+              ## Next Steps
+              1. Investigate the issue that caused the rollback
+              2. Fix the problem in a new branch
+              3. Test thoroughly in staging
+              4. Promote to stable when ready
+              
+              ## Deployment Status
+              - ✅ Main branch restored to stable baseline
+              - ✅ Staging deployments will continue normally
+              - ✅ Stable Vercel project remains protected`,
+              labels: ['emergency', 'rollback', 'deployment']
+            });
