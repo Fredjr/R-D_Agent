@@ -134,6 +134,9 @@ jobs:
               --cpu 1 --memory 2Gi --min-instances 1 \
               --timeout 900 \
               --no-traffic \
+              --port 8080 \
+              --cpu-boost \
+              --startup-cpu-boost \
               --set-env-vars=GEMINI_MAIN_MODEL=gemini-1.5-pro,GEMINI_SMALL_MODEL=gemini-1.5-flash \
               --set-env-vars=TOTAL_BUDGET_S=300,HARVEST_BUDGET_S=60,TRIAGE_BUDGET_S=20,DEEPDIVE_BUDGET_S=200,SYNTH_BUDGET_S=15,ENTAILMENT_BUDGET_S=8.0,TRIAGE_TOP_K=20,DEEPDIVE_TOP_K=8 \
               --set-env-vars=ALLOW_ORIGIN_REGEX="$ALLOW_ORIGIN_REGEX_VAL" \
