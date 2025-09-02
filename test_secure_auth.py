@@ -10,7 +10,7 @@ import uuid
 import time
 
 # Backend URL
-BACKEND_URL = "https://rd-backend-new-537209831678.us-central1.run.app"
+BASE_URL = "https://rd-backend-new-537209831678.us-central1.run.app"
 
 def test_secure_authentication():
     """Test complete authentication flow with secure password hashing"""
@@ -27,7 +27,7 @@ def test_secure_authentication():
     try:
         # Test 1: Health Check
         print("\n1️⃣ Testing health check endpoint...")
-        health_response = requests.get(f"{BACKEND_URL}/health", timeout=30)
+        health_response = requests.get(f"{BASE_URL}/health", timeout=30)
         print(f"   Status: {health_response.status_code}")
         if health_response.status_code == 200:
             health_data = health_response.json()
@@ -42,7 +42,7 @@ def test_secure_authentication():
         }
         
         signup_response = requests.post(
-            f"{BACKEND_URL}/auth/signup",
+            f"{BASE_URL}/auth/signup",
             json=signup_data,
             timeout=30
         )
@@ -71,7 +71,7 @@ def test_secure_authentication():
         }
         
         complete_response = requests.post(
-            f"{BACKEND_URL}/auth/complete-registration",
+            f"{BASE_URL}/auth/complete-registration",
             json=complete_data,
             timeout=30
         )
@@ -91,7 +91,7 @@ def test_secure_authentication():
         }
         
         signin_response = requests.post(
-            f"{BACKEND_URL}/auth/signin",
+            f"{BASE_URL}/auth/signin",
             json=signin_data,
             timeout=30
         )
@@ -114,7 +114,7 @@ def test_secure_authentication():
         }
         
         wrong_signin_response = requests.post(
-            f"{BACKEND_URL}/auth/signin",
+            f"{BASE_URL}/auth/signin",
             json=wrong_signin_data,
             timeout=30
         )

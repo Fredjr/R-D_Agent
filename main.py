@@ -308,7 +308,7 @@ response_cache = TTLCache(RESPONSE_CACHE_TTL)
 synonyms_cache = TTLCache(int(os.getenv("SYNONYMS_CACHE_TTL", "86400")))
 ALWAYS_THREE_SECTIONS = os.getenv("ALWAYS_THREE_SECTIONS", "0") not in ("0", "false", "False")
 CROSS_ENCODER_ENABLED = os.getenv("CROSS_ENCODER_ENABLED", "0") not in ("0", "false", "False")
-TOTAL_BUDGET_S = float(os.getenv("TOTAL_BUDGET_S", "90"))
+TOTAL_BUDGET_S = float(os.getenv("TOTAL_BUDGET_S", "240"))
 PER_QUERY_BUDGET_S = float(os.getenv("PER_QUERY_BUDGET_S", "20"))
 ENABLE_AGENT = os.getenv("ENABLE_AGENT", "0") not in ("0", "false", "False")
 ENABLE_CRITIC = os.getenv("ENABLE_CRITIC", "0") not in ("0", "false", "False")
@@ -4494,7 +4494,11 @@ async def feedback(payload: dict):
 async def generate_review(request: ReviewRequest, db: Session = Depends(get_db)):
     req_start = _now_ms()
     _metrics_inc("requests_total", 1)
-    deadline = time.time() + TOTAL_BUDGET_S
+    
+    # Dynamic timeout based on preference: 5min for recall, 4min for precision
+    preference = getattr(request, "preference", "precision") or "precision"
+    timeout_budget = 300 if preference.lower() == "recall" else 240  # 5min vs 4min
+    deadline = time.time() + timeout_budget
 
     def time_left_s() -> float:
         return max(0.0, deadline - time.time())
