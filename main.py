@@ -5812,69 +5812,72 @@ async def get_user(user_id: str, db: Session = Depends(get_db)):
 # PROJECT MANAGEMENT ENDPOINTS
 # =============================================================================
 
-@app.post("/projects")
-async def create_project(project_data: dict, db: Session = Depends(get_db)):
+class ProjectCreate(BaseModel):
+    project_name: str
+    description: Optional[str] = None
+    owner_user_id: str
+    tags: List[str] = []
+    settings: Dict[str, Any] = {}
+
+class ProjectResponse(BaseModel):
+    id: str
+    project_name: str
+    description: Optional[str]
+    owner_user_id: str
+    tags: List[str]
+    settings: Dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+@app.post("/projects", response_model=ProjectResponse)
+async def create_project(
+    project_data: ProjectCreate,
+    db: Session = Depends(get_db)
+):
     """Create a new project"""
     try:
-        from database import Project, User
+        from database import Project, User, ProjectCollaborator
         import uuid
         
-        project_id = str(uuid.uuid4())
-        project_name = project_data.get("project_name")
-        description = project_data.get("description", "")
-        owner_user_id = project_data.get("owner_user_id", "default_user")
-        
-        if not project_name:
-            raise HTTPException(status_code=400, detail="Project name is required")
-        
-        # Ensure user exists
-        user = db.query(User).filter(User.user_id == owner_user_id).first()
-        if not user:
-            # Create default user if doesn't exist with required fields
-            user = User(
-                user_id=owner_user_id,
-                username=owner_user_id.split('@')[0] if '@' in owner_user_id else owner_user_id,
-                email=owner_user_id if '@' in owner_user_id else f"{owner_user_id}@example.com",
-                first_name="User",
-                last_name="Name",
-                category="Academic",
-                role="Researcher", 
-                institution="Unknown",
-                subject_area="General",
-                how_heard_about_us="Direct",
-                registration_completed=False
-            )
-            db.add(user)
-            db.commit()
-        
-        # Create new project
-        new_project = Project(
-            project_id=project_id,
-            project_name=project_name,
-            description=description,
-            owner_user_id=owner_user_id,
-            tags=project_data.get("tags", []),
-            settings=project_data.get("settings", {})
+        # Verify owner exists
+        owner = db.query(User).filter(User.user_id == project_data.owner_user_id).first()
+        if not owner:
+            raise HTTPException(status_code=404, detail=f"Owner {project_data.owner_user_id} not found")
+            
+        # Create project
+        project = Project(
+            id=str(uuid.uuid4()),
+            project_name=project_data.project_name,
+            description=project_data.description,
+            owner_user_id=project_data.owner_user_id,
+            tags=project_data.tags,
+            settings=project_data.settings
         )
         
-        db.add(new_project)
+        # Add owner as collaborator
+        collaborator = ProjectCollaborator(
+            project_id=project.id,
+            user_id=project_data.owner_user_id,
+            role="owner"
+        )
+        
+        db.add(project)
+        db.add(collaborator)
         db.commit()
-        db.refresh(new_project)
+        db.refresh(project)
         
-        return {
-            "project_id": new_project.project_id,
-            "project_name": new_project.project_name,
-            "description": new_project.description,
-            "owner_user_id": new_project.owner_user_id,
-            "created_at": new_project.created_at.isoformat(),
-            "tags": new_project.tags,
-            "settings": new_project.settings
-        }
+        return project
         
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error creating project: {str(e)}")
-
+        
+        
 @app.get("/projects")
 async def list_projects(user_id: str = "default_user", db: Session = Depends(get_db)):
     """List all projects for a user"""
