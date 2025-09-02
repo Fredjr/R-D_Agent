@@ -104,7 +104,7 @@ jobs:
           docker push $IMAGE
         working-directory: .
 
-      - name: Deploy to Cloud Run (no-traffic)
+      - name: Deploy to Cloud Run (conditional traffic)
         run: |
           set -euo pipefail
           IMAGE="us-central1-docker.pkg.dev/r-and-d-agent-mvp/rd-agent/backend:$(git rev-parse --short HEAD)"
@@ -114,19 +114,28 @@ jobs:
           # Prefer explicit PINECONE_HOST secret; then (optional) typo fallback; then step output
           PINECONE_HOST_VAL="gcp-starter.pinecone.io"
 
+          BACKEND_SERVICE=rd-agent-staging
+          # Determine whether the service already exists; if not, we must NOT use --no-traffic
+          if gcloud run services describe "$BACKEND_SERVICE" --region us-central1 --format='value(metadata.name)' >/dev/null 2>&1; then
+            echo "Service $BACKEND_SERVICE exists; deploying new revision with --no-traffic"
+            NO_TRAFFIC_FLAG="--no-traffic"
+          else
+            echo "Service $BACKEND_SERVICE does not exist; creating it with default traffic"
+            NO_TRAFFIC_FLAG=""
+          fi
+
           # Retry wrapper to avoid ABORTED etag/version conflicts on the service
           attempts=4
           for i in $(seq 1 $attempts); do
             set +e
-            BACKEND_SERVICE=rd-agent-staging
-            gcloud run deploy $BACKEND_SERVICE \
-              --image $IMAGE \
+            gcloud run deploy "$BACKEND_SERVICE" \
+              --image "$IMAGE" \
               --region us-central1 \
               --platform managed \
               --allow-unauthenticated \
               --cpu 1 --memory 2Gi --min-instances 1 \
               --timeout 900 \
-              --no-traffic \
+              ${NO_TRAFFIC_FLAG} \
               --port 8080 \
               --cpu-boost \
               --use-http2 \
