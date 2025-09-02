@@ -3294,7 +3294,8 @@ async def complete_registration(request: CompleteRegistrationRequest, db: Sessio
         user.how_heard_about_us = request.how_heard_about_us
         user.join_mailing_list = request.join_mailing_list
         user.registration_completed = True
-        user.username = f"{request.first_name} {request.last_name}"
+        # Generate unique username - use email prefix to ensure uniqueness
+        user.username = user.email.split('@')[0]
         
         db.commit()
         db.refresh(user)
