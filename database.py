@@ -42,7 +42,9 @@ if DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgres
         pool_pre_ping=True,    # Verify connections before use
         pool_recycle=3600,     # Recycle connections every hour
         connect_args={
-            "sslmode": "require" if "localhost" not in DATABASE_URL else "prefer"
+            "sslmode": "require" if "localhost" not in DATABASE_URL else "prefer",
+            # Short connection timeout so startup doesn't hang if DB is unreachable
+            "connect_timeout": int(os.getenv("DB_CONNECT_TIMEOUT", "8"))
         }
     )
     print("🗄️ Using Google Cloud SQL PostgreSQL - Production database configured!")

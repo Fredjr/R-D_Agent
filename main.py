@@ -3113,7 +3113,9 @@ class AnnotationResponse(BaseModel):
 # Initialize database on startup
 @app.on_event("startup")
 async def startup_event():
-    init_db()
+    # Non-blocking: DB init is handled later in a guarded startup hook.
+    # Avoid heavy work here so the server can bind to the PORT promptly on Cloud Run.
+    return
 
 @app.get("/")
 async def root():
@@ -5719,21 +5721,6 @@ async def debug_database():
     }
     
     return db_info
-
-# Initialize database on startup
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database and create tables on startup"""
-    try:
-        from database import init_db, test_connection
-        
-        if test_connection():
-            init_db()
-            print("✅ Database initialized successfully on startup")
-        else:
-            print("❌ Database connection failed on startup")
-    except Exception as e:
-        print(f"⚠️ Database initialization error: {e}")
 
 # =============================================================================
 # USER MANAGEMENT ENDPOINTS
