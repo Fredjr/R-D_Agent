@@ -21,3 +21,4 @@ nltk
 pdfminer.six
 alembic
 bcrypt
+jsonschema
