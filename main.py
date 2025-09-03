@@ -137,20 +137,30 @@ def _get_embeddings():
             _EMBEDDINGS_OBJ = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     return _EMBEDDINGS_OBJ
 _CROSS_MODEL_NAME = os.getenv("CROSS_ENCODER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
+_CROSS_ENCODER_ENABLED = os.getenv("CROSS_ENCODER_ENABLED", "0") not in ("0","false","False")
 cross_encoder = None
-if os.getenv("CROSS_ENCODER_ENABLED", "0") not in ("0","false","False") and _HAS_CROSS:
-    try:
-        cross_encoder = CrossEncoder(_CROSS_MODEL_NAME)
-    except Exception:
-        cross_encoder = None
+
+def _get_cross_encoder():
+    global cross_encoder
+    if cross_encoder is None and _CROSS_ENCODER_ENABLED and _HAS_CROSS:
+        try:
+            cross_encoder = CrossEncoder(_CROSS_MODEL_NAME)
+        except Exception:
+            cross_encoder = None
+    return cross_encoder
+
 _NLI_MODEL_NAME = os.getenv("NLI_CROSS_ENCODER_MODEL", "cross-encoder/nli-deberta-v3-base")
 _ENTAILMENT_ENABLED = os.getenv("ENTAILMENT_ENABLED", "0") not in ("0","false","False")
 nli_encoder = None
-if _HAS_CROSS and _ENTAILMENT_ENABLED:
-    try:
-        nli_encoder = CrossEncoder(_NLI_MODEL_NAME)
-    except Exception:
-        nli_encoder = None
+
+def _get_nli_encoder():
+    global nli_encoder
+    if nli_encoder is None and _HAS_CROSS and _ENTAILMENT_ENABLED:
+        try:
+            nli_encoder = CrossEncoder(_NLI_MODEL_NAME)
+        except Exception:
+            nli_encoder = None
+    return nli_encoder
 
 # Pinecone client
 PINECONE_INDEX = os.getenv("PINECONE_INDEX", "rd-agent-memory")
@@ -930,7 +940,7 @@ def _nli_entailment_filter(abstract: str, fact_anchors: list[dict], deadline: fl
     """Use CrossEncoder NLI model to keep anchors with high entailment confidence.
     Fallback to lightweight filter if model/time not available.
     """
-    if not _ENTAILMENT_ENABLED or nli_encoder is None or _time_left(deadline) < ENTAILMENT_BUDGET_S:
+    if not _ENTAILMENT_ENABLED or _get_nli_encoder() is None or _time_left(deadline) < ENTAILMENT_BUDGET_S:
         return _lightweight_entailment_filter(abstract, fact_anchors)
     try:
         pairs = []
@@ -941,7 +951,7 @@ def _nli_entailment_filter(abstract: str, fact_anchors: list[dict], deadline: fl
         if not pairs:
             return fact_anchors
         # Predict entailment confidence; normalize to [0,1] if needed
-        scores = nli_encoder.predict(pairs)
+        scores = _get_nli_encoder().predict(pairs)
         kept = []
         for fa, sc in zip(fact_anchors, scores):
             try:
@@ -1148,9 +1158,9 @@ def _build_dag_app():
             shortlist = _triage_rank(request.objective, norm, triage_cap, None, mol_tokens, getattr(request, "preference", None))
             # Cross-encoder re-ranking for DAG shortlist if enabled and time remains (robustness: blend CE with heuristic)
             try:
-                if cross_encoder is not None and time_left > 5.0:
+                if _get_cross_encoder() is not None and time_left > 5.0:
                     pairs = [(request.objective or "", (a.get('title') or '') + ". " + (a.get('abstract') or '')) for a in shortlist[:30]]
-                    scores = cross_encoder.predict(pairs)
+                    scores = _get_cross_encoder().predict(pairs)
                     # Blend + threshold to drop weak items without over-pruning
                     ce_thresh = 0.2  # conservative
                     keep: list[dict] = []
@@ -2374,7 +2384,7 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
     shortlist = _triage_rank(request.objective, norm, triage_cap, proj_vec, mol_tokens, getattr(request, "preference", None))
     # Cross-encoder re-ranking for V2 shortlist
     try:
-        if cross_encoder is not None and _time_left(deadline) > 5.0:
+        if _get_cross_encoder() is not None and _time_left(deadline) > 5.0:
             pairs = [(request.objective or "", (a.get('title') or '') + ". " + (a.get('abstract') or '')) for a in shortlist[:30]]
             scores = cross_encoder.predict(pairs)
             ce_thresh = 0.2
@@ -5002,9 +5012,9 @@ Objective: {objective}
             try:
                 articles = sorted(articles, key=_score_article, reverse=True)
                 # Cross-encoder re-rank top 30 for sharper order (skip if budget nearly spent)
-                if cross_encoder is not None and time_left_s() > 10.0:
+                if _get_cross_encoder() is not None and time_left_s() > 10.0:
                     pairs = [(request.objective or "", (a.get('title') or '') + ". " + (a.get('abstract') or '')) for a in articles[:30]]
-                    scores = cross_encoder.predict(pairs)
+                    scores = _get_cross_encoder().predict(pairs)
                     for i, s in enumerate(scores):
                         articles[i]["score_breakdown"]["cross_score"] = float(s)
                         # blend: 80% original + 20% cross
