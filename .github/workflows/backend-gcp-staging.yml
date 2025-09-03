@@ -100,7 +100,7 @@ jobs:
         run: |
           set -euo pipefail
           IMAGE="us-central1-docker.pkg.dev/r-and-d-agent-mvp/rd-agent/backend:$(git rev-parse --short HEAD)"
-          docker build -t $IMAGE .
+          docker build --platform linux/amd64 -t $IMAGE .
           docker push $IMAGE
         working-directory: .
 
