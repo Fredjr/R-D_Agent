@@ -102,7 +102,7 @@ jobs:
           REGION="${{ secrets.GCP_REGION }}"
           REPO="$GCP_PROJECT_ID/$AR_REPO"
           IMAGE="$REGION-docker.pkg.dev/$REPO/backend-stable:$(git rev-parse --short HEAD)"
-          docker build -t $IMAGE .
+          docker build --platform linux/amd64 -t $IMAGE .
           docker push $IMAGE
         working-directory: .
 
