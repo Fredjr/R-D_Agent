@@ -11,25 +11,8 @@ import os
 from typing import Optional
 
 # Database configuration - Google Cloud SQL PostgreSQL
-# Instance: rd-agent-postgres
-# Database: rd_agent
-# Connection name: r-and-d-agent-mvp:us-central1:rd-agent-postgres
-DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL")
-
-# If no DATABASE_URL provided, construct from Google Cloud SQL components
-if not DATABASE_URL:
-    db_user = os.getenv("DB_USER", "postgres")
-    db_password = os.getenv("DB_PASSWORD", "")
-    db_host = os.getenv("DB_HOST", "34.31.30.156")  # Google Cloud SQL public IP
-    db_port = os.getenv("DB_PORT", "5432")
-    db_name = "rd_agent"
-    
-    if db_password:
-        # External connection to Google Cloud SQL
-        DATABASE_URL = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-    else:
-        # Local development fallback
-        DATABASE_URL = "sqlite:///./rd_agent.db"
+# Format: postgresql://[user]:[password]@[host]:[port]/[database]
+DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL") or "sqlite:///./rd_agent.db"
 
 # Lazy engine creation to prevent blocking during import
 engine = None
