@@ -99,32 +99,55 @@ app.add_middleware(
 
 # Enable CORS for frontend dev
 
-# Initialize the Gemini Pro model with API key
-# Prefer a dedicated Gemini key if provided; fall back to GOOGLE_API_KEY
+# Lazy initialization of LLM models to prevent blocking during startup
 _GENAI_KEY = os.getenv("GOOGLE_GENAI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-llm = ChatGoogleGenerativeAI(
-    model=os.getenv("GEMINI_MODEL", "gemini-1.5-pro"),
-    convert_system_message_to_human=True,
-    google_api_key=_GENAI_KEY,
-)
-llm_analyzer = ChatGoogleGenerativeAI(
-    model=os.getenv("GEMINI_SMALL_MODEL", os.getenv("GEMINI_MODEL", "gemini-1.5-pro")),
-    convert_system_message_to_human=True,
-    google_api_key=_GENAI_KEY,
-    temperature=0.2,
-)
-llm_summary = ChatGoogleGenerativeAI(
-    model=os.getenv("GEMINI_MAIN_MODEL", os.getenv("GEMINI_MODEL", "gemini-1.5-pro")),
-    convert_system_message_to_human=True,
-    google_api_key=_GENAI_KEY,
-    temperature=0.5,
-)
-llm_critic = ChatGoogleGenerativeAI(
-    model=os.getenv("GEMINI_SMALL_MODEL", os.getenv("GEMINI_MODEL", "gemini-1.5-pro")),
-    convert_system_message_to_human=True,
-    google_api_key=_GENAI_KEY,
-    temperature=0.1,
-)
+_llm = None
+_llm_analyzer = None
+_llm_summary = None
+_llm_critic = None
+
+def get_llm():
+    global _llm
+    if _llm is None:
+        _llm = ChatGoogleGenerativeAI(
+            model=os.getenv("GEMINI_MODEL", "gemini-1.5-pro"),
+            convert_system_message_to_human=True,
+            google_api_key=_GENAI_KEY,
+        )
+    return _llm
+
+def get_llm_analyzer():
+    global _llm_analyzer
+    if _llm_analyzer is None:
+        _llm_analyzer = ChatGoogleGenerativeAI(
+            model=os.getenv("GEMINI_SMALL_MODEL", os.getenv("GEMINI_MODEL", "gemini-1.5-pro")),
+            convert_system_message_to_human=True,
+            google_api_key=_GENAI_KEY,
+            temperature=0.2,
+        )
+    return _llm_analyzer
+
+def get_llm_summary():
+    global _llm_summary
+    if _llm_summary is None:
+        _llm_summary = ChatGoogleGenerativeAI(
+            model=os.getenv("GEMINI_MAIN_MODEL", os.getenv("GEMINI_MODEL", "gemini-1.5-pro")),
+            convert_system_message_to_human=True,
+            google_api_key=_GENAI_KEY,
+            temperature=0.5,
+        )
+    return _llm_summary
+
+def get_llm_critic():
+    global _llm_critic
+    if _llm_critic is None:
+        _llm_critic = ChatGoogleGenerativeAI(
+            model=os.getenv("GEMINI_SMALL_MODEL", os.getenv("GEMINI_MODEL", "gemini-1.5-pro")),
+            convert_system_message_to_human=True,
+            google_api_key=_GENAI_KEY,
+            temperature=0.1,
+        )
+    return _llm_critic
 _EMBED_MODEL_NAME = os.getenv("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 _EMBEDDINGS_OBJ = None
 
@@ -1651,7 +1674,7 @@ Prior Context: {memories}
     if STRATEGIST_LLM_ENABLED:
         try:
             prompt = PromptTemplate(template=strategist_template, input_variables=["objective", "memories", "molecule"])
-            chain = LLMChain(llm=llm_analyzer, prompt=prompt)
+            chain = LLMChain(llm=get_llm_analyzer(), prompt=prompt)
             out = chain.invoke({"objective": objective[:400], "memories": memories_text[:400], "molecule": (molecule or "")[:200]})
             txt = out.get("text", out) if isinstance(out, dict) else str(out)
             if "```" in txt:
@@ -2045,7 +2068,7 @@ You are an information extraction bot. From the abstract below, return ONLY JSON
 Abstract: {abstract}
 """
     extraction_prompt = PromptTemplate(template=extraction_tmpl, input_variables=["abstract"])
-    extraction_chain = LLMChain(llm=llm_analyzer, prompt=extraction_prompt)
+    extraction_chain = LLMChain(llm=get_llm_analyzer(), prompt=extraction_prompt)
     target_deep = min(DEEPDIVE_TOP_K, len(items))
     for idx, art in enumerate(items):
         # Dynamically shrink deep-K if time is running low
@@ -2170,7 +2193,7 @@ Abstract: {abstract}
                 Abstract: {abstract}
                 """
                 cm_prompt = PromptTemplate(template=cm_tmpl, input_variables=["objective", "abstract"])
-                cm_chain = LLMChain(llm=llm_analyzer, prompt=cm_prompt)
+                cm_chain = LLMChain(llm=get_llm_analyzer(), prompt=cm_prompt)
                 cm = await run_in_threadpool(cm_chain.invoke, {"objective": objective, "abstract": abstract})
                 txt = str(cm.get("text", cm))
                 contextual_match_score = float(int(''.join(ch for ch in txt if ch.isdigit()) or '0'))
@@ -2490,7 +2513,7 @@ Output:
 
 # Step 2.2.3: Create the Prompt and LLMChain
 prompt = PromptTemplate(template=query_generation_template, input_variables=["objective"])
-query_generation_chain = LLMChain(llm=llm_analyzer, prompt=prompt)
+query_generation_chain = LLMChain(llm=get_llm_analyzer(), prompt=prompt)
 # Dedicated summarization prompt-chain that grounds the summary in a specific article abstract
 summarization_template = """
 You are writing a grounded summary based strictly on an article abstract and the user's objective.
@@ -2852,7 +2875,7 @@ objective_deconstruction_prompt = PromptTemplate(
     template=objective_deconstruction_template,
     input_variables=["objective"],
 )
-objective_deconstruction_chain = LLMChain(llm=llm_analyzer, prompt=objective_deconstruction_prompt)
+objective_deconstruction_chain = LLMChain(llm=get_llm_analyzer(), prompt=objective_deconstruction_prompt)
 
 
 # Clinical Context analyst
@@ -4119,7 +4142,7 @@ _DD_RESULTS_PROMPT = PromptTemplate(
 
 
 async def _run_deepdive_chain(prompt: PromptTemplate, objective: str, full_text: str):
-    chain = LLMChain(llm=llm_analyzer, prompt=prompt)
+    chain = LLMChain(llm=get_llm_analyzer(), prompt=prompt)
     resp = await run_in_threadpool(chain.invoke, {"objective": objective[:400], "full_text": full_text[:12000]})
     out = resp.get("text", resp) if isinstance(resp, dict) else str(resp)
     data = _ensure_module_json(out)
@@ -4168,7 +4191,7 @@ async def deep_dive(request: DeepDiveRequest, db: Session = Depends(get_db)):
         try:
             # Module 1 with timeout
             md_structured = await _with_timeout(
-                run_in_threadpool(analyze_scientific_model, text, request.objective, llm_analyzer),
+                run_in_threadpool(analyze_scientific_model, text, request.objective, get_llm_analyzer()),
                 12.0,
                 "DeepDiveModel",
                 retries=0,
@@ -4180,13 +4203,13 @@ async def deep_dive(request: DeepDiveRequest, db: Session = Depends(get_db)):
             }
             # Modules 2 and 3 with timeouts (structured)
             mth_task = _with_timeout(
-                run_in_threadpool(analyze_experimental_methods, text, request.objective, llm_analyzer),
+                run_in_threadpool(analyze_experimental_methods, text, request.objective, get_llm_analyzer()),
                 12.0,
                 "DeepDiveMethods",
                 retries=0,
             )
             res_task = _with_timeout(
-                run_in_threadpool(analyze_results_interpretation, text, request.objective, llm_analyzer),
+                run_in_threadpool(analyze_results_interpretation, text, request.objective, get_llm_analyzer()),
                 12.0,
                 "DeepDiveResults",
                 retries=0,
@@ -4328,14 +4351,14 @@ async def deep_dive_upload(objective: str = Form(...), file: UploadFile = File(.
     # Run modules (same as /deep-dive)
     try:
         md_structured = await _with_timeout(
-            run_in_threadpool(analyze_scientific_model, text, objective, llm_analyzer), 12.0, "DeepDiveModel", retries=0
+            run_in_threadpool(analyze_scientific_model, text, objective, get_llm_analyzer()), 12.0, "DeepDiveModel", retries=0
         )
         md_json = {"summary": md_structured.get("protocol_summary", ""), "relevance_justification": "", "fact_anchors": []}
         mth_task = _with_timeout(
-            run_in_threadpool(analyze_experimental_methods, text, objective, llm_analyzer), 12.0, "DeepDiveMethods", retries=0
+            run_in_threadpool(analyze_experimental_methods, text, objective, get_llm_analyzer()), 12.0, "DeepDiveMethods", retries=0
         )
         res_task = _with_timeout(
-            run_in_threadpool(analyze_results_interpretation, text, objective, llm_analyzer), 12.0, "DeepDiveResults", retries=0
+            run_in_threadpool(analyze_results_interpretation, text, objective, get_llm_analyzer()), 12.0, "DeepDiveResults", retries=0
         )
         mth, res = await asyncio.gather(mth_task, res_task)
     except Exception as e:
@@ -4796,7 +4819,7 @@ Return ONLY JSON with keys: molecule (string), mechanisms (array of strings), me
 Objective: {objective}
 """
     analyzer_prompt = PromptTemplate(template=analyzer_template + "\nExamples:\n- Objective: 'mechanism of action of aspirin in inflammation' -> mechanisms: ['COX inhibition','SPMs'], methods: ['ELISA','WB']\n- Objective: 'clinical effects of propranolol in hypertension' -> mechanisms: ['beta-adrenergic blockade'], methods: ['RCT','meta-analysis']\n", input_variables=["objective"])
-    analyzer_chain = LLMChain(llm=llm_analyzer, prompt=analyzer_prompt)
+    analyzer_chain = LLMChain(llm=get_llm_analyzer(), prompt=analyzer_prompt)
     analyzed_mechs: list[str] = []
     analyzed_methods: list[str] = []
     analyzed_diseases: list[str] = []
