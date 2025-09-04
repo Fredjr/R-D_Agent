@@ -31,29 +31,42 @@ if not DATABASE_URL:
         # Local development fallback
         DATABASE_URL = "sqlite:///./rd_agent.db"
 
-# Configure engine based on database type
-if DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgres://"):
-    # Google Cloud SQL PostgreSQL configuration
-    engine = create_engine(
-        DATABASE_URL,
-        echo=False,
-        pool_size=10,          # Increased for production
-        max_overflow=20,       # Handle traffic spikes
-        pool_pre_ping=True,    # Verify connections before use
-        pool_recycle=3600,     # Recycle connections every hour
-        connect_args={
-            "sslmode": "require" if "localhost" not in DATABASE_URL else "prefer",
-            # Short connection timeout so startup doesn't hang if DB is unreachable
-            "connect_timeout": int(os.getenv("DB_CONNECT_TIMEOUT", "8"))
-        }
-    )
-    print("🗄️ Using Google Cloud SQL PostgreSQL - Production database configured!")
-else:
-    # SQLite fallback for local development
-    engine = create_engine(DATABASE_URL, echo=False)
-    print("🗄️ Using SQLite database for local development")
+# Lazy engine creation to prevent blocking during import
+engine = None
+SessionLocal = None
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+def get_engine():
+    """Lazy engine creation to avoid blocking container startup"""
+    global engine
+    if engine is None:
+        if DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgres://"):
+            # Google Cloud SQL PostgreSQL configuration
+            engine = create_engine(
+                DATABASE_URL,
+                echo=False,
+                pool_size=10,          # Increased for production
+                max_overflow=20,       # Handle traffic spikes
+                pool_pre_ping=True,    # Verify connections before use
+                pool_recycle=3600,     # Recycle connections every hour
+                connect_args={
+                    "sslmode": "require" if "localhost" not in DATABASE_URL else "prefer",
+                    # Short connection timeout so startup doesn't hang if DB is unreachable
+                    "connect_timeout": int(os.getenv("DB_CONNECT_TIMEOUT", "8"))
+                }
+            )
+            print("🗄️ Using Google Cloud SQL PostgreSQL - Production database configured!")
+        else:
+            # SQLite fallback for local development
+            engine = create_engine(DATABASE_URL, echo=False)
+            print("🗄️ Using SQLite database for local development")
+    return engine
+
+def get_session_local():
+    """Lazy SessionLocal creation"""
+    global SessionLocal
+    if SessionLocal is None:
+        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=get_engine())
+    return SessionLocal
 Base = declarative_base()
 
 # Core Database Models
@@ -236,7 +249,7 @@ class Annotation(Base):
 # Database session dependency
 def get_db():
     """Dependency to get database session"""
-    db = SessionLocal()
+    db = get_session_local()()
     try:
         yield db
     finally:
@@ -245,12 +258,12 @@ def get_db():
 # Database management functions
 def create_tables():
     """Create all database tables"""
-    Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=get_engine())
     print("✅ Database tables created successfully")
 
 def drop_tables():
     """Drop all database tables (use with caution!)"""
-    Base.metadata.drop_all(bind=engine)
+    Base.metadata.drop_all(bind=get_engine())
     print("⚠️  All database tables dropped")
 
 def init_db():
@@ -263,7 +276,7 @@ def test_connection():
     """Test database connection"""
     try:
         # Test basic connection
-        with engine.connect() as conn:
+        with get_engine().connect() as conn:
             result = conn.execute("SELECT 1").fetchone()
             if result:
                 print("✅ Database connection successful")
