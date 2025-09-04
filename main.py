@@ -248,15 +248,22 @@ Rules:
 
 
 
-agent_executor = initialize_agent(
-    tools,
-    get_llm(),
-    agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
-    verbose=True,
-    agent_kwargs={
-        "system_message": SYSTEM_MESSAGE,
-    },
-)
+# Lazy initialization of agent_executor to prevent LLM loading at import time
+_agent_executor = None
+
+def get_agent_executor():
+    global _agent_executor
+    if _agent_executor is None:
+        _agent_executor = initialize_agent(
+            tools,
+            get_llm(),
+            agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
+            verbose=True,
+            agent_kwargs={
+                "system_message": SYSTEM_MESSAGE,
+            },
+        )
+    return _agent_executor
 
 
 
@@ -4925,7 +4932,7 @@ Objective: {objective}
         if time_left_s() <= 1.0:
             break
         try:
-            output = await run_in_threadpool(agent_executor.run, q)
+            output = await run_in_threadpool(get_agent_executor().run, q)
             _metrics_inc("llm_calls_total", 1)
         except Exception as e:
             output = f"Error running agent: {e}"
@@ -5209,7 +5216,7 @@ Objective: {objective}
             q = conditional_broad_query
             # Run agent best-effort (non-blocking if it fails)
             try:
-                output = await run_in_threadpool(agent_executor.run, q)
+                output = await run_in_threadpool(get_agent_executor().run, q)
                 _metrics_inc("llm_calls_total", 1)
             except Exception as e:
                 output = f"Error running agent: {e}"
@@ -5280,7 +5287,7 @@ Objective: {objective}
                 q = conditional_broad_query
                 if all(sec.get("query") != q for sec in results):
                     try:
-                        output = await run_in_threadpool(agent_executor.run, q)
+                        output = await run_in_threadpool(get_agent_executor().run, q)
                         _metrics_inc("llm_calls_total", 1)
                     except Exception as e:
                         output = f"Error running agent: {e}"
