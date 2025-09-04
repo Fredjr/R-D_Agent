@@ -55,7 +55,7 @@ from database import (
 )
 
 # Embeddings and Pinecone
-from langchain.embeddings import HuggingFaceEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from pinecone import Pinecone
 try:
     # Optional: legacy/alternate Index constructor in some pinecone versions
