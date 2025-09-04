@@ -15,7 +15,7 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 import json
 import re
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import time
 import threading
 from datetime import datetime
@@ -267,7 +267,6 @@ def get_agent_executor():
 
 
 
-from typing import Dict
 
 # ---------------------
 # Observability & Caching
