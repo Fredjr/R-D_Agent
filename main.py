@@ -250,7 +250,7 @@ Rules:
 
 agent_executor = initialize_agent(
     tools,
-    llm,
+    get_llm(),
     agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
     verbose=True,
     agent_kwargs={
@@ -2537,7 +2537,7 @@ Abstract:
 {abstract}
 """
 summarization_prompt = PromptTemplate(template=summarization_template, input_variables=["objective", "abstract", "memory_context"])
-summarization_chain = LLMChain(llm=llm_summary, prompt=summarization_prompt)
+summarization_chain = LLMChain(llm=get_llm_summary(), prompt=summarization_prompt)
 
 # Critic/refiner prompt to self-correct for factual alignment and clarity
 critic_refine_template = """
@@ -2553,7 +2553,7 @@ Draft JSON:
 {draft_json}
 """
 critic_refine_prompt = PromptTemplate(template=critic_refine_template, input_variables=["objective", "abstract", "draft_json"])
-critic_refine_chain = LLMChain(llm=llm_critic, prompt=critic_refine_prompt)
+critic_refine_chain = LLMChain(llm=get_llm_critic(), prompt=critic_refine_prompt)
 
 
 # Step 2.2.4: Build the wrapper function
@@ -2576,7 +2576,7 @@ Output:
 - Keep strictly to mechanism of action; no citations, no repetition
 """
 mechanism_analyst_prompt = PromptTemplate(template=mechanism_analyst_template, input_variables=["objective", "findings"])
-mechanism_analyst_chain = LLMChain(llm=llm_summary, prompt=mechanism_analyst_prompt)
+mechanism_analyst_chain = LLMChain(llm=get_llm_summary(), prompt=mechanism_analyst_prompt)
 
 biomarker_analyst_template = """
 You are an Efficacy & Biomarker Analyst.
@@ -2594,7 +2594,7 @@ Output:
 - Focus on PD-1/PD-L1, CTLA-4, TMB, GEP where relevant; no citations
 """
 biomarker_analyst_prompt = PromptTemplate(template=biomarker_analyst_template, input_variables=["objective", "findings"])
-biomarker_analyst_chain = LLMChain(llm=llm_summary, prompt=biomarker_analyst_prompt)
+biomarker_analyst_chain = LLMChain(llm=get_llm_summary(), prompt=biomarker_analyst_prompt)
 
 resistance_analyst_template = """
 You are a Resistance & Limitations Analyst.
@@ -2612,7 +2612,7 @@ Output:
 - Identify WNT/β-catenin, IFN signaling defects, T-cell exclusion where applicable; no citations
 """
 resistance_analyst_prompt = PromptTemplate(template=resistance_analyst_template, input_variables=["objective", "findings"])
-resistance_analyst_chain = LLMChain(llm=llm_summary, prompt=resistance_analyst_prompt)
+resistance_analyst_chain = LLMChain(llm=get_llm_summary(), prompt=resistance_analyst_prompt)
 
 chief_scientist_template = """
 You are the Chief Scientist presenting a strategic executive summary to an R&D lead. Using the analyst briefs below, write a cohesive narrative that connects the dots and directly addresses the user's objective.
@@ -2646,7 +2646,7 @@ Patent/Commercial Brief:
 chief_scientist_prompt = PromptTemplate(template=chief_scientist_template, input_variables=[
     "objective", "mechanism_report", "biomarker_report", "resistance_report", "clinical_report", "patent_report"
 ])
-chief_scientist_chain = LLMChain(llm=llm_summary, prompt=chief_scientist_prompt)
+chief_scientist_chain = LLMChain(llm=get_llm_summary(), prompt=chief_scientist_prompt)
 
 
 def _build_synthesis_plan(objective: str) -> list[str]:
@@ -2841,7 +2841,7 @@ def _synthesize_executive_summary(objective: str, results_sections: list[dict], 
             Findings:\n{findings}
             """
             patent_prompt = PromptTemplate(template=patent_tmpl, input_variables=["findings"])
-            patent_chain = LLMChain(llm=llm_summary, prompt=patent_prompt)
+            patent_chain = LLMChain(llm=get_llm_summary(), prompt=patent_prompt)
             pat = patent_chain.invoke({"findings": findings}).get("text", "")
     except Exception:
         pat = ""
@@ -2892,7 +2892,7 @@ Findings:
 {findings}
 """
 clinical_analyst_prompt = PromptTemplate(template=clinical_analyst_template, input_variables=["objective", "findings"])
-clinical_analyst_chain = LLMChain(llm=llm_summary, prompt=clinical_analyst_prompt)
+clinical_analyst_chain = LLMChain(llm=get_llm_summary(), prompt=clinical_analyst_prompt)
 
 
 def _strip_code_fences(text: str) -> str:
@@ -2981,7 +2981,7 @@ def _specialist_relevance_justification(objective: str, article: dict, summary: 
             Analyst Notes:\n{notes}
             """
             p = PromptTemplate(template=synth_prompt, input_variables=["notes"])
-            chain = LLMChain(llm=llm_summary, prompt=p)
+            chain = LLMChain(llm=get_llm_summary(), prompt=p)
             out = chain.invoke({"notes": "\n\n".join(pieces)}).get("text", "")
             return {"text": _strip_code_fences(out), "tags": tags}
     except Exception:
