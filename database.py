@@ -229,6 +229,33 @@ class Annotation(Base):
     report = relationship("Report")
     analysis = relationship("DeepDiveAnalysis")
 
+class ActivityLog(Base):
+    """Activity logging for project collaboration tracking"""
+    __tablename__ = "activity_logs"
+    
+    activity_id = Column(String, primary_key=True)  # UUID
+    project_id = Column(String, ForeignKey("projects.project_id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.user_id"), nullable=False)
+    
+    # Activity details
+    activity_type = Column(String, nullable=False)  # annotation_created, report_generated, etc.
+    description = Column(Text, nullable=False)
+    activity_metadata = Column(JSON, nullable=True)  # Additional context data
+    
+    # Optional links to specific items
+    article_pmid = Column(String, nullable=True)
+    report_id = Column(String, ForeignKey("reports.report_id"), nullable=True)
+    analysis_id = Column(String, ForeignKey("deep_dive_analyses.analysis_id"), nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    project = relationship("Project")
+    user = relationship("User")
+    report = relationship("Report")
+    analysis = relationship("DeepDiveAnalysis")
+
 # Database session dependency
 def get_db():
     """Dependency to get database session"""

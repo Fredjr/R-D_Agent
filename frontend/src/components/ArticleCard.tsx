@@ -3,8 +3,9 @@ import { fetchDeepDive } from '@/lib/api';
 import ScientificModelCard from '@/components/ScientificModelCard';
 import ExperimentalMethodsTable from '@/components/ExperimentalMethodsTable';
 import ResultsInterpretationCard from '@/components/ResultsInterpretationCard';
+import AnnotationsFeed from '@/components/AnnotationsFeed';
 import { BookmarkIcon } from '@heroicons/react/24/outline';
-import { BookmarkIcon as BookmarkSolidIcon } from '@heroicons/react/24/solid';
+import { BookmarkIcon as BookmarkSolidIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/solid';
 import type { SearchResult } from '@/lib/dummy-data';
 
 type Props = { item: SearchResult };
@@ -26,6 +27,7 @@ export default function ArticleCard({ item }: Props) {
   const [deepDiveData, setDeepDiveData] = React.useState<any | null>(null);
   const [isPinned, setIsPinned] = React.useState(false);
   const [pinning, setPinning] = React.useState(false);
+  const [showAnnotations, setShowAnnotations] = React.useState(false);
   // Cache deep dive data by key (pmid||title)
   const deepDiveCacheRef = React.useRef<Map<string, any>>(new Map());
 
@@ -300,23 +302,34 @@ export default function ArticleCard({ item }: Props) {
       ) : null}
 
       <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:justify-between">
-        <button
-          onClick={handlePin}
-          disabled={pinning}
-          className={`inline-flex items-center px-3 py-2 rounded-lg text-sm transition-colors ${
-            isPinned 
-              ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' 
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-          title={isPinned ? 'Unpin from workspace' : 'Pin to workspace'}
-        >
-          {isPinned ? (
-            <BookmarkSolidIcon className="h-4 w-4 mr-1" />
-          ) : (
-            <BookmarkIcon className="h-4 w-4 mr-1" />
-          )}
-          {pinning ? 'Saving...' : (isPinned ? 'Pinned' : 'Pin')}
-        </button>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <button
+            onClick={handlePin}
+            disabled={pinning}
+            className={`inline-flex items-center px-3 py-2 rounded-lg text-sm transition-colors ${
+              isPinned 
+                ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+            title={isPinned ? 'Unpin from workspace' : 'Pin to workspace'}
+          >
+            {isPinned ? (
+              <BookmarkSolidIcon className="h-4 w-4 mr-1" />
+            ) : (
+              <BookmarkIcon className="h-4 w-4 mr-1" />
+            )}
+            {pinning ? 'Saving...' : (isPinned ? 'Pinned' : 'Pin')}
+          </button>
+          
+          <button
+            onClick={() => setShowAnnotations(!showAnnotations)}
+            className="inline-flex items-center px-3 py-2 rounded-lg text-sm bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+            title="View article annotations"
+          >
+            <ChatBubbleLeftRightIcon className="h-4 w-4 mr-1" />
+            Annotate
+          </button>
+        </div>
         
         <div className="flex flex-col sm:flex-row gap-2">
           <button
@@ -352,6 +365,17 @@ export default function ArticleCard({ item }: Props) {
           </label>
         </div>
       </div>
+
+      {/* Article Annotations Panel */}
+      {showAnnotations && (
+        <div className="mt-4 border-t border-gray-200 pt-4">
+          <AnnotationsFeed 
+            projectId={new URLSearchParams(window.location.search).get('projectId') || ''}
+            articlePmid={headerPmid}
+            className="h-80"
+          />
+        </div>
+      )}
 
       {deepDiveOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setDeepDiveOpen(false)}>
