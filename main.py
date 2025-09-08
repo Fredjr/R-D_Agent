@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Response, Depends, HTTPException
+from fastapi import FastAPI, Response, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import UploadFile, File, Form
 from sqlalchemy.orm import Session
@@ -86,6 +86,37 @@ def verify_password(password: str, hashed: str) -> bool:
 
 # Initialize FastAPI app
 app = FastAPI(title="R&D Agent API", version="1.0.0")
+
+# WebSocket Connection Manager for Project Rooms
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Dict[str, List[WebSocket]] = {}
+    
+    async def connect(self, websocket: WebSocket, project_id: str):
+        await websocket.accept()
+        if project_id not in self.active_connections:
+            self.active_connections[project_id] = []
+        self.active_connections[project_id].append(websocket)
+    
+    def disconnect(self, websocket: WebSocket, project_id: str):
+        if project_id in self.active_connections:
+            self.active_connections[project_id].remove(websocket)
+            if not self.active_connections[project_id]:
+                del self.active_connections[project_id]
+    
+    async def send_personal_message(self, message: str, websocket: WebSocket):
+        await websocket.send_text(message)
+    
+    async def broadcast_to_project(self, message: str, project_id: str):
+        if project_id in self.active_connections:
+            for connection in self.active_connections[project_id]:
+                try:
+                    await connection.send_text(message)
+                except:
+                    # Remove stale connections
+                    self.active_connections[project_id].remove(connection)
+
+manager = ConnectionManager()
 
 # Enable CORS for frontend dev (broad for local dev)
 app.add_middleware(
@@ -827,7 +858,7 @@ def _extract_signals(objective: str) -> list[str]:
         out.append(s)
     return out[:8]
 
-def _plan_pubmed_queries(molecule: str, synonyms: list[str], objective: str, preference: str | None = None) -> dict:
+def _plan_pubmed_queries(molecule: str, synonyms: List[str], objective: str, preference: Optional[str] = None) -> dict:
     mol = _sanitize_molecule_name(molecule)
     comps = _split_molecule_components(molecule)
     # Build molecule tokens; if combination, require co-mention as primary clause
@@ -1004,7 +1035,7 @@ def _nli_entailment_filter(abstract: str, fact_anchors: list[dict], deadline: fl
 # ---------------------
 _DAG_APP = None
 
-def _log_node_event(name: str, start_ms: int, ok: bool, extra: dict | None = None) -> None:
+def _log_node_event(name: str, start_ms: int, ok: bool, extra: Optional[dict] = None) -> None:
     payload = {"event": f"dag_{name.lower()}", "ok": ok, "took_ms": _now_ms() - start_ms}
     if extra:
         payload.update(extra)
@@ -1015,7 +1046,7 @@ def _log_node_event(name: str, start_ms: int, ok: bool, extra: dict | None = Non
 
 async def _with_timeout(coro, timeout_s: float, name: str, retries: int = 0):
     attempt = 0
-    err: Exception | None = None
+    err: Optional[Exception] = None
     while attempt <= retries:
         try:
             return await asyncio.wait_for(coro, timeout=timeout_s)
@@ -1473,7 +1504,7 @@ def _sanitize_number(value: object, default: float = 0.0) -> float:
         return float(default)
 
 
-def _ensure_relevance_fields(structured: Dict[str, object], molecule: str, objective: str, top_article: dict | None) -> None:
+def _ensure_relevance_fields(structured: Dict[str, object], molecule: str, objective: str, top_article: Optional[dict]) -> None:
     # Ensure keys exist
     if not isinstance(structured.get("summary"), str):
         structured["summary"] = str(structured.get("summary", "")).strip()
@@ -1531,7 +1562,7 @@ def _ensure_relevance_fields(structured: Dict[str, object], molecule: str, objec
     structured["overall_relevance_score"] = round(_sanitize_number(structured.get("overall_relevance_score", 0.0), 0.0), 1)
 
 
-def _ensure_score_breakdown(structured: Dict[str, object], objective: str, abstract: str, top_article: dict | None, contextual_match_score: float | None = None) -> None:
+def _ensure_score_breakdown(structured: Dict[str, object], objective: str, abstract: str, top_article: Optional[dict], contextual_match_score: Optional[float] = None) -> None:
     """Make sure score_breakdown has objective_similarity_score, recency_score, impact_score, and contextual_match_score.
 
     Computes values if missing, using embeddings for similarity and article metadata for recency/impact.
@@ -1628,7 +1659,7 @@ def _ensure_score_breakdown(structured: Dict[str, object], objective: str, abstr
             "contextual_match_score": float(contextual_match_score or 0.0),
         })
 
-def _is_duplicate_section(top_article: dict | None, seen_pmids: set[str], seen_titles: set[str]) -> bool:
+def _is_duplicate_section(top_article: Optional[dict], seen_pmids: set[str], seen_titles: set[str]) -> bool:
     if not top_article:
         return False
     pmid = str(top_article.get("pmid") or "").strip()
@@ -1640,7 +1671,7 @@ def _is_duplicate_section(top_article: dict | None, seen_pmids: set[str], seen_t
         return False
     return False
 
-def _mark_seen(top_article: dict | None, seen_pmids: set[str], seen_titles: set[str]) -> None:
+def _mark_seen(top_article: Optional[dict], seen_pmids: set[str], seen_titles: set[str]) -> None:
     if not top_article:
         return
     pmid = str(top_article.get("pmid") or "").strip()
@@ -1658,7 +1689,7 @@ def _mark_seen(top_article: dict | None, seen_pmids: set[str], seen_titles: set[
 def _time_left(deadline: float) -> float:
     return max(0.0, deadline - time.time())
 
-def _build_query_plan(objective: str, memories_text: str, deadline: float, molecule: str | None = None) -> dict:
+def _build_query_plan(objective: str, memories_text: str, deadline: float, molecule: Optional[str] = None) -> dict:
     """Return a dict of queries. Prefer deterministic planner; optionally try LLM strategist when enabled."""
     if _time_left(deadline) < 1.0:
         return {}
@@ -1676,7 +1707,7 @@ Molecule (if any): {molecule}
 Prior Context: {memories}
 """
     # Prefer deterministic per-corpus plan. Optionally augment with LLM strategist if enabled and valid.
-    llm_plan: dict | None = None
+    llm_plan: Optional[dict] = None
     if STRATEGIST_LLM_ENABLED:
         try:
             prompt = PromptTemplate(template=strategist_template, input_variables=["objective", "memories", "molecule"])
@@ -1730,7 +1761,7 @@ Prior Context: {memories}
     return base_plan
 
 
-def _inject_molecule_into_plan(plan: dict, molecule: str | None) -> dict:
+def _inject_molecule_into_plan(plan: dict, molecule: Optional[str]) -> dict:
     """Ensure molecule token is present in key queries for better specificity.
 
     If a molecule is provided and a plan query lacks it, prefix a title/tiab clause.
@@ -1886,7 +1917,7 @@ def _normalize_candidates(items: list[dict]) -> list[dict]:
     return norm
 
 
-def _filter_by_molecule(candidates: list[dict], molecule: str | None) -> list[dict]:
+def _filter_by_molecule(candidates: list[dict], molecule: Optional[str]) -> list[dict]:
     """Prefer candidates that mention the molecule or a synonym.
     If filtering would drop everything, return the original candidates.
     """
@@ -1912,9 +1943,9 @@ def _triage_rank(
     objective: str,
     candidates: list[dict],
     max_keep: int,
-    project_vec: np.ndarray | None = None,
-    molecule_tokens: list[str] | None = None,
-    preference: str | None = None,
+    project_vec: Optional[np.ndarray] = None,
+    molecule_tokens: Optional[List[str]] = None,
+    preference: Optional[str] = None,
 ) -> list[dict]:
     # Use existing _score_article-like features; reuse embeddings cosine
     try:
@@ -2032,7 +2063,7 @@ def _triage_rank(
     return ranked[:max_keep]
 
 
-def _filter_candidates_by_molecule(candidates: list[dict], molecule: str | None, minimum_keep: int = 6) -> list[dict]:
+def _filter_candidates_by_molecule(candidates: list[dict], molecule: Optional[str], minimum_keep: int = 6) -> list[dict]:
     """If a molecule is specified, prefer items that explicitly mention the molecule or a synonym
     in the title or abstract. Always keep at least `minimum_keep` to avoid over-filtering."""
     mol = _sanitize_molecule_name(molecule or "").strip()
@@ -2680,7 +2711,7 @@ def _apply_fulltext_only_filters(plan: dict, full_text_only: bool) -> dict:
     try:
         if not full_text_only or not isinstance(plan, dict):
             return plan
-        def wrap(q: str | None) -> str | None:
+        def wrap(q: Optional[str]) -> Optional[str]:
             if not q or not isinstance(q, str) or not q.strip():
                 return q
             return f"({q}) AND (free full text[filter] OR pmc[filter])"
@@ -2699,7 +2730,7 @@ def _apply_fulltext_only_filters(plan: dict, full_text_only: bool) -> dict:
     except Exception:
         return plan
 
-def _quick_fulltext_capability(pmid: str | None, title: str | None) -> tuple[bool, dict]:
+def _quick_fulltext_capability(pmid: Optional[str], title: Optional[str]) -> tuple[bool, dict]:
     """Fast check: does this article likely have OA/full text available?
     Returns (ok, meta) where ok True if PMC link or Europe PMC HAS_FT is present.
     """
@@ -3063,14 +3094,14 @@ class ReviewRequest(BaseModel):
     molecule: str
     objective: str
     # Accept either `project_id` (default) or `projectId` (alias)
-    project_id: str | None = Field(default=None, alias="projectId")
+    project_id: Optional[str] = Field(default=None, alias="projectId")
     # Clinical profile and precision/recall preference
     clinical_mode: bool = Field(default=False, alias="clinicalMode")
-    preference: str | None = Field(default=None)  # 'precision' | 'recall'
+    preference: Optional[str] = Field(default=None)  # 'precision' | 'recall'
     # Optional: enable experimental DAG orchestration
     dag_mode: bool = Field(default=False, alias="dagMode")
     # Optional: only include full-text/OA articles to ensure Deep Dive full coverage
-    full_text_only: bool | None = Field(default=False, alias="fullTextOnly")
+    full_text_only: Optional[bool] = Field(default=False, alias="fullTextOnly")
 
     class Config:
         allow_population_by_field_name = True
@@ -3079,11 +3110,11 @@ class ReviewRequest(BaseModel):
 
 class DeepDiveRequest(BaseModel):
     # Either a direct URL to the article full text, or an already-known PMID (optional)
-    url: str | None = None
-    pmid: str | None = None
-    title: str | None = None
+    url: Optional[str] = None
+    pmid: Optional[str] = None
+    title: Optional[str] = None
     objective: str
-    project_id: str | None = Field(default=None, alias="projectId")
+    project_id: Optional[str] = Field(default=None, alias="projectId")
 
     class Config:
         allow_population_by_field_name = True
@@ -3099,8 +3130,8 @@ class DeepDiveModuleResult(BaseModel):
 class DeepDiveResponse(BaseModel):
     source: dict
     model_description: DeepDiveModuleResult
-    experimental_methods: DeepDiveModuleResult | None
-    results_interpretation: DeepDiveModuleResult | None
+    experimental_methods: Optional[DeepDiveModuleResult]
+    results_interpretation: Optional[DeepDiveModuleResult]
     diagnostics: dict
 
 # Project Management Models
@@ -3149,6 +3180,27 @@ class AnnotationResponse(BaseModel):
     report_id: Optional[str]
     analysis_id: Optional[str]
 
+# Activity Logging Models
+class ActivityLogCreate(BaseModel):
+    activity_type: str = Field(..., pattern="^(annotation_created|report_generated|deep_dive_performed|article_pinned|project_created|collaborator_added)$")
+    description: str
+    metadata: Optional[dict] = None
+    article_pmid: Optional[str] = None
+    report_id: Optional[str] = None
+    analysis_id: Optional[str] = None
+
+class ActivityLogResponse(BaseModel):
+    activity_id: str
+    project_id: str
+    user_id: str
+    activity_type: str
+    description: str
+    metadata: Optional[dict]
+    article_pmid: Optional[str]
+    report_id: Optional[str]
+    analysis_id: Optional[str]
+    created_at: datetime
+
 # Initialize database on startup
 @app.on_event("startup")
 async def startup_event():
@@ -3159,6 +3211,18 @@ async def startup_event():
 @app.get("/")
 async def root():
     return {"status": "ok"}
+
+# WebSocket endpoint for project real-time communication
+@app.websocket("/ws/project/{project_id}")
+async def websocket_endpoint(websocket: WebSocket, project_id: str):
+    await manager.connect(websocket, project_id)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # Echo back for now - can be extended for chat functionality
+            await manager.send_personal_message(f"Echo: {data}", websocket)
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, project_id)
 
 @app.get("/health")
 async def health_check(db: Session = Depends(get_db)):
@@ -3638,7 +3702,8 @@ async def create_annotation(
     db.commit()
     db.refresh(annotation)
     
-    return AnnotationResponse(
+    # Create response object
+    response = AnnotationResponse(
         annotation_id=annotation.annotation_id,
         content=annotation.content,
         author_id=annotation.author_id,
@@ -3647,6 +3712,43 @@ async def create_annotation(
         report_id=annotation.report_id,
         analysis_id=annotation.analysis_id
     )
+    
+    # Broadcast new annotation to all connected clients in the project room
+    broadcast_message = {
+        "type": "new_annotation",
+        "annotation": {
+            "annotation_id": annotation.annotation_id,
+            "content": annotation.content,
+            "author_id": annotation.author_id,
+            "created_at": annotation.created_at.isoformat(),
+            "article_pmid": annotation.article_pmid,
+            "report_id": annotation.report_id,
+            "analysis_id": annotation.analysis_id
+        }
+    }
+    
+    # Send broadcast asynchronously (non-blocking)
+    asyncio.create_task(
+        manager.broadcast_to_project(json.dumps(broadcast_message), project_id)
+    )
+    
+    # Log activity
+    await log_activity(
+        project_id=project_id,
+        user_id=current_user,
+        activity_type="annotation_created",
+        description=f"Created annotation: {annotation.content[:100]}{'...' if len(annotation.content) > 100 else ''}",
+        metadata={
+            "annotation_id": annotation.annotation_id,
+            "content_length": len(annotation.content)
+        },
+        article_pmid=annotation.article_pmid,
+        report_id=annotation.report_id,
+        analysis_id=annotation.analysis_id,
+        db=db
+    )
+    
+    return response
 
 @app.get("/projects/{project_id}/annotations")
 async def get_annotations(project_id: str, db: Session = Depends(get_db)):
@@ -3685,6 +3787,210 @@ async def get_annotations(project_id: str, db: Session = Depends(get_db)):
             "analysis_id": a.analysis_id
         } for a in annotations]
     }
+
+# =============================================================================
+# ACTIVITY LOGGING ENDPOINTS
+# =============================================================================
+
+@app.post("/projects/{project_id}/activities", response_model=ActivityLogResponse)
+async def create_activity_log(
+    project_id: str,
+    activity_data: ActivityLogCreate,
+    db: Session = Depends(get_db)
+):
+    """Create a new activity log entry"""
+    from database import ActivityLog
+    import uuid
+    
+    current_user = get_current_user()
+    
+    # Check project access
+    has_access = (
+        db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == current_user
+        ).first() is not None or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+    
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Create activity log
+    activity = ActivityLog(
+        activity_id=str(uuid.uuid4()),
+        project_id=project_id,
+        user_id=current_user,
+        activity_type=activity_data.activity_type,
+        description=activity_data.description,
+        activity_metadata=activity_data.metadata,
+        article_pmid=activity_data.article_pmid,
+        report_id=activity_data.report_id,
+        analysis_id=activity_data.analysis_id
+    )
+    
+    db.add(activity)
+    db.commit()
+    db.refresh(activity)
+    
+    response = ActivityLogResponse(
+        activity_id=activity.activity_id,
+        project_id=activity.project_id,
+        user_id=activity.user_id,
+        activity_type=activity.activity_type,
+        description=activity.description,
+        metadata=activity.activity_metadata,
+        article_pmid=activity.article_pmid,
+        report_id=activity.report_id,
+        analysis_id=activity.analysis_id,
+        created_at=activity.created_at
+    )
+    
+    # Broadcast activity to WebSocket clients
+    broadcast_message = {
+        "type": "new_activity",
+        "activity": {
+            "activity_id": activity.activity_id,
+            "project_id": activity.project_id,
+            "user_id": activity.user_id,
+            "activity_type": activity.activity_type,
+            "description": activity.description,
+            "metadata": activity.activity_metadata,
+            "article_pmid": activity.article_pmid,
+            "report_id": activity.report_id,
+            "analysis_id": activity.analysis_id,
+            "created_at": activity.created_at.isoformat()
+        }
+    }
+    
+    # Send broadcast asynchronously (non-blocking)
+    asyncio.create_task(
+        manager.broadcast_to_project(json.dumps(broadcast_message), project_id)
+    )
+    
+    return response
+
+@app.get("/projects/{project_id}/activities")
+async def get_activities(
+    project_id: str, 
+    limit: int = 50,
+    offset: int = 0,
+    activity_type: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Get activity logs for a project"""
+    from database import ActivityLog
+    
+    current_user = get_current_user()
+    
+    # Check project access
+    has_access = (
+        db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == current_user
+        ).first() is not None or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+    
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Build query
+    query = db.query(ActivityLog).join(User).filter(
+        ActivityLog.project_id == project_id
+    )
+    
+    if activity_type:
+        query = query.filter(ActivityLog.activity_type == activity_type)
+    
+    activities = query.order_by(ActivityLog.created_at.desc()).offset(offset).limit(limit).all()
+    
+    return {
+        "activities": [{
+            "activity_id": a.activity_id,
+            "project_id": a.project_id,
+            "user_id": a.user_id,
+            "user_username": a.user.username,
+            "activity_type": a.activity_type,
+            "description": a.description,
+            "metadata": a.metadata,
+            "article_pmid": a.article_pmid,
+            "report_id": a.report_id,
+            "analysis_id": a.analysis_id,
+            "created_at": a.created_at.isoformat()
+        } for a in activities],
+        "total": query.count(),
+        "limit": limit,
+        "offset": offset
+    }
+
+# Activity logging helper function
+async def log_activity(
+    project_id: str,
+    user_id: str,
+    activity_type: str,
+    description: str,
+    metadata: Optional[dict] = None,
+    article_pmid: Optional[str] = None,
+    report_id: Optional[str] = None,
+    analysis_id: Optional[str] = None,
+    db: Session = None
+):
+    """Helper function to log activities from other endpoints"""
+    from database import ActivityLog
+    import uuid
+    
+    if not db:
+        return
+    
+    try:
+        activity = ActivityLog(
+            activity_id=str(uuid.uuid4()),
+            project_id=project_id,
+            user_id=user_id,
+            activity_type=activity_type,
+            description=description,
+            activity_metadata=metadata,
+            article_pmid=article_pmid,
+            report_id=report_id,
+            analysis_id=analysis_id
+        )
+        
+        db.add(activity)
+        db.commit()
+        
+        # Broadcast activity to WebSocket clients
+        broadcast_message = {
+            "type": "new_activity",
+            "activity": {
+                "activity_id": activity.activity_id,
+                "project_id": activity.project_id,
+                "user_id": activity.user_id,
+                "activity_type": activity.activity_type,
+                "description": activity.description,
+                "metadata": activity.activity_metadata,
+                "article_pmid": activity.article_pmid,
+                "report_id": activity.report_id,
+                "analysis_id": activity.analysis_id,
+                "created_at": activity.created_at.isoformat()
+            }
+        }
+        
+        # Send broadcast asynchronously (non-blocking)
+        asyncio.create_task(
+            manager.broadcast_to_project(json.dumps(broadcast_message), project_id)
+        )
+        
+    except Exception as e:
+        print(f"Failed to log activity: {e}")
 
 def _strip_html(html: str) -> str:
     try:
@@ -3779,7 +4085,7 @@ def _extract_doi_from_html(html_text: str) -> str:
     return ""
 
 
-def _pubmed_resolve_doi(pmid: str | None, timeout: float = 8.0) -> str:
+def _pubmed_resolve_doi(pmid: Optional[str], timeout: float = 8.0) -> str:
     """Resolve DOI for a PubMed PMID using EFetch XML (best-effort, lightweight regex parsing)."""
     try:
         if not pmid:
@@ -3815,7 +4121,7 @@ def _fetch_json(url: str, timeout: float = 10.0) -> dict:
         return {}
 
 
-def _pubmed_fallback_oa(objective: str, molecule: str | None, retmax: int = 40, since_year: int = 2015) -> list[dict]:
+def _pubmed_fallback_oa(objective: str, molecule: Optional[str], retmax: int = 40, since_year: int = 2015) -> list[dict]:
     """Lightweight PubMed fallback restricted to OA/free full text.
     Returns a list of minimal article dicts with at least title, pmid, url, pub_year.
     """
@@ -3888,7 +4194,7 @@ def _expand_objective_synonyms(objective: str) -> list[str]:
         return []
 
 
-def _resolve_via_eupmc(pmid: str | None, doi: str | None) -> tuple[str, dict]:
+def _resolve_via_eupmc(pmid: Optional[str], doi: Optional[str]) -> tuple[str, dict]:
     """Try Europe PMC for OA full text. Returns (text, meta)."""
     try:
         base = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
@@ -3966,7 +4272,7 @@ def _oa_backfill_topup(objective: str, current: list[dict], minimum: int, deadli
         return current
 
 
-def _normalize_title(title: str | None) -> str:
+def _normalize_title(title: Optional[str]) -> str:
     try:
         s = (title or "").lower()
         # Remove punctuation and excessive whitespace
@@ -3997,7 +4303,7 @@ def _extract_title_from_html(html_text: str) -> str:
     return ""
 
 
-def _verify_source_match(req_title: str | None, req_pmid: str | None, meta: dict, landing_html: str | None) -> dict:
+def _verify_source_match(req_title: Optional[str], req_pmid: Optional[str], meta: dict, landing_html: Optional[str]) -> dict:
     """Compare requested identifiers with resolved identifiers to detect mismatches.
     Returns diagnostics dict including resolved identifiers and a mismatch flag.
     """
@@ -4034,7 +4340,7 @@ def _verify_source_match(req_title: str | None, req_pmid: str | None, meta: dict
         return { **({k: meta.get(k) for k in ("resolved_title","resolved_pmid","resolved_pmcid","resolved_doi","license","resolved_source")}), "mismatch": False }
 
 
-def _resolve_oa_fulltext(pmid: str | None, landing_html: str, doi_hint: str | None = None) -> tuple[str, str, str, dict]:
+def _resolve_oa_fulltext(pmid: Optional[str], landing_html: str, doi_hint: Optional[str] = None) -> tuple[str, str, str, dict]:
     """Attempt to resolve open full text via PMC or Unpaywall.
 
     Returns: (text, grounding, source, meta) where grounding in {full_text, abstract_only, none},
@@ -4380,7 +4686,7 @@ async def deep_dive_upload(objective: str = Form(...), file: UploadFile = File(.
     }
 
 
-def _retrieve_memories(project_id: str | None, objective: str) -> list[dict]:
+def _retrieve_memories(project_id: Optional[str], objective: str) -> list[dict]:
     if not project_id:
         return []
     index = _get_pinecone_index()
@@ -4403,7 +4709,7 @@ def _retrieve_memories(project_id: str | None, objective: str) -> list[dict]:
             time.sleep(0.2 * (attempt + 1))
     return []
 
-def _project_interest_vector(memories: list[dict]) -> np.ndarray | None:
+def _project_interest_vector(memories: list[dict]) -> Optional[np.ndarray]:
     """Compute a simple interest vector from project memories (mean embedding)."""
     try:
         if not memories:

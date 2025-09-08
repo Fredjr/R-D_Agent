@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
+import AnnotationsFeed from '@/components/AnnotationsFeed';
+import ActivityFeed from '@/components/ActivityFeed';
 import { 
   ArrowLeftIcon, 
   PlusIcon, 
@@ -420,27 +422,21 @@ export default function ProjectWorkspace() {
               )}
             </div>
 
-            {/* Recent Annotations */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Notes</h3>
-              
-              {project.annotations.length === 0 ? (
-                <div className="text-center py-4">
-                  <ChatBubbleLeftRightIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-600">No notes yet</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {project.annotations.slice(0, 3).map((annotation) => (
-                    <div key={annotation.annotation_id} className="border-l-2 border-blue-200 pl-3">
-                      <p className="text-sm text-gray-700 line-clamp-2">{annotation.content}</p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        By {annotation.author_id} • {formatDate(annotation.created_at)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
+            {/* Real-time Annotations Feed */}
+            <div className="bg-white rounded-lg shadow">
+              <AnnotationsFeed 
+                projectId={projectId}
+                className="h-96"
+              />
+            </div>
+
+            {/* Activity Feed */}
+            <div className="bg-white rounded-lg shadow">
+              <ActivityFeed 
+                projectId={projectId}
+                limit={15}
+                className="h-96"
+              />
             </div>
           </div>
         </div>
