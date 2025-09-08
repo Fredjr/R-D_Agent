@@ -61,7 +61,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({
       
       const response = await fetch(`/api/proxy/projects/${projectId}/activities?${params}`, {
         headers: {
-          'Authorization': `Bearer ${user?.token}`,
+          'User-ID': user?.user_id || 'anonymous',
           'Content-Type': 'application/json',
         },
       });
@@ -82,7 +82,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({
 
   // WebSocket connection
   const connectWebSocket = () => {
-    if (!user?.token || !projectId) return;
+    if (!user?.user_id || !projectId) return;
 
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
@@ -165,7 +165,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({
 
   // Initialize component
   useEffect(() => {
-    if (user?.token && projectId) {
+    if (user?.user_id && projectId) {
       fetchActivities();
       connectWebSocket();
     }
@@ -178,7 +178,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({
         clearTimeout(reconnectTimeoutRef.current);
       }
     };
-  }, [user?.token, projectId, limit, activityType]);
+  }, [user?.user_id, projectId, limit, activityType]);
 
   // Format relative time
   const formatRelativeTime = (dateString: string) => {

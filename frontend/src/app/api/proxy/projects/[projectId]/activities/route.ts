@@ -4,26 +4,26 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:800
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
-    const { projectId } = params;
+    const { projectId } = await params;
     const { searchParams } = new URL(request.url);
     
     // Forward query parameters
     const queryString = searchParams.toString();
     const backendUrl = `${BACKEND_URL}/projects/${projectId}/activities${queryString ? `?${queryString}` : ''}`;
     
-    // Get authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
+    // Get user ID header
+    const userIdHeader = request.headers.get('User-ID');
+    if (!userIdHeader) {
+      return NextResponse.json({ error: 'User-ID required' }, { status: 401 });
     }
 
     const response = await fetch(backendUrl, {
       method: 'GET',
       headers: {
-        'Authorization': authHeader,
+        'User-ID': userIdHeader,
         'Content-Type': 'application/json',
       },
     });
@@ -49,22 +49,22 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
-    const { projectId } = params;
+    const { projectId } = await params;
     const body = await request.json();
     
-    // Get authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
+    // Get user ID header
+    const userIdHeader = request.headers.get('User-ID');
+    if (!userIdHeader) {
+      return NextResponse.json({ error: 'User-ID required' }, { status: 401 });
     }
 
     const response = await fetch(`${BACKEND_URL}/projects/${projectId}/activities`, {
       method: 'POST',
       headers: {
-        'Authorization': authHeader,
+        'User-ID': userIdHeader,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
