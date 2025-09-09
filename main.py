@@ -3216,6 +3216,36 @@ async def startup_event():
 async def root():
     return {"status": "ok"}
 
+@app.get("/health/db")
+async def health_check_db(db: Session = Depends(get_db)):
+    """Health check endpoint that tests database connectivity"""
+    try:
+        # Test basic database connection
+        result = db.execute(text("SELECT 1"))
+        db_status = "connected"
+        
+        # Test if tables exist
+        try:
+            user_count = db.query(User).count()
+            project_count = db.query(Project).count()
+            tables_status = f"tables_exist (users: {user_count}, projects: {project_count})"
+        except Exception as table_error:
+            tables_status = f"tables_missing: {str(table_error)}"
+        
+        return {
+            "status": "ok",
+            "database": db_status,
+            "tables": tables_status,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "database": "disconnected",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
 # WebSocket endpoint for project real-time communication
 @app.websocket("/ws/project/{project_id}")
 async def websocket_endpoint(websocket: WebSocket, project_id: str):
