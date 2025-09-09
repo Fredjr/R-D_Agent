@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Response, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Response, Depends, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import UploadFile, File, Form
 from sqlalchemy.orm import Session
@@ -3434,10 +3434,11 @@ async def auth_login(auth_data: AuthRequest, db: Session = Depends(get_db)):
 @app.post("/projects", response_model=ProjectResponse)
 async def create_project(
     project_data: ProjectCreate,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """Create a new project"""
-    current_user = get_current_user()
+    current_user = request.headers.get("User-ID", "default_user")
     
     # Ensure user exists
     user = db.query(User).filter(User.user_id == current_user).first()
@@ -3474,9 +3475,9 @@ async def create_project(
     )
 
 @app.get("/projects", response_model=ProjectListResponse)
-async def list_projects(db: Session = Depends(get_db)):
+async def list_projects(request: Request, db: Session = Depends(get_db)):
     """List all projects for the current user"""
-    current_user = get_current_user()
+    current_user = request.headers.get("User-ID", "default_user")
     
     # Get projects owned by user
     owned_projects = db.query(Project).filter(
@@ -3508,9 +3509,9 @@ async def list_projects(db: Session = Depends(get_db)):
     return ProjectListResponse(projects=project_responses)
 
 @app.get("/projects/{project_id}", response_model=ProjectDetailResponse)
-async def get_project(project_id: str, db: Session = Depends(get_db)):
+async def get_project(project_id: str, request: Request, db: Session = Depends(get_db)):
     """Get project details with associated reports and collaborators"""
-    current_user = get_current_user()
+    current_user = request.headers.get("User-ID", "default_user")
     
     # Check if user has access to this project
     project = db.query(Project).filter(Project.project_id == project_id).first()
@@ -3574,10 +3575,11 @@ async def get_project(project_id: str, db: Session = Depends(get_db)):
 async def invite_collaborator(
     project_id: str,
     invite_data: CollaboratorInvite,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """Invite a user to collaborate on a project"""
-    current_user = get_current_user()
+    current_user = request.headers.get("User-ID", "default_user")
     
     # Check if current user owns the project
     project = db.query(Project).filter(
@@ -3631,10 +3633,11 @@ async def invite_collaborator(
 async def remove_collaborator(
     project_id: str,
     user_id: str,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """Remove a collaborator from a project"""
-    current_user = get_current_user()
+    current_user = request.headers.get("User-ID", "default_user")
     
     # Check if current user owns the project
     project = db.query(Project).filter(
@@ -3665,10 +3668,11 @@ async def remove_collaborator(
 async def create_annotation(
     project_id: str,
     annotation_data: AnnotationCreate,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """Create a new annotation in a project"""
-    current_user = get_current_user()
+    current_user = request.headers.get("User-ID", "default_user")
     
     # Check project access
     has_access = (
@@ -3751,9 +3755,9 @@ async def create_annotation(
     return response
 
 @app.get("/projects/{project_id}/annotations")
-async def get_annotations(project_id: str, db: Session = Depends(get_db)):
+async def get_annotations(project_id: str, request: Request, db: Session = Depends(get_db)):
     """Get all annotations for a project"""
-    current_user = get_current_user()
+    current_user = request.headers.get("User-ID", "default_user")
     
     # Check project access
     has_access = (
@@ -3796,13 +3800,14 @@ async def get_annotations(project_id: str, db: Session = Depends(get_db)):
 async def create_activity_log(
     project_id: str,
     activity_data: ActivityLogCreate,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """Create a new activity log entry"""
     from database import ActivityLog
     import uuid
     
-    current_user = get_current_user()
+    current_user = request.headers.get("User-ID", "default_user")
     
     # Check project access
     has_access = (
@@ -3875,17 +3880,18 @@ async def create_activity_log(
     return response
 
 @app.get("/projects/{project_id}/activities")
-async def get_activities(
-    project_id: str, 
+async def get_activity_logs(
+    project_id: str,
+    request: Request,
+    activity_type: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
-    activity_type: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """Get activity logs for a project"""
     from database import ActivityLog
     
-    current_user = get_current_user()
+    current_user = request.headers.get("User-ID", "default_user")
     
     # Check project access
     has_access = (
@@ -3921,7 +3927,7 @@ async def get_activities(
             "user_username": a.user.username,
             "activity_type": a.activity_type,
             "description": a.description,
-            "metadata": a.metadata,
+            "activity_metadata": a.activity_metadata,
             "article_pmid": a.article_pmid,
             "report_id": a.report_id,
             "analysis_id": a.analysis_id,
