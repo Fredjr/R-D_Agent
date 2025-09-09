@@ -145,7 +145,7 @@ jobs:
             # Force clean deployment by removing existing service first
             gcloud run services delete rd-agent-staging --region us-central1 --quiet || true
             
-            # Deploy fresh service with environment variables using update-env-vars
+            # Deploy fresh service with environment variables using set-env-vars (since service was deleted)
             gcloud run deploy rd-agent-staging \
               --image us-central1-docker.pkg.dev/r-and-d-agent-mvp/rd-agent/backend:$(git rev-parse --short HEAD) \
               --region us-central1 \
@@ -157,26 +157,26 @@ jobs:
               --timeout 900 \
               --cpu-boost \
               --use-http2 \
-              --update-env-vars DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-              --update-env-vars GOOGLE_GENAI_API_KEY="${{ secrets.GOOGLE_GENAI_API_KEY }}" \
-              --update-env-vars GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}" \
-              --update-env-vars GOOGLE_CSE_ID="${{ secrets.GOOGLE_CSE_ID }}" \
-              --update-env-vars PINECONE_API_KEY="${{ secrets.PINECONE_API_KEY }}" \
-              --update-env-vars UNPAYWALL_EMAIL="${{ secrets.UNPAYWALL_EMAIL }}" \
-              --update-env-vars GEMINI_MAIN_MODEL="gemini-1.5-pro" \
-              --update-env-vars GEMINI_SMALL_MODEL="gemini-1.5-flash" \
-              --update-env-vars TOTAL_BUDGET_S="300" \
-              --update-env-vars HARVEST_BUDGET_S="60" \
-              --update-env-vars TRIAGE_BUDGET_S="20" \
-              --update-env-vars DEEPDIVE_BUDGET_S="200" \
-              --update-env-vars SYNTH_BUDGET_S="15" \
-              --update-env-vars ENTAILMENT_BUDGET_S="8.0" \
-              --update-env-vars TRIAGE_TOP_K="20" \
-              --update-env-vars DEEPDIVE_TOP_K="8" \
-              --update-env-vars ALLOW_ORIGIN_REGEX=".*" \
-              --update-env-vars PINECONE_INDEX="rd-agent-staging" \
-              --update-env-vars PINECONE_HOST="gcp-starter.pinecone.io" \
-              --update-env-vars PUBMED_RETMAX="25" \
+              --set-env-vars DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+              --set-env-vars GOOGLE_GENAI_API_KEY="${{ secrets.GOOGLE_GENAI_API_KEY }}" \
+              --set-env-vars GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}" \
+              --set-env-vars GOOGLE_CSE_ID="${{ secrets.GOOGLE_CSE_ID }}" \
+              --set-env-vars PINECONE_API_KEY="${{ secrets.PINECONE_API_KEY }}" \
+              --set-env-vars UNPAYWALL_EMAIL="${{ secrets.UNPAYWALL_EMAIL }}" \
+              --set-env-vars GEMINI_MAIN_MODEL="gemini-1.5-pro" \
+              --set-env-vars GEMINI_SMALL_MODEL="gemini-1.5-flash" \
+              --set-env-vars TOTAL_BUDGET_S="300" \
+              --set-env-vars HARVEST_BUDGET_S="60" \
+              --set-env-vars TRIAGE_BUDGET_S="20" \
+              --set-env-vars DEEPDIVE_BUDGET_S="200" \
+              --set-env-vars SYNTH_BUDGET_S="15" \
+              --set-env-vars ENTAILMENT_BUDGET_S="8.0" \
+              --set-env-vars TRIAGE_TOP_K="20" \
+              --set-env-vars DEEPDIVE_TOP_K="8" \
+              --set-env-vars ALLOW_ORIGIN_REGEX=".*" \
+              --set-env-vars PINECONE_INDEX="rd-agent-staging" \
+              --set-env-vars PINECONE_HOST="gcp-starter.pinecone.io" \
+              --set-env-vars PUBMED_RETMAX="25" \
               --update-env-vars APP_VERSION="$(git rev-parse --short HEAD)" \
               --update-env-vars GIT_SHA="$(git rev-parse --short HEAD)"
             rc=$?
