@@ -6291,6 +6291,7 @@ async def debug_database():
     connection_test = test_connection()
     
     db_info = {
+        "supabase_database_url_env": os.getenv("SUPABASE_DATABASE_URL", "NOT_SET"),
         "database_url_env": os.getenv("DATABASE_URL", "NOT_SET"),
         "postgres_url_env": os.getenv("POSTGRES_URL", "NOT_SET"), 
         "effective_database_url": DATABASE_URL,
