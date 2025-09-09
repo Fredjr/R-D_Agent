@@ -157,7 +157,7 @@ jobs:
               --timeout 900 \
               --cpu-boost \
               --use-http2 \
-              --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }}" \
+              --set-env-vars "SUPABASE_DATABASE_URL=${{ secrets.SUPABASE_DATABASE_URL }}" \
               --set-env-vars "GOOGLE_GENAI_API_KEY=${{ secrets.GOOGLE_GENAI_API_KEY }}" \
               --set-env-vars "GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}" \
               --set-env-vars "GOOGLE_CSE_ID=${{ secrets.GOOGLE_CSE_ID }}" \
