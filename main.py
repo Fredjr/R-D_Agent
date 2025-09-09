@@ -1,4 +1,4 @@
-# DATABASE_URL secret configured - forcing new deployment with environment variable fix
+# DATABASE_URL secret verified working - testing Cloud Run environment injection
 from fastapi import FastAPI, Response, Depends, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import UploadFile, File, Form
