@@ -1,0 +1,80 @@
+name: Debug Environment Variables
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug-env:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Check Cloud Run Service Configuration
+        run: |
+          echo "=== Cloud Run Service Details ==="
+          gcloud run services describe rd-agent-staging --region=us-central1 --format="export"
+          
+          echo "=== Environment Variables ==="
+          gcloud run services describe rd-agent-staging --region=us-central1 --format="value(spec.template.spec.template.spec.containers[0].env[].name,spec.template.spec.template.spec.containers[0].env[].value)"
+          
+          echo "=== Revisions ==="
+          gcloud run revisions list --service=rd-agent-staging --region=us-central1
+          
+          echo "=== Recent Logs ==="
+          gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=rd-agent-staging" --limit=20 --format="table(timestamp,severity,textPayload)"
+
+      - name: Test Database Connection from GitHub Actions
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GOOGLE_GENAI_API_KEY: ${{ secrets.GOOGLE_GENAI_API_KEY }}
+          PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
+        run: |
+          echo "=== Testing Database Connection ==="
+          python3 -c "
+          import os
+          import sys
+          
+          # Check if DATABASE_URL is set
+          db_url = os.getenv('DATABASE_URL')
+          if not db_url:
+              print('ERROR: DATABASE_URL not set')
+              sys.exit(1)
+          
+          print(f'DATABASE_URL is set (length: {len(db_url)})')
+          print(f'Database type: {db_url.split(\"://\")[0] if \"://\" in db_url else \"unknown\"}')
+          
+          # Try to connect
+          try:
+              import psycopg2
+              from urllib.parse import urlparse
+              
+              parsed = urlparse(db_url)
+              conn = psycopg2.connect(
+                  host=parsed.hostname,
+                  port=parsed.port,
+                  database=parsed.path[1:],
+                  user=parsed.username,
+                  password=parsed.password
+              )
+              cursor = conn.cursor()
+              cursor.execute('SELECT version();')
+              version = cursor.fetchone()
+              print(f'Database connection successful: {version[0]}')
+              
+              # Check if tables exist
+              cursor.execute(\"SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';\")
+              tables = cursor.fetchall()
+              print(f'Tables in database: {[t[0] for t in tables]}')
+              
+              cursor.close()
+              conn.close()
+          except Exception as e:
+              print(f'Database connection failed: {e}')
+          "
