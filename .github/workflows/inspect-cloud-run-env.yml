@@ -1,0 +1,33 @@
+name: Inspect Cloud Run Environment Variables
+
+on:
+  workflow_dispatch:
+
+jobs:
+  inspect-env:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Inspect Cloud Run Service Configuration
+        run: |
+          echo "=== Cloud Run Service Details ==="
+          gcloud run services describe rd-agent-staging --region us-central1 --format="export" > service-config.yaml
+          
+          echo "=== Environment Variables in Service ==="
+          gcloud run services describe rd-agent-staging --region us-central1 --format="value(spec.template.spec.template.spec.containers[0].env[].name,spec.template.spec.template.spec.containers[0].env[].value)" || true
+          
+          echo "=== Full Service Configuration ==="
+          cat service-config.yaml
+          
+          echo "=== Check for DATABASE_URL specifically ==="
+          grep -i "database_url" service-config.yaml || echo "DATABASE_URL not found in service config"
+          
+          echo "=== List all environment variables ==="
+          gcloud run services describe rd-agent-staging --region us-central1 --format="json" | jq '.spec.template.spec.template.spec.containers[0].env // []'
