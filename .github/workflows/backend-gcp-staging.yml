@@ -104,6 +104,18 @@ jobs:
           docker push $IMAGE
         working-directory: .
 
+      - name: Debug DATABASE_URL secret
+        run: |
+          echo "Checking DATABASE_URL secret availability..."
+          if [ -n "$DATABASE_URL" ]; then
+            echo "DATABASE_URL is set (length: ${#DATABASE_URL})"
+            echo "DATABASE_URL starts with: ${DATABASE_URL:0:15}..."
+          else
+            echo "ERROR: DATABASE_URL is NOT set or empty!"
+          fi
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       - name: Deploy to Cloud Run (conditional traffic)
         run: |
           set -euo pipefail
@@ -120,28 +132,30 @@ jobs:
             echo "Service $BACKEND_SERVICE exists; deploying new revision with --no-traffic"
             NO_TRAFFIC_FLAG="--no-traffic"
           else
-            echo "Service $BACKEND_SERVICE does not exist; creating it with default traffic"
+            echo "Service $BACKEND_SERVICE does not exist; creating new service"
             NO_TRAFFIC_FLAG=""
           fi
 
-          # Retry wrapper to avoid ABORTED etag/version conflicts on the service
-          attempts=4
+      - name: Deploy to Cloud Run (with retries)
+        run: |
+          set +e
+          attempts=3
           for i in $(seq 1 $attempts); do
-            set +e
-            gcloud run deploy "$BACKEND_SERVICE" \
-              --image "$IMAGE" \
+            echo "Deploy attempt $i of $attempts"
+            gcloud run deploy rd-agent-staging \
+              --image us-central1-docker.pkg.dev/r-and-d-agent-mvp/rd-agent/backend:$(git rev-parse --short HEAD) \
               --region us-central1 \
               --platform managed \
               --allow-unauthenticated \
-              --cpu 1 --memory 2Gi --min-instances 1 \
-              --timeout 900 \
-              ${NO_TRAFFIC_FLAG} \
               --port 8080 \
+              --memory 2Gi \
+              --cpu 1 \
+              --timeout 900 \
               --cpu-boost \
               --use-http2 \
               --set-env-vars="GEMINI_MAIN_MODEL=gemini-1.5-pro,GEMINI_SMALL_MODEL=gemini-1.5-flash,TOTAL_BUDGET_S=300,HARVEST_BUDGET_S=60,TRIAGE_BUDGET_S=20,DEEPDIVE_BUDGET_S=200,SYNTH_BUDGET_S=15,ENTAILMENT_BUDGET_S=8.0,TRIAGE_TOP_K=20,DEEPDIVE_TOP_K=8,ALLOW_ORIGIN_REGEX=.*,PINECONE_INDEX=rd-agent-staging,PINECONE_HOST=gcp-starter.pinecone.io,PUBMED_RETMAX=25" \
               --set-env-vars="GOOGLE_GENAI_API_KEY=${{ secrets.GOOGLE_GENAI_API_KEY }},GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }},GOOGLE_CSE_ID=${{ secrets.GOOGLE_CSE_ID }},PINECONE_API_KEY=${{ secrets.PINECONE_API_KEY }},UNPAYWALL_EMAIL=${{ secrets.UNPAYWALL_EMAIL }},DATABASE_URL=${{ secrets.DATABASE_URL }}" \
-              --set-env-vars="APP_VERSION=$HEAD,GIT_SHA=$HEAD"
+              --set-env-vars="APP_VERSION=$(git rev-parse --short HEAD),GIT_SHA=$(git rev-parse --short HEAD)"
             rc=$?
             set -e
             if [ $rc -eq 0 ]; then
