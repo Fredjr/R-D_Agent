@@ -3216,6 +3216,61 @@ async def startup_event():
 async def root():
     return {"status": "ok"}
 
+@app.get("/test-db")
+async def test_database_schema():
+    """Minimal database test to identify schema issues"""
+    try:
+        from database import get_db
+        from sqlalchemy import text
+        
+        db = next(get_db())
+        
+        # Test 1: Basic connection
+        db.execute(text("SELECT 1"))
+        
+        # Test 2: Check if tables exist
+        tables_result = db.execute(text("""
+            SELECT table_name FROM information_schema.tables 
+            WHERE table_schema = 'public'
+        """)).fetchall()
+        
+        tables = [row[0] for row in tables_result] if tables_result else []
+        
+        # Test 3: Check User table structure
+        user_columns = []
+        if 'users' in tables:
+            user_cols_result = db.execute(text("""
+                SELECT column_name, data_type, is_nullable 
+                FROM information_schema.columns 
+                WHERE table_name = 'users'
+            """)).fetchall()
+            user_columns = [{"name": row[0], "type": row[1], "nullable": row[2]} for row in user_cols_result]
+        
+        # Test 4: Check Project table structure  
+        project_columns = []
+        if 'projects' in tables:
+            proj_cols_result = db.execute(text("""
+                SELECT column_name, data_type, is_nullable 
+                FROM information_schema.columns 
+                WHERE table_name = 'projects'
+            """)).fetchall()
+            project_columns = [{"name": row[0], "type": row[1], "nullable": row[2]} for row in proj_cols_result]
+        
+        return {
+            "status": "success",
+            "database_type": "postgresql" if "postgresql" in str(db.bind.url) else "sqlite",
+            "tables_found": tables,
+            "user_table_columns": user_columns,
+            "project_table_columns": project_columns
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "error_type": type(e).__name__
+        }
+
 @app.get("/debug/env")
 async def debug_environment():
     """Debug endpoint to check environment configuration"""
