@@ -2,19 +2,56 @@
 Google Cloud SQL Database Configuration for R&D Agent
 Complete data persistence for users, projects, dossiers, and deep dive analyses
 """
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, ForeignKey, Boolean, Index, JSON
+import os
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Boolean, ForeignKey, JSON, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.sql import func
 from datetime import datetime
-import os
 from typing import Optional
 
-# Database configuration - Google Cloud SQL PostgreSQL
-# Format: postgresql://[user]:[password]@[host]:[port]/[database]
-DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL") or "sqlite:///./rd_agent.db"
+# Database configuration with Supabase as primary option
+DATABASE_URL = os.getenv("DATABASE_URL")
+POSTGRES_URL = os.getenv("POSTGRES_URL")
+SUPABASE_DATABASE_URL = os.getenv("SUPABASE_DATABASE_URL")
 
-# Lazy engine creation to prevent blocking during import
+def get_database_url():
+    """Get the appropriate database URL with fallback logic"""
+    # Priority: Supabase > DATABASE_URL > POSTGRES_URL > SQLite
+    if SUPABASE_DATABASE_URL:
+        return SUPABASE_DATABASE_URL
+    elif DATABASE_URL:
+        return DATABASE_URL
+    elif POSTGRES_URL:
+        return POSTGRES_URL
+    else:
+        # Fallback to SQLite for local development
+        return "sqlite:///./rd_agent.db"
+
+def create_database_engine():
+    """Create database engine with appropriate configuration"""
+    db_url = get_database_url()
+    
+    if db_url.startswith("postgresql"):
+        # PostgreSQL configuration (works for both Supabase and Cloud SQL)
+        engine = create_engine(
+            db_url,
+            pool_pre_ping=True,
+            pool_recycle=300,
+            pool_size=10,
+            max_overflow=20,
+            echo=False
+        )
+    else:
+        # SQLite configuration (fallback)
+        engine = create_engine(
+            db_url,
+            connect_args={"check_same_thread": False},
+            echo=False
+        )
+    
+    return engine
+
 engine = None
 SessionLocal = None
 
@@ -22,25 +59,11 @@ def get_engine():
     """Lazy engine creation to avoid blocking container startup"""
     global engine
     if engine is None:
-        if DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgres://"):
-            # Google Cloud SQL PostgreSQL configuration
-            engine = create_engine(
-                DATABASE_URL,
-                echo=False,
-                pool_size=10,          # Increased for production
-                max_overflow=20,       # Handle traffic spikes
-                pool_pre_ping=True,    # Verify connections before use
-                pool_recycle=3600,     # Recycle connections every hour
-                connect_args={
-                    "sslmode": "require" if "localhost" not in DATABASE_URL else "prefer",
-                    # Short connection timeout so startup doesn't hang if DB is unreachable
-                    "connect_timeout": int(os.getenv("DB_CONNECT_TIMEOUT", "8"))
-                }
-            )
-            print("🗄️ Using Google Cloud SQL PostgreSQL - Production database configured!")
+        engine = create_database_engine()
+        db_url = get_database_url()
+        if db_url.startswith("postgresql"):
+            print("🗄️ Using PostgreSQL database (Supabase or Cloud SQL)")
         else:
-            # SQLite fallback for local development
-            engine = create_engine(DATABASE_URL, echo=False)
             print("🗄️ Using SQLite database for local development")
     return engine
 
