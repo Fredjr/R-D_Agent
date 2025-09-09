@@ -3443,11 +3443,18 @@ async def create_project(
     # Ensure user exists
     user = db.query(User).filter(User.user_id == current_user).first()
     if not user:
-        # Create default user if doesn't exist
+        # Create default user if doesn't exist with all required fields
         user = User(
             user_id=current_user,
             username=current_user,
-            email=f"{current_user}@example.com"
+            email=f"{current_user}@example.com",
+            first_name="Default",
+            last_name="User",
+            category="Industry",
+            role="Researcher",
+            institution="Unknown",
+            subject_area="General",
+            how_heard_about_us="Direct"
         )
         db.add(user)
         db.commit()
