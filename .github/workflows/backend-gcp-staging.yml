@@ -144,9 +144,10 @@ jobs:
             echo "Deploy attempt $i of $attempts"
             # Force clean deployment by removing existing service first
             gcloud run services delete rd-agent-staging --region us-central1 --quiet || true
+            gcloud run services delete rd-agent-staging-v2 --region us-central1 --quiet || true
             
             # Deploy fresh service with environment variables using single --set-env-vars flag
-            gcloud run deploy rd-agent-staging \
+            gcloud run deploy rd-agent-staging-v2 \
               --image us-central1-docker.pkg.dev/r-and-d-agent-mvp/rd-agent/backend:$(git rev-parse --short HEAD) \
               --region us-central1 \
               --platform managed \
@@ -175,7 +176,7 @@ jobs:
       - name: Route traffic if new revision is Ready
         run: |
           set -euo pipefail
-          NEW_REV=$(gcloud run services describe "rd-agent-staging" --region "us-central1" --format='value(status.latestCreatedRevisionName)')
+          NEW_REV=$(gcloud run services describe "rd-agent-staging-v2" --region "us-central1" --format='value(status.latestCreatedRevisionName)')
           echo "Latest created revision: $NEW_REV"
           if [ -z "$NEW_REV" ]; then
             echo "No latest created revision found; leaving traffic unchanged"
@@ -187,7 +188,7 @@ jobs:
             READY=$(gcloud run revisions describe "$NEW_REV" --region "us-central1" --format='json' | jq -r '.status.conditions[] | select(.type=="Ready") | .status' || true)
             if [ "$READY" = "True" ]; then
               echo "Revision is Ready. Updating traffic to $NEW_REV"
-              gcloud run services update-traffic "rd-agent-staging" --region "us-central1" --to-revisions="$NEW_REV=100" --quiet
+              gcloud run services update-traffic "rd-agent-staging-v2" --region "us-central1" --to-revisions="$NEW_REV=100" --quiet
               exit 0
             fi
             echo "Not ready yet (status=$READY). Sleeping..."
@@ -197,4 +198,4 @@ jobs:
           exit 0
 
       - name: Output backend URL
-        run: gcloud run services describe rd-agent-staging --region us-central1 --format='value(status.url)'
+        run: gcloud run services describe rd-agent-staging-v2 --region us-central1 --format='value(status.url)'
