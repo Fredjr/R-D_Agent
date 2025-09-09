@@ -51,7 +51,7 @@ from scoring import calculate_publication_score
 # Database imports
 from database import (
     get_db, init_db, User, Project, ProjectCollaborator, 
-    Report, DeepDiveAnalysis, Annotation
+    Report, DeepDiveAnalysis, Annotation, create_tables
 )
 
 # Embeddings and Pinecone
@@ -3204,9 +3204,13 @@ class ActivityLogResponse(BaseModel):
 # Initialize database on startup
 @app.on_event("startup")
 async def startup_event():
-    # Non-blocking: DB init is handled later in a guarded startup hook.
-    # Avoid heavy work here so the server can bind to the PORT promptly on Cloud Run.
-    return
+    # Create database tables if they don't exist
+    try:
+        create_tables()
+        print("✅ Database tables initialized successfully")
+    except Exception as e:
+        print(f"⚠️ Database table creation failed: {e}")
+        # Don't fail startup - let the app start and handle DB errors gracefully
 
 @app.get("/")
 async def root():
