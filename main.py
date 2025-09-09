@@ -3438,48 +3438,73 @@ async def create_project(
     db: Session = Depends(get_db)
 ):
     """Create a new project"""
-    current_user = request.headers.get("User-ID", "default_user")
-    
-    # Ensure user exists
-    user = db.query(User).filter(User.user_id == current_user).first()
-    if not user:
-        # Create default user if doesn't exist with all required fields
-        user = User(
-            user_id=current_user,
-            username=current_user,
-            email=f"{current_user}@example.com",
-            first_name="Default",
-            last_name="User",
-            category="Industry",
-            role="Researcher",
-            institution="Unknown",
-            subject_area="General",
-            how_heard_about_us="Direct"
+    try:
+        current_user = request.headers.get("User-ID", "default_user")
+        
+        # Ensure user exists
+        user = db.query(User).filter(User.user_id == current_user).first()
+        if not user:
+            try:
+                # Create default user if doesn't exist with all required fields
+                user = User(
+                    user_id=current_user,
+                    username=current_user,
+                    email=f"{current_user}@example.com",
+                    first_name="Default",
+                    last_name="User",
+                    category="Industry",
+                    role="Researcher",
+                    institution="Unknown",
+                    subject_area="General",
+                    how_heard_about_us="Direct"
+                )
+                db.add(user)
+                db.commit()
+                db.refresh(user)
+            except Exception as user_error:
+                db.rollback()
+                raise HTTPException(
+                    status_code=500, 
+                    detail=f"Failed to create user: {str(user_error)}"
+                )
+        
+        # Create project
+        try:
+            project_id = str(uuid.uuid4())
+            project = Project(
+                project_id=project_id,
+                project_name=project_data.project_name,
+                description=project_data.description,
+                owner_user_id=current_user
+            )
+            
+            db.add(project)
+            db.commit()
+            db.refresh(project)
+            
+            return ProjectResponse(
+                project_id=project.project_id,
+                project_name=project.project_name,
+                description=project.description,
+                owner_user_id=project.owner_user_id,
+                created_at=project.created_at,
+                updated_at=project.updated_at
+            )
+        except Exception as project_error:
+            db.rollback()
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Failed to create project: {str(project_error)}"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Unexpected error in project creation: {str(e)}"
         )
-        db.add(user)
-        db.commit()
-    
-    # Create project
-    project_id = str(uuid.uuid4())
-    project = Project(
-        project_id=project_id,
-        project_name=project_data.project_name,
-        description=project_data.description,
-        owner_user_id=current_user
-    )
-    
-    db.add(project)
-    db.commit()
-    db.refresh(project)
-    
-    return ProjectResponse(
-        project_id=project.project_id,
-        project_name=project.project_name,
-        description=project.description,
-        owner_user_id=project.owner_user_id,
-        created_at=project.created_at,
-        updated_at=project.updated_at
-    )
 
 @app.get("/projects", response_model=ProjectListResponse)
 async def list_projects(request: Request, db: Session = Depends(get_db)):
