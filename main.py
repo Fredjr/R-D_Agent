@@ -3216,6 +3216,41 @@ async def startup_event():
 async def root():
     return {"status": "ok"}
 
+@app.get("/debug/env")
+async def debug_environment():
+    """Debug endpoint to check environment configuration"""
+    try:
+        import os
+        from database import get_engine
+        
+        # Check critical environment variables (without exposing secrets)
+        env_status = {
+            "DATABASE_URL": "present" if os.getenv("DATABASE_URL") else "missing",
+            "GOOGLE_GENAI_API_KEY": "present" if os.getenv("GOOGLE_GENAI_API_KEY") else "missing",
+            "PINECONE_API_KEY": "present" if os.getenv("PINECONE_API_KEY") else "missing",
+            "DATABASE_TYPE": "postgresql" if os.getenv("DATABASE_URL", "").startswith(("postgresql://", "postgres://")) else "sqlite"
+        }
+        
+        # Test database engine creation (without connecting)
+        try:
+            engine = get_engine()
+            db_engine_status = "created"
+        except Exception as e:
+            db_engine_status = f"failed: {str(e)}"
+        
+        return {
+            "status": "debug_info",
+            "environment": env_status,
+            "database_engine": db_engine_status,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "debug_error",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
 @app.get("/health/db")
 async def health_check_db(db: Session = Depends(get_db)):
     """Health check endpoint that tests database connectivity"""
