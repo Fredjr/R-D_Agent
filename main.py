@@ -1,4 +1,4 @@
-# DATABASE_URL secret configured - triggering deployment
+# DATABASE_URL secret configured - forcing new deployment with environment variable fix
 from fastapi import FastAPI, Response, Depends, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import UploadFile, File, Form
