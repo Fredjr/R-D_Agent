@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 const BACKEND_BASE = (
   process.env.NEXT_PUBLIC_BACKEND_URL || 
   process.env.BACKEND_URL || 
-  "https://rd-backend-new-537209831678.us-central1.run.app"
+  "https://r-dagent-production.up.railway.app"
 ).replace(/\/+$/, "");
 
 export async function GET(request: NextRequest) {

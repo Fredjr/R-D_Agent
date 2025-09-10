@@ -1,7 +1,7 @@
 const BACKEND_BASE = (
   process.env.NEXT_PUBLIC_BACKEND_URL || 
   process.env.BACKEND_URL || 
-  "https://rd-backend-new-537209831678.us-central1.run.app" // Fallback to your production backend
+  "https://r-dagent-production.up.railway.app" // Fallback to your production backend
 ).replace(/\/+$/, "");
 
 function buildTargetUrl(req: Request, path: string[]): string {
@@ -10,7 +10,7 @@ function buildTargetUrl(req: Request, path: string[]): string {
   const search = url.search;
   
   // Always use the production backend as primary
-  const backend = BACKEND_BASE || "https://rd-backend-new-537209831678.us-central1.run.app";
+  const backend = BACKEND_BASE || "https://r-dagent-production.up.railway.app";
   const targetUrl = `${backend}/${suffix}${search}`;
   
   console.log("Proxying request to:", targetUrl, {
