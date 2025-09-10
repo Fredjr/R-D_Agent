@@ -3247,47 +3247,12 @@ async def startup_event():
 
 @app.get("/")
 async def root():
-    """Root endpoint with embedded database diagnostics to bypass deployment issues"""
-    try:
-        from database import get_db
-        from sqlalchemy import text
-        import os
-        
-        # Basic status
-        result = {"status": "ok"}
-        
-        # Add database diagnostics
-        try:
-            db = next(get_db())
-            
-            # Test basic connection
-            db.execute(text("SELECT 1"))
-            result["database"] = {"connection": "ok"}
-            
-            # Check environment variables
-            result["environment"] = {
-                "DATABASE_URL": "present" if os.getenv("DATABASE_URL") else "missing",
-                "database_type": "postgresql" if os.getenv("DATABASE_URL", "").startswith(("postgresql://", "postgres://")) else "sqlite"
-            }
-            
-            # Check if tables exist (PostgreSQL specific)
-            if result["environment"]["database_type"] == "postgresql":
-                tables_result = db.execute(text("""
-                    SELECT table_name FROM information_schema.tables 
-                    WHERE table_schema = 'public'
-                """)).fetchall()
-                tables = [row[0] for row in tables_result] if tables_result else []
-                result["database"]["tables"] = tables
-                result["database"]["users_table_exists"] = "users" in tables
-                result["database"]["projects_table_exists"] = "projects" in tables
-            
-        except Exception as e:
-            result["database"] = {"error": str(e), "error_type": type(e).__name__}
-            
-        return result
-        
-    except Exception as e:
-        return {"status": "error", "error": str(e)}
+    return {"status": "ok"}
+
+@app.get("/test")
+async def test():
+    """Minimal test endpoint to debug HTTP protocol issues"""
+    return {"test": "success", "message": "HTTP protocol working"}
 
 @app.get("/test-db")
 async def test_database_schema():
