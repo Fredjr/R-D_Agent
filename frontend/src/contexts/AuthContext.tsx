@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
 
       setUser(userData);
-      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('rd_agent_user', JSON.stringify(userData));
     } catch (error) {
       console.error('Login failed:', error);
       throw error;
