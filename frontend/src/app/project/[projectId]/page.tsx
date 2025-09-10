@@ -103,10 +103,10 @@ export default function ProjectWorkspace() {
   const [addingAnnotation, setAddingAnnotation] = useState(false);
 
   useEffect(() => {
-    if (projectId) {
+    if (projectId && user && !authLoading) {
       fetchProjectDetails();
     }
-  }, [projectId]);
+  }, [projectId, user, authLoading]);
 
   const fetchProjectDetails = async () => {
     try {
