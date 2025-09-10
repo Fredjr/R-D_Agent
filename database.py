@@ -37,25 +37,37 @@ def create_database_engine():
     """Create database engine with appropriate configuration"""
     db_url = get_database_url()
     
-    if db_url.startswith("postgresql"):
-        # PostgreSQL configuration (works for both Supabase and Cloud SQL)
-        engine = create_engine(
-            db_url,
-            pool_pre_ping=True,
-            pool_recycle=300,
-            pool_size=10,
-            max_overflow=20,
-            echo=False
-        )
-    else:
-        # SQLite configuration (fallback)
-        engine = create_engine(
-            db_url,
+    try:
+        if db_url.startswith("postgresql"):
+            # PostgreSQL configuration (works for both Supabase and Cloud SQL)
+            engine = create_engine(
+                db_url,
+                pool_pre_ping=True,
+                pool_recycle=300,
+                pool_size=10,
+                max_overflow=20,
+                echo=False
+            )
+        else:
+            # SQLite configuration (fallback)
+            engine = create_engine(
+                db_url,
+                connect_args={"check_same_thread": False},
+                echo=False
+            )
+        return engine
+    except Exception as e:
+        print(f"❌ Database initialization failed: {e}")
+        print(f"❌ Error type: {type(e).__name__}")
+        print(f"❌ Database URL (first 50 chars): {db_url[:50]}...")
+        # Fallback to SQLite on any database connection error
+        print("🔄 Falling back to SQLite database")
+        fallback_url = "sqlite:///./rd_agent.db"
+        return create_engine(
+            fallback_url,
             connect_args={"check_same_thread": False},
             echo=False
         )
-    
-    return engine
 
 engine = None
 SessionLocal = None
