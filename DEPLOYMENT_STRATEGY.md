@@ -45,6 +45,122 @@ BACKEND_PUBLIC_URL
 4. **Promotion**: Manually run "Promote Staging to Stable" workflow when ready
 5. **Stable**: Beta testers continue using the stable URL
 
+## CRITICAL ISSUE: Cloud Run Infrastructure Failure
+
+**Status**: The current Cloud Run staging deployment (`rd-agent-staging`) has a fundamental infrastructure issue that prevents ANY HTTP requests from reaching the application container, despite successful container startup.
+
+### Evidence of Infrastructure Problem
+- ✅ Application starts successfully (logs show "Application startup complete")
+- ✅ Database connects and initializes properly (Supabase connection working)
+- ✅ Container runs without errors
+- ❌ ALL HTTP endpoints return 502 Bad Gateway
+- ❌ Even minimal `/test` endpoint fails with "Invalid HTTP request received"
+
+### Failed Resolution Attempts
+1. Environment variable injection fixes (multiple approaches)
+2. Database troubleshooting (SQLite → PostgreSQL → Supabase)
+3. Application code fixes (Pydantic models, error handling)
+4. Traffic routing and revision management
+5. Service deletion/recreation (nuclear option)
+6. Alternative service names (rd-agent-staging-v2)
+7. Minimal endpoint testing
+
+## Alternative Deployment Strategies
+
+### Option 1: Different Cloud Run Region
+Deploy to a different GCP region to rule out regional infrastructure issues:
+```bash
+gcloud run deploy rd-agent-staging-alt \
+  --source . \
+  --region europe-west1 \
+  --allow-unauthenticated
+```
+
+### Option 2: Google Cloud Functions
+Migrate to Cloud Functions for simpler HTTP handling:
+```bash
+gcloud functions deploy rd-agent-function \
+  --runtime python311 \
+  --trigger-http \
+  --allow-unauthenticated
+```
+
+### Option 3: Google App Engine
+Deploy to App Engine as alternative platform:
+```yaml
+# app.yaml
+runtime: python311
+service: rd-agent-staging
+```
+
+### Option 4: Alternative Cloud Provider
+Consider deploying to:
+- **Railway**: Simple Python deployment
+- **Render**: Docker-based deployment
+- **Fly.io**: Global edge deployment
+- **AWS Lambda**: Serverless alternative
+
+### Option 5: Fresh GCP Project
+Create entirely new GCP project to rule out project-level configuration issues.
+
+## Current Working Configuration
+
+### Backend (BROKEN - Cloud Run)
+- **Staging**: `https://rd-agent-staging-537209831678.us-central1.run.app` (502 errors)
+- **Database**: Supabase PostgreSQL (working with hardcoded connection)
+- **Container**: Starts successfully, HTTP layer broken
+
+### Frontend (Vercel - Working)
+- **Staging**: `https://r-d-agent-staging.vercel.app`
+- **Production**: `https://r-d-agent.vercel.app`
+
+## Immediate Action Plan
+
+1. **Try Alternative Platform**: Deploy to Railway/Render for immediate staging environment
+2. **Google Cloud Support**: Open support ticket for Cloud Run infrastructure investigation
+3. **Document Workaround**: Use alternative platform until Cloud Run issue resolved
+4. **Monitor**: Set up health checks on alternative deployment
+
+## Environment Variables (Working)
+
+### Backend
+- `SUPABASE_DATABASE_URL`: Working with hardcoded connection
+- `PINECONE_API_KEY`: Vector database API key
+- `PINECONE_INDEX`: Vector database index name
+- `PINECONE_HOST`: Vector database host
+- `GOOGLE_GENAI_API_KEY`: Google AI API key
+- `ALLOW_ORIGIN_REGEX`: CORS configuration
+
+### Frontend
+- `NEXT_PUBLIC_BACKEND_URL`: Backend API URL (needs update for new platform)
+- `VERCEL_TOKEN`: Deployment token
+- `VERCEL_ORG_ID`: Organization ID
+- `VERCEL_PROJECT_ID`: Project ID
+
+## Database Schema (Working)
+
+### Tables
+1. **users**
+   - `user_id` (Primary Key)
+   - `username`
+   - `email`
+   - `created_at`
+   - `updated_at`
+
+2. **projects**
+   - `project_id` (Primary Key)
+   - `project_name`
+   - `description`
+   - `owner_user_id` (Foreign Key to users)
+   - `created_at`
+   - `updated_at`
+
+## Next Steps
+
+1. **URGENT**: Deploy to alternative platform (Railway recommended)
+2. **Medium**: Investigate Cloud Run with Google Support
+3. **Long-term**: Migrate back to Cloud Run once infrastructure issue resolved
+
 ## Manual Promotion Steps
 
 1. Go to GitHub Actions
