@@ -77,8 +77,8 @@ def get_engine():
     global engine
     if engine is None:
         engine = create_database_engine()
-        db_url = get_database_url()
-        if db_url.startswith("postgresql"):
+        # The engine creation already handles fallback, so we check the actual engine URL
+        if engine.url.drivername.startswith('postgresql'):
             print("🗄️ Using PostgreSQL database (Supabase or Cloud SQL)")
         else:
             print("🗄️ Using SQLite database for local development")
