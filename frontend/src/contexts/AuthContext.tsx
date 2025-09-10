@@ -52,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // For now, we'll create a simple client-side user object
       // In a full implementation, this would authenticate with the backend
       const userData: User = {
-        user_id: email, // Use email as user_id for now
+        user_id: 'default_user', // Use consistent user_id for project persistence
         username: username || email.split('@')[0],
         email: email,
         created_at: new Date().toISOString()
