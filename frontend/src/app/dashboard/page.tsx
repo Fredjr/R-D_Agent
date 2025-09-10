@@ -30,6 +30,8 @@ export default function Dashboard() {
   const [newProjectDescription, setNewProjectDescription] = useState('');
   const [creating, setCreating] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [projectDetails, setProjectDetails] = useState<any>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -53,6 +55,23 @@ export default function Dashboard() {
       return () => clearTimeout(timer);
     }
   }, [error]);
+
+  const fetchProjectDetails = async (projectId: string) => {
+    setLoadingDetails(true);
+    try {
+      const response = await fetch(`/api/proxy/projects/${projectId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch project details');
+      }
+      const details = await response.json();
+      setProjectDetails(details);
+    } catch (error) {
+      console.error('Error fetching project details:', error);
+      setError('Failed to load project details');
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
 
   const fetchProjects = async () => {
     try {
@@ -250,7 +269,10 @@ export default function Dashboard() {
             {projects.map((project) => (
               <div
                 key={project.project_id}
-                onClick={() => setSelectedProject(project)}
+                onClick={() => {
+                  setSelectedProject(project);
+                  fetchProjectDetails(project.project_id);
+                }}
                 className="block cursor-pointer"
               >
                 <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow p-6 border border-gray-200">
@@ -306,7 +328,10 @@ export default function Dashboard() {
                   </div>
                   
                   <button
-                    onClick={() => setSelectedProject(null)}
+                    onClick={() => {
+                      setSelectedProject(null);
+                      setProjectDetails(null);
+                    }}
                     className="ml-4 text-gray-400 hover:text-gray-600"
                   >
                     <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -330,11 +355,28 @@ export default function Dashboard() {
                           New Report
                         </button>
                       </div>
-                      <div className="text-center py-8 text-gray-500">
-                        <BeakerIcon className="h-12 w-12 mx-auto mb-2 text-gray-400" />
-                        <p>No reports created yet</p>
-                        <p className="text-sm">Create your first research report to get started</p>
-                      </div>
+                      {loadingDetails ? (
+                        <div className="text-center py-8">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                          <p className="text-gray-500 mt-2">Loading reports...</p>
+                        </div>
+                      ) : projectDetails?.reports?.length > 0 ? (
+                        <div className="space-y-3">
+                          {projectDetails.reports.map((report: any, index: number) => (
+                            <div key={index} className="bg-white p-4 rounded border">
+                              <h4 className="font-medium text-gray-900">{report.title || `Report ${index + 1}`}</h4>
+                              <p className="text-sm text-gray-600 mt-1">{report.summary || 'No summary available'}</p>
+                              <p className="text-xs text-gray-500 mt-2">Created: {report.created_at ? formatDate(report.created_at) : 'Unknown'}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          <BeakerIcon className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                          <p>No reports created yet</p>
+                          <p className="text-sm">Create your first research report to get started</p>
+                        </div>
+                      )}
                     </div>
 
                     {/* Annotations */}
@@ -350,13 +392,29 @@ export default function Dashboard() {
                           Add Note
                         </button>
                       </div>
-                      <div className="text-center py-8 text-gray-500">
-                        <svg className="h-12 w-12 mx-auto mb-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                        </svg>
-                        <p>No annotations yet</p>
-                        <p className="text-sm">Add research notes and annotations</p>
-                      </div>
+                      {loadingDetails ? (
+                        <div className="text-center py-8">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
+                          <p className="text-gray-500 mt-2">Loading annotations...</p>
+                        </div>
+                      ) : projectDetails?.annotations?.length > 0 ? (
+                        <div className="space-y-3">
+                          {projectDetails.annotations.map((annotation: any, index: number) => (
+                            <div key={index} className="bg-white p-4 rounded border">
+                              <p className="text-sm text-gray-900">{annotation.content || annotation.text}</p>
+                              <p className="text-xs text-gray-500 mt-2">Added: {annotation.created_at ? formatDate(annotation.created_at) : 'Unknown'}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          <svg className="h-12 w-12 mx-auto mb-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                          </svg>
+                          <p>No annotations yet</p>
+                          <p className="text-sm">Add research notes and annotations</p>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -407,7 +465,7 @@ export default function Dashboard() {
 
         {/* Create Project Modal */}
         {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Create New Project</h2>
             
