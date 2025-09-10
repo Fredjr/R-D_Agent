@@ -11,8 +11,9 @@ export async function GET(
     const resolvedParams = await params;
     const projectId = Array.isArray(resolvedParams.projectId) ? resolvedParams.projectId[0] : resolvedParams.projectId;
     
-    console.log('🔄 Proxying GET /projects/' + projectId + ' to backend...');
+    console.log('🔄 Proxying GET /projects/' + projectId + ' to Railway backend...');
     console.log('🔍 DEBUG params:', resolvedParams);
+    console.log('🎯 Using backend URL:', BACKEND_BASE);
     
     if (!projectId) {
       console.error('❌ No projectId found in params');
