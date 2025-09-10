@@ -6444,11 +6444,19 @@ if __name__ == "__main__":
     import uvicorn
     import os
     port = int(os.environ.get("PORT", 8080))
-    uvicorn.run(
-        app, 
-        host="0.0.0.0", 
-        port=port,
-        http="h11",  # Use HTTP/1.1 to avoid protocol issues with Cloud Run
-        access_log=True,
-        log_level="info"  # Updated for Supabase connection
-    )
+    
+    # Try different server configurations for Cloud Run compatibility
+    try:
+        uvicorn.run(
+            app, 
+            host="0.0.0.0", 
+            port=port,
+            server_header=False,
+            date_header=False,
+            access_log=True,
+            log_level="info"
+        )
+    except Exception as e:
+        print(f"Uvicorn failed: {e}")
+        # Fallback to basic configuration
+        uvicorn.run(app, host="0.0.0.0", port=port)
