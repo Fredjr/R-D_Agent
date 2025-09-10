@@ -1,5 +1,5 @@
 // Dedicated projects proxy to avoid routing issues
-const BACKEND_URL = "https://rd-backend-new-537209831678.us-central1.run.app";
+const BACKEND_URL = "https://r-dagent-production.up.railway.app";
 
 export async function GET() {
   try {

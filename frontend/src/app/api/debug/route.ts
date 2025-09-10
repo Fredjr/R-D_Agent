@@ -4,7 +4,7 @@ export async function GET() {
   let backendError = null;
   
   try {
-    const testUrl = "https://rd-backend-new-537209831678.us-central1.run.app/ready";
+    const testUrl = "https://r-dagent-production.up.railway.app/ready";
     const testResponse = await fetch(testUrl);
     backendStatus = testResponse.ok ? "Connected" : `Error ${testResponse.status}`;
     if (!testResponse.ok) {
@@ -21,7 +21,7 @@ export async function GET() {
     backend_urls: {
       NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL || "Not set",
       BACKEND_URL: process.env.BACKEND_URL || "Not set",
-      hardcoded_fallback: "https://rd-backend-new-537209831678.us-central1.run.app"
+      hardcoded_fallback: "https://r-dagent-production.up.railway.app"
     },
     backend_connectivity: {
       status: backendStatus,
