@@ -6260,7 +6260,7 @@ async def debug_database():
         "database_url_env": os.getenv("DATABASE_URL", "NOT_SET"),
         "postgres_url_env": os.getenv("POSTGRES_URL", "NOT_SET"), 
         "effective_database_url": DATABASE_URL,
-        "database_type": "PostgreSQL" if DATABASE_URL.startswith(("postgresql://", "postgres://")) else "SQLite",
+        "database_type": "PostgreSQL" if DATABASE_URL and DATABASE_URL.startswith(("postgresql://", "postgres://")) else "SQLite",
         "engine_url": str(engine.url),
         "environment": os.getenv("ENVIRONMENT", "unknown"),
         "connection_test": "SUCCESS" if connection_test else "FAILED"
