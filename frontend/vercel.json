@@ -1,4 +1,10 @@
 {
   "version": 2,
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "rewrites": [
+    {
+      "source": "/project/:projectId",
+      "destination": "/project/:projectId"
+    }
+  ]
 }
