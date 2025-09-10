@@ -1,8 +1,5 @@
-const BACKEND_BASE = (
-  process.env.NEXT_PUBLIC_BACKEND_URL || 
-  process.env.BACKEND_URL || 
-  "https://r-dagent-production.up.railway.app" // Fallback to your production backend
-).replace(/\/+$/, "");
+// Force Railway URL to bypass cached Vercel environment variables
+const BACKEND_BASE = "https://r-dagent-production.up.railway.app";
 
 function buildTargetUrl(req: Request, path: string[]): string {
   const suffix = path.join("/");
