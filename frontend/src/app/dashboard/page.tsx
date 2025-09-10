@@ -38,8 +38,10 @@ export default function Dashboard() {
   }, [user, authLoading, router]);
 
   useEffect(() => {
-    fetchProjects();
-  }, []);
+    if (user && !authLoading) {
+      fetchProjects();
+    }
+  }, [user, authLoading]);
 
   // Auto-dismiss errors after 10 seconds
   useEffect(() => {
