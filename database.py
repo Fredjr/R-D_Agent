@@ -3,7 +3,7 @@ Google Cloud SQL Database Configuration for R&D Agent
 Complete data persistence for users, projects, dossiers, and deep dive analyses
 """
 import os
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Boolean, ForeignKey, JSON, Index
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Boolean, ForeignKey, JSON, Index, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.sql import func
@@ -48,6 +48,10 @@ def create_database_engine():
                 max_overflow=20,
                 echo=False
             )
+            # Test the connection immediately
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            return engine
         else:
             # SQLite configuration (fallback)
             engine = create_engine(
@@ -55,7 +59,7 @@ def create_database_engine():
                 connect_args={"check_same_thread": False},
                 echo=False
             )
-        return engine
+            return engine
     except Exception as e:
         print(f"❌ Database initialization failed: {e}")
         print(f"❌ Error type: {type(e).__name__}")
