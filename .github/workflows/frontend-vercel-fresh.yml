@@ -41,7 +41,6 @@ jobs:
         vercel-token: ${{ secrets.VERCEL_TOKEN }}
         vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
         vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID_FRESH }}
-        working-directory: ./frontend
         vercel-args: '--prod'
       env:
         NEXT_PUBLIC_BACKEND_URL: https://r-dagent-production.up.railway.app
