@@ -24,5 +24,5 @@ COPY . .
 ENV PORT=8080
 EXPOSE 8080
 
-CMD ["sh","-c","uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}"]
-
+# Use Gunicorn with Uvicorn workers for better Cloud Run compatibility
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--worker-class", "uvicorn.workers.UvicornWorker", "--timeout", "0", "main:app"]
