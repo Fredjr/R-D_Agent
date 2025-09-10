@@ -4,7 +4,7 @@ export async function GET() {
   let backendError = null;
   
   try {
-    const testUrl = "https://r-dagent-production.up.railway.app/ready";
+    const testUrl = "https://r-dagent-production.up.railway.app/";
     const testResponse = await fetch(testUrl);
     backendStatus = testResponse.ok ? "Connected" : `Error ${testResponse.status}`;
     if (!testResponse.ok) {

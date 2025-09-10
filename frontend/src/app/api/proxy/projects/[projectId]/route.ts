@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_BASE = (
-  process.env.NEXT_PUBLIC_BACKEND_URL || 
-  process.env.BACKEND_URL || 
-  "https://r-dagent-production.up.railway.app"
-).replace(/\/+$/, "");
+// Force Railway URL to bypass cached Vercel environment variables
+const BACKEND_BASE = "https://r-dagent-production.up.railway.app";
 
 export async function GET(
   request: NextRequest,

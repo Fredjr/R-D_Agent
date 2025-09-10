@@ -1,19 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_BASE = (
-  process.env.NEXT_PUBLIC_BACKEND_URL || 
-  process.env.BACKEND_URL || 
-  "https://r-dagent-production.up.railway.app"
-).replace(/\/+$/, "");
+// Force Railway URL to bypass cached Vercel environment variables
+const BACKEND_URL = "https://r-dagent-production.up.railway.app";
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const user_id = searchParams.get('user_id') || 'default_user';
     
+    console.log(' Proxying GET /projects for user:', user_id);
     console.log('🔄 Proxying GET /projects for user:', user_id);
     
-    const response = await fetch(`${BACKEND_BASE}/projects?user_id=${user_id}`, {
+    const response = await fetch(`${BACKEND_URL}/projects?user_id=${user_id}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -46,7 +44,7 @@ export async function GET(request: NextRequest) {
       { 
         error: 'Proxy error',
         message: error instanceof Error ? error.message : 'Unknown error',
-        backend_url: BACKEND_BASE
+        backend_url: BACKEND_URL
       },
       { status: 500 }
     );
@@ -58,7 +56,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log('🔄 Proxying POST /projects with data:', body);
     
-    const response = await fetch(`${BACKEND_BASE}/projects`, {
+    const response = await fetch(`${BACKEND_URL}/projects`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -92,7 +90,7 @@ export async function POST(request: NextRequest) {
       { 
         error: 'Proxy error',
         message: error instanceof Error ? error.message : 'Unknown error',
-        backend_url: BACKEND_BASE
+        backend_url: BACKEND_URL
       },
       { status: 500 }
     );
