@@ -29,6 +29,7 @@ export default function Dashboard() {
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectDescription, setNewProjectDescription] = useState('');
   const [creating, setCreating] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -247,10 +248,10 @@ export default function Dashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map((project) => (
-              <Link
+              <div
                 key={project.project_id}
-                href={`/project-detail?id=${project.project_id}`}
-                className="block"
+                onClick={() => setSelectedProject(project)}
+                className="block cursor-pointer"
               >
                 <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow p-6 border border-gray-200">
                   <div className="flex items-start justify-between mb-4">
@@ -260,32 +261,152 @@ export default function Dashboard() {
                       {formatDate(project.created_at)}
                     </span>
                   </div>
-                  
                   <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
                     {project.project_name}
                   </h3>
-                  
-                  {project.description && (
-                    <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-                      {project.description}
-                    </p>
-                  )}
-                  
-                  <div className="flex items-center justify-between text-sm text-gray-500">
-                    <span className="flex items-center">
-                      <UsersIcon className="h-4 w-4 mr-1" />
-                      Owner: {project.owner_user_id}
+                  <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+                    {project.description || 'No description provided'}
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500">
+                      Updated {formatDate(project.updated_at)}
                     </span>
+                    <div className="flex space-x-2">
+                      <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                        Active
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         )}
-      </div>
 
-      {/* Create Project Modal */}
-      {showCreateModal && (
+        {/* Project Detail Modal */}
+        {selectedProject && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-start justify-between mb-6">
+                  <div className="flex-1">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">{selectedProject.project_name}</h2>
+                    <p className="text-gray-600 mb-4">{selectedProject.description || 'No description provided'}</p>
+                    
+                    <div className="flex items-center gap-6 text-sm text-gray-500">
+                      <div className="flex items-center">
+                        <CalendarIcon className="h-4 w-4 mr-1" />
+                        Created {formatDate(selectedProject.created_at)}
+                      </div>
+                      <div className="flex items-center">
+                        <UserIcon className="h-4 w-4 mr-1" />
+                        Project ID: {selectedProject.project_id}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={() => setSelectedProject(null)}
+                    className="ml-4 text-gray-400 hover:text-gray-600"
+                  >
+                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Main Content */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  {/* Left Column - Main Content */}
+                  <div className="lg:col-span-2 space-y-6">
+                    {/* Reports & Dossiers */}
+                    <div className="bg-gray-50 rounded-lg p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                          <BeakerIcon className="h-5 w-5 mr-2" />
+                          Reports & Dossiers
+                        </h3>
+                        <button className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
+                          New Report
+                        </button>
+                      </div>
+                      <div className="text-center py-8 text-gray-500">
+                        <BeakerIcon className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                        <p>No reports created yet</p>
+                        <p className="text-sm">Create your first research report to get started</p>
+                      </div>
+                    </div>
+
+                    {/* Annotations */}
+                    <div className="bg-gray-50 rounded-lg p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                          <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                          </svg>
+                          Annotations
+                        </h3>
+                        <button className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700">
+                          Add Note
+                        </button>
+                      </div>
+                      <div className="text-center py-8 text-gray-500">
+                        <svg className="h-12 w-12 mx-auto mb-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                        </svg>
+                        <p>No annotations yet</p>
+                        <p className="text-sm">Add research notes and annotations</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column - Sidebar */}
+                  <div className="space-y-6">
+                    {/* Project Info */}
+                    <div className="bg-gray-50 rounded-lg p-6">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-4">Project Details</h4>
+                      <div className="space-y-3 text-sm">
+                        <div>
+                          <span className="font-medium text-gray-700">Status:</span>
+                          <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
+                            Active
+                          </span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Created:</span>
+                          <span className="ml-2 text-gray-600">{formatDate(selectedProject.created_at)}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Last Updated:</span>
+                          <span className="ml-2 text-gray-600">{formatDate(selectedProject.updated_at)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quick Actions */}
+                    <div className="bg-gray-50 rounded-lg p-6">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h4>
+                      <div className="space-y-2">
+                        <button className="w-full text-left px-3 py-2 text-sm bg-blue-50 text-blue-700 rounded hover:bg-blue-100">
+                          Start Deep Dive Analysis
+                        </button>
+                        <button className="w-full text-left px-3 py-2 text-sm bg-green-50 text-green-700 rounded hover:bg-green-100">
+                          Generate Summary Report
+                        </button>
+                        <button className="w-full text-left px-3 py-2 text-sm bg-purple-50 text-purple-700 rounded hover:bg-purple-100">
+                          Invite Collaborators
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Create Project Modal */}
+        {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Create New Project</h2>
