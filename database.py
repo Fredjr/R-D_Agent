@@ -17,23 +17,19 @@ SUPABASE_DATABASE_URL = os.getenv("SUPABASE_DATABASE_URL")
 
 def get_database_url():
     """Get the appropriate database URL with fallback logic"""
-    # TEMPORARY: Hardcode Supabase connection to bypass env var issues
-    hardcoded_supabase_url = "postgresql://postgres:Ismene!1993@db.smwmyperkkmlaqhsvphp.supabase.co:5432/postgres"
-    
-    # For debugging: check if we're in Cloud Run
-    if os.getenv("K_SERVICE"):  # Cloud Run environment variable
-        print(f"🔧 TEMP: Using hardcoded Supabase connection in Cloud Run")
-        return hardcoded_supabase_url
-    
-    # Priority: Supabase > DATABASE_URL > POSTGRES_URL > SQLite
+    # Priority: SUPABASE_DATABASE_URL > DATABASE_URL > POSTGRES_URL > SQLite
     if SUPABASE_DATABASE_URL:
+        print(f"🗄️ Using Supabase PostgreSQL database")
         return SUPABASE_DATABASE_URL
     elif DATABASE_URL:
+        print(f"🗄️ Using DATABASE_URL PostgreSQL")
         return DATABASE_URL
     elif POSTGRES_URL:
+        print(f"🗄️ Using POSTGRES_URL PostgreSQL")
         return POSTGRES_URL
     else:
         # Fallback to SQLite for local development
+        print(f"🗄️ Using SQLite database (local development)")
         return "sqlite:///./rd_agent.db"
 
 def create_database_engine():
