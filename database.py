@@ -331,7 +331,7 @@ def test_connection():
     try:
         # Test basic connection
         with get_engine().connect() as conn:
-            result = conn.execute("SELECT 1").fetchone()
+            result = conn.execute(text("SELECT 1")).fetchone()
             if result:
                 print("✅ Database connection successful")
                 return True
