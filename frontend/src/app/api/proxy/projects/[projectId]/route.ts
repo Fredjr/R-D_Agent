@@ -5,13 +5,14 @@ const BACKEND_BASE = "https://r-dagent-production.up.railway.app";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
-    const projectId = Array.isArray(params.projectId) ? params.projectId[0] : params.projectId;
+    const resolvedParams = await params;
+    const projectId = Array.isArray(resolvedParams.projectId) ? resolvedParams.projectId[0] : resolvedParams.projectId;
     
     console.log('🔄 Proxying GET /projects/' + projectId + ' to Railway backend...');
-    console.log('🔍 DEBUG params:', params);
+    console.log('🔍 DEBUG params:', resolvedParams);
     console.log('🎯 Using backend URL:', BACKEND_BASE);
     
     if (!projectId) {
@@ -64,10 +65,11 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
-    const projectId = Array.isArray(params.projectId) ? params.projectId[0] : params.projectId;
+    const resolvedParams = await params;
+    const projectId = Array.isArray(resolvedParams.projectId) ? resolvedParams.projectId[0] : resolvedParams.projectId;
     console.log('🔄 Proxying PUT /projects/' + projectId + ' to backend...');
     
     const body = await request.json();
@@ -115,10 +117,11 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
-    const projectId = Array.isArray(params.projectId) ? params.projectId[0] : params.projectId;
+    const resolvedParams = await params;
+    const projectId = Array.isArray(resolvedParams.projectId) ? resolvedParams.projectId[0] : resolvedParams.projectId;
     console.log('🔄 Proxying DELETE /projects/' + projectId + ' to backend...');
     
     const response = await fetch(`${BACKEND_BASE}/projects/${projectId}`, {
