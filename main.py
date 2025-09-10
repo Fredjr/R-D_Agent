@@ -6450,5 +6450,5 @@ if __name__ == "__main__":
         port=port,
         http="h11",  # Use HTTP/1.1 to avoid protocol issues with Cloud Run
         access_log=True,
-        log_level="info"
+        log_level="info"  # Updated for Supabase connection
     )
