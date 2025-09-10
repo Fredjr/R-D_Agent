@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+// Force Railway URL to bypass cached Vercel environment variables
+const BACKEND_BASE = "https://r-dagent-production.up.railway.app";
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
       join_mailing_list: body.join_mailing_list || false
     };
     
-    const response = await fetch(`${BACKEND_URL}/auth/complete-registration`, {
+    const response = await fetch(`${BACKEND_BASE}/auth/complete-registration`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

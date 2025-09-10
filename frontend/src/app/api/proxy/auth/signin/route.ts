@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Force Railway URL to bypass cached Vercel environment variables
+const BACKEND_BASE = "https://r-dagent-production.up.railway.app";
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
-    const response = await fetch(`${backendUrl}/auth/signin`, {
+    const response = await fetch(`${BACKEND_BASE}/auth/signin`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

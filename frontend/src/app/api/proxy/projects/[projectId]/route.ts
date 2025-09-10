@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Force Railway URL to bypass cached Vercel environment variables
+// Force Railway URL to bypass cached Vercel environment variables - v2
 const BACKEND_BASE = "https://r-dagent-production.up.railway.app";
 
 export async function GET(
