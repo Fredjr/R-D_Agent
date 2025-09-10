@@ -24,5 +24,5 @@ COPY . .
 ENV PORT=8080
 EXPOSE 8080
 
-# Use Gunicorn with Uvicorn workers for better Cloud Run compatibility
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--worker-class", "uvicorn.workers.UvicornWorker", "--timeout", "0", "main:app"]
+# Use Gunicorn with specific HTTP/1.1 configuration for Cloud Run
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--worker-class", "uvicorn.workers.UvicornH11Worker", "--timeout", "0", "--keep-alive", "2", "main:app"]
