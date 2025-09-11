@@ -3,13 +3,19 @@
 ## Overview
 The R&D Agent project is now **PRODUCTION READY** with all features implemented and deployed using a stable Railway + Vercel architecture.
 
-## Current Production Deployment
+## Deployment Environments
 
-### 🟢 **Frontend (Vercel)**
-- **Production URL**: https://r-d-agent-frontend.vercel.app
-- **Status**: ✅ Fully functional with all features
-- **Auto-deploy**: Enabled on `main` branch pushes
-- **Environment**: All required variables configured
+### 🟢 **Production Environment**
+- **Frontend (Vercel)**: https://r-d-agent-frontend.vercel.app
+- **Project**: `r-d-agent` (stable production)
+- **Status**: ✅ Stable for end users
+- **Deploy Strategy**: Manual releases only
+
+### 🟡 **Staging Environment** 
+- **Frontend (Vercel)**: https://frontend-psi-seven-85.vercel.app
+- **Project**: `frontend` (development staging)
+- **Status**: ✅ Auto-deploy from `main` branch
+- **Latest Fix**: Next.js 15 async params compatibility (commit 0e97291)
 
 ### 🟢 **Backend (Railway)**
 - **Production URL**: https://r-dagent-production.up.railway.app
@@ -72,22 +78,40 @@ The R&D Agent project is now **PRODUCTION READY** with all features implemented 
 - Secure header forwarding for user authentication
 - Comprehensive error handling and validation
 
+## Deployment Workflow
+
+### Staging Development Process
+1. **Development**: Work on features locally
+2. **Push to main**: Auto-deploys to staging (frontend project)
+3. **Test staging**: Validate features at https://frontend-psi-seven-85.vercel.app
+4. **Iterate**: Continue development with immediate feedback
+
+### Production Release Process
+1. **Staging validation**: Ensure all features work in staging
+2. **Manual deployment**: Deploy specific commit to production (r-d-agent project)
+3. **Production testing**: Validate at https://r-d-agent-frontend.vercel.app
+4. **User communication**: Notify users of new features
+
+### Rollback Procedure
+- **Staging**: Revert commit and auto-redeploy
+- **Production**: Manual revert to last stable release
+
 ## Environment Variables
 
-### Frontend (Vercel)
-```bash
-NEXT_PUBLIC_BACKEND_URL=https://r-dagent-production.up.railway.app
-```
+### Staging Environment (frontend project)
+- `NEXT_PUBLIC_BACKEND_URL`: https://r-dagent-production.up.railway.app
+- Auto-deploy enabled from main branch
 
-### Backend (Railway)
-```bash
-DATABASE_URL=postgresql://[credentials]  # Managed by Railway
-PINECONE_API_KEY=[your_key]
-PINECONE_INDEX=[your_index]
-PINECONE_HOST=[your_host]
-GOOGLE_GENAI_API_KEY=[your_key]
-ALLOW_ORIGIN_REGEX=.*
-```
+### Production Environment (r-d-agent project)  
+- `NEXT_PUBLIC_BACKEND_URL`: https://r-dagent-production.up.railway.app
+- Manual deployment only
+
+### Backend Variables (Railway)
+- `DATABASE_URL`: PostgreSQL connection string
+- `GOOGLE_GENAI_API_KEY`: For AI features
+- `PINECONE_API_KEY`: For vector search
+- `GOOGLE_API_KEY`: For search functionality
+- `GOOGLE_CSE_ID`: Custom search engine ID
 
 ## Database Schema
 
