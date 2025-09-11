@@ -9,7 +9,7 @@ export async function GET(
 ) {
   try {
     const resolvedParams = await params;
-    const projectId = Array.isArray(resolvedParams.projectId) ? resolvedParams.projectId[0] : resolvedParams.projectId;
+    const { projectId } = resolvedParams;
     
     console.log('🔄 Proxying GET /projects/' + projectId + ' to Railway backend...');
     console.log('🔍 DEBUG params:', resolvedParams);
@@ -69,7 +69,7 @@ export async function PUT(
 ) {
   try {
     const resolvedParams = await params;
-    const projectId = Array.isArray(resolvedParams.projectId) ? resolvedParams.projectId[0] : resolvedParams.projectId;
+    const { projectId } = resolvedParams;
     console.log('🔄 Proxying PUT /projects/' + projectId + ' to backend...');
     
     const body = await request.json();
@@ -121,7 +121,7 @@ export async function DELETE(
 ) {
   try {
     const resolvedParams = await params;
-    const projectId = Array.isArray(resolvedParams.projectId) ? resolvedParams.projectId[0] : resolvedParams.projectId;
+    const { projectId } = resolvedParams;
     console.log('🔄 Proxying DELETE /projects/' + projectId + ' to backend...');
     
     const response = await fetch(`${BACKEND_BASE}/projects/${projectId}`, {
