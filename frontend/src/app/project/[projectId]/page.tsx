@@ -22,6 +22,9 @@ export default function ProjectPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [noteContent, setNoteContent] = useState('');
+  const [creatingNote, setCreatingNote] = useState(false);
 
   useEffect(() => {
     if (projectId && user) {
@@ -41,6 +44,39 @@ export default function ProjectPage() {
       setError(err instanceof Error ? err.message : 'Failed to load project');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreateNote = async () => {
+    if (!noteContent.trim()) return;
+    
+    setCreatingNote(true);
+    try {
+      const response = await fetch(`/api/proxy/projects/${projectId}/annotations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user?.email || 'default_user',
+        },
+        body: JSON.stringify({
+          content: noteContent.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create note');
+      }
+
+      // Reset form and close modal
+      setNoteContent('');
+      setShowNoteModal(false);
+      
+      // Note: The AnnotationsFeed component will automatically update via WebSocket
+    } catch (err) {
+      console.error('Error creating note:', err);
+      alert('Failed to create note. Please try again.');
+    } finally {
+      setCreatingNote(false);
     }
   };
 
@@ -95,7 +131,7 @@ export default function ProjectPage() {
             New Report
           </button>
           <button 
-            onClick={() => alert('Add Note functionality coming soon!')}
+            onClick={() => setShowNoteModal(true)}
             className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
           >
             Add Note
@@ -126,6 +162,41 @@ export default function ProjectPage() {
             </button>
           </div>
         </div>
+
+        {/* Add Note Modal */}
+        {showNoteModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Note</h3>
+              <textarea
+                value={noteContent}
+                onChange={(e) => setNoteContent(e.target.value)}
+                placeholder="Enter your note..."
+                className="w-full h-32 p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                disabled={creatingNote}
+              />
+              <div className="flex justify-end gap-3 mt-4">
+                <button
+                  onClick={() => {
+                    setShowNoteModal(false);
+                    setNoteContent('');
+                  }}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                  disabled={creatingNote}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateNote}
+                  disabled={!noteContent.trim() || creatingNote}
+                  className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                >
+                  {creatingNote ? 'Adding...' : 'Add Note'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div>
