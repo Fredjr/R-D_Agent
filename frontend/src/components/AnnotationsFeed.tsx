@@ -167,7 +167,10 @@ export default function AnnotationsFeed({
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch annotations: ${response.status}`);
+        // Gracefully handle API errors - show empty state instead of error
+        console.warn(`⚠️ Annotations API unavailable (${response.status}), showing empty state`);
+        setAnnotations([]);
+        return;
       }
 
       const data = await response.json();

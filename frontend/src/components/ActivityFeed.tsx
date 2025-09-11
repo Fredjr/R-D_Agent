@@ -67,7 +67,10 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch activities: ${response.statusText}`);
+        // Gracefully handle API errors - show empty state instead of error
+        console.warn(`⚠️ Activities API unavailable (${response.status}), showing empty state`);
+        setActivities([]);
+        return;
       }
 
       const data = await response.json();
