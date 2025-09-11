@@ -61,7 +61,11 @@ export default function ProjectPage() {
 
   const fetchProject = async () => {
     try {
-      const response = await fetch(`/api/proxy/projects/${projectId}`);
+      const response = await fetch(`/api/proxy/projects/${projectId}`, {
+        headers: {
+          'User-ID': user?.email || 'default_user',
+        },
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch project');
       }
