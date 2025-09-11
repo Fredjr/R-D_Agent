@@ -86,6 +86,47 @@ export default function ProjectPage() {
           )}
         </div>
 
+        {/* Action Buttons */}
+        <div className="mb-8 flex flex-wrap gap-4">
+          <button 
+            onClick={() => alert('New Report functionality coming soon!')}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+          >
+            New Report
+          </button>
+          <button 
+            onClick={() => alert('Add Note functionality coming soon!')}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+          >
+            Add Note
+          </button>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
+          <div className="flex flex-wrap gap-3">
+            <button 
+              onClick={() => alert('Deep Dive Analysis functionality coming soon!')}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+            >
+              Start Deep Dive Analysis
+            </button>
+            <button 
+              onClick={() => alert('Summary Report functionality coming soon!')}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+            >
+              Generate Summary Report
+            </button>
+            <button 
+              onClick={() => alert('Invite Collaborators functionality coming soon!')}
+              className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+            >
+              Invite Collaborators
+            </button>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div>
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Annotations</h2>
