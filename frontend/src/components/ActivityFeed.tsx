@@ -89,7 +89,8 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({
 
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
-      const wsUrl = backendUrl.replace(/^http/, 'ws');
+      // Convert HTTPS to WSS, HTTP to WS
+      const wsUrl = backendUrl.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:');
       const ws = new WebSocket(`${wsUrl}/ws/project/${projectId}`);
       
       ws.onopen = () => {
