@@ -70,7 +70,7 @@ export default function AnnotationsFeed({
         // Use the backend URL from environment or default to localhost
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
         // Use the correct backend URL and convert HTTP/HTTPS to WS/WSS for WebSocket connection
-        const wsUrl = backendUrl.replace(/^https?/, (match) => match === 'https' ? 'wss' : 'ws');
+        const wsUrl = backendUrl.replace(/^https?:\/\//, (match) => match === 'https://' ? 'wss://' : 'ws://');
         const websocketUrl = `${wsUrl}/ws/project/${projectId}`;
         
         console.log('🔌 Connecting to WebSocket:', websocketUrl);
