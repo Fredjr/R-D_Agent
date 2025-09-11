@@ -89,18 +89,19 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({
 
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
-      // Convert HTTPS to WSS, HTTP to WS
-      const wsUrl = backendUrl.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:');
-      const ws = new WebSocket(`${wsUrl}/ws/project/${projectId}`);
+      const wsUrl = backendUrl.replace(/^https?/, (match) => match === 'https' ? 'wss' : 'ws');
+      const websocketUrl = `${wsUrl}/ws/project/${projectId}`;
       
-      ws.onopen = () => {
+      wsRef.current = new WebSocket(websocketUrl);
+      
+      wsRef.current.onopen = () => {
         console.log('ActivityFeed WebSocket connected');
         setWsConnected(true);
         setWsError(null);
         reconnectAttempts.current = 0;
       };
 
-      ws.onmessage = (event) => {
+      wsRef.current.onmessage = (event: MessageEvent) => {
         try {
           const message = JSON.parse(event.data);
           
@@ -139,7 +140,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({
         }
       };
 
-      ws.onclose = () => {
+      wsRef.current.onclose = () => {
         console.log('ActivityFeed WebSocket disconnected');
         setWsConnected(false);
         
@@ -155,12 +156,10 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({
         }
       };
 
-      ws.onerror = (error) => {
+      wsRef.current.onerror = (error: Event) => {
         console.error('ActivityFeed WebSocket error:', error);
         setWsError('Connection error occurred');
       };
-
-      wsRef.current = ws;
     } catch (err) {
       console.error('Error connecting to WebSocket:', err);
       setWsError('Failed to connect to real-time updates');
