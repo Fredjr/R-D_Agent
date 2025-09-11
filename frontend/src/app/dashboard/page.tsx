@@ -59,7 +59,13 @@ export default function Dashboard() {
   const fetchProjectDetails = async (projectId: string) => {
     setLoadingDetails(true);
     try {
-      const response = await fetch(`/api/proxy/projects/${projectId}`);
+      const user_id = user?.email || 'default_user';
+      const response = await fetch(`/api/proxy/projects/${projectId}`, {
+        headers: {
+          'User-ID': user_id,
+          'Content-Type': 'application/json',
+        },
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch project details');
       }
@@ -445,9 +451,12 @@ export default function Dashboard() {
                     <div className="bg-gray-50 rounded-lg p-6">
                       <h4 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h4>
                       <div className="space-y-2">
-                        <button className="w-full text-left px-3 py-2 text-sm bg-blue-50 text-blue-700 rounded hover:bg-blue-100">
-                          Start Deep Dive Analysis
-                        </button>
+                        <Link
+                          href={`/project/${selectedProject.project_id}`}
+                          className="block w-full text-left px-3 py-2 text-sm bg-blue-50 text-blue-700 rounded hover:bg-blue-100"
+                        >
+                          Open Project Workspace
+                        </Link>
                         <button className="w-full text-left px-3 py-2 text-sm bg-green-50 text-green-700 rounded hover:bg-green-100">
                           Generate Summary Report
                         </button>
@@ -466,63 +475,63 @@ export default function Dashboard() {
         {/* Create Project Modal */}
         {showCreateModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Create New Project</h2>
-            
-            <form onSubmit={createProject}>
-              <div className="mb-4">
-                <label htmlFor="projectName" className="block text-sm font-medium text-gray-700 mb-2">
-                  Project Name *
-                </label>
-                <input
-                  id="projectName"
-                  type="text"
-                  value={newProjectName}
-                  onChange={(e) => setNewProjectName(e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter project name"
-                  required
-                />
-              </div>
+            <div className="bg-white rounded-lg max-w-md w-full p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Create New Project</h2>
               
-              <div className="mb-6">
-                <label htmlFor="projectDescription" className="block text-sm font-medium text-gray-700 mb-2">
-                  Description (Optional)
-                </label>
-                <textarea
-                  id="projectDescription"
-                  value={newProjectDescription}
-                  onChange={(e) => setNewProjectDescription(e.target.value)}
-                  rows={3}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Describe your research project"
-                />
-              </div>
-              
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCreateModal(false);
-                    setNewProjectName('');
-                    setNewProjectDescription('');
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={creating || !newProjectName.trim()}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {creating ? 'Creating...' : 'Create Project'}
-                </button>
-              </div>
-            </form>
+              <form onSubmit={createProject}>
+                <div className="mb-4">
+                  <label htmlFor="projectName" className="block text-sm font-medium text-gray-700 mb-2">
+                    Project Name *
+                  </label>
+                  <input
+                    id="projectName"
+                    type="text"
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter project name"
+                    required
+                  />
+                </div>
+                
+                <div className="mb-6">
+                  <label htmlFor="projectDescription" className="block text-sm font-medium text-gray-700 mb-2">
+                    Description (Optional)
+                  </label>
+                  <textarea
+                    id="projectDescription"
+                    value={newProjectDescription}
+                    onChange={(e) => setNewProjectDescription(e.target.value)}
+                    rows={3}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Describe your research project"
+                  />
+                </div>
+                
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreateModal(false);
+                      setNewProjectName('');
+                      setNewProjectDescription('');
+                    }}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={creating || !newProjectName.trim()}
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {creating ? 'Creating...' : 'Create Project'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        )}
       </div>
     </div>
   );
