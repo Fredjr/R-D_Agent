@@ -3204,6 +3204,21 @@ class ReportResponse(BaseModel):
     created_by: str
     article_count: int
 
+class DeepDiveAnalysisCreate(BaseModel):
+    article_pmid: Optional[str] = None
+    article_url: Optional[str] = None
+    article_title: str = Field(..., min_length=1)
+    objective: str = Field(..., min_length=1)
+
+class DeepDiveAnalysisResponse(BaseModel):
+    analysis_id: str
+    article_title: str
+    article_pmid: Optional[str]
+    article_url: Optional[str]
+    processing_status: str
+    created_at: datetime
+    created_by: str
+
 # Activity Logging Models
 class ActivityLogCreate(BaseModel):
     activity_type: str = Field(..., pattern="^(annotation_created|report_generated|deep_dive_performed|article_pinned|project_created|collaborator_added)$")
@@ -4106,6 +4121,95 @@ async def create_report(
         report_id=report.report_id,
         db=db
     )
+    
+    return response
+
+@app.post("/projects/{project_id}/deep-dive-analyses", response_model=DeepDiveAnalysisResponse)
+async def create_deep_dive_analysis(
+    project_id: str,
+    analysis_data: DeepDiveAnalysisCreate,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Create a new deep dive analysis in a project"""
+    current_user = request.headers.get("User-ID", "default_user")
+    
+    # Check project access
+    has_access = (
+        db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == current_user
+        ).first() is not None or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+    
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Create deep dive analysis
+    analysis_id = str(uuid.uuid4())
+    analysis = DeepDiveAnalysis(
+        analysis_id=analysis_id,
+        project_id=project_id,
+        article_title=analysis_data.article_title,
+        article_pmid=analysis_data.article_pmid,
+        article_url=analysis_data.article_url,
+        created_by=current_user,
+        processing_status="pending"
+    )
+    
+    db.add(analysis)
+    db.commit()
+    db.refresh(analysis)
+    
+    # Create response
+    response = DeepDiveAnalysisResponse(
+        analysis_id=analysis.analysis_id,
+        article_title=analysis.article_title,
+        article_pmid=analysis.article_pmid,
+        article_url=analysis.article_url,
+        processing_status=analysis.processing_status,
+        created_at=analysis.created_at,
+        created_by=analysis.created_by
+    )
+    
+    # Broadcast to WebSocket clients
+    broadcast_message = {
+        "type": "deep_dive_created",
+        "data": {
+            "analysis_id": analysis.analysis_id,
+            "article_title": analysis.article_title,
+            "created_by": current_user,
+            "created_at": analysis.created_at.isoformat()
+        }
+    }
+    
+    # Send broadcast asynchronously (non-blocking)
+    asyncio.create_task(
+        manager.broadcast_to_project(json.dumps(broadcast_message), project_id)
+    )
+    
+    # Log activity
+    await log_activity(
+        project_id=project_id,
+        user_id=current_user,
+        activity_type="deep_dive_performed",
+        description=f"Started deep dive analysis: {analysis.article_title}",
+        metadata={
+            "analysis_id": analysis.analysis_id,
+            "article_title": analysis.article_title
+        },
+        analysis_id=analysis.analysis_id,
+        db=db
+    )
+    
+    # TODO: Trigger background processing of the deep dive analysis
+    # This would involve calling the existing deep dive analysis functions
+    # and updating the analysis record with results
     
     return response
 
