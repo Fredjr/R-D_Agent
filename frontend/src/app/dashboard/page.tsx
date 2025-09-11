@@ -79,7 +79,7 @@ export default function Dashboard() {
       console.log('🔄 Fetching projects from Google Cloud SQL database...');
       
       // Use the database-connected proxy route
-      const user_id = user?.user_id || 'default_user';
+      const user_id = user?.email || 'default_user';
       const response = await fetch(`/api/proxy/projects?user_id=${user_id}`, {
         headers: {
           'User-ID': user_id,
@@ -114,7 +114,7 @@ export default function Dashboard() {
     try {
       console.log('🔄 Creating project in Google Cloud SQL database...');
       
-      const user_id = user?.user_id || 'default_user';
+      const user_id = user?.email || 'default_user';
       const projectData = {
         project_name: newProjectName.trim(),
         description: newProjectDescription.trim() || null,
