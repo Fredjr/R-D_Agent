@@ -34,13 +34,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Check for existing session on mount
-    const savedUser = localStorage.getItem('rd_agent_user');
+    const savedUser = localStorage.getItem('rd_agent_user') || sessionStorage.getItem('rd_agent_user_backup');
     if (savedUser) {
       try {
-        setUser(JSON.parse(savedUser));
+        const userData = JSON.parse(savedUser);
+        setUser(userData);
+        // Ensure both storages have the data
+        localStorage.setItem('rd_agent_user', savedUser);
+        sessionStorage.setItem('rd_agent_user_backup', savedUser);
       } catch (error) {
         console.error('Failed to parse saved user:', error);
         localStorage.removeItem('rd_agent_user');
+        sessionStorage.removeItem('rd_agent_user_backup');
       }
     }
     setIsLoading(false);
@@ -49,10 +54,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, username?: string) => {
     setIsLoading(true);
     try {
-      // For now, we'll create a simple client-side user object
-      // In a full implementation, this would authenticate with the backend
+      // Create a consistent user_id based on email to ensure project persistence
+      // This ensures the same user gets the same ID across deployments
+      const consistentUserId = `user_${btoa(email).replace(/[^a-zA-Z0-9]/g, '').substring(0, 16)}`;
+      
       const userData: User = {
-        user_id: 'default_user', // Use consistent user_id for project persistence
+        user_id: consistentUserId,
         username: username || email.split('@')[0],
         email: email,
         created_at: new Date().toISOString()
@@ -60,6 +67,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(userData);
       localStorage.setItem('rd_agent_user', JSON.stringify(userData));
+      // Also store in sessionStorage as backup
+      sessionStorage.setItem('rd_agent_user_backup', JSON.stringify(userData));
     } catch (error) {
       console.error('Login failed:', error);
       throw error;
@@ -87,6 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userData = await response.json();
       setUser(userData);
       localStorage.setItem('rd_agent_user', JSON.stringify(userData));
+      sessionStorage.setItem('rd_agent_user_backup', JSON.stringify(userData));
     } catch (error) {
       console.error('Sign in failed:', error);
       throw error;
@@ -114,6 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userData = await response.json();
       setUser(userData);
       localStorage.setItem('rd_agent_user', JSON.stringify(userData));
+      sessionStorage.setItem('rd_agent_user_backup', JSON.stringify(userData));
     } catch (error) {
       console.error('Sign up failed:', error);
       throw error;
@@ -153,6 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userData = await response.json();
       setUser(userData);
       localStorage.setItem('rd_agent_user', JSON.stringify(userData));
+      sessionStorage.setItem('rd_agent_user_backup', JSON.stringify(userData));
       return userData;
     } catch (error) {
       console.error('Registration completion failed:', error);
@@ -165,6 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('rd_agent_user');
+    sessionStorage.removeItem('rd_agent_user_backup');
   };
 
   return (
