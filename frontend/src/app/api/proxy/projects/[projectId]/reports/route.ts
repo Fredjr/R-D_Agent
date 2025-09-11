@@ -4,10 +4,10 @@ const BACKEND_URL = "https://r-dagent-production.up.railway.app";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
-    const { projectId } = params;
+    const { projectId } = await params;
     const body = await request.json();
     
     const response = await fetch(`${BACKEND_URL}/projects/${projectId}/reports`, {
@@ -40,10 +40,10 @@ export async function POST(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
-    const { projectId } = params;
+    const { projectId } = await params;
     
     const response = await fetch(`${BACKEND_URL}/projects/${projectId}/reports`, {
       method: 'GET',
