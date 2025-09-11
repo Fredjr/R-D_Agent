@@ -3181,6 +3181,29 @@ class AnnotationResponse(BaseModel):
     report_id: Optional[str]
     analysis_id: Optional[str]
 
+class ReportCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    objective: str = Field(..., min_length=1)
+    molecule: Optional[str] = None
+    clinical_mode: bool = False
+    dag_mode: bool = False
+    full_text_only: bool = False
+    preference: str = Field(default="precision", pattern="^(precision|recall)$")
+
+class ReportResponse(BaseModel):
+    report_id: str
+    title: str
+    objective: str
+    molecule: Optional[str]
+    clinical_mode: bool
+    dag_mode: bool
+    full_text_only: bool
+    preference: str
+    status: str
+    created_at: datetime
+    created_by: str
+    article_count: int
+
 # Activity Logging Models
 class ActivityLogCreate(BaseModel):
     activity_type: str = Field(..., pattern="^(annotation_created|report_generated|deep_dive_performed|article_pinned|project_created|collaborator_added)$")
@@ -3974,17 +3997,117 @@ async def get_annotations(project_id: str, request: Request, db: Session = Depen
     ).order_by(Annotation.created_at.desc()).all()
     
     return {
-        "annotations": [{
-            "annotation_id": a.annotation_id,
-            "content": a.content,
-            "author_id": a.author_id,
-            "author_username": a.author.username,
-            "created_at": a.created_at.isoformat(),
-            "article_pmid": a.article_pmid,
-            "report_id": a.report_id,
-            "analysis_id": a.analysis_id
-        } for a in annotations]
+        "annotations": [
+            {
+                "annotation_id": a.annotation_id,
+                "content": a.content,
+                "author_id": a.author_id,
+                "author_username": a.author.username if a.author else "Unknown",
+                "created_at": a.created_at.isoformat(),
+                "article_pmid": a.article_pmid,
+                "report_id": a.report_id,
+                "analysis_id": a.analysis_id
+            }
+            for a in annotations
+        ]
     }
+
+# Report Endpoints
+
+@app.post("/projects/{project_id}/reports", response_model=ReportResponse)
+async def create_report(
+    project_id: str,
+    report_data: ReportCreate,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Create a new report in a project"""
+    current_user = request.headers.get("User-ID", "default_user")
+    
+    # Check project access
+    has_access = (
+        db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == current_user
+        ).first() is not None or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+    
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Create report
+    report_id = str(uuid.uuid4())
+    report = Report(
+        report_id=report_id,
+        project_id=project_id,
+        title=report_data.title,
+        objective=report_data.objective,
+        molecule=report_data.molecule,
+        clinical_mode=report_data.clinical_mode,
+        dag_mode=report_data.dag_mode,
+        full_text_only=report_data.full_text_only,
+        preference=report_data.preference,
+        created_by=current_user,
+        content={},  # Will be populated by background processing
+        status="pending"
+    )
+    
+    db.add(report)
+    db.commit()
+    db.refresh(report)
+    
+    # Create response
+    response = ReportResponse(
+        report_id=report.report_id,
+        title=report.title,
+        objective=report.objective,
+        molecule=report.molecule,
+        clinical_mode=report.clinical_mode,
+        dag_mode=report.dag_mode,
+        full_text_only=report.full_text_only,
+        preference=report.preference,
+        status=report.status,
+        created_at=report.created_at,
+        created_by=report.created_by,
+        article_count=report.article_count
+    )
+    
+    # Broadcast to WebSocket clients
+    broadcast_message = {
+        "type": "report_created",
+        "data": {
+            "report_id": report.report_id,
+            "title": report.title,
+            "created_by": current_user,
+            "created_at": report.created_at.isoformat()
+        }
+    }
+    
+    # Send broadcast asynchronously (non-blocking)
+    asyncio.create_task(
+        manager.broadcast_to_project(json.dumps(broadcast_message), project_id)
+    )
+    
+    # Log activity
+    await log_activity(
+        project_id=project_id,
+        user_id=current_user,
+        activity_type="report_generated",
+        description=f"Created report: {report.title}",
+        metadata={
+            "report_id": report.report_id,
+            "objective": report.objective[:100] + "..." if len(report.objective) > 100 else report.objective
+        },
+        report_id=report.report_id,
+        db=db
+    )
+    
+    return response
 
 # =============================================================================
 # ACTIVITY LOGGING ENDPOINTS
