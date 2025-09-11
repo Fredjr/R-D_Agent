@@ -17,17 +17,17 @@ SUPABASE_DATABASE_URL = os.getenv("SUPABASE_DATABASE_URL")
 
 def get_database_url():
     """Get the appropriate database URL with fallback logic"""
-    # Priority: SUPABASE_DATABASE_URL > DATABASE_URL > POSTGRES_URL > SQLite
+    # Priority: DATABASE_URL > POSTGRES_URL > SUPABASE_DATABASE_URL > SQLite
     # Check for non-empty strings to avoid SQLAlchemy parsing errors
-    if SUPABASE_DATABASE_URL and SUPABASE_DATABASE_URL.strip():
-        print(f"🗄️ Using Supabase PostgreSQL database")
-        return SUPABASE_DATABASE_URL
-    elif DATABASE_URL and DATABASE_URL.strip():
+    if DATABASE_URL and DATABASE_URL.strip():
         print(f"🗄️ Using DATABASE_URL PostgreSQL")
         return DATABASE_URL
     elif POSTGRES_URL and POSTGRES_URL.strip():
         print(f"🗄️ Using POSTGRES_URL PostgreSQL")
         return POSTGRES_URL
+    elif SUPABASE_DATABASE_URL and SUPABASE_DATABASE_URL.strip():
+        print(f"🗄️ Using Supabase PostgreSQL database")
+        return SUPABASE_DATABASE_URL
     else:
         # Fallback to SQLite for local development
         print(f"🗄️ Using SQLite database (local development)")
