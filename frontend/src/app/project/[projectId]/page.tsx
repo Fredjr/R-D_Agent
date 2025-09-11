@@ -44,6 +44,14 @@ export default function ProjectPage() {
     objective: ''
   });
   const [creatingDeepDive, setCreatingDeepDive] = useState(false);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [generatingSummary, setGeneratingSummary] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteData, setInviteData] = useState({
+    email: '',
+    role: 'viewer'
+  });
+  const [sendingInvite, setSendingInvite] = useState(false);
 
   useEffect(() => {
     if (projectId && user) {
@@ -189,6 +197,96 @@ export default function ProjectPage() {
     }
   };
 
+  const handleGenerateSummary = async () => {
+    setGeneratingSummary(true);
+    try {
+      // Fetch project data including reports, annotations, and activities
+      const projectResponse = await fetch(`/api/proxy/projects/${projectId}`, {
+        headers: {
+          'User-ID': user?.email || 'default_user',
+        },
+      });
+
+      if (!projectResponse.ok) {
+        throw new Error('Failed to fetch project data');
+      }
+
+      const projectData = await projectResponse.json();
+      
+      // Generate summary report
+      const summaryData = {
+        title: `${project?.project_name} - Summary Report`,
+        objective: `Comprehensive summary of project: ${project?.project_name}`,
+        clinical_mode: false,
+        dag_mode: false,
+        full_text_only: false,
+        preference: 'precision'
+      };
+
+      const response = await fetch(`/api/proxy/projects/${projectId}/reports`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user?.email || 'default_user',
+        },
+        body: JSON.stringify(summaryData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate summary report');
+      }
+
+      setShowSummaryModal(false);
+      
+      // Note: The ActivityFeed component will automatically update via WebSocket
+    } catch (err) {
+      console.error('Error generating summary:', err);
+      alert('Failed to generate summary report. Please try again.');
+    } finally {
+      setGeneratingSummary(false);
+    }
+  };
+
+  const handleInviteCollaborator = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteData.email.trim()) return;
+    
+    setSendingInvite(true);
+    try {
+      const response = await fetch(`/api/proxy/projects/${projectId}/collaborators`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user?.email || 'default_user',
+        },
+        body: JSON.stringify({
+          email: inviteData.email.trim(),
+          role: inviteData.role,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send invitation');
+      }
+
+      // Reset form and close modal
+      setInviteData({
+        email: '',
+        role: 'viewer'
+      });
+      setShowInviteModal(false);
+      
+      alert(`Invitation sent successfully to ${inviteData.email}!`);
+      
+      // Note: The ActivityFeed component will automatically update via WebSocket
+    } catch (err) {
+      console.error('Error sending invitation:', err);
+      alert('Failed to send invitation. Please try again.');
+    } finally {
+      setSendingInvite(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -258,13 +356,13 @@ export default function ProjectPage() {
               Start Deep Dive Analysis
             </button>
             <button 
-              onClick={() => alert('Summary Report functionality coming soon!')}
+              onClick={() => setShowSummaryModal(true)}
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
             >
               Generate Summary Report
             </button>
             <button 
-              onClick={() => alert('Invite Collaborators functionality coming soon!')}
+              onClick={() => setShowInviteModal(true)}
               className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
             >
               Invite Collaborators
@@ -515,6 +613,122 @@ export default function ProjectPage() {
                     className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-colors"
                   >
                     {creatingDeepDive ? 'Starting Analysis...' : 'Start Analysis'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Summary Report Modal */}
+        {showSummaryModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-lg mx-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Generate Summary Report</h3>
+              <div className="space-y-4">
+                <div className="bg-indigo-50 p-4 rounded-lg">
+                  <p className="text-sm text-indigo-700 mb-2">
+                    <strong>Project Summary</strong> will generate a comprehensive overview including:
+                  </p>
+                  <ul className="text-sm text-indigo-600 ml-4 list-disc space-y-1">
+                    <li>Project objectives and scope</li>
+                    <li>All reports and their key findings</li>
+                    <li>Deep dive analyses performed</li>
+                    <li>Annotations and collaborative insights</li>
+                    <li>Activity timeline and progress</li>
+                  </ul>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">Project:</span>
+                    <span className="font-medium text-gray-900">{project?.project_name}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm mt-2">
+                    <span className="text-gray-600">Created:</span>
+                    <span className="text-gray-900">{project?.created_at ? new Date(project.created_at).toLocaleDateString() : 'N/A'}</span>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 pt-4">
+                  <button
+                    onClick={() => setShowSummaryModal(false)}
+                    className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                    disabled={generatingSummary}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleGenerateSummary}
+                    disabled={generatingSummary}
+                    className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                  >
+                    {generatingSummary ? 'Generating...' : 'Generate Summary'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Invite Collaborators Modal */}
+        {showInviteModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-lg mx-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Invite Collaborator</h3>
+              <form onSubmit={handleInviteCollaborator} className="space-y-4">
+                <div className="bg-orange-50 p-4 rounded-lg">
+                  <p className="text-sm text-orange-700 mb-2">
+                    <strong>Invite a collaborator</strong> to join this project and contribute to research.
+                  </p>
+                  <ul className="text-sm text-orange-600 ml-4 list-disc space-y-1">
+                    <li>Viewer: Can view project content and annotations</li>
+                    <li>Editor: Can add notes, create reports, and collaborate</li>
+                    <li>Admin: Full project management access</li>
+                  </ul>
+                </div>
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                    Email Address *
+                  </label>
+                  <input
+                    type="email"
+                    id="email"
+                    required
+                    value={inviteData.email}
+                    onChange={(e) => setInviteData({ ...inviteData, email: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    placeholder="colleague@example.com"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-2">
+                    Role
+                  </label>
+                  <select
+                    id="role"
+                    value={inviteData.role}
+                    onChange={(e) => setInviteData({ ...inviteData, role: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  >
+                    <option value="viewer">Viewer</option>
+                    <option value="editor">Editor</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <div className="flex justify-end gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowInviteModal(false)}
+                    className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                    disabled={sendingInvite}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={sendingInvite || !inviteData.email.trim()}
+                    className="bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                  >
+                    {sendingInvite ? 'Sending...' : 'Send Invite'}
                   </button>
                 </div>
               </form>
