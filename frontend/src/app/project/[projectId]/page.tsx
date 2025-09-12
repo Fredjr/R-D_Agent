@@ -13,6 +13,36 @@ interface Project {
   owner_user_id: string;
   created_at: string;
   updated_at: string;
+  reports: Array<{
+    report_id: string;
+    title: string;
+    objective: string;
+    created_at: string;
+    created_by: string;
+  }>;
+  collaborators: Array<{
+    user_id: string;
+    username: string;
+    role: string;
+    invited_at: string;
+  }>;
+  annotations: Array<{
+    annotation_id: string;
+    content: string;
+    author_id: string;
+    created_at: string;
+    article_pmid?: string;
+    report_id?: string;
+  }>;
+  deep_dive_analyses: Array<{
+    analysis_id: string;
+    article_title: string;
+    article_pmid?: string;
+    article_url?: string;
+    processing_status: string;
+    created_at: string;
+    created_by: string;
+  }>;
 }
 
 export default function ProjectPage() {
@@ -204,30 +234,14 @@ export default function ProjectPage() {
   const handleGenerateSummary = async () => {
     setGeneratingSummary(true);
     try {
-      // Fetch project data including reports, annotations, and activities
-      const projectResponse = await fetch(`/api/proxy/projects/${projectId}`, {
-        headers: {
-          'User-ID': user?.email || 'default_user',
-        },
-      });
-
-      if (!projectResponse.ok) {
-        throw new Error('Failed to fetch project data');
-      }
-
-      const projectData = await projectResponse.json();
-      
-      // Generate summary report
+      // Generate project-linked summary report using new endpoint
       const summaryData = {
-        title: `${project?.project_name} - Summary Report`,
+        molecule: project?.project_name || 'project-summary',
         objective: `Comprehensive summary of project: ${project?.project_name}`,
-        clinical_mode: false,
-        dag_mode: false,
-        full_text_only: false,
         preference: 'precision'
       };
 
-      const response = await fetch(`/api/proxy/projects/${projectId}/reports`, {
+      const response = await fetch(`/api/proxy/projects/${projectId}/generate-summary-report`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -242,7 +256,10 @@ export default function ProjectPage() {
 
       setShowSummaryModal(false);
       
-      // Note: The ActivityFeed component will automatically update via WebSocket
+      // Refresh project data to show new report
+      fetchProject();
+      
+      alert('Summary report generated successfully!');
     } catch (err) {
       console.error('Error generating summary:', err);
       alert('Failed to generate summary report. Please try again.');
@@ -739,6 +756,86 @@ export default function ProjectPage() {
             </div>
           </div>
         )}
+
+        {/* Project Data Sections */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-8">
+          {/* Reports Section */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Reports ({project.reports?.length || 0})</h3>
+            {project.reports && project.reports.length > 0 ? (
+              <div className="space-y-3">
+                {project.reports.map((report) => (
+                  <div key={report.report_id} className="border border-gray-200 rounded-lg p-4">
+                    <h4 className="font-medium text-gray-900 mb-1">{report.title}</h4>
+                    <p className="text-sm text-gray-600 mb-2">{report.objective}</p>
+                    <div className="flex justify-between items-center text-xs text-gray-500">
+                      <span>By {report.created_by}</span>
+                      <span>{new Date(report.created_at).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-sm">No reports yet. Create your first report to get started.</p>
+            )}
+          </div>
+
+          {/* Deep Dive Analyses Section */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Deep Dive Analyses ({project.deep_dive_analyses?.length || 0})</h3>
+            {project.deep_dive_analyses && project.deep_dive_analyses.length > 0 ? (
+              <div className="space-y-3">
+                {project.deep_dive_analyses.map((analysis) => (
+                  <div key={analysis.analysis_id} className="border border-gray-200 rounded-lg p-4">
+                    <h4 className="font-medium text-gray-900 mb-1">{analysis.article_title}</h4>
+                    {analysis.article_pmid && (
+                      <p className="text-sm text-blue-600 mb-1">PMID: {analysis.article_pmid}</p>
+                    )}
+                    <div className="flex justify-between items-center mb-2">
+                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                        analysis.processing_status === 'completed' 
+                          ? 'bg-green-100 text-green-800'
+                          : analysis.processing_status === 'processing'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {analysis.processing_status}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs text-gray-500">
+                      <span>By {analysis.created_by}</span>
+                      <span>{new Date(analysis.created_at).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-sm">No deep dive analyses yet. Start your first analysis to explore articles in detail.</p>
+            )}
+          </div>
+
+          {/* Collaborators Section */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Collaborators ({project.collaborators?.length || 0})</h3>
+            {project.collaborators && project.collaborators.length > 0 ? (
+              <div className="space-y-3">
+                {project.collaborators.map((collaborator) => (
+                  <div key={collaborator.user_id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                    <div>
+                      <p className="font-medium text-gray-900">{collaborator.username}</p>
+                      <p className="text-sm text-gray-600 capitalize">{collaborator.role}</p>
+                    </div>
+                    <span className="text-xs text-gray-500">
+                      {new Date(collaborator.invited_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-sm">No collaborators yet. Invite team members to collaborate on this project.</p>
+            )}
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div>
