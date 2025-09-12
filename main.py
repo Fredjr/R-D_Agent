@@ -3857,16 +3857,21 @@ async def invite_collaborator(
             return {"message": "Collaborator re-invited successfully"}
     
     # Create new collaboration
-    collaboration = ProjectCollaborator(
-        project_id=project_id,
-        user_id=invited_user.user_id,
-        role=invite_data.role
-    )
-    
-    db.add(collaboration)
-    db.commit()
-    
-    return {"message": "Collaborator invited successfully"}
+    try:
+        collaboration = ProjectCollaborator(
+            project_id=project_id,
+            user_id=invited_user.user_id,
+            role=invite_data.role
+        )
+        
+        db.add(collaboration)
+        db.commit()
+        
+        return {"message": "Collaborator invited successfully"}
+    except Exception as e:
+        db.rollback()
+        print(f"Database error creating collaboration: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create collaboration: {str(e)}")
 
 @app.delete("/projects/{project_id}/collaborators/{user_id}")
 async def remove_collaborator(
