@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class EmailService:
     def __init__(self):
         self.api_key = os.getenv("SENDGRID_API_KEY")
-        self.from_email = os.getenv("FROM_EMAIL", "noreply@r-d-agent.com")
+        self.from_email = os.getenv("FROM_EMAIL", "jules.balanche@erythosia.com")
         self.frontend_url = os.getenv("FRONTEND_URL", "https://r-d-agent-frontend.vercel.app")
         
         if not self.api_key:
@@ -33,6 +33,7 @@ class EmailService:
         """Send collaborator invitation email"""
         if not self.client:
             logger.warning("SendGrid not configured - skipping email notification")
+            print(f"SendGrid config - API Key: {'SET' if self.api_key else 'NOT_SET'}, From Email: {self.from_email}")
             return False
         
         try:
@@ -75,6 +76,7 @@ class EmailService:
                 
         except Exception as e:
             logger.error(f"Error sending invitation email: {str(e)}")
+            print(f"SendGrid error details: {e}")  # Add console logging for debugging
             return False
     
     def _get_invitation_html_template(
