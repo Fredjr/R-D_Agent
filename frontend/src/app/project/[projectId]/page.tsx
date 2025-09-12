@@ -147,16 +147,16 @@ export default function ProjectPage() {
     
     setCreatingReport(true);
     try {
-      const response = await fetch(`/api/proxy/projects/${projectId}/reports`, {
+      const response = await fetch(`/api/proxy/generate-review`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'User-ID': user?.email || 'default_user',
         },
         body: JSON.stringify({
-          title: reportData.title.trim(),
+          molecule: reportData.molecule.trim() || reportData.title.trim(),
           objective: reportData.objective.trim(),
-          molecule: reportData.molecule.trim() || null,
+          project_id: projectId,
           clinical_mode: reportData.clinical_mode,
           dag_mode: reportData.dag_mode,
           full_text_only: reportData.full_text_only,
