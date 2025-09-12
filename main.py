@@ -3880,6 +3880,7 @@ async def invite_collaborator(
                 owner = db.query(User).filter(User.user_id == current_user).first()
                 owner_name = f"{owner.first_name} {owner.last_name}".strip() if owner and owner.first_name else owner.email if owner else current_user
                 
+                print(f"Attempting to send email to {invite_data.email} from {owner_name}")
                 email_sent = email_service.send_collaborator_invitation(
                     invitee_email=invite_data.email,
                     inviter_name=owner_name,
@@ -3888,6 +3889,7 @@ async def invite_collaborator(
                     project_id=project_id,
                     role=invite_data.role
                 )
+                print(f"Email sending result: {email_sent}")
                 
                 if email_sent:
                     return {"message": "Collaborator invited successfully and notification email sent"}
