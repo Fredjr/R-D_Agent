@@ -357,7 +357,10 @@ export default function Dashboard() {
                           <BeakerIcon className="h-5 w-5 mr-2" />
                           Reports & Dossiers
                         </h3>
-                        <button className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
+                        <button 
+                          onClick={() => window.location.href = `/project/${selectedProject.project_id}`}
+                          className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                        >
                           New Report
                         </button>
                       </div>
@@ -394,7 +397,10 @@ export default function Dashboard() {
                           </svg>
                           Annotations
                         </h3>
-                        <button className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700">
+                        <button 
+                          onClick={() => window.location.href = `/project/${selectedProject.project_id}`}
+                          className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+                        >
                           Add Note
                         </button>
                       </div>
@@ -457,10 +463,16 @@ export default function Dashboard() {
                         >
                           Open Project Workspace
                         </Link>
-                        <button className="w-full text-left px-3 py-2 text-sm bg-green-50 text-green-700 rounded hover:bg-green-100">
+                        <button 
+                          onClick={() => window.location.href = `/project/${selectedProject.project_id}`}
+                          className="w-full text-left px-3 py-2 text-sm bg-green-50 text-green-700 rounded hover:bg-green-100"
+                        >
                           Generate Summary Report
                         </button>
-                        <button className="w-full text-left px-3 py-2 text-sm bg-purple-50 text-purple-700 rounded hover:bg-purple-100">
+                        <button 
+                          onClick={() => window.location.href = `/project/${selectedProject.project_id}`}
+                          className="w-full text-left px-3 py-2 text-sm bg-purple-50 text-purple-700 rounded hover:bg-purple-100"
+                        >
                           Invite Collaborators
                         </button>
                       </div>
