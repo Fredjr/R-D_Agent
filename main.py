@@ -5461,7 +5461,7 @@ async def generate_project_summary_report(
         modified_request = ReviewRequest(**request_dict)
         
         # Generate the review using existing logic
-        return await generate_review_internal(modified_request, db)
+        return await generate_review_internal(modified_request, db, current_user)
         
     except HTTPException:
         raise
@@ -5474,7 +5474,7 @@ async def generate_review(request: ReviewRequest, db: Session = Depends(get_db))
     """Generate a summary report (legacy endpoint)"""
     return await generate_review_internal(request, db)
 
-async def generate_review_internal(request: ReviewRequest, db: Session):
+async def generate_review_internal(request: ReviewRequest, db: Session, current_user: str = None):
     req_start = _now_ms()
     _metrics_inc("requests_total", 1)
     
@@ -6581,7 +6581,7 @@ Objective: {objective}
     # Save report to database if project_id is provided
     if request.project_id:
         try:
-            current_user = get_current_user()
+            user_id = current_user or get_current_user()
             
             # Verify project exists and user has access
             project = db.query(Project).filter(Project.project_id == request.project_id).first()
@@ -6594,10 +6594,10 @@ Objective: {objective}
                 print(f"Project not found: {request.project_id}")
             else:
                 has_access = (
-                    project.owner_user_id == current_user or
+                    project.owner_user_id == user_id or
                     db.query(ProjectCollaborator).filter(
                         ProjectCollaborator.project_id == request.project_id,
-                        ProjectCollaborator.user_id == current_user,
+                        ProjectCollaborator.user_id == user_id,
                         ProjectCollaborator.is_active == True
                     ).first() is not None
                 )
@@ -6606,9 +6606,9 @@ Objective: {objective}
                     log_event({
                         "event": "report_save_failed",
                         "project_id": request.project_id,
-                        "error": f"Access denied for user {current_user}"
+                        "error": f"Access denied for user {user_id}"
                     })
-                    print(f"Access denied for user {current_user} to project {request.project_id}")
+                    print(f"Access denied for user {user_id} to project {request.project_id}")
                 else:
                     # Create report
                     report_id = str(uuid.uuid4())
@@ -6620,7 +6620,7 @@ Objective: {objective}
                         title=title,
                         objective=request.objective,
                         content=json.dumps(resp),
-                        created_by=current_user
+                        created_by=user_id
                     )
                     
                     db.add(report)
