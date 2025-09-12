@@ -5454,11 +5454,13 @@ async def generate_project_summary_report(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found or access denied")
     
-    # Set project_id in request for tracking
-    request.project_id = project_id
+    # Create a copy of the request with project_id set
+    request_dict = request.dict()
+    request_dict['project_id'] = project_id
+    modified_request = ReviewRequest(**request_dict)
     
     # Generate the review using existing logic
-    return await generate_review_internal(request, db)
+    return await generate_review_internal(modified_request, db)
 
 @app.post("/generate-review")
 async def generate_review(request: ReviewRequest, db: Session = Depends(get_db)):
