@@ -3828,10 +3828,17 @@ async def invite_collaborator(
         invited_user = User(
             user_id=str(uuid.uuid4()),
             username=invite_data.email.split('@')[0],
-            email=invite_data.email
+            email=invite_data.email,
+            password_hash="",  # Empty password hash for invited users
+            first_name="",
+            last_name="",
+            category="",
+            organization="",
+            registration_completed=False
         )
         db.add(invited_user)
         db.commit()
+        db.refresh(invited_user)
     
     # Check if collaboration already exists
     existing = db.query(ProjectCollaborator).filter(
