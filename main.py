@@ -3614,8 +3614,16 @@ async def complete_registration(request: CompleteRegistrationRequest, db: Sessio
         user.how_heard_about_us = request.how_heard_about_us
         user.join_mailing_list = request.join_mailing_list
         user.registration_completed = True
-        # Generate unique username - use email prefix to ensure uniqueness
-        user.username = user.email.split('@')[0]
+        # Generate unique username - use email prefix with timestamp to ensure uniqueness
+        base_username = user.email.split('@')[0]
+        # Check if username already exists, if so, keep the current one or generate unique
+        existing_user = db.query(User).filter(User.username == base_username, User.user_id != user.user_id).first()
+        if not existing_user:
+            user.username = base_username
+        # If username exists and current user doesn't have one set, generate unique
+        elif not user.username or user.username == user.email:
+            import time
+            user.username = f"{base_username}_{int(time.time())}"
         
         db.commit()
         db.refresh(user)
