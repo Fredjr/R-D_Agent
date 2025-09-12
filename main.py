@@ -10,11 +10,6 @@ from dotenv import load_dotenv
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import text
 import bcrypt
-try:
-    from email_service import email_service
-except ImportError as e:
-    print(f"Email service import failed: {e}")
-    email_service = None
 
 # Step 2.2.1: Import LangChain components for prompt-driven chain
 from langchain.prompts import PromptTemplate
@@ -3871,34 +3866,7 @@ async def invite_collaborator(
     db.add(collaboration)
     db.commit()
     
-    # Send email notification to invited user
-    try:
-        if email_service is None:
-            print("Email service not available - skipping notification")
-            return {"message": "Collaborator invited successfully (email service unavailable)"}
-            
-        # Get project owner details for email
-        owner = db.query(User).filter(User.user_id == current_user).first()
-        owner_name = f"{owner.first_name} {owner.last_name}".strip() if owner and owner.first_name else owner.email if owner else current_user
-        
-        email_sent = email_service.send_collaborator_invitation(
-            invitee_email=invite_data.email,
-            inviter_name=owner_name,
-            inviter_email=current_user,
-            project_name=project.project_name,
-            project_id=project_id,
-            role=invite_data.role
-        )
-        
-        if email_sent:
-            return {"message": "Collaborator invited successfully and notification email sent"}
-        else:
-            return {"message": "Collaborator invited successfully (email notification failed)"}
-            
-    except Exception as e:
-        # Don't fail the invitation if email fails
-        print(f"Email notification error: {e}")
-        return {"message": "Collaborator invited successfully (email notification failed)"}
+    return {"message": "Collaborator invited successfully"}
 
 @app.delete("/projects/{project_id}/collaborators/{user_id}")
 async def remove_collaborator(
