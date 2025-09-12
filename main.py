@@ -5467,7 +5467,7 @@ async def generate_review(request: ReviewRequest, db: Session = Depends(get_db))
     """Generate a summary report (legacy endpoint)"""
     return await generate_review_internal(request, db)
 
-async def generate_review_internal(request: ReviewRequest, db: Session = Depends(get_db)):
+async def generate_review_internal(request: ReviewRequest, db: Session):
     req_start = _now_ms()
     _metrics_inc("requests_total", 1)
     
