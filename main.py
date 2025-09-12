@@ -3166,6 +3166,7 @@ class ProjectDetailResponse(BaseModel):
     reports: List[dict]
     collaborators: List[dict]
     annotations: List[dict]
+    deep_dive_analyses: List[dict]
 
 class CollaboratorInvite(BaseModel):
     email: str
@@ -3784,6 +3785,7 @@ async def get_project(project_id: str, request: Request, db: Session = Depends(g
         ProjectCollaborator.is_active == True
     ).all()
     annotations = db.query(Annotation).filter(Annotation.project_id == project_id).all()
+    deep_dive_analyses = db.query(DeepDiveAnalysis).filter(DeepDiveAnalysis.project_id == project_id).all()
     
     return ProjectDetailResponse(
         project_id=project.project_id,
@@ -3812,7 +3814,16 @@ async def get_project(project_id: str, request: Request, db: Session = Depends(g
             "created_at": a.created_at.isoformat(),
             "article_pmid": a.article_pmid,
             "report_id": a.report_id
-        } for a in annotations]
+        } for a in annotations],
+        deep_dive_analyses=[{
+            "analysis_id": d.analysis_id,
+            "article_title": d.article_title,
+            "article_pmid": d.article_pmid,
+            "article_url": d.article_url,
+            "processing_status": d.processing_status,
+            "created_at": d.created_at.isoformat(),
+            "created_by": d.created_by
+        } for d in deep_dive_analyses]
     )
 
 # Collaboration Endpoints
@@ -4183,6 +4194,98 @@ async def create_report(
     )
     
     return response
+
+@app.get("/projects/{project_id}/deep-dive-analyses")
+async def get_deep_dive_analyses(
+    project_id: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Get all deep dive analyses for a project"""
+    current_user = request.headers.get("User-ID", "default_user")
+    
+    # Verify project access
+    project = db.query(Project).filter(
+        Project.project_id == project_id,
+        or_(
+            Project.owner_user_id == current_user,
+            Project.project_id.in_(
+                db.query(ProjectCollaborator.project_id).filter(
+                    ProjectCollaborator.user_id == current_user,
+                    ProjectCollaborator.is_active == True
+                )
+            )
+        )
+    ).first()
+    
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found or access denied")
+    
+    # Get all deep dive analyses for the project
+    analyses = db.query(DeepDiveAnalysis).filter(
+        DeepDiveAnalysis.project_id == project_id
+    ).order_by(DeepDiveAnalysis.created_at.desc()).all()
+    
+    return [
+        {
+            "analysis_id": analysis.analysis_id,
+            "article_title": analysis.article_title,
+            "article_pmid": analysis.article_pmid,
+            "article_url": analysis.article_url,
+            "processing_status": analysis.processing_status,
+            "created_at": analysis.created_at,
+            "created_by": analysis.created_by,
+            "results": analysis.results
+        }
+        for analysis in analyses
+    ]
+
+@app.get("/projects/{project_id}/deep-dive-analyses/{analysis_id}")
+async def get_deep_dive_analysis(
+    project_id: str,
+    analysis_id: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Get a specific deep dive analysis"""
+    current_user = request.headers.get("User-ID", "default_user")
+    
+    # Verify project access
+    project = db.query(Project).filter(
+        Project.project_id == project_id,
+        or_(
+            Project.owner_user_id == current_user,
+            Project.project_id.in_(
+                db.query(ProjectCollaborator.project_id).filter(
+                    ProjectCollaborator.user_id == current_user,
+                    ProjectCollaborator.is_active == True
+                )
+            )
+        )
+    ).first()
+    
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found or access denied")
+    
+    # Get the specific analysis
+    analysis = db.query(DeepDiveAnalysis).filter(
+        DeepDiveAnalysis.analysis_id == analysis_id,
+        DeepDiveAnalysis.project_id == project_id
+    ).first()
+    
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Deep dive analysis not found")
+    
+    return {
+        "analysis_id": analysis.analysis_id,
+        "article_title": analysis.article_title,
+        "article_pmid": analysis.article_pmid,
+        "article_url": analysis.article_url,
+        "processing_status": analysis.processing_status,
+        "created_at": analysis.created_at,
+        "created_by": analysis.created_by,
+        "results": analysis.results
+    }
 
 @app.post("/projects/{project_id}/deep-dive-analyses", response_model=DeepDiveAnalysisResponse)
 async def create_deep_dive_analysis(
@@ -5324,8 +5427,45 @@ async def feedback(payload: dict):
         return {"status": "error", "message": str(e)}
 
 
+@app.post("/projects/{project_id}/generate-summary-report")
+async def generate_project_summary_report(
+    project_id: str,
+    request: ReviewRequest,
+    http_request: Request,
+    db: Session = Depends(get_db)
+):
+    """Generate a summary report and link it to a project"""
+    current_user = http_request.headers.get("User-ID", "default_user")
+    
+    # Verify project access
+    project = db.query(Project).filter(
+        Project.project_id == project_id,
+        or_(
+            Project.owner_user_id == current_user,
+            Project.project_id.in_(
+                db.query(ProjectCollaborator.project_id).filter(
+                    ProjectCollaborator.user_id == current_user,
+                    ProjectCollaborator.is_active == True
+                )
+            )
+        )
+    ).first()
+    
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found or access denied")
+    
+    # Set project_id in request for tracking
+    request.project_id = project_id
+    
+    # Generate the review using existing logic
+    return await generate_review_internal(request, db)
+
 @app.post("/generate-review")
 async def generate_review(request: ReviewRequest, db: Session = Depends(get_db)):
+    """Generate a summary report (legacy endpoint)"""
+    return await generate_review_internal(request, db)
+
+async def generate_review_internal(request: ReviewRequest, db: Session = Depends(get_db)):
     req_start = _now_ms()
     _metrics_inc("requests_total", 1)
     
