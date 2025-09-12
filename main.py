@@ -3881,6 +3881,10 @@ async def invite_collaborator(
                 owner_name = f"{owner.first_name} {owner.last_name}".strip() if owner and owner.first_name else owner.email if owner else current_user
                 
                 print(f"Attempting to send email to {invite_data.email} from {owner_name}")
+                print(f"Email service configured: {email_service is not None}")
+                print(f"SendGrid API key present: {bool(os.getenv('SENDGRID_API_KEY'))}")
+                print(f"FROM_EMAIL setting: {os.getenv('FROM_EMAIL', 'NOT_SET')}")
+                
                 email_sent = email_service.send_collaborator_invitation(
                     invitee_email=invite_data.email,
                     inviter_name=owner_name,
@@ -3899,6 +3903,7 @@ async def invite_collaborator(
                 print(f"Email notification error: {e}")
                 return {"message": "Collaborator invited successfully (email notification failed)"}
         else:
+            print("Email service is None - not configured")
             return {"message": "Collaborator invited successfully (email service unavailable)"}
         
     except HTTPException:
