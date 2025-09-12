@@ -10,6 +10,11 @@ from dotenv import load_dotenv
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import text
 import bcrypt
+try:
+    from email_service import email_service
+except ImportError as e:
+    print(f"Email service import failed: {e}")
+    email_service = None
 
 # Step 2.2.1: Import LangChain components for prompt-driven chain
 from langchain.prompts import PromptTemplate
@@ -3823,9 +3828,73 @@ async def invite_collaborator(
         if not project:
             raise HTTPException(status_code=404, detail="Project not found or access denied")
         
-        # For now, just return success without creating database records
-        # This bypasses the database constraint issues
-        return {"message": f"Collaborator invitation sent to {invite_data.email} (database creation disabled temporarily)"}
+        # Check if user exists, create if not
+        invited_user = db.query(User).filter(User.email == invite_data.email).first()
+        if not invited_user:
+            invited_user = User(
+                user_id=str(uuid.uuid4()),
+                username=invite_data.email.split('@')[0],
+                email=invite_data.email,
+                password_hash="",  # Empty password hash for invited users
+                first_name="",
+                last_name="",
+                category="",
+                organization="",
+                registration_completed=False
+            )
+            db.add(invited_user)
+            db.commit()
+            db.refresh(invited_user)
+        
+        # Check if collaboration already exists
+        existing = db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == invited_user.user_id
+        ).first()
+        
+        if existing:
+            if existing.is_active:
+                return {"message": "User is already a collaborator"}
+            else:
+                # Reactivate existing collaboration
+                existing.is_active = True
+                existing.role = invite_data.role
+                db.commit()
+        else:
+            # Create new collaboration
+            collaboration = ProjectCollaborator(
+                project_id=project_id,
+                user_id=invited_user.user_id,
+                role=invite_data.role
+            )
+            db.add(collaboration)
+            db.commit()
+        
+        # Send email notification
+        if email_service:
+            try:
+                # Get project owner details for email
+                owner = db.query(User).filter(User.user_id == current_user).first()
+                owner_name = f"{owner.first_name} {owner.last_name}".strip() if owner and owner.first_name else owner.email if owner else current_user
+                
+                email_sent = email_service.send_collaborator_invitation(
+                    invitee_email=invite_data.email,
+                    inviter_name=owner_name,
+                    inviter_email=current_user,
+                    project_name=project.project_name,
+                    project_id=project_id,
+                    role=invite_data.role
+                )
+                
+                if email_sent:
+                    return {"message": "Collaborator invited successfully and notification email sent"}
+                else:
+                    return {"message": "Collaborator invited successfully (email notification failed)"}
+            except Exception as e:
+                print(f"Email notification error: {e}")
+                return {"message": "Collaborator invited successfully (email notification failed)"}
+        else:
+            return {"message": "Collaborator invited successfully (email service unavailable)"}
         
     except HTTPException:
         raise
