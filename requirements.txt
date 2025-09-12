@@ -24,3 +24,4 @@ pdfminer.six
 alembic
 bcrypt
 jsonschema
+sendgrid
