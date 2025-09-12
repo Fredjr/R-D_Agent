@@ -10,7 +10,11 @@ from dotenv import load_dotenv
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import text
 import bcrypt
-from email_service import email_service
+try:
+    from email_service import email_service
+except ImportError as e:
+    print(f"Email service import failed: {e}")
+    email_service = None
 
 # Step 2.2.1: Import LangChain components for prompt-driven chain
 from langchain.prompts import PromptTemplate
@@ -3869,6 +3873,10 @@ async def invite_collaborator(
     
     # Send email notification to invited user
     try:
+        if email_service is None:
+            print("Email service not available - skipping notification")
+            return {"message": "Collaborator invited successfully (email service unavailable)"}
+            
         # Get project owner details for email
         owner = db.query(User).filter(User.user_id == current_user).first()
         owner_name = f"{owner.first_name} {owner.last_name}".strip() if owner and owner.first_name else owner.email if owner else current_user
