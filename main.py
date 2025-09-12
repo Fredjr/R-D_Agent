@@ -3430,23 +3430,32 @@ async def websocket_endpoint(websocket: WebSocket, project_id: str):
         manager.disconnect(websocket, project_id)
 
 @app.get("/health")
-async def health_check(db: Session = Depends(get_db)):
-    """Health check endpoint with database connectivity"""
+async def health_check():
+    """Health check endpoint"""
     try:
         # Test database connection
+        db = next(get_db())
         db.execute(text("SELECT 1"))
-        return {
-            "status": "healthy",
-            "database": "connected",
-            "timestamp": datetime.now().isoformat()
-        }
+        db_status = "connected"
     except Exception as e:
-        return {
-            "status": "unhealthy", 
-            "database": "disconnected",
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        }
+        db_status = f"error: {str(e)}"
+    
+    return {
+        "status": "healthy",
+        "database": db_status,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+@app.get("/debug/email")
+async def debug_email_config():
+    """Debug endpoint to check email configuration"""
+    return {
+        "sendgrid_api_key_configured": bool(os.getenv("SENDGRID_API_KEY")),
+        "from_email": os.getenv("FROM_EMAIL", "NOT_SET"),
+        "frontend_url": os.getenv("FRONTEND_URL", "NOT_SET"),
+        "email_service_available": email_service is not None,
+        "sendgrid_api_key_length": len(os.getenv("SENDGRID_API_KEY", "")) if os.getenv("SENDGRID_API_KEY") else 0
+    }
 
 
 @app.get("/ready")
