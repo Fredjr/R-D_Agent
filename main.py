@@ -3838,8 +3838,11 @@ async def invite_collaborator(
                 password_hash="",  # Empty password hash for invited users
                 first_name="",
                 last_name="",
-                category="",
-                organization="",
+                category="Invited",
+                role="Collaborator",
+                institution="",
+                subject_area="",
+                how_heard_about_us="Invitation",
                 registration_completed=False
             )
             db.add(invited_user)
