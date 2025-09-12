@@ -4267,24 +4267,115 @@ async def get_deep_dive_analysis(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found or access denied")
     
-    # Get the specific analysis
+    # Get the analysis
     analysis = db.query(DeepDiveAnalysis).filter(
         DeepDiveAnalysis.analysis_id == analysis_id,
         DeepDiveAnalysis.project_id == project_id
     ).first()
     
     if not analysis:
-        raise HTTPException(status_code=404, detail="Deep dive analysis not found")
+        raise HTTPException(status_code=404, detail="Analysis not found")
     
     return {
         "analysis_id": analysis.analysis_id,
+        "project_id": analysis.project_id,
         "article_title": analysis.article_title,
         "article_pmid": analysis.article_pmid,
         "article_url": analysis.article_url,
         "processing_status": analysis.processing_status,
+        "content": analysis.content,
         "created_at": analysis.created_at,
-        "created_by": analysis.created_by,
-        "results": analysis.results
+        "created_by": analysis.created_by
+    }
+
+@app.get("/deep-dive-analyses/{analysis_id}")
+async def get_analysis_by_id(
+    analysis_id: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Get a specific deep dive analysis by ID (for direct access)"""
+    current_user = request.headers.get("User-ID", "default_user")
+    
+    # Get the analysis
+    analysis = db.query(DeepDiveAnalysis).filter(
+        DeepDiveAnalysis.analysis_id == analysis_id
+    ).first()
+    
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    
+    # Verify user has access to the project
+    project = db.query(Project).filter(
+        Project.project_id == analysis.project_id,
+        or_(
+            Project.owner_user_id == current_user,
+            Project.project_id.in_(
+                db.query(ProjectCollaborator.project_id).filter(
+                    ProjectCollaborator.user_id == current_user,
+                    ProjectCollaborator.is_active == True
+                )
+            )
+        )
+    ).first()
+    
+    if not project:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    return {
+        "analysis_id": analysis.analysis_id,
+        "project_id": analysis.project_id,
+        "article_title": analysis.article_title,
+        "article_pmid": analysis.article_pmid,
+        "article_url": analysis.article_url,
+        "processing_status": analysis.processing_status,
+        "content": analysis.content,
+        "created_at": analysis.created_at,
+        "created_by": analysis.created_by
+    }
+
+@app.get("/reports/{report_id}")
+async def get_report_by_id(
+    report_id: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Get a specific report by ID (for direct access)"""
+    current_user = request.headers.get("User-ID", "default_user")
+    
+    # Get the report
+    report = db.query(Report).filter(
+        Report.report_id == report_id
+    ).first()
+    
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    
+    # Verify user has access to the project
+    project = db.query(Project).filter(
+        Project.project_id == report.project_id,
+        or_(
+            Project.owner_user_id == current_user,
+            Project.project_id.in_(
+                db.query(ProjectCollaborator.project_id).filter(
+                    ProjectCollaborator.user_id == current_user,
+                    ProjectCollaborator.is_active == True
+                )
+            )
+        )
+    ).first()
+    
+    if not project:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    return {
+        "report_id": report.report_id,
+        "project_id": report.project_id,
+        "title": report.title,
+        "objective": report.objective,
+        "content": report.content,
+        "created_at": report.created_at,
+        "created_by": report.created_by
     }
 
 @app.post("/projects/{project_id}/deep-dive-analyses", response_model=DeepDiveAnalysisResponse)

@@ -765,7 +765,11 @@ export default function ProjectPage() {
             {project.reports && project.reports.length > 0 ? (
               <div className="space-y-3">
                 {project.reports.map((report) => (
-                  <div key={report.report_id} className="border border-gray-200 rounded-lg p-4">
+                  <div 
+                    key={report.report_id} 
+                    className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
+                    onClick={() => window.open(`/report/${report.report_id}`, '_blank')}
+                  >
                     <h4 className="font-medium text-gray-900 mb-1">{report.title}</h4>
                     <p className="text-sm text-gray-600 mb-2">{report.objective}</p>
                     <div className="flex justify-between items-center text-xs text-gray-500">
@@ -786,7 +790,11 @@ export default function ProjectPage() {
             {project.deep_dive_analyses && project.deep_dive_analyses.length > 0 ? (
               <div className="space-y-3">
                 {project.deep_dive_analyses.map((analysis) => (
-                  <div key={analysis.analysis_id} className="border border-gray-200 rounded-lg p-4">
+                  <div 
+                    key={analysis.analysis_id} 
+                    className="border border-gray-200 rounded-lg p-4 hover:border-purple-300 hover:shadow-md transition-all cursor-pointer"
+                    onClick={() => window.open(`/analysis/${analysis.analysis_id}`, '_blank')}
+                  >
                     <h4 className="font-medium text-gray-900 mb-1">{analysis.article_title}</h4>
                     {analysis.article_pmid && (
                       <p className="text-sm text-blue-600 mb-1">PMID: {analysis.article_pmid}</p>
