@@ -5435,32 +5435,39 @@ async def generate_project_summary_report(
     db: Session = Depends(get_db)
 ):
     """Generate a summary report and link it to a project"""
-    current_user = http_request.headers.get("User-ID", "default_user")
-    
-    # Verify project access
-    project = db.query(Project).filter(
-        Project.project_id == project_id,
-        or_(
-            Project.owner_user_id == current_user,
-            Project.project_id.in_(
-                db.query(ProjectCollaborator.project_id).filter(
-                    ProjectCollaborator.user_id == current_user,
-                    ProjectCollaborator.is_active == True
+    try:
+        current_user = http_request.headers.get("User-ID", "default_user")
+        
+        # Verify project access
+        project = db.query(Project).filter(
+            Project.project_id == project_id,
+            or_(
+                Project.owner_user_id == current_user,
+                Project.project_id.in_(
+                    db.query(ProjectCollaborator.project_id).filter(
+                        ProjectCollaborator.user_id == current_user,
+                        ProjectCollaborator.is_active == True
+                    )
                 )
             )
-        )
-    ).first()
-    
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found or access denied")
-    
-    # Create a copy of the request with project_id set
-    request_dict = request.dict()
-    request_dict['project_id'] = project_id
-    modified_request = ReviewRequest(**request_dict)
-    
-    # Generate the review using existing logic
-    return await generate_review_internal(modified_request, db)
+        ).first()
+        
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found or access denied")
+        
+        # Create a copy of the request with project_id set
+        request_dict = request.dict()
+        request_dict['project_id'] = project_id
+        modified_request = ReviewRequest(**request_dict)
+        
+        # Generate the review using existing logic
+        return await generate_review_internal(modified_request, db)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in generate_project_summary_report: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.post("/generate-review")
 async def generate_review(request: ReviewRequest, db: Session = Depends(get_db)):
