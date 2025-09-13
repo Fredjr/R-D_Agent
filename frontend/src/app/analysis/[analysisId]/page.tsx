@@ -14,6 +14,10 @@ interface Analysis {
   created_at: string;
   created_by: string;
   project_id: string;
+  // New analysis fields
+  scientific_model_analysis?: any;
+  experimental_methods_analysis?: any;
+  results_interpretation_analysis?: any;
 }
 
 export default function AnalysisDetailPage() {
