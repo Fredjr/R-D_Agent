@@ -4966,12 +4966,9 @@ async def process_deep_dive_analysis(analysis: DeepDiveAnalysis, request: DeepDi
             mth = _generate_fallback_experimental_methods_analysis(text, request.title, request.objective, grounding)
             res = _generate_fallback_results_interpretation_analysis(text, request.title, request.objective)
 
-        # Step 5: Process and structure the results (same logic as /deep-dive endpoint)
-        md_json = {
-            "summary": md_structured.get("protocol_summary", ""),
-            "relevance_justification": md_structured.get("relevance_justification", ""),
-            "fact_anchors": md_structured.get("fact_anchors", []),
-        }
+        # Step 5: Process and structure the results (SAME STRUCTURE AS GENERATE DOSSIER)
+        # Use the FULL structured output from the specialized agents, not simplified version
+        md_json = md_structured  # Keep the full structure for UI compatibility
 
         # Step 6: Apply fallback population when full text is available but analyzers return empty
         # (same logic as /deep-dive endpoint)
