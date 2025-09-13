@@ -179,25 +179,51 @@ export default function ProjectPage() {
       // Show user-friendly message
       alert(`🚀 Report generation started for "${reportToGenerate.title}"!\n\nThis will take 3-5 minutes. You can continue using the app - we'll notify you when it's ready.\n\nCheck the Activity feed for progress updates.`);
 
-      // Start background report generation (don't await - fire and forget)
-      fetch(`/api/proxy/generate-review`, {
+      // Step 1: Create report record immediately (this logs activity)
+      fetch(`/api/proxy/projects/${projectId}/reports`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'User-ID': user?.email || 'default_user',
         },
-        body: JSON.stringify(reportToGenerate),
-      }).then(response => {
+        body: JSON.stringify({
+          title: reportToGenerate.title,
+          objective: reportToGenerate.objective,
+          molecule: reportToGenerate.molecule,
+          clinical_mode: reportToGenerate.clinicalMode,
+          dag_mode: reportToGenerate.dagMode,
+          full_text_only: reportToGenerate.fullTextOnly,
+          preference: reportToGenerate.preference
+        }),
+      }).then(async response => {
         if (response.ok) {
-          console.log('Report generation completed successfully');
-          // Success notification will come via WebSocket activity feed
+          const reportData = await response.json();
+          console.log('Report record created:', reportData.report_id);
+
+          // Step 2: Start background content generation
+          fetch(`/api/proxy/generate-review`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'User-ID': user?.email || 'default_user',
+            },
+            body: JSON.stringify(reportToGenerate),
+          }).then(contentResponse => {
+            if (contentResponse.ok) {
+              console.log('Report content generation completed successfully');
+            } else {
+              console.error('Report content generation failed:', contentResponse.status);
+            }
+          }).catch(err => {
+            console.error('Error in background content generation:', err);
+          });
         } else {
-          console.error('Report generation failed:', response.status);
-          // Could add a toast notification here for failures
+          console.error('Report record creation failed:', response.status);
+          alert('❌ Failed to create report. Please try again.');
         }
       }).catch(err => {
-        console.error('Error in background report generation:', err);
-        // Could add a toast notification here for failures
+        console.error('Error creating report record:', err);
+        alert('❌ Failed to create report. Please try again.');
       });
 
     } catch (err) {
