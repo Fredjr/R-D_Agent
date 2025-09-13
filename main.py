@@ -4729,6 +4729,66 @@ async def regenerate_report_content(
         print(f"ERROR: Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Failed to regenerate report content: {str(e)}")
 
+@app.post("/deep-dive-analyses/{analysis_id}/process")
+async def process_pending_analysis(
+    analysis_id: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Process a pending deep dive analysis (for fixing existing pending analyses)"""
+    current_user = request.headers.get("User-ID", "default_user")
+
+    # Get the analysis
+    analysis = db.query(DeepDiveAnalysis).filter(
+        DeepDiveAnalysis.analysis_id == analysis_id
+    ).first()
+
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    # Verify user has access to the project
+    project = db.query(Project).filter(
+        Project.project_id == analysis.project_id,
+        or_(
+            Project.owner_user_id == current_user,
+            Project.project_id.in_(
+                db.query(ProjectCollaborator.project_id).filter(
+                    ProjectCollaborator.user_id == current_user,
+                    ProjectCollaborator.is_active == True
+                )
+            )
+        )
+    ).first()
+
+    if not project:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if analysis.processing_status == "completed":
+        return {"message": "Analysis already completed", "analysis_id": analysis_id}
+
+    try:
+        # Create a DeepDiveRequest object for processing
+        deep_dive_request = DeepDiveRequest(
+            title=analysis.article_title,
+            pmid=analysis.article_pmid,
+            url=analysis.article_url,
+            objective="Analyze this article for research insights",  # Default objective
+            project_id=analysis.project_id
+        )
+
+        # Process the analysis
+        await process_deep_dive_analysis(analysis, deep_dive_request, db, current_user)
+
+        return {
+            "message": "Analysis processed successfully",
+            "analysis_id": analysis_id,
+            "status": analysis.processing_status
+        }
+
+    except Exception as e:
+        print(f"Error processing analysis {analysis_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to process analysis: {str(e)}")
+
 async def process_deep_dive_analysis(analysis: DeepDiveAnalysis, request: DeepDiveRequest, db: Session, current_user: str):
     """Process a deep dive analysis by analyzing the article content"""
     try:
