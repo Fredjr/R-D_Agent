@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Railway startup script with proper port handling
-PORT=${PORT:-8000}
+PORT=${PORT:-8080}
 echo "Starting R&D Agent Backend on port $PORT"
 
 # Start the application

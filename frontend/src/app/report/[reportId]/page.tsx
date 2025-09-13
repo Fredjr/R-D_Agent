@@ -3,12 +3,14 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import ArticleCard from '@/components/ArticleCard';
+import type { SearchResult } from '@/lib/dummy-data';
 
 interface Report {
   report_id: string;
   title: string;
   objective: string;
-  content: string;
+  content: any; // Changed to any to handle structured content
   created_at: string;
   created_by: string;
   project_id: string;
@@ -116,208 +118,83 @@ export default function ReportDetailPage() {
     );
   }
 
-  // Robust content parsing with fallbacks
-  const parseReportContent = (content: any) => {
+  // Parse report content to match Generate Dossier structure
+  const parseReportContent = (content: any): SearchResult[] | null => {
     if (!content) return null;
 
     try {
-      // If it's already an object, return it
+      // If it's already an object, extract results
       if (typeof content === 'object' && content !== null) {
-        return content;
+        // Check if it has the expected structure
+        if (content.results && Array.isArray(content.results)) {
+          return content.results.map((result: any, index: number) => ({
+            query: result.query || `Query ${index + 1}`,
+            result: result.result || {
+              summary: result.summary || 'No summary available',
+              confidence_score: result.confidence_score || 0,
+              methodologies: result.methodologies || [],
+              publication_score: result.publication_score || 0,
+              overall_relevance_score: result.overall_relevance_score || 0
+            },
+            articles: result.articles || [],
+            top_article: result.top_article || null,
+            source: result.source || 'report',
+            memories_used: result.memories_used || 0
+          }));
+        }
+
+        // Fallback: create a single result from the content
+        return [{
+          query: content.objective || 'Report Analysis',
+          result: {
+            summary: content.executive_summary || content.summary || 'Report content available',
+            confidence_score: 85,
+            methodologies: content.methodologies || ['Report Analysis'],
+            publication_score: 80,
+            overall_relevance_score: 82
+          },
+          articles: content.articles || [],
+          top_article: content.top_article || null,
+          source: 'report',
+          memories_used: 0
+        }];
       }
 
       // If it's a string, try to parse as JSON
       if (typeof content === 'string') {
         if (content.trim() === '') return null;
         try {
-          return JSON.parse(content);
+          const parsed = JSON.parse(content);
+          return parseReportContent(parsed); // Recursive call
         } catch {
           // If JSON parsing fails, create a simple structure
-          return { summary: content };
+          return [{
+            query: 'Report Content',
+            result: {
+              summary: content,
+              confidence_score: 70,
+              methodologies: ['Text Analysis'],
+              publication_score: 70,
+              overall_relevance_score: 70
+            },
+            articles: [],
+            top_article: null,
+            source: 'report',
+            memories_used: 0
+          }];
         }
       }
 
-      // For any other type, convert to string and wrap
-      return { summary: String(content) };
+      return null;
     } catch (e) {
       console.warn('Error parsing report content:', e);
       return null;
     }
   };
 
-  const parsedContent = parseReportContent(report.content);
+  const parsedResults = parseReportContent(report.content);
 
-  // Robust report content renderer
-  const RobustReportRenderer = ({ content }: { content: any }) => {
-    if (!content) return null;
 
-    const renderSection = (key: string, value: any, index?: number) => {
-      if (value === null || value === undefined || value === '') return null;
-
-      // Handle arrays
-      if (Array.isArray(value)) {
-        if (value.length === 0) return null;
-
-        if (key === 'queries') {
-          return (
-            <div key={key}>
-              <h3 className="text-lg font-medium text-gray-900 mb-3">Search Queries</h3>
-              <div className="space-y-2">
-                {value.map((query: any, idx: number) => (
-                  <div key={idx} className="bg-gray-50 p-3 rounded-lg">
-                    <code className="text-sm text-gray-700">{String(query)}</code>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        }
-
-        if (key === 'results') {
-          return (
-            <div key={key}>
-              <h3 className="text-lg font-medium text-gray-900 mb-3">Research Results</h3>
-              <div className="space-y-4">
-                {value.map((result: any, idx: number) => (
-                  <div key={idx} className="border border-gray-200 rounded-lg p-4">
-                    <h4 className="font-medium text-gray-900 mb-2">Result {idx + 1}</h4>
-                    {typeof result === 'object' && result !== null ? (
-                      Object.entries(result).map(([k, v]) => (
-                        <div key={k} className="mb-2">
-                          <span className="text-sm font-medium text-gray-600 capitalize">
-                            {k.replace(/_/g, ' ')}:
-                          </span>
-                          <div className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">
-                            {String(v)}
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-sm text-gray-700 whitespace-pre-wrap">
-                        {String(result)}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        }
-
-        // Generic array rendering
-        return (
-          <div key={key}>
-            <h3 className="text-lg font-medium text-gray-900 mb-3 capitalize">
-              {key.replace(/_/g, ' ')}
-            </h3>
-            <div className="space-y-2">
-              {value.map((item: any, idx: number) => (
-                <div key={idx} className="bg-gray-50 p-3 rounded-lg">
-                  <div className="text-sm text-gray-700">{String(item)}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      }
-
-      // Handle objects
-      if (typeof value === 'object' && value !== null) {
-        if (key === 'diagnostics') {
-          return (
-            <div key={key}>
-              <h3 className="text-lg font-medium text-gray-900 mb-3">Research Diagnostics</h3>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  {Object.entries(value).map(([k, v]) => (
-                    <div key={k}>
-                      <span className="font-medium text-gray-900 capitalize">
-                        {k.replace(/_/g, ' ')}:
-                      </span>
-                      <span className="ml-2 text-gray-700">
-                        {typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          );
-        }
-
-        // Generic object rendering
-        return (
-          <div key={key}>
-            <h3 className="text-lg font-medium text-gray-900 mb-3 capitalize">
-              {key.replace(/_/g, ' ')}
-            </h3>
-            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-              {Object.entries(value).map(([k, v]) => (
-                <div key={k}>
-                  <span className="font-medium text-gray-700 capitalize">
-                    {k.replace(/_/g, ' ')}:
-                  </span>
-                  <span className="ml-2 text-gray-600">
-                    {String(v)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      }
-
-      // Handle primitive values
-      return (
-        <div key={key}>
-          <h3 className="text-lg font-medium text-gray-900 mb-3 capitalize">
-            {key.replace(/_/g, ' ')}
-          </h3>
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="text-gray-700 whitespace-pre-wrap">{String(value)}</div>
-          </div>
-        </div>
-      );
-    };
-
-    try {
-      if (typeof content === 'object' && content !== null) {
-        const sections = Object.entries(content)
-          .filter(([_, value]) => value !== null && value !== undefined && value !== '')
-          .map(([key, value]) => renderSection(key, value))
-          .filter(Boolean);
-
-        return sections.length > 0 ? <>{sections}</> : (
-          <div className="text-center py-8">
-            <p className="text-gray-500">Report content is available but appears to be empty.</p>
-          </div>
-        );
-      }
-
-      // Fallback for non-object content
-      return (
-        <div>
-          <h3 className="text-lg font-medium text-gray-900 mb-3">Report Content</h3>
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="text-gray-700 whitespace-pre-wrap">{String(content)}</div>
-          </div>
-        </div>
-      );
-    } catch (error) {
-      console.warn('Error rendering report content:', error);
-      return (
-        <div className="text-center py-8">
-          <p className="text-gray-500">Report content is available but could not be displayed properly.</p>
-          <details className="mt-2">
-            <summary className="text-sm text-gray-400 cursor-pointer">Show raw content</summary>
-            <pre className="mt-2 text-xs text-gray-400 bg-gray-100 p-2 rounded overflow-auto">
-              {JSON.stringify(content, null, 2)}
-            </pre>
-          </details>
-        </div>
-      );
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -350,20 +227,58 @@ export default function ReportDetailPage() {
           </div>
         </div>
 
-        {/* Content */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Report Content</h2>
-          
-          {parsedContent ? (
-            <div className="space-y-6">
-              <RobustReportRenderer content={parsedContent} />
-            </div>
+        {/* Content - Generate Dossier Structure */}
+        <div className="space-y-6">
+          {parsedResults && parsedResults.length > 0 ? (
+            <>
+              {/* Diagnostics Section (same as Generate Dossier) */}
+              {(() => {
+                const diagnostics = report.content?.diagnostics;
+                if (!diagnostics) return null;
+                return (
+                  <div className="p-3 sm:p-4 rounded-md bg-slate-50 border border-slate-200 text-slate-800 text-xs sm:text-sm">
+                    <div className="font-medium mb-2">Run details</div>
+                    <div className="flex flex-wrap gap-2 sm:gap-3 text-xs sm:text-sm">
+                      <span>Pool: {diagnostics.pool_size || 0}</span>
+                      <span>Shortlist: {diagnostics.shortlist_size || 0}</span>
+                      <span>Deep-dive: {diagnostics.deep_dive_count || 0}</span>
+                      {diagnostics.timings_ms && (
+                        <>
+                          <span>Plan: {diagnostics.timings_ms.plan_ms || 0}ms</span>
+                          <span>Harvest: {diagnostics.timings_ms.harvest_ms || 0}ms</span>
+                          <span>Deep-dive: {diagnostics.timings_ms.deepdive_ms || 0}ms</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Executive Summary */}
+              {report.content?.executive_summary && (
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h2 className="text-xl font-semibold text-gray-900 mb-4">Executive Summary</h2>
+                  <div className="text-gray-700 whitespace-pre-wrap">
+                    {report.content.executive_summary}
+                  </div>
+                </div>
+              )}
+
+              {/* Article Results (same structure as Generate Dossier) */}
+              <div className="space-y-6">
+                {parsedResults.map((item, idx) => (
+                  <ArticleCard key={idx} item={item} />
+                ))}
+              </div>
+            </>
           ) : (
-            <div className="text-center py-8">
-              <p className="text-gray-500">No content available for this report.</p>
-              <p className="text-sm text-gray-400 mt-2">
-                The report may still be processing or there was an issue generating content.
-              </p>
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="text-center py-8">
+                <p className="text-gray-500">No content available for this report.</p>
+                <p className="text-sm text-gray-400 mt-2">
+                  The report may still be processing or there was an issue generating content.
+                </p>
+              </div>
             </div>
           )}
         </div>

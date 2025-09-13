@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { ScientificModelCard } from '@/components/ScientificModelCard';
+import { ExperimentalMethodsCard } from '@/components/ExperimentalMethodsCard';
+import { ResultsInterpretationCard } from '@/components/ResultsInterpretationCard';
 
 interface Analysis {
   analysis_id: string;
@@ -14,7 +17,7 @@ interface Analysis {
   created_at: string;
   created_by: string;
   project_id: string;
-  // New analysis fields
+  // Analysis fields (same structure as molecule dossier)
   scientific_model_analysis?: any;
   experimental_methods_analysis?: any;
   results_interpretation_analysis?: any;
@@ -26,6 +29,7 @@ export default function AnalysisDetailPage() {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'Model' | 'Methods' | 'Results'>('Model');
 
   useEffect(() => {
     if (!analysisId || !user) return;
@@ -82,135 +86,14 @@ export default function AnalysisDetailPage() {
     );
   }
 
-  // Robust content parsing with fallbacks
-  const parseAnalysisField = (field: any, fieldName: string) => {
-    if (!field) return null;
-
-    try {
-      // If it's already an object, return it
-      if (typeof field === 'object' && field !== null) {
-        return field;
-      }
-
-      // If it's a string, try to parse as JSON
-      if (typeof field === 'string') {
-        // Handle empty strings
-        if (field.trim() === '') return null;
-
-        // Try JSON parsing
-        try {
-          return JSON.parse(field);
-        } catch {
-          // If JSON parsing fails, treat as plain text
-          return { summary: field };
-        }
-      }
-
-      // For any other type, convert to string and wrap in summary
-      return { summary: String(field) };
-    } catch (e) {
-      console.warn(`Error parsing ${fieldName}:`, e);
-      return null;
-    }
-  };
-
-  const scientificModel = parseAnalysisField(analysis.scientific_model_analysis, 'scientific_model_analysis');
-  const experimentalMethods = parseAnalysisField(analysis.experimental_methods_analysis, 'experimental_methods_analysis');
-  const resultsInterpretation = parseAnalysisField(analysis.results_interpretation_analysis, 'results_interpretation_analysis');
+  // Parse analysis data (same structure as molecule dossier)
+  const scientificModel = analysis.scientific_model_analysis;
+  const experimentalMethods = analysis.experimental_methods_analysis;
+  const resultsInterpretation = analysis.results_interpretation_analysis;
 
   const hasContent = scientificModel || experimentalMethods || resultsInterpretation;
 
-  // Robust content renderer component
-  const RobustContentRenderer = ({ data, color = "gray", fallbackMessage }: {
-    data: any,
-    color?: string,
-    fallbackMessage?: string
-  }) => {
-    if (!data) return null;
 
-    const colorClasses = {
-      purple: { dot: "bg-purple-600", text: "text-purple-700" },
-      blue: { dot: "bg-blue-600", text: "text-blue-700" },
-      green: { dot: "bg-green-600", text: "text-green-700" },
-      gray: { dot: "bg-gray-600", text: "text-gray-700" }
-    };
-
-    const colors = colorClasses[color as keyof typeof colorClasses] || colorClasses.gray;
-
-    // Helper to safely render any value
-    const renderValue = (value: any, key?: string): React.ReactNode => {
-      if (value === null || value === undefined) return null;
-
-      if (Array.isArray(value)) {
-        if (value.length === 0) return null;
-        return (
-          <div className="space-y-1">
-            {value.map((item, index) => (
-              <div key={index} className="flex items-start gap-2">
-                <div className={`w-1.5 h-1.5 ${colors.dot} rounded-full mt-2 flex-shrink-0`}></div>
-                <span className="text-gray-700">{renderValue(item)}</span>
-              </div>
-            ))}
-          </div>
-        );
-      }
-
-      if (typeof value === 'object') {
-        return (
-          <div className="space-y-2">
-            {Object.entries(value).map(([k, v]) => (
-              <div key={k}>
-                <span className="font-medium text-gray-800 capitalize">
-                  {k.replace(/_/g, ' ')}:
-                </span>
-                <span className="ml-2 text-gray-700">{renderValue(v)}</span>
-              </div>
-            ))}
-          </div>
-        );
-      }
-
-      return String(value);
-    };
-
-    // Try to render structured content
-    try {
-      if (typeof data === 'object' && data !== null) {
-        const entries = Object.entries(data).filter(([_, value]) =>
-          value !== null && value !== undefined && value !== ''
-        );
-
-        if (entries.length === 0) {
-          return <div className="text-gray-500 italic">{fallbackMessage || "No content available"}</div>;
-        }
-
-        return (
-          <div className="space-y-3">
-            {entries.map(([key, value]) => (
-              <div key={key}>
-                <h4 className="font-medium text-gray-800 mb-2 capitalize">
-                  {key.replace(/_/g, ' ')}
-                </h4>
-                <div className="text-gray-700">
-                  {renderValue(value, key)}
-                </div>
-              </div>
-            ))}
-          </div>
-        );
-      }
-
-      // Fallback for non-object data
-      return <div className="text-gray-700">{renderValue(data)}</div>;
-    } catch (error) {
-      console.warn('Error rendering content:', error);
-      return (
-        <div className="text-gray-500 italic">
-          {fallbackMessage || "Content available but could not be displayed properly"}
-        </div>
-      );
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -273,10 +156,10 @@ export default function AnalysisDetailPage() {
           </div>
         </div>
 
-        {/* Content */}
+        {/* Content - Tabbed Interface (same as molecule dossier) */}
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Analysis Results</h2>
-          
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">Deep Dive Analysis</h2>
+
           {analysis.processing_status === 'pending' ? (
             <div className="text-center py-12">
               <div className="animate-pulse">
@@ -292,53 +175,62 @@ export default function AnalysisDetailPage() {
               <p className="text-gray-600">Our AI is analyzing this article. This may take several minutes.</p>
             </div>
           ) : analysis.processing_status === 'completed' && hasContent ? (
-            <div className="space-y-6">
-              {/* Scientific Model Analysis */}
-              {scientificModel && (
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">Scientific Model Analysis</h3>
-                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                    <RobustContentRenderer
-                      data={scientificModel}
-                      color="purple"
-                      fallbackMessage="Scientific model analysis data available but format not recognized"
-                    />
-                  </div>
-                </div>
-              )}
+            <div>
+              {/* Tab Navigation (same as molecule dossier) */}
+              <nav className="-mb-px flex gap-4 text-sm mb-6">
+                {['Model', 'Methods', 'Results'].map((tab) => (
+                  <button
+                    key={tab}
+                    className={`px-3 py-2 border-b-2 ${
+                      activeTab === tab
+                        ? 'border-indigo-600 text-indigo-700'
+                        : 'border-transparent text-slate-600 hover:text-slate-900'
+                    }`}
+                    onClick={() => setActiveTab(tab as 'Model' | 'Methods' | 'Results')}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </nav>
 
-              {/* Experimental Methods Analysis */}
-              {experimentalMethods && (
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">Experimental Methods Analysis</h3>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <RobustContentRenderer
-                      data={experimentalMethods}
-                      color="blue"
-                      fallbackMessage="Experimental methods analysis data available but format not recognized"
-                    />
-                  </div>
-                </div>
-              )}
+              {/* Tab Content */}
+              <div className="mt-6">
+                {activeTab === 'Model' && scientificModel && (
+                  <ScientificModelCard data={scientificModel} />
+                )}
 
-              {/* Results Interpretation Analysis */}
-              {resultsInterpretation && (
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">Results Interpretation Analysis</h3>
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <RobustContentRenderer
-                      data={resultsInterpretation}
-                      color="green"
-                      fallbackMessage="Results interpretation analysis data available but format not recognized"
-                    />
+                {activeTab === 'Methods' && experimentalMethods && (
+                  <ExperimentalMethodsCard data={experimentalMethods} />
+                )}
+
+                {activeTab === 'Results' && resultsInterpretation && (
+                  <ResultsInterpretationCard data={resultsInterpretation} />
+                )}
+
+                {/* Fallback for missing data */}
+                {activeTab === 'Model' && !scientificModel && (
+                  <div className="text-center py-8 text-gray-500">
+                    Scientific model analysis not available
                   </div>
-                </div>
-              )}
+                )}
+
+                {activeTab === 'Methods' && !experimentalMethods && (
+                  <div className="text-center py-8 text-gray-500">
+                    Experimental methods analysis not available
+                  </div>
+                )}
+
+                {activeTab === 'Results' && !resultsInterpretation && (
+                  <div className="text-center py-8 text-gray-500">
+                    Results interpretation analysis not available
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <div className="text-center py-8">
               <p className="text-gray-500">
-                {analysis.processing_status === 'completed' 
+                {analysis.processing_status === 'completed'
                   ? 'Analysis completed but no detailed content available.'
                   : 'Analysis content not yet available.'
                 }

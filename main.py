@@ -53,6 +53,7 @@ from tools import PubMedSearchTool, WebSearchTool, PatentsSearchTool
 from scientific_model_analyst import analyze_scientific_model
 from experimental_methods_analyst import analyze_experimental_methods
 from results_interpretation_analyst import analyze_results_interpretation
+from project_summary_agents import ProjectSummaryOrchestrator
 from langchain.agents import AgentType, initialize_agent
 from scoring import calculate_publication_score
 
@@ -419,8 +420,8 @@ response_cache = TTLCache(RESPONSE_CACHE_TTL)
 synonyms_cache = TTLCache(int(os.getenv("SYNONYMS_CACHE_TTL", "86400")))
 ALWAYS_THREE_SECTIONS = os.getenv("ALWAYS_THREE_SECTIONS", "0") not in ("0", "false", "False")
 CROSS_ENCODER_ENABLED = os.getenv("CROSS_ENCODER_ENABLED", "0") not in ("0", "false", "False")
-TOTAL_BUDGET_S = float(os.getenv("TOTAL_BUDGET_S", "240"))
-PER_QUERY_BUDGET_S = float(os.getenv("PER_QUERY_BUDGET_S", "20"))
+TOTAL_BUDGET_S = float(os.getenv("TOTAL_BUDGET_S", "1800"))  # 30 minutes instead of 4 minutes
+PER_QUERY_BUDGET_S = float(os.getenv("PER_QUERY_BUDGET_S", "60"))  # 1 minute instead of 20 seconds
 ENABLE_AGENT = os.getenv("ENABLE_AGENT", "0") not in ("0", "false", "False")
 ENABLE_CRITIC = os.getenv("ENABLE_CRITIC", "0") not in ("0", "false", "False")
 AGGRESSIVE_PRIMARY_ENABLED = os.getenv("AGGRESSIVE_PRIMARY", "0") not in ("0", "false", "False")
@@ -429,13 +430,13 @@ TRIAGE_TOP_K = int(os.getenv("TRIAGE_TOP_K", "20"))
 DEEPDIVE_TOP_K = int(os.getenv("DEEPDIVE_TOP_K", "8"))
 PATENTS_RETMAX = int(os.getenv("PATENTS_RETMAX", "10"))
 TRIALS_RETMAX = int(os.getenv("TRIALS_RETMAX", "25"))
-PLAN_BUDGET_S = float(os.getenv("PLAN_BUDGET_S", "3"))
-HARVEST_BUDGET_S = float(os.getenv("HARVEST_BUDGET_S", "20"))
-TRIAGE_BUDGET_S = float(os.getenv("TRIAGE_BUDGET_S", "5"))
-DEEPDIVE_BUDGET_S = float(os.getenv("DEEPDIVE_BUDGET_S", "20"))
+PLAN_BUDGET_S = float(os.getenv("PLAN_BUDGET_S", "10"))  # 10 seconds instead of 3
+HARVEST_BUDGET_S = float(os.getenv("HARVEST_BUDGET_S", "120"))  # 2 minutes instead of 20 seconds
+TRIAGE_BUDGET_S = float(os.getenv("TRIAGE_BUDGET_S", "30"))  # 30 seconds instead of 5
+DEEPDIVE_BUDGET_S = float(os.getenv("DEEPDIVE_BUDGET_S", "300"))  # 5 minutes instead of 20 seconds
 # Soft ceiling per article during deep-dive to avoid long tails
-PER_ARTICLE_BUDGET_S = float(os.getenv("PER_ARTICLE_BUDGET_S", "7"))
-SYNTH_BUDGET_S = float(os.getenv("SYNTH_BUDGET_S", "5"))
+PER_ARTICLE_BUDGET_S = float(os.getenv("PER_ARTICLE_BUDGET_S", "60"))  # 1 minute instead of 7 seconds
+SYNTH_BUDGET_S = float(os.getenv("SYNTH_BUDGET_S", "30"))  # 30 seconds instead of 5
 ENTAILMENT_BUDGET_S = float(os.getenv("ENTAILMENT_BUDGET_S", "2.5"))
 PUBMED_POOL_MAX = int(os.getenv("PUBMED_POOL_MAX", "80"))
 TRIALS_POOL_MAX = int(os.getenv("TRIALS_POOL_MAX", "50"))
@@ -4935,7 +4936,7 @@ async def process_deep_dive_analysis(analysis: DeepDiveAnalysis, request: DeepDi
             # Module 1: Scientific Model Analysis with timeout
             md_structured = await _with_timeout(
                 run_in_threadpool(analyze_scientific_model, text, request.objective, llm),
-                12.0,
+                120.0,  # 2 minutes instead of 12 seconds
                 "DeepDiveModel",
                 retries=0,
             )
@@ -4943,13 +4944,13 @@ async def process_deep_dive_analysis(analysis: DeepDiveAnalysis, request: DeepDi
             # Modules 2 and 3 with timeouts (run in parallel)
             mth_task = _with_timeout(
                 run_in_threadpool(analyze_experimental_methods, text, request.objective, llm),
-                12.0,
+                120.0,  # 2 minutes instead of 12 seconds
                 "DeepDiveMethods",
                 retries=0,
             )
             res_task = _with_timeout(
                 run_in_threadpool(analyze_results_interpretation, text, request.objective, llm),
-                12.0,
+                120.0,  # 2 minutes instead of 12 seconds
                 "DeepDiveResults",
                 retries=0,
             )
@@ -5865,7 +5866,7 @@ async def deep_dive(request: DeepDiveRequest, db: Session = Depends(get_db)):
             # Module 1 with timeout
             md_structured = await _with_timeout(
                 run_in_threadpool(analyze_scientific_model, text, request.objective, get_llm_analyzer()),
-                12.0,
+                120.0,  # 2 minutes instead of 12 seconds
                 "DeepDiveModel",
                 retries=0,
             )
@@ -6208,7 +6209,7 @@ async def generate_project_summary_report(
     """Generate a summary report and link it to a project"""
     try:
         current_user = http_request.headers.get("User-ID", "default_user")
-        
+
         # Verify project access
         project = db.query(Project).filter(
             Project.project_id == project_id,
@@ -6222,22 +6223,142 @@ async def generate_project_summary_report(
                 )
             )
         ).first()
-        
+
         if not project:
             raise HTTPException(status_code=404, detail="Project not found or access denied")
-        
+
         # Create a copy of the request with project_id set
         request_dict = request.dict()
         request_dict['project_id'] = project_id
         modified_request = ReviewRequest(**request_dict)
-        
+
         # Generate the review using existing logic
         return await generate_review_internal(modified_request, db, current_user)
-        
+
     except HTTPException:
         raise
     except Exception as e:
         print(f"Error in generate_project_summary_report: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@app.post("/projects/{project_id}/generate-comprehensive-summary")
+async def generate_comprehensive_project_summary(
+    project_id: str,
+    http_request: Request,
+    db: Session = Depends(get_db)
+):
+    """Generate a comprehensive project summary using specialized agents"""
+    try:
+        current_user = http_request.headers.get("User-ID", "default_user")
+
+        # Verify project access and get full project data
+        project = db.query(Project).filter(Project.project_id == project_id).first()
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        # Check permissions
+        has_access = (
+            project.owner_user_id == current_user or
+            db.query(ProjectCollaborator).filter(
+                ProjectCollaborator.project_id == project_id,
+                ProjectCollaborator.user_id == current_user,
+                ProjectCollaborator.is_active == True
+            ).first() is not None
+        )
+
+        if not has_access:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # Gather all project data
+        reports = db.query(Report).filter(Report.project_id == project_id).all()
+        collaborators = db.query(ProjectCollaborator).join(User).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.is_active == True
+        ).all()
+        annotations = db.query(Annotation).filter(Annotation.project_id == project_id).all()
+        deep_dive_analyses = db.query(DeepDiveAnalysis).filter(DeepDiveAnalysis.project_id == project_id).all()
+
+        # Prepare project data for analysis
+        project_data = {
+            "project_id": project.project_id,
+            "project_name": project.project_name,
+            "description": project.description,
+            "owner_user_id": project.owner_user_id,
+            "created_at": project.created_at.isoformat(),
+            "updated_at": project.updated_at.isoformat(),
+            "reports": [{
+                "report_id": r.report_id,
+                "title": r.title,
+                "objective": r.objective,
+                "molecule": r.molecule,
+                "content": r.content,
+                "summary": r.summary,
+                "created_at": r.created_at.isoformat(),
+                "created_by": r.created_by,
+                "article_count": r.article_count,
+                "clinical_mode": r.clinical_mode,
+                "dag_mode": r.dag_mode,
+                "full_text_only": r.full_text_only,
+                "preference": r.preference
+            } for r in reports],
+            "collaborators": [{
+                "user_id": c.user_id,
+                "username": c.user.username,
+                "role": c.role,
+                "invited_at": c.invited_at.isoformat(),
+                "accepted_at": c.accepted_at.isoformat() if c.accepted_at else None
+            } for c in collaborators],
+            "annotations": [{
+                "annotation_id": a.annotation_id,
+                "content": a.content,
+                "author_id": a.author_id,
+                "created_at": a.created_at.isoformat(),
+                "article_pmid": a.article_pmid,
+                "report_id": a.report_id
+            } for a in annotations],
+            "deep_dive_analyses": [{
+                "analysis_id": d.analysis_id,
+                "article_title": d.article_title,
+                "article_pmid": d.article_pmid,
+                "article_url": d.article_url,
+                "processing_status": d.processing_status,
+                "created_at": d.created_at.isoformat(),
+                "created_by": d.created_by,
+                "content": d.content
+            } for d in deep_dive_analyses]
+        }
+
+        # Initialize the orchestrator with LLM
+        llm = get_llm_analyzer()
+        orchestrator = ProjectSummaryOrchestrator(llm)
+
+        # Generate comprehensive summary using specialized agents
+        summary_results = await orchestrator.generate_comprehensive_summary(project_data)
+
+        # Return the comprehensive analysis
+        return {
+            "project_id": project_id,
+            "project_name": project.project_name,
+            "generated_at": datetime.utcnow().isoformat(),
+            "generated_by": current_user,
+            "summary_type": "comprehensive",
+            "analysis_results": summary_results,
+            "metadata": {
+                "total_reports": len(reports),
+                "total_collaborators": len(collaborators),
+                "total_annotations": len(annotations),
+                "total_deep_dives": len(deep_dive_analyses),
+                "project_duration_days": (datetime.utcnow() - project.created_at).days
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in generate_comprehensive_project_summary: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.post("/generate-review")
@@ -6250,9 +6371,9 @@ async def generate_review_internal(request: ReviewRequest, db: Session, current_
     req_start = _now_ms()
     _metrics_inc("requests_total", 1)
     
-    # Dynamic timeout based on preference: 5min for recall, 4min for precision
+    # Dynamic timeout based on preference: 30min for recall, 20min for precision
     preference = getattr(request, "preference", "precision") or "precision"
-    timeout_budget = 300 if preference.lower() == "recall" else 240  # 5min vs 4min
+    timeout_budget = 1800 if preference.lower() == "recall" else 1200  # 30min vs 20min
     deadline = time.time() + timeout_budget
 
     def time_left_s() -> float:

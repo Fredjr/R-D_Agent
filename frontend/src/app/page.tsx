@@ -38,9 +38,40 @@ export default function Home() {
     setResults([]);
     setDiagnostics(null);
     setQueries(null);
-    
+
     try {
-      const data = await fetchReview({ molecule, objective, projectId: projectId ?? null, clinicalMode, preference, dagMode, fullTextOnly });
+      // If projectId is provided, use the unified endpoint that saves to database
+      // Otherwise, use the direct generate-review endpoint for immediate display
+      let data;
+      if (projectId) {
+        // Use the same endpoint as "New Report" - saves to database
+        const response = await fetch(`/api/proxy/projects/${projectId}/generate-summary-report`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-ID': user?.email || 'default_user',
+          },
+          body: JSON.stringify({
+            molecule,
+            objective,
+            clinical_mode: clinicalMode,
+            dag_mode: dagMode,
+            full_text_only: fullTextOnly,
+            preference
+          }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to generate report: ${errorText}`);
+        }
+
+        data = await response.json();
+      } else {
+        // Use direct endpoint for immediate display (no database save)
+        data = await fetchReview({ molecule, objective, projectId: null, clinicalMode, preference, dagMode, fullTextOnly });
+      }
+
       const arr = Array.isArray(data?.results) ? data.results : [];
       // Attach the original objective for downstream Deep Dive calls
       const enriched = arr.map((it: any) => ({ ...it, _objective: objective, query: objective }));

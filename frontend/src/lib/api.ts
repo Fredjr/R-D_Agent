@@ -30,9 +30,11 @@ export async function fetchReview(args: FetchReviewArgs): Promise<any> {
   const payload = buildPayload(args);
 
   // Create AbortController for timeout handling
-  // Use longer timeout for recall mode (which processes more articles)
-  const timeoutDuration = args.preference === 'recall' ? 240000 : 120000; // 4 minutes for recall, 2 minutes for precision
+  // SOLUTION: Remove all timeouts to prevent any timeout issues
+  // Complex analyses (DAG mode, fullTextOnly, recall) can take 10-20 minutes
   const controller = new AbortController();
+  // Set a very long timeout (30 minutes) to handle the most complex cases
+  const timeoutDuration = 30 * 60 * 1000; // 30 minutes
   const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
 
   try {
@@ -55,7 +57,8 @@ export async function fetchReview(args: FetchReviewArgs): Promise<any> {
     clearTimeout(timeoutId);
     
     if (error.name === 'AbortError') {
-      throw new Error('Request timed out. The analysis is taking longer than expected. Please try again or use a more specific query.');
+      const timeoutMinutes = Math.round(timeoutDuration / 60000);
+      throw new Error(`Request timed out after ${timeoutMinutes} minutes. This is unusual - please check your internet connection and try again.`);
     }
     
     if (error.message?.includes('ERR_NETWORK_IO_SUSPENDED')) {
@@ -90,7 +93,8 @@ export async function fetchDeepDive(args: FetchDeepDiveArgs): Promise<any> {
 
   // Create AbortController for timeout handling
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 90000); // 90 seconds timeout for deep dive
+  // Increase deep dive timeout to 30 minutes for complex analyses
+  const timeoutId = setTimeout(() => controller.abort(), 30 * 60 * 1000); // 30 minutes timeout for deep dive
 
   try {
     const res = await fetch(url, {
