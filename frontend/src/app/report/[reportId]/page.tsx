@@ -116,12 +116,208 @@ export default function ReportDetailPage() {
     );
   }
 
-  let parsedContent;
-  try {
-    parsedContent = JSON.parse(report.content);
-  } catch {
-    parsedContent = null;
-  }
+  // Robust content parsing with fallbacks
+  const parseReportContent = (content: any) => {
+    if (!content) return null;
+
+    try {
+      // If it's already an object, return it
+      if (typeof content === 'object' && content !== null) {
+        return content;
+      }
+
+      // If it's a string, try to parse as JSON
+      if (typeof content === 'string') {
+        if (content.trim() === '') return null;
+        try {
+          return JSON.parse(content);
+        } catch {
+          // If JSON parsing fails, create a simple structure
+          return { summary: content };
+        }
+      }
+
+      // For any other type, convert to string and wrap
+      return { summary: String(content) };
+    } catch (e) {
+      console.warn('Error parsing report content:', e);
+      return null;
+    }
+  };
+
+  const parsedContent = parseReportContent(report.content);
+
+  // Robust report content renderer
+  const RobustReportRenderer = ({ content }: { content: any }) => {
+    if (!content) return null;
+
+    const renderSection = (key: string, value: any, index?: number) => {
+      if (value === null || value === undefined || value === '') return null;
+
+      // Handle arrays
+      if (Array.isArray(value)) {
+        if (value.length === 0) return null;
+
+        if (key === 'queries') {
+          return (
+            <div key={key}>
+              <h3 className="text-lg font-medium text-gray-900 mb-3">Search Queries</h3>
+              <div className="space-y-2">
+                {value.map((query: any, idx: number) => (
+                  <div key={idx} className="bg-gray-50 p-3 rounded-lg">
+                    <code className="text-sm text-gray-700">{String(query)}</code>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        }
+
+        if (key === 'results') {
+          return (
+            <div key={key}>
+              <h3 className="text-lg font-medium text-gray-900 mb-3">Research Results</h3>
+              <div className="space-y-4">
+                {value.map((result: any, idx: number) => (
+                  <div key={idx} className="border border-gray-200 rounded-lg p-4">
+                    <h4 className="font-medium text-gray-900 mb-2">Result {idx + 1}</h4>
+                    {typeof result === 'object' && result !== null ? (
+                      Object.entries(result).map(([k, v]) => (
+                        <div key={k} className="mb-2">
+                          <span className="text-sm font-medium text-gray-600 capitalize">
+                            {k.replace(/_/g, ' ')}:
+                          </span>
+                          <div className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">
+                            {String(v)}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-sm text-gray-700 whitespace-pre-wrap">
+                        {String(result)}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        }
+
+        // Generic array rendering
+        return (
+          <div key={key}>
+            <h3 className="text-lg font-medium text-gray-900 mb-3 capitalize">
+              {key.replace(/_/g, ' ')}
+            </h3>
+            <div className="space-y-2">
+              {value.map((item: any, idx: number) => (
+                <div key={idx} className="bg-gray-50 p-3 rounded-lg">
+                  <div className="text-sm text-gray-700">{String(item)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      }
+
+      // Handle objects
+      if (typeof value === 'object' && value !== null) {
+        if (key === 'diagnostics') {
+          return (
+            <div key={key}>
+              <h3 className="text-lg font-medium text-gray-900 mb-3">Research Diagnostics</h3>
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  {Object.entries(value).map(([k, v]) => (
+                    <div key={k}>
+                      <span className="font-medium text-gray-900 capitalize">
+                        {k.replace(/_/g, ' ')}:
+                      </span>
+                      <span className="ml-2 text-gray-700">
+                        {typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        // Generic object rendering
+        return (
+          <div key={key}>
+            <h3 className="text-lg font-medium text-gray-900 mb-3 capitalize">
+              {key.replace(/_/g, ' ')}
+            </h3>
+            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+              {Object.entries(value).map(([k, v]) => (
+                <div key={k}>
+                  <span className="font-medium text-gray-700 capitalize">
+                    {k.replace(/_/g, ' ')}:
+                  </span>
+                  <span className="ml-2 text-gray-600">
+                    {String(v)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      }
+
+      // Handle primitive values
+      return (
+        <div key={key}>
+          <h3 className="text-lg font-medium text-gray-900 mb-3 capitalize">
+            {key.replace(/_/g, ' ')}
+          </h3>
+          <div className="bg-gray-50 rounded-lg p-4">
+            <div className="text-gray-700 whitespace-pre-wrap">{String(value)}</div>
+          </div>
+        </div>
+      );
+    };
+
+    try {
+      if (typeof content === 'object' && content !== null) {
+        const sections = Object.entries(content)
+          .filter(([_, value]) => value !== null && value !== undefined && value !== '')
+          .map(([key, value]) => renderSection(key, value))
+          .filter(Boolean);
+
+        return sections.length > 0 ? <>{sections}</> : (
+          <div className="text-center py-8">
+            <p className="text-gray-500">Report content is available but appears to be empty.</p>
+          </div>
+        );
+      }
+
+      // Fallback for non-object content
+      return (
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 mb-3">Report Content</h3>
+          <div className="bg-gray-50 rounded-lg p-4">
+            <div className="text-gray-700 whitespace-pre-wrap">{String(content)}</div>
+          </div>
+        </div>
+      );
+    } catch (error) {
+      console.warn('Error rendering report content:', error);
+      return (
+        <div className="text-center py-8">
+          <p className="text-gray-500">Report content is available but could not be displayed properly.</p>
+          <details className="mt-2">
+            <summary className="text-sm text-gray-400 cursor-pointer">Show raw content</summary>
+            <pre className="mt-2 text-xs text-gray-400 bg-gray-100 p-2 rounded overflow-auto">
+              {JSON.stringify(content, null, 2)}
+            </pre>
+          </details>
+        </div>
+      );
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -160,97 +356,14 @@ export default function ReportDetailPage() {
           
           {parsedContent ? (
             <div className="space-y-6">
-              {/* Queries */}
-              {parsedContent.queries && parsedContent.queries.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">Search Queries</h3>
-                  <div className="space-y-2">
-                    {parsedContent.queries.map((query: string, index: number) => (
-                      <div key={index} className="bg-gray-50 p-3 rounded-lg">
-                        <code className="text-sm text-gray-700">{query}</code>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Results */}
-              {parsedContent.results && parsedContent.results.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">Research Results</h3>
-                  <div className="space-y-4">
-                    {parsedContent.results.map((result: any, index: number) => (
-                      <div key={index} className="border border-gray-200 rounded-lg p-4">
-                        <h4 className="font-medium text-gray-900 mb-2">Result {index + 1}</h4>
-                        {result.query && (
-                          <p className="text-sm text-gray-600 mb-2">
-                            <strong>Query:</strong> {result.query}
-                          </p>
-                        )}
-                        {result.result && (
-                          <div className="text-sm text-gray-700">
-                            <strong>Analysis:</strong>
-                            <div className="mt-1 whitespace-pre-wrap">{result.result}</div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Executive Summary */}
-              {parsedContent.executive_summary && (
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">Executive Summary</h3>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div className="whitespace-pre-wrap text-gray-700">
-                      {parsedContent.executive_summary}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Diagnostics */}
-              {parsedContent.diagnostics && (
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">Research Diagnostics</h3>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      {parsedContent.diagnostics.pool_size && (
-                        <div>
-                          <span className="font-medium text-gray-900">Pool Size:</span>
-                          <span className="ml-2 text-gray-700">{parsedContent.diagnostics.pool_size}</span>
-                        </div>
-                      )}
-                      {parsedContent.diagnostics.shortlist_size && (
-                        <div>
-                          <span className="font-medium text-gray-900">Shortlist:</span>
-                          <span className="ml-2 text-gray-700">{parsedContent.diagnostics.shortlist_size}</span>
-                        </div>
-                      )}
-                      {parsedContent.diagnostics.deep_dive_count && (
-                        <div>
-                          <span className="font-medium text-gray-900">Deep Dives:</span>
-                          <span className="ml-2 text-gray-700">{parsedContent.diagnostics.deep_dive_count}</span>
-                        </div>
-                      )}
-                      {parsedContent.diagnostics.timings_ms && (
-                        <div>
-                          <span className="font-medium text-gray-900">Processing Time:</span>
-                          <span className="ml-2 text-gray-700">
-                            {Math.round((parsedContent.diagnostics.timings_ms.plan_ms || 0) / 1000)}s
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
+              <RobustReportRenderer content={parsedContent} />
             </div>
           ) : (
             <div className="text-center py-8">
-              <p className="text-gray-500">No detailed content available for this report.</p>
+              <p className="text-gray-500">No content available for this report.</p>
+              <p className="text-sm text-gray-400 mt-2">
+                The report may still be processing or there was an issue generating content.
+              </p>
             </div>
           )}
         </div>

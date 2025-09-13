@@ -38,11 +38,52 @@ interface ScientificModelCardProps {
 }
 
 export default function ScientificModelCard({ data, className = '' }: ScientificModelCardProps) {
+  // Robust data handling
+  const safeData = data || {};
+
   const splitStringToArray = (str: string): string[] => {
     if (!str) return [];
     // Try to split by common delimiters
     return str.split(/[;,\n]/).map(s => s.trim()).filter(s => s.length > 0);
   };
+
+  // Helper function to safely get values
+  const getValue = (key: keyof ScientificModelData, fallback: string = 'Not specified') => {
+    const value = safeData[key];
+    if (value === null || value === undefined || value === '') return fallback;
+    return String(value);
+  };
+
+  // Helper function to safely get arrays
+  const getArray = (key: keyof ScientificModelData): any[] => {
+    const value = safeData[key];
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return splitStringToArray(value);
+      }
+    }
+    return [];
+  };
+
+  // Check if we have any meaningful data
+  const hasData = Object.values(safeData).some(value =>
+    value !== null && value !== undefined && value !== ''
+  );
+
+  if (!hasData) {
+    return (
+      <div className={`bg-white rounded-lg shadow-md border border-gray-200 ${className}`}>
+        <div className="p-6 text-center">
+          <AcademicCapIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600">No scientific model data available</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`bg-white rounded-lg shadow-md border border-gray-200 ${className}`}>
@@ -64,18 +105,18 @@ export default function ScientificModelCard({ data, className = '' }: Scientific
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Model Type</label>
               <span className="inline-block px-3 py-1 bg-blue-50 text-blue-800 rounded-full text-sm">
-                {data.model_type}
+                {getValue('model_type')}
               </span>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Study Design</label>
-              <p className="text-sm text-gray-900">{data.study_design}</p>
+              <p className="text-sm text-gray-900">{getValue('study_design')}</p>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Sample Size</label>
-              <p className="text-sm text-gray-900">{data.sample_size}</p>
+              <p className="text-sm text-gray-900">{getValue('sample_size')}</p>
             </div>
           </div>
           
