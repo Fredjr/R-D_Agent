@@ -95,7 +95,7 @@ async def test_collaborator_activity():
             print(f"✅ Created project: {project_id}")
         
         # Invite a collaborator
-        async with session.post(f"{BACKEND_URL}/projects/{project_id}/collaborators/invite",
+        async with session.post(f"{BACKEND_URL}/projects/{project_id}/collaborators",
             json={
                 "email": collaborator_email,
                 "role": "editor"
