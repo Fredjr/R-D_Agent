@@ -20,6 +20,7 @@ export default function ReportDetailPage() {
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
 
   useEffect(() => {
     if (!reportId || !user) return;
@@ -48,6 +49,45 @@ export default function ReportDetailPage() {
 
     fetchReport();
   }, [reportId, user]);
+
+  const handleRegenerateContent = async () => {
+    if (!reportId || !user) return;
+
+    setRegenerating(true);
+    try {
+      const response = await fetch(`/api/proxy/reports/${reportId}/regenerate`, {
+        method: 'POST',
+        headers: {
+          'User-ID': user.email || 'default_user',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to regenerate report content');
+      }
+
+      const result = await response.json();
+
+      // Refresh the report data
+      const refreshResponse = await fetch(`/api/proxy/reports/${reportId}`, {
+        headers: {
+          'User-ID': user.email || 'default_user',
+        },
+      });
+
+      if (refreshResponse.ok) {
+        const refreshedData = await refreshResponse.json();
+        setReport(refreshedData);
+      }
+
+      alert('Report content regenerated successfully!');
+    } catch (err) {
+      console.error('Error regenerating report:', err);
+      alert('Failed to regenerate report content. Please try again.');
+    } finally {
+      setRegenerating(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -90,12 +130,21 @@ export default function ReportDetailPage() {
         <div className="bg-white rounded-lg shadow p-6 mb-8">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-2xl font-bold text-gray-900">{report.title}</h1>
-            <button
-              onClick={() => window.history.back()}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-            >
-              ← Back
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleRegenerateContent}
+                disabled={regenerating}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors font-medium"
+              >
+                {regenerating ? 'Regenerating...' : 'Regenerate Content'}
+              </button>
+              <button
+                onClick={() => window.history.back()}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                ← Back
+              </button>
+            </div>
           </div>
           <p className="text-gray-600 mb-4">{report.objective}</p>
           <div className="flex items-center gap-4 text-sm text-gray-500">

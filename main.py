@@ -4546,15 +4546,15 @@ async def get_report_by_id(
 ):
     """Get a specific report by ID (for direct access)"""
     current_user = request.headers.get("User-ID", "default_user")
-    
+
     # Get the report
     report = db.query(Report).filter(
         Report.report_id == report_id
     ).first()
-    
+
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
-    
+
     # Verify user has access to the project
     project = db.query(Project).filter(
         Project.project_id == report.project_id,
@@ -4568,10 +4568,10 @@ async def get_report_by_id(
             )
         )
     ).first()
-    
+
     if not project:
         raise HTTPException(status_code=403, detail="Access denied")
-    
+
     return {
         "report_id": report.report_id,
         "project_id": report.project_id,
@@ -4581,6 +4581,101 @@ async def get_report_by_id(
         "created_at": report.created_at,
         "created_by": report.created_by
     }
+
+@app.post("/reports/{report_id}/regenerate")
+async def regenerate_report_content(
+    report_id: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Regenerate content for an existing report"""
+    current_user = request.headers.get("User-ID", "default_user")
+
+    # Get the report
+    report = db.query(Report).filter(
+        Report.report_id == report_id
+    ).first()
+
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    # Verify user has access to the project
+    project = db.query(Project).filter(
+        Project.project_id == report.project_id,
+        or_(
+            Project.owner_user_id == current_user,
+            Project.project_id.in_(
+                db.query(ProjectCollaborator.project_id).filter(
+                    ProjectCollaborator.user_id == current_user,
+                    ProjectCollaborator.is_active == True
+                )
+            )
+        )
+    ).first()
+
+    if not project:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    try:
+        # Create a ReviewRequest object to reuse existing logic
+        review_request = ReviewRequest(
+            molecule=report.title,
+            objective=report.objective,
+            project_id=report.project_id,
+            clinical_mode=True,  # Default values for regeneration
+            dag_mode=True,
+            full_text_only=False,
+            preference="precision"
+        )
+
+        # Generate new content using existing function
+        resp = await generate_review_internal(review_request, db, current_user)
+
+        # Update the existing report with new content
+        report.content = resp
+        report.updated_at = func.now()
+        db.commit()
+
+        # Log the regeneration activity
+        activity = ActivityLog(
+            activity_id=str(uuid.uuid4()),
+            project_id=report.project_id,
+            user_id=current_user,
+            activity_type="report_regenerated",
+            description=f"Regenerated content for report: {report.title}",
+            metadata={
+                "report_id": report.report_id,
+                "report_title": report.title
+            }
+        )
+        db.add(activity)
+        db.commit()
+
+        # Broadcast the activity via WebSocket
+        await connection_manager.broadcast_to_project(
+            report.project_id,
+            {
+                "type": "activity_update",
+                "activity": {
+                    "activity_id": activity.activity_id,
+                    "activity_type": activity.activity_type,
+                    "description": activity.description,
+                    "user_id": activity.user_id,
+                    "created_at": activity.created_at.isoformat(),
+                    "metadata": activity.metadata
+                }
+            }
+        )
+
+        return {
+            "message": "Report content regenerated successfully",
+            "report_id": report.report_id,
+            "content_preview": str(resp)[:200] + "..." if len(str(resp)) > 200 else str(resp)
+        }
+
+    except Exception as e:
+        print(f"Error regenerating report content: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to regenerate report content: {str(e)}")
 
 @app.post("/projects/{project_id}/deep-dive-analyses", response_model=DeepDiveAnalysisResponse)
 async def create_deep_dive_analysis(

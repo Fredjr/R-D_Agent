@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Frontend Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .message { background-color: #f8f9fa; padding: 10px; margin: 5px 0; border-left: 3px solid #007bff; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        input { padding: 8px; margin: 5px; width: 300px; }
+        #messages { max-height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>🔌 WebSocket Frontend Test</h1>
+    
+    <div id="status" class="status disconnected">
+        ❌ Disconnected
+    </div>
+    
+    <div>
+        <input type="text" id="projectId" placeholder="Project ID" value="test-project-frontend">
+        <button onclick="connect()">Connect</button>
+        <button onclick="disconnect()">Disconnect</button>
+    </div>
+    
+    <div>
+        <input type="text" id="messageInput" placeholder="Type a message...">
+        <button onclick="sendMessage()">Send Message</button>
+        <button onclick="sendPing()">Send Ping</button>
+    </div>
+    
+    <div id="messages"></div>
+    
+    <script>
+        let websocket = null;
+        let projectId = 'test-project-frontend';
+        
+        const statusDiv = document.getElementById('status');
+        const messagesDiv = document.getElementById('messages');
+        const projectIdInput = document.getElementById('projectId');
+        const messageInput = document.getElementById('messageInput');
+        
+        function updateStatus(connected, message) {
+            statusDiv.className = `status ${connected ? 'connected' : 'disconnected'}`;
+            statusDiv.textContent = `${connected ? '✅' : '❌'} ${message}`;
+        }
+        
+        function addMessage(message, type = 'info') {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong> [${type}] ${message}`;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        function connect() {
+            projectId = projectIdInput.value || 'test-project-frontend';
+            
+            if (websocket) {
+                websocket.close();
+            }
+            
+            // Use the same backend URL as the frontend
+            const backendUrl = 'wss://r-dagent-production.up.railway.app';
+            const wsUrl = `${backendUrl}/ws/project/${projectId}`;
+            
+            addMessage(`Connecting to: ${wsUrl}`, 'info');
+            updateStatus(false, 'Connecting...');
+            
+            try {
+                websocket = new WebSocket(wsUrl);
+                
+                websocket.onopen = function(event) {
+                    updateStatus(true, `Connected to project: ${projectId}`);
+                    addMessage('WebSocket connection established!', 'success');
+                };
+                
+                websocket.onmessage = function(event) {
+                    addMessage(`Received: ${event.data}`, 'received');
+                    
+                    // Try to parse as JSON
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type) {
+                            addMessage(`Message type: ${data.type}`, 'info');
+                        }
+                    } catch (e) {
+                        // Not JSON, that's fine
+                    }
+                };
+                
+                websocket.onclose = function(event) {
+                    updateStatus(false, 'Disconnected');
+                    addMessage(`Connection closed: ${event.code} - ${event.reason}`, 'warning');
+                };
+                
+                websocket.onerror = function(error) {
+                    updateStatus(false, 'Connection Error');
+                    addMessage(`WebSocket error: ${error}`, 'error');
+                };
+                
+            } catch (error) {
+                updateStatus(false, 'Connection Failed');
+                addMessage(`Failed to create WebSocket: ${error}`, 'error');
+            }
+        }
+        
+        function disconnect() {
+            if (websocket) {
+                websocket.close();
+                websocket = null;
+            }
+        }
+        
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message || !websocket || websocket.readyState !== WebSocket.OPEN) {
+                addMessage('Cannot send message: not connected or empty message', 'error');
+                return;
+            }
+            
+            websocket.send(message);
+            addMessage(`Sent: ${message}`, 'sent');
+            messageInput.value = '';
+        }
+        
+        function sendPing() {
+            if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+                addMessage('Cannot send ping: not connected', 'error');
+                return;
+            }
+            
+            const pingMessage = JSON.stringify({
+                type: 'ping',
+                timestamp: new Date().toISOString()
+            });
+            
+            websocket.send(pingMessage);
+            addMessage(`Sent ping: ${pingMessage}`, 'sent');
+        }
+        
+        // Auto-connect on page load
+        window.onload = function() {
+            addMessage('Page loaded. Click Connect to test WebSocket functionality.', 'info');
+        };
+        
+        // Handle Enter key in message input
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
