@@ -2,26 +2,27 @@
 
 ## Current Stable Baseline
 
-**Version**: `v2.1-stable-pre-realtime`  
-**Git Commit**: `02f114d`  
-**Commit Message**: 🔧 Fix NameError: name 'Any' is not defined in ProjectCreate model  
-**Date**: 2025-09-08  
-**Status**: ✅ READY FOR PRODUCTION DEPLOYMENT
+**Version**: `v1.0.0`  
+**Git Commit**: `ffc6170`  
+**Commit Message**: Fix: Handle username conflicts in registration completion  
+**Date**: 2025-09-13  
+**Status**: ✅ STABLE VERSION DEPLOYED
 
-### Features Included
-- ✅ Complete Project Workspace functionality
-- ✅ Full Collaboration Tools (basic version)
-- ✅ Database schema with Projects, Collaborators, Annotations
-- ✅ All API endpoints for project management
-- ✅ Frontend dashboard and project workspace pages
-- ✅ User authentication and authorization
-- ✅ Backend deployment fixes and optimizations
+### Key Features
+- ✅ User Authentication & Registration
+- ✅ Project Management
+- ✅ Report Generation
+- ✅ Deep Dive Analysis
+- ✅ Summary Reports
+- ✅ Real-time Collaboration
+- ✅ Email Notifications
 
 ### Deployment Status
-- **Stable Vercel**: `/r-d-agent` project (FROZEN) ✅
-- **Staging Vercel**: New staging project (auto-deploys) 🚀
-- **Backend GCP**: Cloud Run deployment ✅
-- **Frontend GCP**: Cloud Run deployment ✅
+- **Frontend (Vercel Staging)**: [frontend-psi-seven-85.vercel.app](https://frontend-psi-seven-85.vercel.app) ✅
+- **Backend (Railway)**: [r-dagent-production.up.railway.app](https://r-dagent-production.up.railway.app) ✅
+- **GitHub Tag**: `stable-v1.0.0-ffc6170`
+- **Frontend Project**: `frontend` (Vercel)
+- **Backend Service**: Railway
 
 ### What's Protected
 This version is now the **golden baseline** for:
@@ -30,23 +31,41 @@ This version is now the **golden baseline** for:
 - ✅ Navigation system
 - ✅ Beta tester experience
 
-## Quick Rollback Commands
+## Rollback Procedures
 
-### Emergency Rollback to Stable Baseline
+### Quick Rollback to Stable v1.0.0
+
+#### Frontend (Vercel)
+1. Go to [Vercel Dashboard](https://vercel.com)
+2. Select the `frontend` project
+3. Navigate to "Deployments"
+4. Find deployment with commit `ffc6170`
+5. Click "..." → "Redeploy"
+
+#### Backend (Railway)
+1. Go to [Railway Dashboard](https://railway.app)
+2. Select the R&D Agent service
+3. Navigate to "Deployments"
+4. Find deployment with commit `ffc6170`
+5. Click "Redeploy"
+
+### Git Rollback (Development)
 
 ```bash
-# 1. Checkout stable version
-git checkout stable-baseline-v1.0
+# 1. Fetch latest tags
+git fetch --all --tags
 
-# 2. Create emergency rollback branch
-git checkout -b emergency-rollback-$(date +%Y%m%d-%H%M%S)
+# 2. Checkout stable version
+git checkout stable-v1.0.0-ffc6170
 
-# 3. Force push to main (EMERGENCY ONLY)
-git push origin HEAD:main --force
+# 3. Create rollback branch
+git checkout -b hotfix/rollback-to-stable-$(date +%Y%m%d)
+
+# 4. Push rollback branch
+git push -u origin hotfix/rollback-to-stable-$(date +%Y%m%d)
 ```
 
-### Safe Rollback (Recommended)
-
+### Emergency Rollback (Force Push)
 ```bash
 # 1. Create rollback branch from stable
 git checkout stable-baseline-v1.0
