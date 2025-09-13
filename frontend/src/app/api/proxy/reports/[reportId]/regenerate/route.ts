@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { reportId: string } }
+  context: { params: Promise<{ reportId: string }> }
 ) {
   try {
-    const { reportId } = params;
+    const { reportId } = await context.params;
     
     // Get all headers from the original request
     const headers: Record<string, string> = {};
