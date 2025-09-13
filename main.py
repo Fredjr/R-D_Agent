@@ -4824,9 +4824,9 @@ async def process_pending_analysis(
     if not project:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    # Allow reprocessing if content is empty
-    if analysis.processing_status == "completed" and analysis.scientific_model_analysis is not None:
-        return {"message": "Analysis already completed", "analysis_id": analysis_id}
+    # Allow reprocessing even if completed (for fixing data structure issues)
+    # Force reprocessing to ensure correct data structure
+    print(f"Reprocessing analysis {analysis_id} to ensure correct data structure")
 
     try:
         # Create a DeepDiveRequest object for processing
