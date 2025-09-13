@@ -4620,6 +4620,10 @@ async def regenerate_report_content(
         from database import ActivityLog
         import uuid
 
+        print(f"DEBUG: Starting regeneration for report {report_id}")
+        print(f"DEBUG: Report title: {report.title}")
+        print(f"DEBUG: Report objective: {report.objective}")
+
         # Generate new content using a simple approach
         # Create a basic response structure with the report's molecule and objective
         resp = {
@@ -4669,10 +4673,16 @@ async def regenerate_report_content(
             "memories": []
         }
 
+        print(f"DEBUG: Generated content structure: {type(resp)}")
+        print(f"DEBUG: Content keys: {list(resp.keys()) if isinstance(resp, dict) else 'Not a dict'}")
+
         # Update the existing report with new content
+        print(f"DEBUG: Updating report content...")
         report.content = resp
         report.updated_at = func.now()
+        print(f"DEBUG: Committing to database...")
         db.commit()
+        print(f"DEBUG: Database commit successful")
 
         # Log the regeneration activity
         activity = ActivityLog(
@@ -4712,7 +4722,10 @@ async def regenerate_report_content(
         }
 
     except Exception as e:
-        print(f"Error regenerating report content: {str(e)}")
+        import traceback
+        print(f"ERROR: Exception in regenerate_report_content: {str(e)}")
+        print(f"ERROR: Exception type: {type(e).__name__}")
+        print(f"ERROR: Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Failed to regenerate report content: {str(e)}")
 
 @app.post("/projects/{project_id}/deep-dive-analyses", response_model=DeepDiveAnalysisResponse)
