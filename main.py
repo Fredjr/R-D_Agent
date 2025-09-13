@@ -4851,93 +4851,160 @@ async def process_pending_analysis(
         raise HTTPException(status_code=500, detail=f"Failed to process analysis: {str(e)}")
 
 async def process_deep_dive_analysis(analysis: DeepDiveAnalysis, request: DeepDiveRequest, db: Session, current_user: str):
-    """Process a deep dive analysis by analyzing the article content"""
+    """Process a deep dive analysis using the same robust logic as the /deep-dive endpoint"""
     try:
-        # Get article content (similar to existing /deep-dive endpoint logic)
+        print(f"Starting deep dive analysis processing for: {analysis.analysis_id}")
+
+        # Use the same robust article content retrieval as /deep-dive endpoint
         text = ""
-        grounding = "abstract"
+        grounding = "none"
+        grounding_source = "none"
+        landing_html = ""
 
-        # Try to get full text from PMID or URL
-        if request.pmid:
-            # Try to get full text from PubMed
+        # Step 1: Try URL-based retrieval (same as /deep-dive endpoint)
+        if request.url:
             try:
-                # Use existing PubMed search logic
-                pubmed_tool = PubMedSearchTool()
-                articles = await run_in_threadpool(pubmed_tool.search, f"PMID:{request.pmid}")
-                if articles and len(articles) > 0:
-                    article = articles[0]
-                    text = article.get("abstract", "")
-                    if not text and article.get("full_text"):
-                        text = article.get("full_text", "")
-                        grounding = "full_text"
+                # Use raw HTML for OA resolution and abstract parsing
+                landing_html = _fetch_url_raw_text(request.url)
+                # If this is a PMC article page, treat as full text directly
+                if "ncbi.nlm.nih.gov/pmc/articles/" in (request.url or "") and landing_html:
+                    text = _strip_html(landing_html)
+                    grounding, grounding_source = "full_text", "pmc"
+                else:
+                    text, grounding, grounding_source, meta = _resolve_oa_fulltext(request.pmid, landing_html, None)
+                    if not text and landing_html:
+                        text = _strip_html(landing_html)
+                        if text:
+                            grounding = "abstract_only" if "pubmed.ncbi.nlm.nih.gov" in (request.url or "") else "none"
+                            grounding_source = "pubmed_abstract" if grounding == "abstract_only" else "none"
             except Exception as e:
-                print(f"Error fetching article from PMID: {e}")
+                print(f"Error in URL-based retrieval: {e}")
 
-        # If no text from PMID, try URL
-        if not text and request.url:
+        # Step 2: If no text yet, try PMID-based retrieval
+        if not text and request.pmid:
             try:
-                # Simple web scraping for article content
-                import requests
-                response = requests.get(request.url, timeout=10)
-                if response.status_code == 200:
-                    text = response.text[:12000]  # Limit text length
-                    grounding = "web_content"
+                # Try to construct PubMed URL and use same logic
+                pubmed_url = f"https://pubmed.ncbi.nlm.nih.gov/{request.pmid}/"
+                landing_html = _fetch_url_raw_text(pubmed_url)
+                if landing_html:
+                    text, grounding, grounding_source, meta = _resolve_oa_fulltext(request.pmid, landing_html, None)
+                    if not text:
+                        text = _strip_html(landing_html)
+                        if text:
+                            grounding = "abstract_only"
+                            grounding_source = "pubmed_abstract"
             except Exception as e:
-                print(f"Error fetching article from URL: {e}")
+                print(f"Error in PMID-based retrieval: {e}")
 
-        # If still no text, use title as fallback
-        if not text:
-            text = f"Article Title: {request.title}\nObjective: {request.objective}"
-            grounding = "title_only"
+        # Step 3: Fallback - if still no meaningful text, fail gracefully
+        if not text or len(text.strip()) < 100:
+            print(f"Insufficient article content retrieved. Text length: {len(text) if text else 0}")
+            analysis.processing_status = "failed"
+            analysis.scientific_model_analysis = {
+                "summary": "Unable to retrieve sufficient article content for analysis",
+                "relevance_justification": "Content retrieval failed - please provide a direct PMC URL or upload the PDF",
+                "fact_anchors": []
+            }
+            analysis.experimental_methods_analysis = [{
+                "technique": "Content retrieval failed",
+                "measurement": "Unable to analyze experimental methods",
+                "role_in_study": "N/A - insufficient content",
+                "parameters": "",
+                "controls_validation": "",
+                "limitations_reproducibility": "Content not accessible",
+                "validation": "",
+                "accession_ids": [],
+                "fact_anchors": []
+            }]
+            analysis.results_interpretation_analysis = {
+                "results_summary": "Unable to interpret results due to insufficient content",
+                "key_findings": [],
+                "clinical_significance": "N/A - content not accessible",
+                "limitations": ["Article content could not be retrieved for analysis"]
+            }
+            db.commit()
+            return
 
-        # Run the three analysis modules
-        md_json = {}
-        mth = {}
-        res = {}
+        print(f"Successfully retrieved article content. Length: {len(text)}, Grounding: {grounding}")
 
-        if text:
+        # Step 4: Run the three specialist modules with timeouts (same as /deep-dive endpoint)
+        try:
+            # Module 1: Scientific Model Analysis with timeout
+            md_structured = await _with_timeout(
+                run_in_threadpool(analyze_scientific_model, text, request.objective, get_llm_analyzer()),
+                12.0,
+                "DeepDiveModel",
+                retries=0,
+            )
+
+            # Modules 2 and 3 with timeouts (run in parallel)
+            mth_task = _with_timeout(
+                run_in_threadpool(analyze_experimental_methods, text, request.objective, get_llm_analyzer()),
+                12.0,
+                "DeepDiveMethods",
+                retries=0,
+            )
+            res_task = _with_timeout(
+                run_in_threadpool(analyze_results_interpretation, text, request.objective, get_llm_analyzer()),
+                12.0,
+                "DeepDiveResults",
+                retries=0,
+            )
+
+            mth, res = await asyncio.gather(mth_task, res_task)
+
+            print("All analysis modules completed successfully")
+
+        except Exception as e:
+            print(f"Error in analysis modules: {e}")
+            # Don't fail completely - provide meaningful error content
+            md_structured = {}
+            mth = []
+            res = {}
+
+        # Step 5: Process and structure the results (same logic as /deep-dive endpoint)
+        md_json = {
+            "summary": md_structured.get("protocol_summary", ""),
+            "relevance_justification": md_structured.get("relevance_justification", ""),
+            "fact_anchors": md_structured.get("fact_anchors", []),
+        }
+
+        # Step 6: Apply fallback population when full text is available but analyzers return empty
+        # (same logic as /deep-dive endpoint)
+        if grounding == "full_text":
             try:
-                # Scientific Model Analysis
-                md_structured = await run_in_threadpool(
-                    analyze_scientific_model, text, request.objective, get_llm_analyzer()
-                )
-                md_json = {
-                    "summary": md_structured.get("protocol_summary", ""),
-                    "relevance_justification": md_structured.get("relevance_justification", ""),
-                    "fact_anchors": md_structured.get("fact_anchors", []),
-                }
+                if isinstance(mth, list) and len(mth) == 0:
+                    study_design = (md_structured.get("study_design") or md_structured.get("study_design_taxonomy") or "").lower()
+                    is_review = ("review" in study_design) or ("meta" in study_design) or ("systematic" in study_design)
+                    default_row = {
+                        "technique": "Systematic review/meta-analysis" if is_review else "Document analysis",
+                        "measurement": "Aggregate outcomes from included studies" if is_review else "Evidence extraction from full text",
+                        "role_in_study": "Synthesize evidence relevant to the objective",
+                        "parameters": "",
+                        "controls_validation": "",
+                        "limitations_reproducibility": "Heterogeneity across sources; publication bias; lack of raw data",
+                        "validation": "",
+                        "accession_ids": [],
+                        "fact_anchors": [],
+                    }
+                    mth = [default_row]
+            except Exception:
+                pass
 
-                # Experimental Methods Analysis
-                mth = await run_in_threadpool(
-                    analyze_experimental_methods, text, request.objective, get_llm_analyzer()
-                )
+            try:
+                if isinstance(res, dict) and isinstance(res.get("key_results"), list) and len(res.get("key_results") or []) == 0:
+                    lims = res.get("limitations_biases_in_results")
+                    if not isinstance(lims, list):
+                        lims = []
+                    lims.append("Quantitative endpoints not explicit in accessible text; qualitative synthesis provided")
+                    res["limitations_biases_in_results"] = list({s.strip(): True for s in lims if isinstance(s, str) and s.strip()}.keys())
+            except Exception:
+                pass
 
-                # Results Interpretation Analysis
-                res = await run_in_threadpool(
-                    analyze_results_interpretation, text, request.objective, get_llm_analyzer()
-                )
-
-            except Exception as e:
-                print(f"Error in analysis modules: {e}")
-
-        # Update the analysis with results (provide fallback content if modules failed)
-        analysis.scientific_model_analysis = md_json if md_json else {
-            "summary": f"Analysis of {request.title} - Scientific model analysis completed",
-            "relevance_justification": "This article was analyzed for scientific relevance",
-            "fact_anchors": []
-        }
-        analysis.experimental_methods_analysis = mth if mth else {
-            "methods_summary": f"Experimental methods analysis for {request.title}",
-            "methodology_type": "Clinical Study",
-            "sample_size": "Not specified",
-            "study_design": "Research study"
-        }
-        analysis.results_interpretation_analysis = res if res else {
-            "results_summary": f"Results interpretation for {request.title}",
-            "key_findings": ["Analysis completed successfully"],
-            "clinical_significance": "Research findings analyzed",
-            "limitations": []
-        }
+        # Step 7: Update the analysis with structured results
+        analysis.scientific_model_analysis = md_json
+        analysis.experimental_methods_analysis = mth if isinstance(mth, list) else []
+        analysis.results_interpretation_analysis = res if isinstance(res, dict) else {}
         analysis.processing_status = "completed"
 
         db.commit()
@@ -4946,6 +5013,8 @@ async def process_deep_dive_analysis(analysis: DeepDiveAnalysis, request: DeepDi
 
     except Exception as e:
         print(f"Error processing deep dive analysis: {e}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
         analysis.processing_status = "failed"
         db.commit()
         raise
