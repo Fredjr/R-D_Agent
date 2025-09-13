@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { handleProxyError, handleProxyException } from '@/lib/errorHandler';
 
 // Force Railway URL to bypass cached Vercel environment variables
 const BACKEND_URL = "https://r-dagent-production.up.railway.app";
@@ -8,9 +9,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const user_id = searchParams.get('user_id') || 'default_user';
     
-    console.log(' Proxying GET /projects for user:', user_id);
-    console.log('🔄 Proxying GET /projects for user:', user_id);
-    
+    console.log('🔄 Fetching projects for user:', user_id);
+
     const response = await fetch(`${BACKEND_URL}/projects?user_id=${user_id}`, {
       method: 'GET',
       headers: {
@@ -19,43 +19,26 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    console.log('📡 Backend response status:', response.status);
-
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ Backend error:', errorText);
-      return NextResponse.json(
-        { 
-          error: 'Backend error',
-          status: response.status,
-          message: errorText
-        },
-        { status: response.status }
-      );
+      console.error('❌ Backend projects fetch failed:', response.status);
+      return await handleProxyError(response, 'Projects fetch', BACKEND_URL);
     }
 
     const data = await response.json();
     console.log('✅ Projects fetched successfully:', data.projects?.length || 0, 'projects');
-    
+
     return NextResponse.json(data);
   } catch (error) {
-    console.error('❌ Proxy error:', error);
-    return NextResponse.json(
-      { 
-        error: 'Proxy error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        backend_url: BACKEND_URL
-      },
-      { status: 500 }
-    );
+    console.error('❌ Projects fetch proxy exception:', error);
+    return handleProxyException(error, 'Projects fetch', BACKEND_URL);
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    console.log('🔄 Proxying POST /projects with data:', body);
-    
+    console.log('🔄 Creating new project:', body.title);
+
     const response = await fetch(`${BACKEND_URL}/projects`, {
       method: 'POST',
       headers: {
@@ -65,35 +48,18 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify(body),
     });
 
-    console.log('📡 Backend response status:', response.status);
-
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ Backend error:', errorText);
-      return NextResponse.json(
-        { 
-          error: 'Backend error',
-          status: response.status,
-          message: errorText
-        },
-        { status: response.status }
-      );
+      console.error('❌ Backend project creation failed:', response.status);
+      return await handleProxyError(response, 'Project creation', BACKEND_URL);
     }
 
     const data = await response.json();
     console.log('✅ Project created successfully:', data.project_id);
-    
+
     return NextResponse.json(data);
   } catch (error) {
-    console.error('❌ Proxy error:', error);
-    return NextResponse.json(
-      { 
-        error: 'Proxy error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        backend_url: BACKEND_URL
-      },
-      { status: 500 }
-    );
+    console.error('❌ Project creation proxy exception:', error);
+    return handleProxyException(error, 'Project creation', BACKEND_URL);
   }
 }
 

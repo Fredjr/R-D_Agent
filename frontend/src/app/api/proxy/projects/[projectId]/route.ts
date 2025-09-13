@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { handleProxyError, handleProxyException, createValidationError } from '@/lib/errorHandler';
 
 // Force Railway URL to bypass cached Vercel environment variables - v2
 const BACKEND_BASE = "https://r-dagent-production.up.railway.app";
@@ -11,18 +12,17 @@ export async function GET(
     const resolvedParams = await params;
     const { projectId } = resolvedParams;
     
-    console.log('🔄 Proxying GET /projects/' + projectId + ' to Railway backend...');
-    console.log('🔍 DEBUG params:', resolvedParams);
-    console.log('🎯 Using backend URL:', BACKEND_BASE);
-    
+    console.log('🔄 Fetching project details:', projectId);
+
     if (!projectId) {
       console.error('❌ No projectId found in params');
-      return NextResponse.json(
-        { error: 'Missing projectId parameter' },
-        { status: 400 }
-      );
+      const validationError = createValidationError('projectId', 'Project ID is required');
+      return new Response(JSON.stringify(validationError), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
-    
+
     const response = await fetch(`${BACKEND_BASE}/projects/${projectId}`, {
       method: 'GET',
       headers: {
@@ -31,19 +31,9 @@ export async function GET(
       },
     });
 
-    console.log('📡 Backend response status:', response.status);
-
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ Backend error:', errorText);
-      return NextResponse.json(
-        { 
-          error: 'Backend error',
-          status: response.status,
-          message: errorText
-        },
-        { status: response.status }
-      );
+      console.error('❌ Backend project fetch failed:', response.status);
+      return await handleProxyError(response, 'Project details fetch', BACKEND_BASE);
     }
 
     const data = await response.json();
@@ -51,15 +41,8 @@ export async function GET(
     
     return NextResponse.json(data);
   } catch (error) {
-    console.error('❌ Proxy error:', error);
-    return NextResponse.json(
-      { 
-        error: 'Proxy error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        backend_url: BACKEND_BASE
-      },
-      { status: 500 }
-    );
+    console.error('❌ Project details fetch proxy exception:', error);
+    return handleProxyException(error, 'Project details fetch', BACKEND_BASE);
   }
 }
 
