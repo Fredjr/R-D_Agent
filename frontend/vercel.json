@@ -1,10 +1,13 @@
 {
   "version": 2,
   "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "installCommand": "npm install",
   "rewrites": [
     {
-      "source": "/project/:projectId",
-      "destination": "/project/:projectId"
+      "source": "/api/proxy/(.*)",
+      "destination": "/api/proxy/$1"
     }
   ]
 }
