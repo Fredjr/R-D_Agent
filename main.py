@@ -6911,7 +6911,12 @@ Objective: {objective}
                         project_id=request.project_id,
                         title=title,
                         objective=request.objective,
-                        content=json.dumps(resp),
+                        molecule=request.molecule,
+                        clinical_mode=getattr(request, 'clinical_mode', False),
+                        dag_mode=getattr(request, 'dag_mode', False),
+                        full_text_only=getattr(request, 'full_text_only', False),
+                        preference=getattr(request, 'preference', 'precision'),
+                        content=resp,  # Store as JSON object, not string
                         created_by=user_id
                     )
                     
