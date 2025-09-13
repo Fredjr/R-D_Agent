@@ -4681,7 +4681,7 @@ async def regenerate_report_content(
             user_id=current_user,
             activity_type="report_regenerated",
             description=f"Regenerated content for report: {report.title}",
-            metadata={
+            activity_metadata={
                 "report_id": report.report_id,
                 "report_title": report.title
             }
@@ -4700,7 +4700,7 @@ async def regenerate_report_content(
                     "description": activity.description,
                     "user_id": activity.user_id,
                     "created_at": activity.created_at.isoformat(),
-                    "metadata": activity.metadata
+                    "metadata": activity.activity_metadata
                 }
             }
         )
