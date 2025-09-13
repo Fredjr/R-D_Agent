@@ -4617,6 +4617,9 @@ async def regenerate_report_content(
         raise HTTPException(status_code=403, detail="Access denied")
 
     try:
+        from database import ActivityLog
+        import uuid
+
         # Create a ReviewRequest object to reuse existing logic
         review_request = ReviewRequest(
             molecule=report.title,
