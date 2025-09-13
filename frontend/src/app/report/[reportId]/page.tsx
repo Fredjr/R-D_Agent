@@ -137,9 +137,7 @@ export default function ReportDetailPage() {
               overall_relevance_score: result.overall_relevance_score || 0
             },
             articles: result.articles || [],
-            top_article: result.top_article || null,
-            source: result.source || 'report',
-            memories_used: result.memories_used || 0
+            source: result.source === 'fallback' ? 'fallback' : 'primary'
           }));
         }
 
@@ -154,9 +152,7 @@ export default function ReportDetailPage() {
             overall_relevance_score: 82
           },
           articles: content.articles || [],
-          top_article: content.top_article || null,
-          source: 'report',
-          memories_used: 0
+          source: 'primary'
         }];
       }
 
@@ -178,9 +174,7 @@ export default function ReportDetailPage() {
               overall_relevance_score: 70
             },
             articles: [],
-            top_article: null,
-            source: 'report',
-            memories_used: 0
+            source: 'primary'
           }];
         }
       }

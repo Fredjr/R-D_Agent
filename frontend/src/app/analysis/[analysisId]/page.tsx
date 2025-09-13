@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { ScientificModelCard } from '@/components/ScientificModelCard';
-import { ExperimentalMethodsCard } from '@/components/ExperimentalMethodsCard';
-import { ResultsInterpretationCard } from '@/components/ResultsInterpretationCard';
+import ScientificModelCard from '@/components/ScientificModelCard';
+import ExperimentalMethodsTable from '@/components/ExperimentalMethodsTable';
+import ResultsInterpretationCard from '@/components/ResultsInterpretationCard';
 
 interface Analysis {
   analysis_id: string;
@@ -200,7 +200,7 @@ export default function AnalysisDetailPage() {
                 )}
 
                 {activeTab === 'Methods' && experimentalMethods && (
-                  <ExperimentalMethodsCard data={experimentalMethods} />
+                  <ExperimentalMethodsTable data={experimentalMethods} />
                 )}
 
                 {activeTab === 'Results' && resultsInterpretation && (

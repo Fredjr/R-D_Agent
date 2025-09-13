@@ -75,6 +75,7 @@ export default function ProjectPage() {
     objective: ''
   });
   const [creatingDeepDive, setCreatingDeepDive] = useState(false);
+  const [creatingReport, setCreatingReport] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [generatingSummary, setGeneratingSummary] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -330,7 +331,7 @@ export default function ProjectPage() {
       setShowSummaryModal(false);
       
       // Refresh project data to show new report
-      fetchProject();
+      fetchProjectData();
       
       alert('Summary report generated successfully!');
     } catch (err) {
