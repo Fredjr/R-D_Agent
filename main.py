@@ -5761,9 +5761,10 @@ async def generate_project_summary_report(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.post("/generate-review")
-async def generate_review(request: ReviewRequest, db: Session = Depends(get_db)):
+async def generate_review(request: ReviewRequest, http_request: Request, db: Session = Depends(get_db)):
     """Generate a summary report (legacy endpoint)"""
-    return await generate_review_internal(request, db)
+    current_user = http_request.headers.get("User-ID", "default_user")
+    return await generate_review_internal(request, db, current_user)
 
 async def generate_review_internal(request: ReviewRequest, db: Session, current_user: str = None):
     req_start = _now_ms()
@@ -6872,7 +6873,7 @@ Objective: {objective}
     # Save report to database if project_id is provided
     if request.project_id:
         try:
-            user_id = current_user or get_current_user()
+            user_id = current_user or "default_user"
             
             # Verify project exists and user has access
             project = db.query(Project).filter(Project.project_id == request.project_id).first()
