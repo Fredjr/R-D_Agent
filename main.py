@@ -9,7 +9,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 import os
 from dotenv import load_dotenv
 from fastapi.concurrency import run_in_threadpool
-from sqlalchemy import text, or_
+from sqlalchemy import text, or_, func
 import bcrypt
 try:
     from email_service import email_service
