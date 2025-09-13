@@ -6322,7 +6322,9 @@ async def generate_comprehensive_project_summary(
                 "processing_status": d.processing_status,
                 "created_at": d.created_at.isoformat(),
                 "created_by": d.created_by,
-                "content": d.content
+                "scientific_model_analysis": d.scientific_model_analysis,
+                "experimental_methods_analysis": d.experimental_methods_analysis,
+                "results_interpretation_analysis": d.results_interpretation_analysis
             } for d in deep_dive_analyses]
         }
 
