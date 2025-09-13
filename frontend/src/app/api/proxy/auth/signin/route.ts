@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { handleProxyError, handleProxyException } from '@/lib/errorHandler';
 
 // Force Railway URL to bypass cached Vercel environment variables
 const BACKEND_BASE = "https://r-dagent-production.up.railway.app";
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('🔐 Processing signin request');
+
     const body = await request.json();
     const response = await fetch(`${BACKEND_BASE}/auth/signin`, {
       method: 'POST',
@@ -14,18 +17,17 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify(body),
     });
 
-    const data = await response.json();
-    
     if (!response.ok) {
-      return NextResponse.json(data, { status: response.status });
+      console.error('❌ Backend signin failed:', response.status);
+      return await handleProxyError(response, 'User signin', BACKEND_BASE);
     }
 
+    const data = await response.json();
+    console.log('✅ User signin successful:', data.email);
     return NextResponse.json(data);
+
   } catch (error) {
-    console.error('Auth signin proxy error:', error);
-    return NextResponse.json(
-      { detail: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error('❌ Signin proxy exception:', error);
+    return handleProxyException(error, 'User signin', BACKEND_BASE);
   }
 }
