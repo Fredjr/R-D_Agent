@@ -34,6 +34,7 @@ import urllib.parse
 from urllib.parse import urlparse
 import asyncio
 import random
+import requests
 try:
     # Optional lightweight PDF text extraction
     import io
@@ -4728,6 +4729,92 @@ async def regenerate_report_content(
         print(f"ERROR: Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Failed to regenerate report content: {str(e)}")
 
+async def process_deep_dive_analysis(analysis: DeepDiveAnalysis, request: DeepDiveRequest, db: Session, current_user: str):
+    """Process a deep dive analysis by analyzing the article content"""
+    try:
+        # Get article content (similar to existing /deep-dive endpoint logic)
+        text = ""
+        grounding = "abstract"
+
+        # Try to get full text from PMID or URL
+        if request.pmid:
+            # Try to get full text from PubMed
+            try:
+                # Use existing PubMed search logic
+                pubmed_tool = PubMedSearchTool()
+                articles = await run_in_threadpool(pubmed_tool.search, f"PMID:{request.pmid}")
+                if articles and len(articles) > 0:
+                    article = articles[0]
+                    text = article.get("abstract", "")
+                    if not text and article.get("full_text"):
+                        text = article.get("full_text", "")
+                        grounding = "full_text"
+            except Exception as e:
+                print(f"Error fetching article from PMID: {e}")
+
+        # If no text from PMID, try URL
+        if not text and request.url:
+            try:
+                # Simple web scraping for article content
+                import requests
+                response = requests.get(request.url, timeout=10)
+                if response.status_code == 200:
+                    text = response.text[:12000]  # Limit text length
+                    grounding = "web_content"
+            except Exception as e:
+                print(f"Error fetching article from URL: {e}")
+
+        # If still no text, use title as fallback
+        if not text:
+            text = f"Article Title: {request.title}\nObjective: {request.objective}"
+            grounding = "title_only"
+
+        # Run the three analysis modules
+        md_json = {}
+        mth = {}
+        res = {}
+
+        if text:
+            try:
+                # Scientific Model Analysis
+                md_structured = await run_in_threadpool(
+                    analyze_scientific_model, text, request.objective, get_llm_analyzer()
+                )
+                md_json = {
+                    "summary": md_structured.get("protocol_summary", ""),
+                    "relevance_justification": md_structured.get("relevance_justification", ""),
+                    "fact_anchors": md_structured.get("fact_anchors", []),
+                }
+
+                # Experimental Methods Analysis
+                mth = await run_in_threadpool(
+                    analyze_experimental_methods, text, request.objective, get_llm_analyzer()
+                )
+
+                # Results Interpretation Analysis
+                res = await run_in_threadpool(
+                    analyze_results_interpretation, text, request.objective, get_llm_analyzer()
+                )
+
+            except Exception as e:
+                print(f"Error in analysis modules: {e}")
+
+        # Update the analysis with results
+        analysis.scientific_model_analysis = md_json if md_json else None
+        analysis.experimental_methods_analysis = mth if mth else None
+        analysis.results_interpretation_analysis = res if res else None
+        analysis.processing_status = "completed"
+
+        db.commit()
+
+        print(f"Deep dive analysis completed successfully: {analysis.analysis_id}")
+
+    except Exception as e:
+        print(f"Error processing deep dive analysis: {e}")
+        analysis.processing_status = "failed"
+        db.commit()
+        raise
+
 @app.post("/projects/{project_id}/deep-dive-analyses", response_model=DeepDiveAnalysisResponse)
 async def create_deep_dive_analysis(
     project_id: str,
@@ -4754,8 +4841,10 @@ async def create_deep_dive_analysis(
     if not has_access:
         raise HTTPException(status_code=403, detail="Access denied")
     
-    # Create deep dive analysis
+    # Create deep dive analysis with processing
     analysis_id = str(uuid.uuid4())
+
+    # Start with pending status
     analysis = DeepDiveAnalysis(
         analysis_id=analysis_id,
         project_id=project_id,
@@ -4763,11 +4852,35 @@ async def create_deep_dive_analysis(
         article_pmid=analysis_data.article_pmid,
         article_url=analysis_data.article_url,
         created_by=current_user,
-        processing_status="pending"
+        processing_status="processing"
     )
-    
+
     db.add(analysis)
     db.commit()
+    db.refresh(analysis)
+
+    # Process the analysis in the background
+    try:
+        # Create a DeepDiveRequest object for processing
+        deep_dive_request = DeepDiveRequest(
+            title=analysis_data.article_title,
+            pmid=analysis_data.article_pmid,
+            url=analysis_data.article_url,
+            objective=analysis_data.objective,
+            project_id=project_id
+        )
+
+        # Process the analysis using existing deep dive logic
+        # This will populate the analysis fields and update status to completed
+        await process_deep_dive_analysis(analysis, deep_dive_request, db, current_user)
+
+    except Exception as e:
+        # If processing fails, update status to failed
+        analysis.processing_status = "failed"
+        db.commit()
+        print(f"Deep dive analysis processing failed: {e}")
+
+    # Refresh to get updated data
     db.refresh(analysis)
     
     # Create response
