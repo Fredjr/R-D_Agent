@@ -5769,6 +5769,11 @@ async def generate_review(request: ReviewRequest, http_request: Request, db: Ses
 async def generate_review_internal(request: ReviewRequest, db: Session, current_user: str = None):
     req_start = _now_ms()
     _metrics_inc("requests_total", 1)
+
+    # Debug logging
+    print(f"DEBUG: generate_review_internal called with project_id: {request.project_id}")
+    print(f"DEBUG: current_user: {current_user}")
+    print(f"DEBUG: request: {request}")
     
     # Dynamic timeout based on preference: 5min for recall, 4min for precision
     preference = getattr(request, "preference", "precision") or "precision"
@@ -6862,6 +6867,9 @@ Objective: {objective}
                 results.append({"query": fallback_q, "result": structured, "articles": arts[:3], "top_article": top_article_payload, "source": "fallback", "memories_used": len(memories or [])})
         except Exception:
             pass
+    # Debug logging before response construction
+    print(f"DEBUG: Before response construction - project_id: {request.project_id}")
+
     resp = {
         "molecule": request.molecule,
         "objective": request.objective,
@@ -6870,6 +6878,8 @@ Objective: {objective}
         "results": results,
         "memories": memories,
     }
+
+    print(f"DEBUG: Response constructed with project_id: {resp['project_id']}")
     # Save report to database if project_id is provided
     if request.project_id:
         try:
