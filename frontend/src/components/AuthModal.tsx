@@ -10,7 +10,7 @@ interface AuthModalProps {
 }
 
 export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
-  const { login } = useAuth();
+  const { login } = useAuth(); // Keep using login for quick access - it's marked as legacy but functional
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -24,12 +24,13 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setError(null);
 
     try {
-      await login(email.trim(), username.trim() || undefined);
+      // Use legacy login for quick access - creates temporary session
+      await login!(email.trim(), username.trim() || undefined);
       onClose();
       setEmail('');
       setUsername('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to sign in');
+      setError(err instanceof Error ? err.message : 'Failed to create session');
     } finally {
       setIsLoading(false);
     }
