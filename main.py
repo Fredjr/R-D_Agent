@@ -4621,15 +4621,16 @@ async def regenerate_report_content(
         import uuid
 
         # Create a ReviewRequest object to reuse existing logic
-        review_request = ReviewRequest(
-            molecule=report.title,
-            objective=report.objective,
-            project_id=report.project_id,
-            clinical_mode=True,  # Default values for regeneration
-            dag_mode=True,
-            full_text_only=False,
-            preference="precision"
-        )
+        review_request_data = {
+            "molecule": report.title,
+            "objective": report.objective,
+            "project_id": report.project_id,
+            "clinical_mode": True,  # Default values for regeneration
+            "dag_mode": True,
+            "full_text_only": False,
+            "preference": "precision"
+        }
+        review_request = ReviewRequest(**review_request_data)
 
         # Generate new content using existing function
         resp = await generate_review_internal(review_request, db, current_user)
