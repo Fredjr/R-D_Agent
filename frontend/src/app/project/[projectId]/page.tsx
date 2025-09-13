@@ -143,32 +143,27 @@ export default function ProjectPage() {
 
   const handleCreateReport = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!reportData.title.trim() || !reportData.objective.trim()) return;
+    if (!reportData.title.trim() || !reportData.objective.trim() || !reportData.molecule.trim()) {
+      alert('Please fill in all required fields (Title, Research Objective, and Molecule)');
+      return;
+    }
     
     setCreatingReport(true);
+
+    // Store report data for background processing
+    const reportToGenerate = {
+      molecule: reportData.molecule.trim(),
+      objective: reportData.objective.trim(),
+      title: reportData.title.trim(),
+      projectId: projectId,
+      clinicalMode: reportData.clinical_mode,
+      dagMode: reportData.dag_mode,
+      fullTextOnly: reportData.full_text_only,
+      preference: reportData.preference,
+    };
+
     try {
-      const response = await fetch(`/api/proxy/generate-review`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-ID': user?.email || 'default_user',
-        },
-        body: JSON.stringify({
-          molecule: reportData.molecule.trim() || reportData.title.trim(),
-          objective: reportData.objective.trim(),
-          projectId: projectId,  // Use camelCase to match Pydantic alias
-          clinicalMode: reportData.clinical_mode,  // Use camelCase to match Pydantic alias
-          dagMode: reportData.dag_mode,  // Use camelCase to match Pydantic alias
-          fullTextOnly: reportData.full_text_only,  // Use camelCase to match Pydantic alias
-          preference: reportData.preference,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create report');
-      }
-
-      // Reset form and close modal
+      // Reset form and close modal immediately
       setReportData({
         title: '',
         objective: '',
@@ -179,12 +174,35 @@ export default function ProjectPage() {
         preference: 'precision'
       });
       setShowReportModal(false);
-      
-      // Note: The ActivityFeed component will automatically update via WebSocket
+      setCreatingReport(false);
+
+      // Show user-friendly message
+      alert(`🚀 Report generation started for "${reportToGenerate.title}"!\n\nThis will take 3-5 minutes. You can continue using the app - we'll notify you when it's ready.\n\nCheck the Activity feed for progress updates.`);
+
+      // Start background report generation (don't await - fire and forget)
+      fetch(`/api/proxy/generate-review`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user?.email || 'default_user',
+        },
+        body: JSON.stringify(reportToGenerate),
+      }).then(response => {
+        if (response.ok) {
+          console.log('Report generation completed successfully');
+          // Success notification will come via WebSocket activity feed
+        } else {
+          console.error('Report generation failed:', response.status);
+          // Could add a toast notification here for failures
+        }
+      }).catch(err => {
+        console.error('Error in background report generation:', err);
+        // Could add a toast notification here for failures
+      });
+
     } catch (err) {
-      console.error('Error creating report:', err);
-      alert('Failed to create report. Please try again.');
-    } finally {
+      console.error('Error starting report generation:', err);
+      alert('Failed to start report generation. Please try again.');
       setCreatingReport(false);
     }
   };
@@ -456,14 +474,15 @@ export default function ProjectPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Molecule (Optional)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Molecule *</label>
                   <input
                     type="text"
                     value={reportData.molecule}
                     onChange={(e) => setReportData(prev => ({ ...prev, molecule: e.target.value }))}
-                    placeholder="Enter molecule name..."
+                    placeholder="Enter molecule name (e.g., finerenone, metformin)..."
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     disabled={creatingReport}
+                    required
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
