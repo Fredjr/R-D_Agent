@@ -4396,6 +4396,55 @@ async def create_report(
     
     return response
 
+@app.get("/projects/{project_id}/reports")
+async def get_project_reports(
+    project_id: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Get all reports for a specific project"""
+    current_user = request.headers.get("User-ID", "default_user")
+
+    # Check project access
+    has_access = (
+        db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == current_user
+        ).first() is not None or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Get all reports for the project
+    reports = db.query(Report).filter(
+        Report.project_id == project_id
+    ).order_by(Report.created_at.desc()).all()
+
+    # Return reports with basic info
+    return [
+        {
+            "report_id": report.report_id,
+            "title": report.title,
+            "objective": report.objective,
+            "molecule": report.molecule,
+            "status": report.status,
+            "created_at": report.created_at,
+            "created_by": report.created_by,
+            "article_count": report.article_count,
+            "clinical_mode": report.clinical_mode,
+            "dag_mode": report.dag_mode,
+            "full_text_only": report.full_text_only,
+            "preference": report.preference
+        }
+        for report in reports
+    ]
+
 @app.get("/projects/{project_id}/deep-dive-analyses")
 async def get_deep_dive_analyses(
     project_id: str,
@@ -4763,7 +4812,8 @@ async def process_pending_analysis(
     if not project:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    if analysis.processing_status == "completed":
+    # Allow reprocessing if content is empty
+    if analysis.processing_status == "completed" and analysis.scientific_model_analysis is not None:
         return {"message": "Analysis already completed", "analysis_id": analysis_id}
 
     try:
