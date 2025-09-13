@@ -97,30 +97,63 @@ app = FastAPI(title="R&D Agent API", version="1.0.0")
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, List[WebSocket]] = {}
-    
+
     async def connect(self, websocket: WebSocket, project_id: str):
-        await websocket.accept()
-        if project_id not in self.active_connections:
-            self.active_connections[project_id] = []
-        self.active_connections[project_id].append(websocket)
-    
+        try:
+            await websocket.accept()
+            if project_id not in self.active_connections:
+                self.active_connections[project_id] = []
+            self.active_connections[project_id].append(websocket)
+            print(f"✅ WebSocket connected to project {project_id}. Total connections: {len(self.active_connections[project_id])}")
+        except Exception as e:
+            print(f"❌ Error connecting WebSocket to project {project_id}: {e}")
+
     def disconnect(self, websocket: WebSocket, project_id: str):
-        if project_id in self.active_connections:
-            self.active_connections[project_id].remove(websocket)
-            if not self.active_connections[project_id]:
-                del self.active_connections[project_id]
-    
+        try:
+            if project_id in self.active_connections:
+                if websocket in self.active_connections[project_id]:
+                    self.active_connections[project_id].remove(websocket)
+                    print(f"🔌 WebSocket disconnected from project {project_id}. Remaining connections: {len(self.active_connections[project_id])}")
+                if not self.active_connections[project_id]:
+                    del self.active_connections[project_id]
+        except Exception as e:
+            print(f"❌ Error disconnecting WebSocket from project {project_id}: {e}")
+
     async def send_personal_message(self, message: str, websocket: WebSocket):
-        await websocket.send_text(message)
-    
+        try:
+            await websocket.send_text(message)
+        except Exception as e:
+            print(f"❌ Error sending personal message: {e}")
+
     async def broadcast_to_project(self, message: str, project_id: str):
-        if project_id in self.active_connections:
-            for connection in self.active_connections[project_id]:
-                try:
-                    await connection.send_text(message)
-                except:
-                    # Remove stale connections
-                    self.active_connections[project_id].remove(connection)
+        """Safely broadcast message to all connections in a project"""
+        if project_id not in self.active_connections:
+            print(f"⚠️ No active connections for project {project_id}")
+            return
+
+        connections = self.active_connections[project_id].copy()  # Create a copy to avoid modification during iteration
+        disconnected_connections = []
+
+        for connection in connections:
+            try:
+                await connection.send_text(message)
+                print(f"📤 Broadcasted to project {project_id}: {message[:100]}...")
+            except Exception as e:
+                print(f"❌ Error broadcasting to connection in project {project_id}: {e}")
+                disconnected_connections.append(connection)
+
+        # Remove disconnected connections
+        for conn in disconnected_connections:
+            try:
+                if conn in self.active_connections[project_id]:
+                    self.active_connections[project_id].remove(conn)
+            except Exception as e:
+                print(f"❌ Error removing disconnected connection: {e}")
+
+        # Clean up empty project rooms
+        if project_id in self.active_connections and not self.active_connections[project_id]:
+            del self.active_connections[project_id]
+            print(f"🧹 Cleaned up empty project room: {project_id}")
 
 manager = ConnectionManager()
 
@@ -3421,13 +3454,78 @@ async def health_check_db(db: Session = Depends(get_db)):
 # WebSocket endpoint for project real-time communication
 @app.websocket("/ws/project/{project_id}")
 async def websocket_endpoint(websocket: WebSocket, project_id: str):
+    """WebSocket endpoint for real-time project communication"""
+    print(f"🔌 New WebSocket connection attempt for project: {project_id}")
+
     await manager.connect(websocket, project_id)
+
     try:
+        # Send welcome message to confirm connection
+        welcome_message = {
+            "type": "connection_established",
+            "project_id": project_id,
+            "timestamp": datetime.now().isoformat(),
+            "message": "Real-time connection established"
+        }
+        await manager.send_personal_message(json.dumps(welcome_message), websocket)
+
+        # Keep connection alive and handle incoming messages
         while True:
-            data = await websocket.receive_text()
-            # Echo back for now - can be extended for chat functionality
-            await manager.send_personal_message(f"Echo: {data}", websocket)
+            try:
+                data = await websocket.receive_text()
+                print(f"📥 Received WebSocket message in project {project_id}: {data}")
+
+                # Parse incoming message
+                try:
+                    message_data = json.loads(data)
+                    message_type = message_data.get("type", "unknown")
+
+                    if message_type == "ping":
+                        # Respond to ping with pong
+                        pong_response = {
+                            "type": "pong",
+                            "timestamp": datetime.now().isoformat()
+                        }
+                        await manager.send_personal_message(json.dumps(pong_response), websocket)
+                    else:
+                        # Echo back other messages for now
+                        echo_response = {
+                            "type": "echo",
+                            "original_message": data,
+                            "timestamp": datetime.now().isoformat()
+                        }
+                        await manager.send_personal_message(json.dumps(echo_response), websocket)
+
+                except json.JSONDecodeError:
+                    # Handle plain text messages
+                    echo_response = {
+                        "type": "echo",
+                        "message": f"Echo: {data}",
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    await manager.send_personal_message(json.dumps(echo_response), websocket)
+
+            except WebSocketDisconnect:
+                print(f"🔌 WebSocket client disconnected from project {project_id}")
+                break
+            except Exception as e:
+                print(f"❌ Error handling WebSocket message in project {project_id}: {e}")
+                # Send error message to client
+                error_response = {
+                    "type": "error",
+                    "message": "Error processing message",
+                    "timestamp": datetime.now().isoformat()
+                }
+                try:
+                    await manager.send_personal_message(json.dumps(error_response), websocket)
+                except:
+                    break  # Connection is likely broken
+
     except WebSocketDisconnect:
+        print(f"🔌 WebSocket disconnected for project {project_id}")
+    except Exception as e:
+        print(f"❌ WebSocket error for project {project_id}: {e}")
+    finally:
         manager.disconnect(websocket, project_id)
 
 @app.get("/health")
