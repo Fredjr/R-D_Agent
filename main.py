@@ -3248,8 +3248,24 @@ class ReportResponse(BaseModel):
 class DeepDiveAnalysisCreate(BaseModel):
     article_pmid: Optional[str] = None
     article_url: Optional[str] = None
-    article_title: str = Field(..., min_length=1)
+    article_title: Optional[str] = None
     objective: str = Field(..., min_length=1)
+
+    @validator('article_title', 'article_pmid', 'article_url', pre=True, always=True)
+    def validate_at_least_one_identifier(cls, v, values):
+        # This validator runs for each field, but we only check when all fields are processed
+        return v
+
+    @root_validator
+    def validate_identifiers(cls, values):
+        article_title = values.get('article_title', '').strip() if values.get('article_title') else ''
+        article_pmid = values.get('article_pmid', '').strip() if values.get('article_pmid') else ''
+        article_url = values.get('article_url', '').strip() if values.get('article_url') else ''
+
+        if not article_title and not article_pmid and not article_url:
+            raise ValueError('At least one of article_title, article_pmid, or article_url must be provided')
+
+        return values
 
 class DeepDiveAnalysisResponse(BaseModel):
     analysis_id: str
@@ -4965,6 +4981,16 @@ async def create_deep_dive_analysis(
     if not has_access:
         raise HTTPException(status_code=403, detail="Access denied")
     
+    # Generate a title if not provided
+    article_title = analysis_data.article_title
+    if not article_title:
+        if analysis_data.article_pmid:
+            article_title = f"Article PMID: {analysis_data.article_pmid}"
+        elif analysis_data.article_url:
+            article_title = f"Article from URL: {analysis_data.article_url[:50]}..."
+        else:
+            article_title = "Unknown Article"
+
     # Create deep dive analysis with processing
     analysis_id = str(uuid.uuid4())
 
@@ -4972,7 +4998,7 @@ async def create_deep_dive_analysis(
     analysis = DeepDiveAnalysis(
         analysis_id=analysis_id,
         project_id=project_id,
-        article_title=analysis_data.article_title,
+        article_title=article_title,
         article_pmid=analysis_data.article_pmid,
         article_url=analysis_data.article_url,
         created_by=current_user,

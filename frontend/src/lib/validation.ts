@@ -218,18 +218,29 @@ export const reportCreateRules: ValidationRule[] = [
 
 /**
  * Deep dive analysis validation (matching DeepDiveAnalysisCreate)
+ * At least one of article_title, article_pmid, or article_url must be provided
  */
 export const deepDiveAnalysisRules: ValidationRule[] = [
-  { field: 'article_title', required: true, minLength: 1, maxLength: 500 },
+  { field: 'article_title', required: false, minLength: 1, maxLength: 500 },
   { field: 'objective', required: true, minLength: 1, maxLength: 1000 },
   { field: 'article_pmid', required: false, maxLength: 50 },
-  { 
-    field: 'article_url', 
-    required: false, 
+  {
+    field: 'article_url',
+    required: false,
     pattern: /^https?:\/\/.+/,
     maxLength: 2000
   }
 ];
+
+/**
+ * Custom validation for deep dive analysis - at least one identifier required
+ */
+export const validateDeepDiveAnalysis = (data: any): string | null => {
+  if (!data.article_title?.trim() && !data.article_pmid?.trim() && !data.article_url?.trim()) {
+    return 'Please provide at least one of: Article Title, PMID, or Article URL';
+  }
+  return null;
+};
 
 /**
  * Collaborator invite validation (matching CollaboratorInvite)
