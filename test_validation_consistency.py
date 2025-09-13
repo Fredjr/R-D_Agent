@@ -18,10 +18,13 @@ async def test_signup_validation():
     print("📝 Testing Signup Validation...")
     print("=" * 50)
     
+    # Generate unique timestamp for test emails
+    timestamp = int(datetime.now().timestamp())
+
     test_cases = [
         # Valid cases
         {
-            "email": "valid@example.com",
+            "email": f"valid_{timestamp}@example.com",
             "password": "ValidPass123!",
             "expected_status": 200,
             "description": "Valid signup data"
@@ -41,26 +44,32 @@ async def test_signup_validation():
         },
         # Invalid password cases
         {
-            "email": "test@example.com",
+            "email": f"test_short_{timestamp}@example.com",
             "password": "short",
             "expected_status": 422,
             "description": "Password too short"
         },
         {
-            "email": "test@example.com",
+            "email": f"test_empty_{timestamp}@example.com",
             "password": "",
             "expected_status": 422,
             "description": "Empty password"
         },
+        {
+            "email": f"test_weak_{timestamp}@example.com",
+            "password": "weakpassword",
+            "expected_status": 422,
+            "description": "Weak password (no uppercase/numbers)"
+        },
         # Duplicate email (will fail after first success)
         {
-            "email": "duplicate@example.com",
+            "email": f"duplicate_{timestamp}@example.com",
             "password": "ValidPass123!",
             "expected_status": 200,
             "description": "First signup (should succeed)"
         },
         {
-            "email": "duplicate@example.com",
+            "email": f"duplicate_{timestamp}@example.com",
             "password": "ValidPass123!",
             "expected_status": 400,
             "description": "Duplicate email (should fail)"
