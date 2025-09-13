@@ -156,10 +156,10 @@ export default function ProjectPage() {
         body: JSON.stringify({
           molecule: reportData.molecule.trim() || reportData.title.trim(),
           objective: reportData.objective.trim(),
-          project_id: projectId,
-          clinical_mode: reportData.clinical_mode,
-          dag_mode: reportData.dag_mode,
-          full_text_only: reportData.full_text_only,
+          projectId: projectId,  // Use camelCase to match Pydantic alias
+          clinicalMode: reportData.clinical_mode,  // Use camelCase to match Pydantic alias
+          dagMode: reportData.dag_mode,  // Use camelCase to match Pydantic alias
+          fullTextOnly: reportData.full_text_only,  // Use camelCase to match Pydantic alias
           preference: reportData.preference,
         }),
       });
