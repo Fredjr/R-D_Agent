@@ -3,7 +3,7 @@ from fastapi import FastAPI, Response, Depends, HTTPException, WebSocket, WebSoc
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import UploadFile, File, Form
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, validator, field_validator, model_validator
 import re
 from langchain_google_genai import ChatGoogleGenerativeAI
 import os
@@ -3251,21 +3251,16 @@ class DeepDiveAnalysisCreate(BaseModel):
     article_title: Optional[str] = None
     objective: str = Field(..., min_length=1)
 
-    @validator('article_title', 'article_pmid', 'article_url', pre=True, always=True)
-    def validate_at_least_one_identifier(cls, v, values):
-        # This validator runs for each field, but we only check when all fields are processed
-        return v
-
-    @root_validator
-    def validate_identifiers(cls, values):
-        article_title = values.get('article_title', '').strip() if values.get('article_title') else ''
-        article_pmid = values.get('article_pmid', '').strip() if values.get('article_pmid') else ''
-        article_url = values.get('article_url', '').strip() if values.get('article_url') else ''
+    @model_validator(mode='after')
+    def validate_identifiers(self):
+        article_title = self.article_title.strip() if self.article_title else ''
+        article_pmid = self.article_pmid.strip() if self.article_pmid else ''
+        article_url = self.article_url.strip() if self.article_url else ''
 
         if not article_title and not article_pmid and not article_url:
             raise ValueError('At least one of article_title, article_pmid, or article_url must be provided')
 
-        return values
+        return self
 
 class DeepDiveAnalysisResponse(BaseModel):
     analysis_id: str
