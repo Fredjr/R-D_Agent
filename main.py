@@ -3,7 +3,8 @@ from fastapi import FastAPI, Response, Depends, HTTPException, WebSocket, WebSoc
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import UploadFile, File, Form
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field, EmailStr, validator
+from pydantic import BaseModel, Field, validator
+import re
 from langchain_google_genai import ChatGoogleGenerativeAI
 import os
 from dotenv import load_dotenv
@@ -3260,7 +3261,7 @@ class DeepDiveAnalysisResponse(BaseModel):
 
 # Activity Logging Models
 class ActivityLogCreate(BaseModel):
-    activity_type: str = Field(..., pattern="^(annotation_created|report_generated|deep_dive_performed|article_pinned|project_created|collaborator_added)$")
+    activity_type: str = Field(..., pattern="^(annotation_created|report_generated|deep_dive_performed|article_pinned|project_created|collaborator_added|collaborator_removed|user_registered)$")
     description: str
     metadata: Optional[dict] = None
     article_pmid: Optional[str] = None
@@ -3595,8 +3596,17 @@ def set_current_user(user_id: str):
 # Authentication Endpoints
 
 class AuthRequest(BaseModel):
-    email: EmailStr = Field(..., description="User email address")
+    email: str = Field(..., description="User email address")
     password: str = Field(..., min_length=8, max_length=128, description="User password")
+
+    @validator('email')
+    def validate_email(cls, v):
+        if not v:
+            raise ValueError('Email is required')
+        email_pattern = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
+        if not re.match(email_pattern, v):
+            raise ValueError('Invalid email format')
+        return v
 
     @validator('password')
     def validate_password(cls, v):
@@ -3613,8 +3623,17 @@ class AuthRequest(BaseModel):
         return v
 
 class SignUpRequest(BaseModel):
-    email: EmailStr = Field(..., description="User email address")
+    email: str = Field(..., description="User email address")
     password: str = Field(..., min_length=8, max_length=128, description="User password")
+
+    @validator('email')
+    def validate_email(cls, v):
+        if not v:
+            raise ValueError('Email is required')
+        email_pattern = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
+        if not re.match(email_pattern, v):
+            raise ValueError('Invalid email format')
+        return v
 
     @validator('password')
     def validate_password(cls, v):
@@ -3837,7 +3856,20 @@ async def create_project(
             db.add(project)
             db.commit()
             db.refresh(project)
-            
+
+            # Log activity
+            await log_activity(
+                project_id=project.project_id,
+                user_id=current_user,
+                activity_type="project_created",
+                description=f"Created project: {project.project_name}",
+                metadata={
+                    "project_name": project.project_name,
+                    "description": project.description
+                },
+                db=db
+            )
+
             return ProjectResponse(
                 project_id=project.project_id,
                 project_name=project.project_name,
@@ -4033,7 +4065,21 @@ async def invite_collaborator(
             )
             db.add(collaboration)
             db.commit()
-        
+
+        # Log activity
+        await log_activity(
+            project_id=project_id,
+            user_id=current_user,
+            activity_type="collaborator_added",
+            description=f"Added collaborator: {invite_data.email} as {invite_data.role}",
+            metadata={
+                "collaborator_email": invite_data.email,
+                "role": invite_data.role,
+                "action": "reactivated" if existing else "new_invitation"
+            },
+            db=db
+        )
+
         # Send email notification
         if email_service:
             try:
@@ -4103,7 +4149,20 @@ async def remove_collaborator(
     
     collaboration.is_active = False
     db.commit()
-    
+
+    # Log activity
+    await log_activity(
+        project_id=project_id,
+        user_id=current_user,
+        activity_type="collaborator_removed",
+        description=f"Removed collaborator: {user_id}",
+        metadata={
+            "removed_user_id": user_id,
+            "previous_role": collaboration.role
+        },
+        db=db
+    )
+
     return {"message": "Collaborator removed successfully"}
 
 # Annotation Endpoints
