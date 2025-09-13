@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { CheckCircleIcon, UserIcon, BuildingOfficeIcon, AcademicCapIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
+import { validateObject, userProfileRules, formatValidationErrors } from '@/lib/validation';
 
 const CATEGORY_ROLES = {
   Student: ['Undergraduate', 'Postgraduate', 'PhD Student'],
@@ -28,6 +29,7 @@ export default function CompleteProfile() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<string>('');
   const [availableRoles, setAvailableRoles] = useState<string[]>([]);
 
   // Check if user is authenticated
@@ -62,32 +64,35 @@ export default function CompleteProfile() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const isFormValid = () => {
-    return formData.firstName.trim() && 
-           formData.lastName.trim() && 
-           formData.category && 
-           formData.role && 
-           formData.institution.trim() && 
-           formData.subjectArea.trim() && 
-           formData.howHeardAboutUs.trim();
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isFormValid()) return;
+    setError(null);
+    setValidationErrors('');
+
+    // Prepare data for validation (matching backend field names)
+    const validationData = {
+      first_name: formData.firstName.trim(),
+      last_name: formData.lastName.trim(),
+      category: formData.category,
+      role: formData.role,
+      institution: formData.institution.trim(),
+      subject_area: formData.subjectArea.trim(),
+      how_heard_about_us: formData.howHeardAboutUs.trim()
+    };
+
+    // Validate form data
+    const validation = validateObject(validationData, userProfileRules);
+
+    if (!validation.isValid) {
+      setValidationErrors(formatValidationErrors(validation.errors));
+      return;
+    }
 
     setIsLoading(true);
-    setError(null);
 
     try {
       await completeRegistration({
-        first_name: formData.firstName.trim(),
-        last_name: formData.lastName.trim(),
-        category: formData.category,
-        role: formData.role,
-        institution: formData.institution.trim(),
-        subject_area: formData.subjectArea.trim(),
-        how_heard_about_us: formData.howHeardAboutUs.trim(),
+        ...validationData,
         join_mailing_list: formData.joinMailingList
       });
       router.push('/dashboard');
@@ -263,6 +268,13 @@ export default function CompleteProfile() {
             </label>
           </div>
 
+          {/* Validation Errors */}
+          {validationErrors && (
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-yellow-800 text-sm whitespace-pre-line">{validationErrors}</p>
+            </div>
+          )}
+
           {/* Error Message */}
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -273,7 +285,7 @@ export default function CompleteProfile() {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={isLoading || !isFormValid()}
+            disabled={isLoading}
             className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
           >
             {isLoading ? (

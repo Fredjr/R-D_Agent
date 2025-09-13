@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { EnvelopeIcon, LockClosedIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
+import { validateObject, emailRules, passwordRules, formatValidationErrors, getPasswordStrength } from '@/lib/validation';
 
 export default function SignUp() {
   const router = useRouter();
@@ -15,16 +16,25 @@ export default function SignUp() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<string>('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password.trim()) {
-      setError('Please fill in all fields');
+    setError('');
+    setValidationErrors('');
+
+    // Validate form data
+    const validation = validateObject(
+      { email: email.trim(), password },
+      [...emailRules, ...passwordRules]
+    );
+
+    if (!validation.isValid) {
+      setValidationErrors(formatValidationErrors(validation.errors));
       return;
     }
 
     setIsLoading(true);
-    setError('');
 
     try {
       await signup(email.trim(), password);
@@ -34,6 +44,22 @@ export default function SignUp() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Calculate password strength for display
+  const passwordStrength = getPasswordStrength(password);
+  const getPasswordStrengthColor = () => {
+    if (passwordStrength < 30) return 'bg-red-500';
+    if (passwordStrength < 60) return 'bg-yellow-500';
+    if (passwordStrength < 80) return 'bg-blue-500';
+    return 'bg-green-500';
+  };
+
+  const getPasswordStrengthText = () => {
+    if (passwordStrength < 30) return 'Weak';
+    if (passwordStrength < 60) return 'Fair';
+    if (passwordStrength < 80) return 'Good';
+    return 'Strong';
   };
 
   return (
@@ -102,8 +128,39 @@ export default function SignUp() {
                 )}
               </button>
             </div>
-            <p className="text-xs text-gray-500 mt-1">Minimum 8 characters</p>
+
+            {/* Password Strength Indicator */}
+            {password && (
+              <div className="mt-2">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-xs text-gray-500">Password strength:</span>
+                  <span className={`text-xs font-medium ${
+                    passwordStrength < 30 ? 'text-red-600' :
+                    passwordStrength < 60 ? 'text-yellow-600' :
+                    passwordStrength < 80 ? 'text-blue-600' : 'text-green-600'
+                  }`}>
+                    {getPasswordStrengthText()}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full transition-all duration-300 ${getPasswordStrengthColor()}`}
+                    style={{ width: `${passwordStrength}%` }}
+                  ></div>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Use uppercase, lowercase, numbers, and special characters
+                </p>
+              </div>
+            )}
           </div>
+
+          {/* Validation Errors */}
+          {validationErrors && (
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-yellow-800 text-sm whitespace-pre-line">{validationErrors}</p>
+            </div>
+          )}
 
           {/* Error Message */}
           {error && (

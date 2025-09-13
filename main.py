@@ -3,7 +3,7 @@ from fastapi import FastAPI, Response, Depends, HTTPException, WebSocket, WebSoc
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import UploadFile, File, Form
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr, validator
 from langchain_google_genai import ChatGoogleGenerativeAI
 import os
 from dotenv import load_dotenv
@@ -3595,12 +3595,40 @@ def set_current_user(user_id: str):
 # Authentication Endpoints
 
 class AuthRequest(BaseModel):
-    email: str = Field(..., description="User email address")
-    password: str = Field(..., description="User password")
+    email: EmailStr = Field(..., description="User email address")
+    password: str = Field(..., min_length=8, max_length=128, description="User password")
+
+    @validator('password')
+    def validate_password(cls, v):
+        if not v:
+            raise ValueError('Password is required')
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        if not any(c.isupper() for c in v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not any(c.islower() for c in v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Password must contain at least one number')
+        return v
 
 class SignUpRequest(BaseModel):
-    email: str = Field(..., description="User email address")
-    password: str = Field(..., description="User password")
+    email: EmailStr = Field(..., description="User email address")
+    password: str = Field(..., min_length=8, max_length=128, description="User password")
+
+    @validator('password')
+    def validate_password(cls, v):
+        if not v:
+            raise ValueError('Password is required')
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        if not any(c.isupper() for c in v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not any(c.islower() for c in v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Password must contain at least one number')
+        return v
 
 class UserDetailsRequest(BaseModel):
     first_name: str = Field(..., description="User first name")
@@ -3683,15 +3711,22 @@ async def auth_signup(auth_data: SignUpRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Sign up failed: {str(e)}")
 
 class CompleteRegistrationRequest(BaseModel):
-    user_id: str
-    first_name: str
-    last_name: str
-    category: str
-    role: str
-    institution: str
-    subject_area: str
-    how_heard_about_us: str
+    user_id: str = Field(..., min_length=1, description="User ID")
+    first_name: str = Field(..., min_length=1, max_length=100, description="First name")
+    last_name: str = Field(..., min_length=1, max_length=100, description="Last name")
+    category: str = Field(..., description="User category")
+    role: str = Field(..., min_length=1, max_length=100, description="User role")
+    institution: str = Field(..., min_length=1, max_length=255, description="Institution")
+    subject_area: str = Field(..., min_length=1, max_length=255, description="Subject area")
+    how_heard_about_us: str = Field(..., min_length=1, max_length=255, description="How heard about us")
     join_mailing_list: bool = False
+
+    @validator('category')
+    def validate_category(cls, v):
+        valid_categories = ['Student', 'Academic', 'Industry']
+        if v not in valid_categories:
+            raise ValueError(f'Category must be one of: {", ".join(valid_categories)}')
+        return v
 
 @app.post("/auth/complete-registration")
 async def complete_registration(request: CompleteRegistrationRequest, db: Session = Depends(get_db)):
@@ -6979,8 +7014,8 @@ async def get_user(user_id: str, db: Session = Depends(get_db)):
 # =============================================================================
 
 class ProjectCreate(BaseModel):
-    project_name: str
-    description: Optional[str] = None
+    project_name: str = Field(..., min_length=1, max_length=255, description="Project name")
+    description: Optional[str] = Field(None, max_length=1000, description="Project description")
 
 @app.get("/projects/{project_id}")
 async def get_project(project_id: str, db: Session = Depends(get_db)):
