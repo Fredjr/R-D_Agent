@@ -3,7 +3,7 @@ from fastapi import FastAPI, Response, Depends, HTTPException, WebSocket, WebSoc
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import UploadFile, File, Form
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, root_validator
 import re
 from langchain_google_genai import ChatGoogleGenerativeAI
 import os
