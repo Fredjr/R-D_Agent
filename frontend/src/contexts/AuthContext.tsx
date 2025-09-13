@@ -18,12 +18,13 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, username?: string) => Promise<void>;
   signin: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string) => Promise<void>;
   completeRegistration: (userDetails: any) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
+  // Legacy support - will be removed in future version
+  login?: (email: string, username?: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -33,44 +34,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing session on mount
-    const savedUser = localStorage.getItem('rd_agent_user') || sessionStorage.getItem('rd_agent_user_backup');
+    // Check for existing session on mount - use localStorage as primary storage
+    const savedUser = localStorage.getItem('rd_agent_user');
     if (savedUser) {
       try {
         const userData = JSON.parse(savedUser);
         setUser(userData);
-        // Ensure both storages have the data
-        localStorage.setItem('rd_agent_user', savedUser);
-        sessionStorage.setItem('rd_agent_user_backup', savedUser);
+        console.log('✅ User session restored:', userData.email);
       } catch (error) {
-        console.error('Failed to parse saved user:', error);
+        console.error('❌ Failed to parse saved user:', error);
         localStorage.removeItem('rd_agent_user');
-        sessionStorage.removeItem('rd_agent_user_backup');
       }
     }
     setIsLoading(false);
   }, []);
 
+  // Legacy login method - deprecated, use signin instead
   const login = async (email: string, username?: string) => {
+    console.warn('⚠️ login() method is deprecated. Use signin() instead.');
     setIsLoading(true);
     try {
-      // Create a consistent user_id based on email to ensure project persistence
-      // This ensures the same user gets the same ID across deployments
-      const consistentUserId = `user_${btoa(email).replace(/[^a-zA-Z0-9]/g, '').substring(0, 16)}`;
-      
+      // For backward compatibility, create a temporary user session
+      // This should be replaced with proper signin flow
       const userData: User = {
-        user_id: consistentUserId,
+        user_id: email, // Use email as user_id for consistency with backend
         username: username || email.split('@')[0],
         email: email,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        registration_completed: false // Mark as incomplete to prompt proper registration
       };
 
       setUser(userData);
       localStorage.setItem('rd_agent_user', JSON.stringify(userData));
-      // Also store in sessionStorage as backup
-      sessionStorage.setItem('rd_agent_user_backup', JSON.stringify(userData));
+      console.log('⚠️ Temporary user session created. Please complete registration.');
     } catch (error) {
-      console.error('Login failed:', error);
+      console.error('❌ Login failed:', error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -80,6 +78,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signin = async (email: string, password: string) => {
     setIsLoading(true);
     try {
+      console.log('🔐 Signing in user:', email);
+
       const response = await fetch('/api/proxy/auth/signin', {
         method: 'POST',
         headers: {
@@ -90,15 +90,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Sign in failed');
+        const errorMessage = errorData.detail || 'Sign in failed';
+        console.error('❌ Sign in failed:', errorMessage);
+        throw new Error(errorMessage);
       }
 
       const userData = await response.json();
       setUser(userData);
       localStorage.setItem('rd_agent_user', JSON.stringify(userData));
-      sessionStorage.setItem('rd_agent_user_backup', JSON.stringify(userData));
+      console.log('✅ User signed in successfully:', userData.email);
     } catch (error) {
-      console.error('Sign in failed:', error);
+      console.error('❌ Sign in error:', error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -108,6 +110,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signup = async (email: string, password: string) => {
     setIsLoading(true);
     try {
+      console.log('📝 Creating new user account:', email);
+
       const response = await fetch('/api/proxy/auth/signup', {
         method: 'POST',
         headers: {
@@ -118,15 +122,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Sign up failed');
+        const errorMessage = errorData.detail || 'Sign up failed';
+        console.error('❌ Sign up failed:', errorMessage);
+        throw new Error(errorMessage);
       }
 
       const userData = await response.json();
       setUser(userData);
       localStorage.setItem('rd_agent_user', JSON.stringify(userData));
-      sessionStorage.setItem('rd_agent_user_backup', JSON.stringify(userData));
+      console.log('✅ User account created successfully:', userData.email);
     } catch (error) {
-      console.error('Sign up failed:', error);
+      console.error('❌ Sign up error:', error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -136,13 +142,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const completeRegistration = async (userDetails: any) => {
     setIsLoading(true);
     try {
+      console.log('📋 Completing user registration...');
+
       // Get current user from localStorage to get user_id
       const currentUser = localStorage.getItem('rd_agent_user');
       let user_id = userDetails.user_id;
-      
+
       if (!user_id && currentUser) {
         const parsedUser = JSON.parse(currentUser);
         user_id = parsedUser.user_id || parsedUser.email;
+      }
+
+      if (!user_id) {
+        throw new Error('No user ID found. Please sign up first.');
       }
 
       const requestData = {
@@ -158,16 +170,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.detail || 'Registration completion failed');
+        const errorMessage = error.detail || 'Registration completion failed';
+        console.error('❌ Registration completion failed:', errorMessage);
+        throw new Error(errorMessage);
       }
 
       const userData = await response.json();
       setUser(userData);
       localStorage.setItem('rd_agent_user', JSON.stringify(userData));
-      sessionStorage.setItem('rd_agent_user_backup', JSON.stringify(userData));
+      console.log('✅ Registration completed successfully:', userData.email);
       return userData;
     } catch (error) {
-      console.error('Registration completion failed:', error);
+      console.error('❌ Registration completion error:', error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -175,13 +189,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    console.log('👋 User logging out');
     setUser(null);
     localStorage.removeItem('rd_agent_user');
-    sessionStorage.removeItem('rd_agent_user_backup');
+    console.log('✅ User session cleared');
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, signin, signup, completeRegistration, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, signin, signup, completeRegistration, logout, isLoading, login }}>
       {children}
     </AuthContext.Provider>
   );
