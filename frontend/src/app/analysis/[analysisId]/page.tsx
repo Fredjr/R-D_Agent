@@ -78,18 +78,135 @@ export default function AnalysisDetailPage() {
     );
   }
 
-  // Parse the analysis content from the separate fields
-  const hasContent = analysis.scientific_model_analysis || analysis.experimental_methods_analysis || analysis.results_interpretation_analysis;
+  // Robust content parsing with fallbacks
+  const parseAnalysisField = (field: any, fieldName: string) => {
+    if (!field) return null;
 
-  let scientificModel, experimentalMethods, resultsInterpretation;
-  try {
-    scientificModel = analysis.scientific_model_analysis ? (typeof analysis.scientific_model_analysis === 'string' ? JSON.parse(analysis.scientific_model_analysis) : analysis.scientific_model_analysis) : null;
-    experimentalMethods = analysis.experimental_methods_analysis ? (typeof analysis.experimental_methods_analysis === 'string' ? JSON.parse(analysis.experimental_methods_analysis) : analysis.experimental_methods_analysis) : null;
-    resultsInterpretation = analysis.results_interpretation_analysis ? (typeof analysis.results_interpretation_analysis === 'string' ? JSON.parse(analysis.results_interpretation_analysis) : analysis.results_interpretation_analysis) : null;
-  } catch (e) {
-    console.error('Error parsing analysis content:', e);
-    scientificModel = experimentalMethods = resultsInterpretation = null;
-  }
+    try {
+      // If it's already an object, return it
+      if (typeof field === 'object' && field !== null) {
+        return field;
+      }
+
+      // If it's a string, try to parse as JSON
+      if (typeof field === 'string') {
+        // Handle empty strings
+        if (field.trim() === '') return null;
+
+        // Try JSON parsing
+        try {
+          return JSON.parse(field);
+        } catch {
+          // If JSON parsing fails, treat as plain text
+          return { summary: field };
+        }
+      }
+
+      // For any other type, convert to string and wrap in summary
+      return { summary: String(field) };
+    } catch (e) {
+      console.warn(`Error parsing ${fieldName}:`, e);
+      return null;
+    }
+  };
+
+  const scientificModel = parseAnalysisField(analysis.scientific_model_analysis, 'scientific_model_analysis');
+  const experimentalMethods = parseAnalysisField(analysis.experimental_methods_analysis, 'experimental_methods_analysis');
+  const resultsInterpretation = parseAnalysisField(analysis.results_interpretation_analysis, 'results_interpretation_analysis');
+
+  const hasContent = scientificModel || experimentalMethods || resultsInterpretation;
+
+  // Robust content renderer component
+  const RobustContentRenderer = ({ data, color = "gray", fallbackMessage }: {
+    data: any,
+    color?: string,
+    fallbackMessage?: string
+  }) => {
+    if (!data) return null;
+
+    const colorClasses = {
+      purple: { dot: "bg-purple-600", text: "text-purple-700" },
+      blue: { dot: "bg-blue-600", text: "text-blue-700" },
+      green: { dot: "bg-green-600", text: "text-green-700" },
+      gray: { dot: "bg-gray-600", text: "text-gray-700" }
+    };
+
+    const colors = colorClasses[color as keyof typeof colorClasses] || colorClasses.gray;
+
+    // Helper to safely render any value
+    const renderValue = (value: any, key?: string): React.ReactNode => {
+      if (value === null || value === undefined) return null;
+
+      if (Array.isArray(value)) {
+        if (value.length === 0) return null;
+        return (
+          <div className="space-y-1">
+            {value.map((item, index) => (
+              <div key={index} className="flex items-start gap-2">
+                <div className={`w-1.5 h-1.5 ${colors.dot} rounded-full mt-2 flex-shrink-0`}></div>
+                <span className="text-gray-700">{renderValue(item)}</span>
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      if (typeof value === 'object') {
+        return (
+          <div className="space-y-2">
+            {Object.entries(value).map(([k, v]) => (
+              <div key={k}>
+                <span className="font-medium text-gray-800 capitalize">
+                  {k.replace(/_/g, ' ')}:
+                </span>
+                <span className="ml-2 text-gray-700">{renderValue(v)}</span>
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      return String(value);
+    };
+
+    // Try to render structured content
+    try {
+      if (typeof data === 'object' && data !== null) {
+        const entries = Object.entries(data).filter(([_, value]) =>
+          value !== null && value !== undefined && value !== ''
+        );
+
+        if (entries.length === 0) {
+          return <div className="text-gray-500 italic">{fallbackMessage || "No content available"}</div>;
+        }
+
+        return (
+          <div className="space-y-3">
+            {entries.map(([key, value]) => (
+              <div key={key}>
+                <h4 className="font-medium text-gray-800 mb-2 capitalize">
+                  {key.replace(/_/g, ' ')}
+                </h4>
+                <div className="text-gray-700">
+                  {renderValue(value, key)}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      // Fallback for non-object data
+      return <div className="text-gray-700">{renderValue(data)}</div>;
+    } catch (error) {
+      console.warn('Error rendering content:', error);
+      return (
+        <div className="text-gray-500 italic">
+          {fallbackMessage || "Content available but could not be displayed properly"}
+        </div>
+      );
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -177,33 +294,11 @@ export default function AnalysisDetailPage() {
                 <div>
                   <h3 className="text-lg font-medium text-gray-900 mb-3">Scientific Model Analysis</h3>
                   <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                    <div className="space-y-3">
-                      {scientificModel.summary && (
-                        <div>
-                          <h4 className="font-medium text-gray-800 mb-2">Summary</h4>
-                          <div className="text-gray-700">{scientificModel.summary}</div>
-                        </div>
-                      )}
-                      {scientificModel.relevance_justification && (
-                        <div>
-                          <h4 className="font-medium text-gray-800 mb-2">Relevance</h4>
-                          <div className="text-gray-700">{scientificModel.relevance_justification}</div>
-                        </div>
-                      )}
-                      {scientificModel.fact_anchors && scientificModel.fact_anchors.length > 0 && (
-                        <div>
-                          <h4 className="font-medium text-gray-800 mb-2">Key Facts</h4>
-                          <div className="space-y-1">
-                            {scientificModel.fact_anchors.map((fact: string, index: number) => (
-                              <div key={index} className="flex items-start gap-2">
-                                <div className="w-1.5 h-1.5 bg-purple-600 rounded-full mt-2 flex-shrink-0"></div>
-                                <span className="text-gray-700">{fact}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <RobustContentRenderer
+                      data={scientificModel}
+                      color="purple"
+                      fallbackMessage="Scientific model analysis data available but format not recognized"
+                    />
                   </div>
                 </div>
               )}
@@ -213,32 +308,11 @@ export default function AnalysisDetailPage() {
                 <div>
                   <h3 className="text-lg font-medium text-gray-900 mb-3">Experimental Methods Analysis</h3>
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div className="space-y-3">
-                      {experimentalMethods.methods_summary && (
-                        <div>
-                          <h4 className="font-medium text-gray-800 mb-2">Methods Summary</h4>
-                          <div className="text-gray-700">{experimentalMethods.methods_summary}</div>
-                        </div>
-                      )}
-                      {experimentalMethods.methodology_type && (
-                        <div>
-                          <h4 className="font-medium text-gray-800 mb-2">Methodology Type</h4>
-                          <div className="text-gray-700">{experimentalMethods.methodology_type}</div>
-                        </div>
-                      )}
-                      {experimentalMethods.sample_size && (
-                        <div>
-                          <h4 className="font-medium text-gray-800 mb-2">Sample Size</h4>
-                          <div className="text-gray-700">{experimentalMethods.sample_size}</div>
-                        </div>
-                      )}
-                      {experimentalMethods.study_design && (
-                        <div>
-                          <h4 className="font-medium text-gray-800 mb-2">Study Design</h4>
-                          <div className="text-gray-700">{experimentalMethods.study_design}</div>
-                        </div>
-                      )}
-                    </div>
+                    <RobustContentRenderer
+                      data={experimentalMethods}
+                      color="blue"
+                      fallbackMessage="Experimental methods analysis data available but format not recognized"
+                    />
                   </div>
                 </div>
               )}
@@ -248,46 +322,11 @@ export default function AnalysisDetailPage() {
                 <div>
                   <h3 className="text-lg font-medium text-gray-900 mb-3">Results Interpretation Analysis</h3>
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <div className="space-y-3">
-                      {resultsInterpretation.results_summary && (
-                        <div>
-                          <h4 className="font-medium text-gray-800 mb-2">Results Summary</h4>
-                          <div className="text-gray-700">{resultsInterpretation.results_summary}</div>
-                        </div>
-                      )}
-                      {resultsInterpretation.key_findings && resultsInterpretation.key_findings.length > 0 && (
-                        <div>
-                          <h4 className="font-medium text-gray-800 mb-2">Key Findings</h4>
-                          <div className="space-y-1">
-                            {resultsInterpretation.key_findings.map((finding: string, index: number) => (
-                              <div key={index} className="flex items-start gap-2">
-                                <div className="w-1.5 h-1.5 bg-green-600 rounded-full mt-2 flex-shrink-0"></div>
-                                <span className="text-gray-700">{finding}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {resultsInterpretation.clinical_significance && (
-                        <div>
-                          <h4 className="font-medium text-gray-800 mb-2">Clinical Significance</h4>
-                          <div className="text-gray-700">{resultsInterpretation.clinical_significance}</div>
-                        </div>
-                      )}
-                      {resultsInterpretation.limitations && resultsInterpretation.limitations.length > 0 && (
-                        <div>
-                          <h4 className="font-medium text-gray-800 mb-2">Limitations</h4>
-                          <div className="space-y-1">
-                            {resultsInterpretation.limitations.map((limitation: string, index: number) => (
-                              <div key={index} className="flex items-start gap-2">
-                                <div className="w-1.5 h-1.5 bg-yellow-600 rounded-full mt-2 flex-shrink-0"></div>
-                                <span className="text-gray-700">{limitation}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <RobustContentRenderer
+                      data={resultsInterpretation}
+                      color="green"
+                      fallbackMessage="Results interpretation analysis data available but format not recognized"
+                    />
                   </div>
                 </div>
               )}
