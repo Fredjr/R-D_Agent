@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { XMarkIcon, UserIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
+import { Button, Input, ErrorAlert } from '@/components/ui';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -53,53 +54,48 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-              Email Address
-            </label>
-            <div className="relative">
-              <EnvelopeIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="your.email@company.com"
-                required
-              />
-            </div>
+            <Input
+              id="email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              label="Email Address"
+              placeholder="your.email@company.com"
+              leftIcon={<EnvelopeIcon className="h-5 w-5" />}
+              size="lg"
+            />
           </div>
 
           <div className="mb-6">
-            <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
-              Display Name (Optional)
-            </label>
-            <div className="relative">
-              <UserIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Dr. Anya Sharma"
-              />
-            </div>
+            <Input
+              id="username"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              label="Display Name (Optional)"
+              placeholder="Dr. Anya Sharma"
+              leftIcon={<UserIcon className="h-5 w-5" />}
+              size="lg"
+            />
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-800 text-sm">{error}</p>
+            <div className="mb-4">
+              <ErrorAlert title="">{error}</ErrorAlert>
             </div>
           )}
 
-          <button
+          <Button
             type="submit"
             disabled={isLoading || !email.trim()}
-            className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+            loading={isLoading}
+            loadingText="Signing In..."
+            size="lg"
+            className="w-full"
           >
-            {isLoading ? 'Signing In...' : 'Sign In / Sign Up'}
-          </button>
+            Sign In / Sign Up
+          </Button>
         </form>
 
         <div className="mt-4 text-center text-xs text-gray-500">

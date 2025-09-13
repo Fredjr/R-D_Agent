@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { PlusIcon, FolderIcon, UsersIcon, CalendarIcon, BeakerIcon, UserIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
+import { Button, FullPageLoading, LoadingSpinner, ErrorAlert } from '@/components/ui';
 
 interface Project {
   project_id: string;
@@ -170,14 +171,9 @@ export default function Dashboard() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">
-            {authLoading ? 'Authenticating...' : 'Loading your projects...'}
-          </p>
-        </div>
-      </div>
+      <FullPageLoading
+        message={authLoading ? 'Authenticating...' : 'Loading your projects...'}
+      />
     );
   }
 
@@ -207,50 +203,44 @@ export default function Dashboard() {
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
-              <Link
-                href="/"
-                className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <BeakerIcon className="h-5 w-5 mr-2" />
-                Research Hub
+              <Link href="/">
+                <Button variant="outline" className="inline-flex items-center">
+                  <BeakerIcon className="h-5 w-5 mr-2" />
+                  Research Hub
+                </Button>
               </Link>
-              <button
+              <Button
                 onClick={() => setShowCreateModal(true)}
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="inline-flex items-center"
               >
                 <PlusIcon className="h-5 w-5 mr-2" />
                 New Project
-              </button>
+              </Button>
             </div>
           </div>
         </div>
 
         {/* Error Display */}
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <p className="text-red-800 font-medium">Error:</p>
-                <p className="text-red-700 text-sm mt-1">{error}</p>
-                <div className="mt-2 text-xs text-red-600">
-                  Backend URL: {process.env.NEXT_PUBLIC_BACKEND_URL || 'Not configured'}
-                </div>
+          <div className="mb-6">
+            <ErrorAlert
+              title="Error"
+              onClose={() => setError(null)}
+            >
+              <p>{error}</p>
+              <div className="mt-2 text-xs opacity-75">
+                Backend URL: {process.env.NEXT_PUBLIC_BACKEND_URL || 'Not configured'}
               </div>
-              <button
-                onClick={() => setError(null)}
-                className="ml-4 text-sm text-red-600 hover:text-red-800 font-medium"
-              >
-                Dismiss
-              </button>
-            </div>
-            <div className="mt-3 flex gap-2">
-              <button
-                onClick={fetchProjects}
-                className="text-xs px-3 py-1 bg-red-100 text-red-800 rounded hover:bg-red-200"
-              >
-                Retry
-              </button>
-            </div>
+              <div className="mt-3">
+                <Button
+                  onClick={fetchProjects}
+                  variant="outline"
+                  size="sm"
+                >
+                  Retry
+                </Button>
+              </div>
+            </ErrorAlert>
           </div>
         )}
 
