@@ -4655,7 +4655,7 @@ async def regenerate_report_content(
         db.commit()
 
         # Broadcast the activity via WebSocket
-        await connection_manager.broadcast_to_project(
+        await manager.broadcast_to_project(
             report.project_id,
             {
                 "type": "activity_update",
