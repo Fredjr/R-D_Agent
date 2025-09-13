@@ -285,7 +285,7 @@ class ProjectSummaryOrchestrator:
         activity_data = {
             'reports_timeline': [{'created_at': r.get('created_at'), 'title': r.get('title')} 
                                for r in project_data.get('reports', [])],
-            'annotations_timeline': [{'created_at': a.get('created_at'), 'content': a.get('content')[:100]} 
+            'annotations_timeline': [{'created_at': a.get('created_at'), 'content': str(a.get('content', ''))[:100]}
                                    for a in project_data.get('annotations', [])],
             'deep_dives_timeline': [{'created_at': d.get('created_at'), 'title': d.get('article_title')} 
                                   for d in project_data.get('deep_dive_analyses', [])]
