@@ -235,8 +235,22 @@ export default function ProjectPage() {
 
   const handleCreateDeepDive = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!deepDiveData.article_title.trim() || !deepDiveData.objective.trim()) return;
-    
+
+    // Validate that at least one identifier is provided
+    const hasTitle = deepDiveData.article_title.trim();
+    const hasPmid = deepDiveData.article_pmid.trim();
+    const hasUrl = deepDiveData.article_url.trim();
+
+    if (!hasTitle && !hasPmid && !hasUrl) {
+      alert('Please provide at least one of: Article Title, PMID, or Article URL');
+      return;
+    }
+
+    if (!deepDiveData.objective.trim()) {
+      alert('Please provide a research objective');
+      return;
+    }
+
     setCreatingDeepDive(true);
     try {
       const response = await fetch(`/api/proxy/projects/${projectId}/deep-dive-analyses`, {
@@ -600,7 +614,7 @@ export default function ProjectPage() {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Start Deep Dive Analysis</h3>
               <form onSubmit={handleCreateDeepDive} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Article Title *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Article Title</label>
                   <input
                     type="text"
                     value={deepDiveData.article_title}
@@ -608,7 +622,6 @@ export default function ProjectPage() {
                     placeholder="Enter article title..."
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     disabled={creatingDeepDive}
-                    required
                   />
                 </div>
                 <div>
@@ -622,9 +635,13 @@ export default function ProjectPage() {
                     required
                   />
                 </div>
+                <div className="bg-blue-50 p-3 rounded-lg mb-4">
+                  <p className="text-sm text-blue-700 font-medium mb-1">Article Identification</p>
+                  <p className="text-xs text-blue-600">Provide at least one of the following to identify the article:</p>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">PMID (Optional)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">PMID</label>
                     <input
                       type="text"
                       value={deepDiveData.article_pmid}
@@ -635,7 +652,7 @@ export default function ProjectPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Article URL (Optional)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Article URL</label>
                     <input
                       type="url"
                       value={deepDiveData.article_url}

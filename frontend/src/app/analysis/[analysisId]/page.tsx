@@ -78,11 +78,17 @@ export default function AnalysisDetailPage() {
     );
   }
 
-  let parsedContent;
+  // Parse the analysis content from the separate fields
+  const hasContent = analysis.scientific_model_analysis || analysis.experimental_methods_analysis || analysis.results_interpretation_analysis;
+
+  let scientificModel, experimentalMethods, resultsInterpretation;
   try {
-    parsedContent = analysis.content ? JSON.parse(analysis.content) : null;
-  } catch {
-    parsedContent = null;
+    scientificModel = analysis.scientific_model_analysis ? (typeof analysis.scientific_model_analysis === 'string' ? JSON.parse(analysis.scientific_model_analysis) : analysis.scientific_model_analysis) : null;
+    experimentalMethods = analysis.experimental_methods_analysis ? (typeof analysis.experimental_methods_analysis === 'string' ? JSON.parse(analysis.experimental_methods_analysis) : analysis.experimental_methods_analysis) : null;
+    resultsInterpretation = analysis.results_interpretation_analysis ? (typeof analysis.results_interpretation_analysis === 'string' ? JSON.parse(analysis.results_interpretation_analysis) : analysis.results_interpretation_analysis) : null;
+  } catch (e) {
+    console.error('Error parsing analysis content:', e);
+    scientificModel = experimentalMethods = resultsInterpretation = null;
   }
 
   return (
@@ -164,54 +170,123 @@ export default function AnalysisDetailPage() {
               <h3 className="text-lg font-medium text-gray-900 mb-2">Processing Analysis</h3>
               <p className="text-gray-600">Our AI is analyzing this article. This may take several minutes.</p>
             </div>
-          ) : analysis.processing_status === 'completed' && parsedContent ? (
+          ) : analysis.processing_status === 'completed' && hasContent ? (
             <div className="space-y-6">
-              {/* Analysis Results */}
-              {parsedContent.analysis && (
+              {/* Scientific Model Analysis */}
+              {scientificModel && (
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">Deep Dive Analysis</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-3">Scientific Model Analysis</h3>
                   <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                    <div className="whitespace-pre-wrap text-gray-700">
-                      {parsedContent.analysis}
+                    <div className="space-y-3">
+                      {scientificModel.summary && (
+                        <div>
+                          <h4 className="font-medium text-gray-800 mb-2">Summary</h4>
+                          <div className="text-gray-700">{scientificModel.summary}</div>
+                        </div>
+                      )}
+                      {scientificModel.relevance_justification && (
+                        <div>
+                          <h4 className="font-medium text-gray-800 mb-2">Relevance</h4>
+                          <div className="text-gray-700">{scientificModel.relevance_justification}</div>
+                        </div>
+                      )}
+                      {scientificModel.fact_anchors && scientificModel.fact_anchors.length > 0 && (
+                        <div>
+                          <h4 className="font-medium text-gray-800 mb-2">Key Facts</h4>
+                          <div className="space-y-1">
+                            {scientificModel.fact_anchors.map((fact: string, index: number) => (
+                              <div key={index} className="flex items-start gap-2">
+                                <div className="w-1.5 h-1.5 bg-purple-600 rounded-full mt-2 flex-shrink-0"></div>
+                                <span className="text-gray-700">{fact}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Key Findings */}
-              {parsedContent.key_findings && parsedContent.key_findings.length > 0 && (
+              {/* Experimental Methods Analysis */}
+              {experimentalMethods && (
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">Key Findings</h3>
-                  <div className="space-y-2">
-                    {parsedContent.key_findings.map((finding: string, index: number) => (
-                      <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                        <div className="w-2 h-2 bg-purple-600 rounded-full mt-2 flex-shrink-0"></div>
-                        <span className="text-gray-700">{finding}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Methodology */}
-              {parsedContent.methodology && (
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">Methodology</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-3">Experimental Methods Analysis</h3>
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div className="whitespace-pre-wrap text-gray-700">
-                      {parsedContent.methodology}
+                    <div className="space-y-3">
+                      {experimentalMethods.methods_summary && (
+                        <div>
+                          <h4 className="font-medium text-gray-800 mb-2">Methods Summary</h4>
+                          <div className="text-gray-700">{experimentalMethods.methods_summary}</div>
+                        </div>
+                      )}
+                      {experimentalMethods.methodology_type && (
+                        <div>
+                          <h4 className="font-medium text-gray-800 mb-2">Methodology Type</h4>
+                          <div className="text-gray-700">{experimentalMethods.methodology_type}</div>
+                        </div>
+                      )}
+                      {experimentalMethods.sample_size && (
+                        <div>
+                          <h4 className="font-medium text-gray-800 mb-2">Sample Size</h4>
+                          <div className="text-gray-700">{experimentalMethods.sample_size}</div>
+                        </div>
+                      )}
+                      {experimentalMethods.study_design && (
+                        <div>
+                          <h4 className="font-medium text-gray-800 mb-2">Study Design</h4>
+                          <div className="text-gray-700">{experimentalMethods.study_design}</div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Limitations */}
-              {parsedContent.limitations && (
+              {/* Results Interpretation Analysis */}
+              {resultsInterpretation && (
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">Limitations</h3>
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <div className="whitespace-pre-wrap text-gray-700">
-                      {parsedContent.limitations}
+                  <h3 className="text-lg font-medium text-gray-900 mb-3">Results Interpretation Analysis</h3>
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="space-y-3">
+                      {resultsInterpretation.results_summary && (
+                        <div>
+                          <h4 className="font-medium text-gray-800 mb-2">Results Summary</h4>
+                          <div className="text-gray-700">{resultsInterpretation.results_summary}</div>
+                        </div>
+                      )}
+                      {resultsInterpretation.key_findings && resultsInterpretation.key_findings.length > 0 && (
+                        <div>
+                          <h4 className="font-medium text-gray-800 mb-2">Key Findings</h4>
+                          <div className="space-y-1">
+                            {resultsInterpretation.key_findings.map((finding: string, index: number) => (
+                              <div key={index} className="flex items-start gap-2">
+                                <div className="w-1.5 h-1.5 bg-green-600 rounded-full mt-2 flex-shrink-0"></div>
+                                <span className="text-gray-700">{finding}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {resultsInterpretation.clinical_significance && (
+                        <div>
+                          <h4 className="font-medium text-gray-800 mb-2">Clinical Significance</h4>
+                          <div className="text-gray-700">{resultsInterpretation.clinical_significance}</div>
+                        </div>
+                      )}
+                      {resultsInterpretation.limitations && resultsInterpretation.limitations.length > 0 && (
+                        <div>
+                          <h4 className="font-medium text-gray-800 mb-2">Limitations</h4>
+                          <div className="space-y-1">
+                            {resultsInterpretation.limitations.map((limitation: string, index: number) => (
+                              <div key={index} className="flex items-start gap-2">
+                                <div className="w-1.5 h-1.5 bg-yellow-600 rounded-full mt-2 flex-shrink-0"></div>
+                                <span className="text-gray-700">{limitation}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
