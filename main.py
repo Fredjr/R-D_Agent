@@ -4483,7 +4483,9 @@ async def get_deep_dive_analysis(
         "article_pmid": analysis.article_pmid,
         "article_url": analysis.article_url,
         "processing_status": analysis.processing_status,
-        "content": analysis.content,
+        "scientific_model_analysis": analysis.scientific_model_analysis,
+        "experimental_methods_analysis": analysis.experimental_methods_analysis,
+        "results_interpretation_analysis": analysis.results_interpretation_analysis,
         "created_at": analysis.created_at,
         "created_by": analysis.created_by
     }
@@ -4529,7 +4531,9 @@ async def get_analysis_by_id(
         "article_pmid": analysis.article_pmid,
         "article_url": analysis.article_url,
         "processing_status": analysis.processing_status,
-        "content": analysis.content,
+        "scientific_model_analysis": analysis.scientific_model_analysis,
+        "experimental_methods_analysis": analysis.experimental_methods_analysis,
+        "results_interpretation_analysis": analysis.results_interpretation_analysis,
         "created_at": analysis.created_at,
         "created_by": analysis.created_by
     }
