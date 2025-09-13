@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import AnnotationsFeed from '@/components/AnnotationsFeed';
 import ActivityFeed from '@/components/ActivityFeed';
+import ResultsList from '@/components/ResultsList';
 
 interface Project {
   project_id: string;
@@ -65,7 +66,7 @@ export default function ProjectPage() {
     full_text_only: false,
     preference: 'precision'
   });
-  const [creatingReport, setCreatingReport] = useState(false);
+
   const [showDeepDiveModal, setShowDeepDiveModal] = useState(false);
   const [deepDiveData, setDeepDiveData] = useState({
     article_title: '',
@@ -83,13 +84,25 @@ export default function ProjectPage() {
   });
   const [sendingInvite, setSendingInvite] = useState(false);
 
+  // Report generation results (same as Welcome Page)
+  const [reportResults, setReportResults] = useState<any[]>([]);
+  const [reportDiagnostics, setReportDiagnostics] = useState<any | null>(null);
+  const [reportQueries, setReportQueries] = useState<string[] | null>(null);
+  const [reportTitle, setReportTitle] = useState<string>('');
+  const [reportObjective, setReportObjective] = useState<string>('');
+  const [generatingReport, setGeneratingReport] = useState(false);
+
+  // Comprehensive project summary state
+  const [comprehensiveSummary, setComprehensiveSummary] = useState<any>(null);
+  const [generatingComprehensiveSummary, setGeneratingComprehensiveSummary] = useState(false);
+
   useEffect(() => {
     if (projectId && user) {
-      fetchProject();
+      fetchProjectData();
     }
   }, [projectId, user]);
 
-  const fetchProject = async () => {
+  const fetchProjectData = async () => {
     try {
       const response = await fetch(`/api/proxy/projects/${projectId}`, {
         headers: {
@@ -177,54 +190,56 @@ export default function ProjectPage() {
       setCreatingReport(false);
 
       // Show user-friendly message
-      alert(`🚀 Report generation started for "${reportToGenerate.title}"!\n\nThis will take 3-5 minutes. You can continue using the app - we'll notify you when it's ready.\n\nCheck the Activity feed for progress updates.`);
+      // Use the same endpoint and approach as Welcome Page
+      setGeneratingReport(true);
 
-      // Step 1: Create report record immediately (this logs activity)
-      fetch(`/api/proxy/projects/${projectId}/reports`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-ID': user?.email || 'default_user',
-        },
-        body: JSON.stringify({
-          title: reportToGenerate.title,
-          objective: reportToGenerate.objective,
-          molecule: reportToGenerate.molecule,
-          clinical_mode: reportToGenerate.clinicalMode,
-          dag_mode: reportToGenerate.dagMode,
-          full_text_only: reportToGenerate.fullTextOnly,
-          preference: reportToGenerate.preference
-        }),
-      }).then(async response => {
-        if (response.ok) {
-          const reportData = await response.json();
-          console.log('Report record created:', reportData.report_id);
+      try {
+        const response = await fetch('/api/proxy/generate-review', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-ID': user?.email || 'default_user',
+          },
+          body: JSON.stringify({
+            molecule: reportToGenerate.molecule,
+            objective: reportToGenerate.objective,
+            projectId: projectId, // Include projectId to save to database
+            clinicalMode: reportToGenerate.clinicalMode,
+            dagMode: reportToGenerate.dagMode,
+            fullTextOnly: reportToGenerate.fullTextOnly,
+            preference: reportToGenerate.preference
+          }),
+        });
 
-          // Step 2: Start background content generation
-          fetch(`/api/proxy/generate-review`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'User-ID': user?.email || 'default_user',
-            },
-            body: JSON.stringify(reportToGenerate),
-          }).then(contentResponse => {
-            if (contentResponse.ok) {
-              console.log('Report content generation completed successfully');
-            } else {
-              console.error('Report content generation failed:', contentResponse.status);
-            }
-          }).catch(err => {
-            console.error('Error in background content generation:', err);
-          });
-        } else {
-          console.error('Report record creation failed:', response.status);
-          alert('❌ Failed to create report. Please try again.');
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to generate report: ${errorText}`);
         }
-      }).catch(err => {
-        console.error('Error creating report record:', err);
-        alert('❌ Failed to create report. Please try again.');
-      });
+
+        const data = await response.json();
+
+        // Set the results to display them immediately (same as Welcome Page)
+        const arr = Array.isArray(data?.results) ? data.results : [];
+        const enriched = arr.map((it: any) => ({ ...it, _objective: reportToGenerate.objective, query: reportToGenerate.objective }));
+
+        setReportResults(enriched);
+        setReportDiagnostics(data?.diagnostics ?? null);
+        setReportQueries(Array.isArray(data?.queries) ? data.queries : null);
+        setReportTitle(reportToGenerate.title);
+        setReportObjective(reportToGenerate.objective);
+
+        // Show success message
+        alert(`✅ Report "${reportToGenerate.title}" generated successfully!\n\nResults are displayed below and saved to the project.`);
+
+        // Refresh project data to show the new report in the list
+        fetchProjectData();
+
+      } catch (error: any) {
+        console.error('Error generating report:', error);
+        alert(`❌ Failed to generate report: ${error.message || 'Unknown error'}. Please try again.`);
+      } finally {
+        setGeneratingReport(false);
+      }
 
     } catch (err) {
       console.error('Error starting report generation:', err);
@@ -323,6 +338,32 @@ export default function ProjectPage() {
       alert('Failed to generate summary report. Please try again.');
     } finally {
       setGeneratingSummary(false);
+    }
+  };
+
+  const handleGenerateComprehensiveSummary = async () => {
+    setGeneratingComprehensiveSummary(true);
+    try {
+      const response = await fetch(`/api/proxy/projects/${projectId}/generate-comprehensive-summary`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user?.email || 'default_user',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate comprehensive summary');
+      }
+
+      const data = await response.json();
+      setComprehensiveSummary(data);
+      alert('✅ Comprehensive project summary generated successfully!');
+    } catch (error: any) {
+      console.error('Error generating comprehensive summary:', error);
+      alert(`❌ Failed to generate comprehensive summary: ${error.message}`);
+    } finally {
+      setGeneratingComprehensiveSummary(false);
     }
   };
 
@@ -434,11 +475,18 @@ export default function ProjectPage() {
             >
               Start Deep Dive Analysis
             </button>
-            <button 
+            <button
               onClick={() => setShowSummaryModal(true)}
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
             >
               Generate Summary Report
+            </button>
+            <button
+              onClick={handleGenerateComprehensiveSummary}
+              disabled={generatingComprehensiveSummary}
+              className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+            >
+              {generatingComprehensiveSummary ? 'Analyzing...' : 'Comprehensive Analysis'}
             </button>
             <button 
               onClick={() => setShowInviteModal(true)}
@@ -498,7 +546,7 @@ export default function ProjectPage() {
                     onChange={(e) => setReportData(prev => ({ ...prev, title: e.target.value }))}
                     placeholder="Enter report title..."
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    disabled={creatingReport}
+                    disabled={generatingReport}
                     required
                   />
                 </div>
@@ -509,7 +557,7 @@ export default function ProjectPage() {
                     onChange={(e) => setReportData(prev => ({ ...prev, objective: e.target.value }))}
                     placeholder="Describe the research objective..."
                     className="w-full h-24 p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    disabled={creatingReport}
+                    disabled={generatingReport}
                     required
                   />
                 </div>
@@ -521,7 +569,7 @@ export default function ProjectPage() {
                     onChange={(e) => setReportData(prev => ({ ...prev, molecule: e.target.value }))}
                     placeholder="Enter molecule name (e.g., finerenone, metformin)..."
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    disabled={creatingReport}
+                    disabled={generatingReport}
                     required
                   />
                 </div>
@@ -532,7 +580,7 @@ export default function ProjectPage() {
                       value={reportData.preference}
                       onChange={(e) => setReportData(prev => ({ ...prev, preference: e.target.value }))}
                       className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      disabled={creatingReport}
+                      disabled={generatingReport}
                     >
                       <option value="precision">Precision</option>
                       <option value="recall">Recall</option>
@@ -548,7 +596,7 @@ export default function ProjectPage() {
                         checked={reportData.clinical_mode}
                         onChange={(e) => setReportData(prev => ({ ...prev, clinical_mode: e.target.checked }))}
                         className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        disabled={creatingReport}
+                        disabled={generatingReport}
                       />
                       <span className="text-sm text-gray-700">Clinical Mode</span>
                     </label>
@@ -558,7 +606,7 @@ export default function ProjectPage() {
                         checked={reportData.dag_mode}
                         onChange={(e) => setReportData(prev => ({ ...prev, dag_mode: e.target.checked }))}
                         className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        disabled={creatingReport}
+                        disabled={generatingReport}
                       />
                       <span className="text-sm text-gray-700">DAG Mode</span>
                     </label>
@@ -568,7 +616,7 @@ export default function ProjectPage() {
                         checked={reportData.full_text_only}
                         onChange={(e) => setReportData(prev => ({ ...prev, full_text_only: e.target.checked }))}
                         className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        disabled={creatingReport}
+                        disabled={generatingReport}
                       />
                       <span className="text-sm text-gray-700">Full Text Only</span>
                     </label>
@@ -590,16 +638,16 @@ export default function ProjectPage() {
                       });
                     }}
                     className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-                    disabled={creatingReport}
+                    disabled={generatingReport}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    disabled={!reportData.title.trim() || !reportData.objective.trim() || creatingReport}
+                    disabled={!reportData.title.trim() || !reportData.objective.trim() || !reportData.molecule.trim() || generatingReport}
                     className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-colors"
                   >
-                    {creatingReport ? 'Creating...' : 'Create Report'}
+                    {generatingReport ? 'Generating...' : 'Generate Report'}
                   </button>
                 </div>
               </form>
@@ -964,6 +1012,108 @@ export default function ProjectPage() {
             )}
           </div>
         </div>
+
+        {/* Comprehensive Summary Results */}
+        {comprehensiveSummary && (
+          <div className="bg-white rounded-lg shadow p-6 mb-8">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Comprehensive Project Analysis</h2>
+              <p className="text-gray-600 mb-4">Generated on {new Date(comprehensiveSummary.generated_at).toLocaleDateString()}</p>
+
+              {/* Executive Summary */}
+              {comprehensiveSummary.analysis_results?.synthesis?.executive_summary && (
+                <div className="bg-blue-50 p-4 rounded-lg mb-6">
+                  <h3 className="font-semibold text-blue-900 mb-2">Executive Summary</h3>
+                  <p className="text-blue-800 text-sm leading-relaxed">
+                    {comprehensiveSummary.analysis_results.synthesis.executive_summary}
+                  </p>
+                </div>
+              )}
+
+              {/* Key Achievements */}
+              {comprehensiveSummary.analysis_results?.synthesis?.key_achievements && (
+                <div className="mb-6">
+                  <h3 className="font-semibold text-gray-900 mb-3">Key Achievements</h3>
+                  <ul className="space-y-2">
+                    {comprehensiveSummary.analysis_results.synthesis.key_achievements.map((achievement: string, idx: number) => (
+                      <li key={idx} className="flex items-start">
+                        <span className="text-green-500 mr-2">✓</span>
+                        <span className="text-gray-700 text-sm">{achievement}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Strategic Recommendations */}
+              {comprehensiveSummary.analysis_results?.synthesis?.strategic_recommendations && (
+                <div className="mb-6">
+                  <h3 className="font-semibold text-gray-900 mb-3">Strategic Recommendations</h3>
+                  <ul className="space-y-2">
+                    {comprehensiveSummary.analysis_results.synthesis.strategic_recommendations.map((rec: string, idx: number) => (
+                      <li key={idx} className="flex items-start">
+                        <span className="text-blue-500 mr-2">→</span>
+                        <span className="text-gray-700 text-sm">{rec}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Project Metrics */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-gray-900">{comprehensiveSummary.metadata?.total_reports || 0}</div>
+                  <div className="text-sm text-gray-600">Reports</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-gray-900">{comprehensiveSummary.metadata?.total_deep_dives || 0}</div>
+                  <div className="text-sm text-gray-600">Deep Dives</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-gray-900">{comprehensiveSummary.metadata?.total_annotations || 0}</div>
+                  <div className="text-sm text-gray-600">Annotations</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-gray-900">{comprehensiveSummary.metadata?.project_duration_days || 0}</div>
+                  <div className="text-sm text-gray-600">Days Active</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Report Results Section (same as Welcome Page) */}
+        {reportResults.length > 0 && (
+          <div className="bg-white rounded-lg shadow p-6 mb-8">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">{reportTitle}</h2>
+              <p className="text-gray-600 mb-4">{reportObjective}</p>
+
+              {/* Diagnostics (same as Welcome Page) */}
+              {reportDiagnostics && (
+                <div className="p-3 sm:p-4 rounded-md bg-slate-50 border border-slate-200 text-slate-800 text-xs sm:text-sm mb-6">
+                  <div className="font-medium mb-2">Run details</div>
+                  <div className="flex flex-wrap gap-2 sm:gap-3 text-xs sm:text-sm">
+                    <span>Pool: {reportDiagnostics.pool_size || 0}</span>
+                    <span>Shortlist: {reportDiagnostics.shortlist_size || 0}</span>
+                    <span>Deep-dive: {reportDiagnostics.deep_dive_count || 0}</span>
+                    {reportDiagnostics.timings_ms && (
+                      <>
+                        <span>Plan: {reportDiagnostics.timings_ms.plan_ms || 0}ms</span>
+                        <span>Harvest: {reportDiagnostics.timings_ms.harvest_ms || 0}ms</span>
+                        <span>Deep-dive: {reportDiagnostics.timings_ms.deepdive_ms || 0}ms</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Results List (same as Welcome Page) */}
+            <ResultsList results={reportResults} />
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div>

@@ -4,7 +4,7 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const data = await request.json();
     const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), parseInt(process.env.PROXY_TIMEOUT_MS || '240000', 10));
+    const t = setTimeout(() => controller.abort(), parseInt(process.env.PROXY_TIMEOUT_MS || '1800000', 10)); // 30 minutes instead of 4 minutes
     try {
       const upstream = await fetch(`${BACKEND_URL}/generate-review`, {
         method: 'POST',
