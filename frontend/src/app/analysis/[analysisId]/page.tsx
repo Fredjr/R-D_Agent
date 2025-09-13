@@ -120,15 +120,6 @@ export default function AnalysisDetailPage() {
 
   const hasContent = scientificModel || experimentalMethods || resultsInterpretation;
 
-  // Debug logging
-  console.log('Analysis data:', {
-    scientificModel,
-    experimentalMethods,
-    resultsInterpretation,
-    hasContent,
-    rawAnalysis: analysis
-  });
-
   // Robust content renderer component
   const RobustContentRenderer = ({ data, color = "gray", fallbackMessage }: {
     data: any,
