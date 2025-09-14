@@ -3299,8 +3299,9 @@ async def startup_event():
     """Initialize database tables on startup"""
     print(" Starting R&D Agent Backend...")
     
-    # Force database table creation with more robust error handling
-    try:
+    # DISABLED: Force database table creation with more robust error handling
+    # Database initialization was blocking Railway health checks - disabled temporarily
+    if False:  # try:
         from database import get_engine, Base
         from sqlalchemy import text
         
