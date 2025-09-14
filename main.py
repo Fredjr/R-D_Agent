@@ -3668,6 +3668,41 @@ async def debug_llm_status():
             "llm_analyzer_available": False
         }
 
+# Global variable to track background task results
+_background_test_results = {}
+
+async def test_background_task(task_id: str):
+    """Simple background task for testing"""
+    try:
+        print(f"🧪 Starting background test task: {task_id}")
+        await asyncio.sleep(5)  # Simulate work
+        _background_test_results[task_id] = {"status": "completed", "message": "Background task completed successfully"}
+        print(f"✅ Background test task completed: {task_id}")
+    except Exception as e:
+        print(f"❌ Background test task failed: {task_id}, error: {e}")
+        _background_test_results[task_id] = {"status": "failed", "error": str(e)}
+
+@app.post("/debug/test-background-task")
+async def debug_test_background_task():
+    """Test if background tasks work in Railway environment"""
+    import uuid
+    task_id = str(uuid.uuid4())[:8]
+
+    # Launch background task
+    asyncio.create_task(test_background_task(task_id))
+
+    return {
+        "task_id": task_id,
+        "status": "started",
+        "message": "Background task started - check status with GET /debug/test-background-task/{task_id}"
+    }
+
+@app.get("/debug/test-background-task/{task_id}")
+async def debug_get_background_task_status(task_id: str):
+    """Get status of background test task"""
+    result = _background_test_results.get(task_id, {"status": "processing", "message": "Task still running or not found"})
+    return {"task_id": task_id, **result}
+
 @app.get("/debug/email")
 async def debug_email_config():
     """Debug endpoint to check email configuration"""
