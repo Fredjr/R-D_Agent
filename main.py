@@ -4894,6 +4894,7 @@ async def process_deep_dive_analysis(analysis: DeepDiveAnalysis, request: DeepDi
                 "fact_anchors": []
             }
             analysis.experimental_methods_analysis = []
+            analysis.results_interpretation_analysis = {
                 "hypothesis_alignment": "Unable to interpret results due to insufficient content",
                 "key_results": [],
                 "limitations_biases_in_results": ["Article content could not be retrieved for analysis"],
