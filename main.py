@@ -4712,6 +4712,16 @@ async def get_deep_dive_analysis(
         "created_by": analysis.created_by
     }
 
+@app.post("/projects/{project_id}/deep-dive-analyses/sync", response_model=DeepDiveAnalysisResponse)
+async def create_deep_dive_analysis_sync(
+    project_id: str,
+    analysis_data: DeepDiveAnalysisCreate,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Create and process deep dive analysis synchronously (for debugging)"""
+    return await create_deep_dive_analysis(project_id, analysis_data, request, db, sync_processing=True)
+
 @app.get("/projects/{project_id}/deep-dive-analyses/{analysis_id}/status")
 async def get_deep_dive_analysis_status(
     project_id: str,
@@ -5318,7 +5328,8 @@ async def create_deep_dive_analysis(
     project_id: str,
     analysis_data: DeepDiveAnalysisCreate,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    sync_processing: bool = False  # Add sync processing option
 ):
     """Create a new deep dive analysis in a project"""
     current_user = request.headers.get("User-ID", "default_user")
@@ -5376,32 +5387,43 @@ async def create_deep_dive_analysis(
         project_id=project_id
     )
 
-    # Launch background task for processing with timeout
-    async def background_task_with_timeout():
+    # Choose processing mode based on sync_processing parameter
+    if sync_processing:
+        print(f"🔄 Starting SYNCHRONOUS processing for analysis: {analysis.analysis_id}")
         try:
-            # Set a 5-minute timeout for the entire background processing
-            await asyncio.wait_for(
-                process_deep_dive_analysis_background(analysis.analysis_id, deep_dive_request, current_user),
-                timeout=300.0  # 5 minutes
-            )
-        except asyncio.TimeoutError:
-            print(f"⏰ Background processing timed out for analysis: {analysis.analysis_id}")
-            # Update status to failed due to timeout
-            try:
-                db_timeout = SessionLocal()
-                analysis_timeout = db_timeout.query(DeepDiveAnalysis).filter(DeepDiveAnalysis.analysis_id == analysis.analysis_id).first()
-                if analysis_timeout:
-                    analysis_timeout.processing_status = "failed"
-                    db_timeout.commit()
-                db_timeout.close()
-            except Exception as timeout_db_error:
-                print(f"💥 Failed to update timeout status: {timeout_db_error}")
+            # Process synchronously (like standalone endpoint)
+            await process_deep_dive_analysis(analysis, deep_dive_request, db, current_user)
+            print(f"✅ Synchronous processing completed for analysis: {analysis.analysis_id}")
         except Exception as e:
-            print(f"💥 Background task wrapper failed for analysis {analysis.analysis_id}: {e}")
+            print(f"💥 Synchronous processing failed for analysis {analysis.analysis_id}: {e}")
+            analysis.processing_status = "failed"
+            db.commit()
+    else:
+        # Launch background task for processing with timeout
+        async def background_task_with_timeout():
+            try:
+                # Set a 5-minute timeout for the entire background processing
+                await asyncio.wait_for(
+                    process_deep_dive_analysis_background(analysis.analysis_id, deep_dive_request, current_user),
+                    timeout=300.0  # 5 minutes
+                )
+            except asyncio.TimeoutError:
+                print(f"⏰ Background processing timed out for analysis: {analysis.analysis_id}")
+                # Update status to failed due to timeout
+                try:
+                    db_timeout = SessionLocal()
+                    analysis_timeout = db_timeout.query(DeepDiveAnalysis).filter(DeepDiveAnalysis.analysis_id == analysis.analysis_id).first()
+                    if analysis_timeout:
+                        analysis_timeout.processing_status = "failed"
+                        db_timeout.commit()
+                    db_timeout.close()
+                except Exception as timeout_db_error:
+                    print(f"💥 Failed to update timeout status: {timeout_db_error}")
+            except Exception as e:
+                print(f"💥 Background task wrapper failed for analysis {analysis.analysis_id}: {e}")
 
-    asyncio.create_task(background_task_with_timeout())
-
-    print(f"Started background processing for analysis: {analysis.analysis_id}")
+        asyncio.create_task(background_task_with_timeout())
+        print(f"🚀 Started background processing for analysis: {analysis.analysis_id}")
 
     # Return immediately with processing status
     # Client can poll for completion using GET endpoint
