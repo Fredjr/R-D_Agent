@@ -4620,7 +4620,22 @@ async def get_deep_dive_analysis(
         "scientific_model_analysis": analysis.scientific_model_analysis,
         "experimental_methods_analysis": analysis.experimental_methods_analysis,
         "results_interpretation_analysis": analysis.results_interpretation_analysis,
-        # "diagnostics": getattr(analysis, 'diagnostics', None),  # TODO: Add after database migration
+
+        # Add compatibility fields for UI consistency
+        "model_description": analysis.scientific_model_analysis,
+        "model_description_structured": analysis.scientific_model_analysis,
+        "experimental_methods_structured": analysis.experimental_methods_analysis,
+        "results_interpretation_structured": analysis.results_interpretation_analysis,
+
+        # Add source information for consistency with standalone
+        "source": {
+            "url": f"https://pubmed.ncbi.nlm.nih.gov/{analysis.article_pmid}/" if analysis.article_pmid else analysis.article_url,
+            "pmid": analysis.article_pmid,
+            "title": analysis.article_title
+        },
+
+        # TODO: Add diagnostics after database migration
+        # "diagnostics": getattr(analysis, 'diagnostics', None),
         "created_at": analysis.created_at,
         "created_by": analysis.created_by
     }
