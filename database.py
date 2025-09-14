@@ -235,6 +235,7 @@ class DeepDiveAnalysis(Base):
     scientific_model_analysis = Column(JSON)  # ScientificModelAnalyst results
     experimental_methods_analysis = Column(JSON)  # ExperimentalMethodAnalyst results
     results_interpretation_analysis = Column(JSON)  # ResultsInterpretationAgent results
+    diagnostics = Column(JSON)  # Processing diagnostics (grounding, ingested_chars, etc.)
     
     # Analysis metadata
     created_at = Column(DateTime(timezone=True), server_default=func.now())
