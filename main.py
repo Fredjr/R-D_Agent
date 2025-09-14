@@ -3631,6 +3631,43 @@ async def health_check():
         "version": "1.0"
     }
 
+@app.get("/debug/llm-status")
+async def debug_llm_status():
+    """Debug endpoint to check LLM initialization status"""
+    try:
+        genai_key_available = bool(_GENAI_KEY)
+        llm_analyzer = get_llm_analyzer()
+        llm_analyzer_available = llm_analyzer is not None
+
+        # Test a simple LLM call if available
+        test_result = None
+        if llm_analyzer_available:
+            try:
+                test_result = await run_in_threadpool(
+                    lambda: llm_analyzer.invoke("Say 'LLM working' if you can process this message.")
+                )
+                test_result = str(test_result)[:100]  # Truncate for safety
+            except Exception as e:
+                test_result = f"LLM test failed: {str(e)[:100]}"
+
+        return {
+            "genai_key_available": genai_key_available,
+            "llm_analyzer_available": llm_analyzer_available,
+            "test_result": test_result,
+            "environment_check": {
+                "GOOGLE_GENAI_API_KEY": bool(os.getenv("GOOGLE_GENAI_API_KEY")),
+                "GOOGLE_API_KEY": bool(os.getenv("GOOGLE_API_KEY")),
+                "GEMINI_MODEL": os.getenv("GEMINI_MODEL", "not_set"),
+                "GEMINI_SMALL_MODEL": os.getenv("GEMINI_SMALL_MODEL", "not_set")
+            }
+        }
+    except Exception as e:
+        return {
+            "error": f"Debug check failed: {str(e)}",
+            "genai_key_available": False,
+            "llm_analyzer_available": False
+        }
+
 @app.get("/debug/email")
 async def debug_email_config():
     """Debug endpoint to check email configuration"""
@@ -5156,30 +5193,47 @@ async def process_deep_dive_analysis(analysis: DeepDiveAnalysis, request: DeepDi
 
 async def process_deep_dive_analysis_background(analysis_id: str, request: DeepDiveRequest, current_user: str):
     """Background task for processing deep dive analysis without blocking HTTP response"""
+    print(f"🚀 Starting background processing for analysis: {analysis_id}")
+
     try:
+        # Check LLM availability first
+        llm_analyzer = get_llm_analyzer()
+        if not llm_analyzer:
+            print(f"❌ LLM analyzer not available for analysis {analysis_id}")
+            raise Exception("LLM analyzer not initialized - check GOOGLE_API_KEY environment variable")
+
+        print(f"✅ LLM analyzer available for analysis: {analysis_id}")
+
         # Create new database session for background task
         db = SessionLocal()
         try:
             # Get the analysis record
             analysis = db.query(DeepDiveAnalysis).filter(DeepDiveAnalysis.analysis_id == analysis_id).first()
             if not analysis:
-                print(f"Analysis {analysis_id} not found for background processing")
+                print(f"❌ Analysis {analysis_id} not found for background processing")
                 return
+
+            print(f"📊 Found analysis record: {analysis_id}, current status: {analysis.processing_status}")
 
             # Update status to processing
             analysis.processing_status = "processing"
             db.commit()
+            print(f"📝 Updated status to 'processing' for analysis: {analysis_id}")
 
             # Process the analysis using existing logic
+            print(f"🔬 Starting deep dive analysis processing for: {analysis_id}")
             await process_deep_dive_analysis(analysis, request, db, current_user)
 
-            print(f"Background processing completed successfully for analysis: {analysis_id}")
+            print(f"🎉 Background processing completed successfully for analysis: {analysis_id}")
 
         finally:
             db.close()
 
     except Exception as e:
-        print(f"Background processing failed for analysis {analysis_id}: {e}")
+        print(f"💥 Background processing failed for analysis {analysis_id}: {e}")
+        import traceback
+        print(f"📋 Full traceback: {traceback.format_exc()}")
+
         # Update status to failed in a separate session
         try:
             db = SessionLocal()
@@ -5187,9 +5241,10 @@ async def process_deep_dive_analysis_background(analysis_id: str, request: DeepD
             if analysis:
                 analysis.processing_status = "failed"
                 db.commit()
+                print(f"📝 Updated status to 'failed' for analysis: {analysis_id}")
             db.close()
         except Exception as db_error:
-            print(f"Failed to update analysis status to failed: {db_error}")
+            print(f"💥 Failed to update analysis status to failed: {db_error}")
 
 @app.post("/projects/{project_id}/deep-dive-analyses", response_model=DeepDiveAnalysisResponse)
 async def create_deep_dive_analysis(
