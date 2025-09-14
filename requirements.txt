@@ -1,39 +1,39 @@
-# Core FastAPI and server dependencies
-fastapi==0.115.0
-uvicorn[standard]==0.23.2
-gunicorn==21.2.0
-websockets==12.0
-python-multipart==0.0.9
+# Core FastAPI and server dependencies - Python 3.12 compatible
+fastapi>=0.115.0
+uvicorn[standard]>=0.23.2
+gunicorn>=21.2.0
+websockets>=12.0
+python-multipart>=0.0.9
 
-# Database dependencies
-sqlalchemy==2.0.23
-psycopg2-binary==2.9.9
-alembic==1.12.1
+# Database dependencies - Python 3.12 compatible
+sqlalchemy>=2.0.23
+psycopg2-binary>=2.9.9
+alembic>=1.12.1
 
-# Data validation and security
-pydantic==2.5.3
-bcrypt==4.1.2
-python-dotenv==1.0.0
+# Data validation and security - Python 3.12 compatible
+pydantic>=2.5.3
+bcrypt>=4.1.2
+python-dotenv>=1.0.0
 
-# Essential AI/LLM dependencies (lightweight versions)
-langchain==0.2.16
-langchain-core==0.2.38
-langchain-community==0.2.16
-langchain-google-genai==1.0.10
-google-generativeai==0.7.2
-google-api-python-client==2.108.0
-pinecone-client==3.2.2
+# Essential AI/LLM dependencies - Python 3.12 compatible
+langchain>=0.2.16
+langchain-core>=0.2.38
+langchain-community>=0.2.16
+langchain-google-genai>=1.0.10
+google-generativeai>=0.7.2
+google-api-python-client>=2.108.0
+pinecone-client>=3.2.2
 
-# HTTP and API dependencies
-requests==2.31.0
-httpx==0.25.2
+# HTTP and API dependencies - Python 3.12 compatible
+requests>=2.31.0
+httpx>=0.25.2
 
-# Document processing (lightweight)
-pdfminer.six==20231228
+# Document processing - Python 3.12 compatible
+pdfminer.six>=20231228
 
-# Utilities
-jsonschema==4.20.0
-sendgrid==6.11.0
+# Utilities - Python 3.12 compatible
+jsonschema>=4.20.0
+sendgrid>=6.11.0
 
-# Basic scientific computing (no heavy ML dependencies)
-numpy==1.24.4
+# Basic scientific computing (no heavy ML dependencies) - Python 3.12 compatible
+numpy>=1.26.0
