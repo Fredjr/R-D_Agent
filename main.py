@@ -4625,6 +4625,49 @@ async def get_deep_dive_analysis(
         "created_by": analysis.created_by
     }
 
+@app.get("/projects/{project_id}/deep-dive-analyses/{analysis_id}/status")
+async def get_deep_dive_analysis_status(
+    project_id: str,
+    analysis_id: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Get the processing status of a deep dive analysis"""
+    current_user = request.headers.get("User-ID", "default_user")
+
+    # Check project access
+    has_access = (
+        db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == current_user
+        ).first() is not None or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Get analysis
+    analysis = db.query(DeepDiveAnalysis).filter(
+        DeepDiveAnalysis.analysis_id == analysis_id,
+        DeepDiveAnalysis.project_id == project_id
+    ).first()
+
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    return {
+        "analysis_id": analysis.analysis_id,
+        "processing_status": analysis.processing_status,
+        "created_at": analysis.created_at,
+        "updated_at": analysis.updated_at,
+        "has_results": analysis.scientific_model_analysis is not None
+    }
+
 @app.get("/deep-dive-analyses/{analysis_id}")
 async def get_analysis_by_id(
     analysis_id: str,
@@ -5096,6 +5139,43 @@ async def process_deep_dive_analysis(analysis: DeepDiveAnalysis, request: DeepDi
         db.commit()
         raise
 
+async def process_deep_dive_analysis_background(analysis_id: str, request: DeepDiveRequest, current_user: str):
+    """Background task for processing deep dive analysis without blocking HTTP response"""
+    try:
+        # Create new database session for background task
+        db = SessionLocal()
+        try:
+            # Get the analysis record
+            analysis = db.query(DeepDiveAnalysis).filter(DeepDiveAnalysis.analysis_id == analysis_id).first()
+            if not analysis:
+                print(f"Analysis {analysis_id} not found for background processing")
+                return
+
+            # Update status to processing
+            analysis.processing_status = "processing"
+            db.commit()
+
+            # Process the analysis using existing logic
+            await process_deep_dive_analysis(analysis, request, db, current_user)
+
+            print(f"Background processing completed successfully for analysis: {analysis_id}")
+
+        finally:
+            db.close()
+
+    except Exception as e:
+        print(f"Background processing failed for analysis {analysis_id}: {e}")
+        # Update status to failed in a separate session
+        try:
+            db = SessionLocal()
+            analysis = db.query(DeepDiveAnalysis).filter(DeepDiveAnalysis.analysis_id == analysis_id).first()
+            if analysis:
+                analysis.processing_status = "failed"
+                db.commit()
+            db.close()
+        except Exception as db_error:
+            print(f"Failed to update analysis status to failed: {db_error}")
+
 @app.post("/projects/{project_id}/deep-dive-analyses", response_model=DeepDiveAnalysisResponse)
 async def create_deep_dive_analysis(
     project_id: str,
@@ -5150,29 +5230,24 @@ async def create_deep_dive_analysis(
     db.commit()
     db.refresh(analysis)
 
-    # Process the analysis in the background
-    try:
-        # Create a DeepDiveRequest object for processing
-        deep_dive_request = DeepDiveRequest(
-            title=analysis_data.article_title,
-            pmid=analysis_data.article_pmid,
-            url=analysis_data.article_url,
-            objective=analysis_data.objective,
-            project_id=project_id
-        )
+    # Start background processing (non-blocking)
+    deep_dive_request = DeepDiveRequest(
+        title=analysis_data.article_title,
+        pmid=analysis_data.article_pmid,
+        url=analysis_data.article_url,
+        objective=analysis_data.objective,
+        project_id=project_id
+    )
 
-        # Process the analysis using existing deep dive logic
-        # This will populate the analysis fields and update status to completed
-        await process_deep_dive_analysis(analysis, deep_dive_request, db, current_user)
+    # Launch background task for processing
+    asyncio.create_task(
+        process_deep_dive_analysis_background(analysis.analysis_id, deep_dive_request, current_user)
+    )
 
-    except Exception as e:
-        # If processing fails, update status to failed
-        analysis.processing_status = "failed"
-        db.commit()
-        print(f"Deep dive analysis processing failed: {e}")
+    print(f"Started background processing for analysis: {analysis.analysis_id}")
 
-    # Refresh to get updated data
-    db.refresh(analysis)
+    # Return immediately with processing status
+    # Client can poll for completion using GET endpoint
     
     # Create response
     response = DeepDiveAnalysisResponse(
