@@ -1,7 +1,20 @@
 #!/bin/bash
 
-# Railway startup script with explicit port 3000
+# Railway startup script with virtual environment and explicit port 3000
 echo "=== R&D Agent Backend Startup ==="
+echo "Activating virtual environment..."
+
+# Activate virtual environment if it exists
+if [ -d "venv" ]; then
+    source venv/bin/activate
+    echo "✅ Virtual environment activated"
+elif [ -d "/opt/venv" ]; then
+    source /opt/venv/bin/activate
+    echo "✅ Virtual environment activated"
+else
+    echo "⚠️ Virtual environment not found, using system Python"
+fi
+
 echo "Using fixed PORT: 3000 for Railway health checks"
 echo "Starting FastAPI application on 0.0.0.0:3000..."
 
