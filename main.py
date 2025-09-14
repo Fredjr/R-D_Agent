@@ -4123,10 +4123,14 @@ async def get_project(project_id: str, request: Request, db: Session = Depends(g
     deep_dive_analyses = db.query(DeepDiveAnalysis).filter(DeepDiveAnalysis.project_id == project_id).all()
 
     # Calculate active days (days with any activity)
-    from sqlalchemy import func, distinct
-    active_days_count = db.query(
-        func.count(distinct(func.date(ActivityLog.created_at)))
-    ).filter(ActivityLog.project_id == project_id).scalar() or 0
+    try:
+        from sqlalchemy import func, distinct
+        active_days_count = db.query(
+            func.count(distinct(func.date(ActivityLog.created_at)))
+        ).filter(ActivityLog.project_id == project_id).scalar() or 0
+    except Exception as e:
+        print(f"Warning: Could not calculate active days: {e}")
+        active_days_count = 1  # Default to 1 if calculation fails
 
     return ProjectDetailResponse(
         project_id=project.project_id,
