@@ -4716,9 +4716,14 @@ async def create_report_sync(
 async def get_project_reports(
     project_id: str,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    page: int = 1,
+    limit: int = 10,
+    status: Optional[str] = None,
+    sort_by: str = "created_at",
+    sort_order: str = "desc"
 ):
-    """Get all reports for a specific project"""
+    """Get reports for a specific project with pagination, filtering, and sorting"""
     current_user = request.headers.get("User-ID", "default_user")
 
     # Check project access
@@ -4737,29 +4742,70 @@ async def get_project_reports(
     if not has_access:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    # Get all reports for the project
-    reports = db.query(Report).filter(
-        Report.project_id == project_id
-    ).order_by(Report.created_at.desc()).all()
+    # Build query with filters
+    query = db.query(Report).filter(Report.project_id == project_id)
 
-    # Return reports with basic info
-    return [
-        {
-            "report_id": report.report_id,
-            "title": report.title,
-            "objective": report.objective,
-            "molecule": report.molecule,
-            "status": report.status,
-            "created_at": report.created_at,
-            "created_by": report.created_by,
-            "article_count": report.article_count,
-            "clinical_mode": report.clinical_mode,
-            "dag_mode": report.dag_mode,
-            "full_text_only": report.full_text_only,
-            "preference": report.preference
+    # Apply status filter if provided
+    if status:
+        query = query.filter(Report.status == status)
+
+    # Apply sorting
+    if sort_by == "created_at":
+        if sort_order == "desc":
+            query = query.order_by(Report.created_at.desc())
+        else:
+            query = query.order_by(Report.created_at.asc())
+    elif sort_by == "title":
+        if sort_order == "desc":
+            query = query.order_by(Report.title.desc())
+        else:
+            query = query.order_by(Report.title.asc())
+    elif sort_by == "status":
+        if sort_order == "desc":
+            query = query.order_by(Report.status.desc())
+        else:
+            query = query.order_by(Report.status.asc())
+
+    # Get total count for pagination
+    total_count = query.count()
+
+    # Apply pagination
+    offset = (page - 1) * limit
+    reports = query.offset(offset).limit(limit).all()
+
+    # Calculate pagination info
+    total_pages = (total_count + limit - 1) // limit
+    has_next = page < total_pages
+    has_prev = page > 1
+
+    # Return paginated response
+    return {
+        "reports": [
+            {
+                "report_id": report.report_id,
+                "title": report.title,
+                "objective": report.objective,
+                "molecule": report.molecule,
+                "status": report.status,
+                "created_at": report.created_at,
+                "created_by": report.created_by,
+                "article_count": report.article_count,
+                "clinical_mode": report.clinical_mode,
+                "dag_mode": report.dag_mode,
+                "full_text_only": report.full_text_only,
+                "preference": report.preference
+            }
+            for report in reports
+        ],
+        "pagination": {
+            "page": page,
+            "limit": limit,
+            "total_count": total_count,
+            "total_pages": total_pages,
+            "has_next": has_next,
+            "has_prev": has_prev
         }
-        for report in reports
-    ]
+    }
 
 @app.get("/projects/{project_id}/reports/{report_id}")
 async def get_project_report_by_id(
@@ -4817,11 +4863,16 @@ async def get_project_report_by_id(
 async def get_deep_dive_analyses(
     project_id: str,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    page: int = 1,
+    limit: int = 10,
+    status: Optional[str] = None,
+    sort_by: str = "created_at",
+    sort_order: str = "desc"
 ):
-    """Get all deep dive analyses for a project"""
+    """Get deep dive analyses for a project with pagination, filtering, and sorting"""
     current_user = request.headers.get("User-ID", "default_user")
-    
+
     # Verify project access
     project = db.query(Project).filter(
         Project.project_id == project_id,
@@ -4835,32 +4886,157 @@ async def get_deep_dive_analyses(
             )
         )
     ).first()
-    
+
     if not project:
         raise HTTPException(status_code=404, detail="Project not found or access denied")
-    
-    # Get all deep dive analyses for the project
-    analyses = db.query(DeepDiveAnalysis).filter(
-        DeepDiveAnalysis.project_id == project_id
-    ).order_by(DeepDiveAnalysis.created_at.desc()).all()
-    
-    return [
-        {
-            "analysis_id": analysis.analysis_id,
-            "article_title": analysis.article_title,
-            "article_pmid": analysis.article_pmid,
-            "article_url": analysis.article_url,
-            "processing_status": analysis.processing_status,
-            "created_at": analysis.created_at,
-            "created_by": analysis.created_by,
-            "has_results": (
-                analysis.scientific_model_analysis is not None and
-                analysis.experimental_methods_analysis is not None and
-                analysis.results_interpretation_analysis is not None
-            )
+
+    # Build query with filters
+    query = db.query(DeepDiveAnalysis).filter(DeepDiveAnalysis.project_id == project_id)
+
+    # Apply status filter if provided
+    if status:
+        query = query.filter(DeepDiveAnalysis.processing_status == status)
+
+    # Apply sorting
+    if sort_by == "created_at":
+        if sort_order == "desc":
+            query = query.order_by(DeepDiveAnalysis.created_at.desc())
+        else:
+            query = query.order_by(DeepDiveAnalysis.created_at.asc())
+    elif sort_by == "article_title":
+        if sort_order == "desc":
+            query = query.order_by(DeepDiveAnalysis.article_title.desc())
+        else:
+            query = query.order_by(DeepDiveAnalysis.article_title.asc())
+    elif sort_by == "processing_status":
+        if sort_order == "desc":
+            query = query.order_by(DeepDiveAnalysis.processing_status.desc())
+        else:
+            query = query.order_by(DeepDiveAnalysis.processing_status.asc())
+
+    # Get total count for pagination
+    total_count = query.count()
+
+    # Apply pagination
+    offset = (page - 1) * limit
+    analyses = query.offset(offset).limit(limit).all()
+
+    # Calculate pagination info
+    total_pages = (total_count + limit - 1) // limit
+    has_next = page < total_pages
+    has_prev = page > 1
+
+    # Return paginated response
+    return {
+        "analyses": [
+            {
+                "analysis_id": analysis.analysis_id,
+                "article_title": analysis.article_title,
+                "article_pmid": analysis.article_pmid,
+                "article_url": analysis.article_url,
+                "processing_status": analysis.processing_status,
+                "created_at": analysis.created_at,
+                "created_by": analysis.created_by,
+                "has_results": (
+                    analysis.scientific_model_analysis is not None and
+                    analysis.experimental_methods_analysis is not None and
+                    analysis.results_interpretation_analysis is not None
+                )
+            }
+            for analysis in analyses
+        ],
+        "pagination": {
+            "page": page,
+            "limit": limit,
+            "total_count": total_count,
+            "total_pages": total_pages,
+            "has_next": has_next,
+            "has_prev": has_prev
         }
-        for analysis in analyses
-    ]
+    }
+
+@app.get("/projects/{project_id}/search")
+async def search_project_content(
+    project_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    q: str = "",
+    content_type: Optional[str] = None,  # "reports", "analyses", or None for both
+    limit: int = 20
+):
+    """Search reports and deep dive analyses within a project"""
+    current_user = request.headers.get("User-ID", "default_user")
+
+    # Check project access
+    has_access = (
+        db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == current_user
+        ).first() is not None or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    results = []
+
+    # Search reports if requested
+    if content_type is None or content_type == "reports":
+        reports = db.query(Report).filter(
+            Report.project_id == project_id,
+            or_(
+                Report.title.ilike(f"%{q}%"),
+                Report.objective.ilike(f"%{q}%"),
+                Report.molecule.ilike(f"%{q}%")
+            )
+        ).limit(limit // 2 if content_type is None else limit).all()
+
+        for report in reports:
+            results.append({
+                "type": "report",
+                "id": report.report_id,
+                "title": report.title,
+                "subtitle": f"{report.molecule} - {report.objective}",
+                "status": report.status,
+                "created_at": report.created_at,
+                "article_count": report.article_count
+            })
+
+    # Search deep dive analyses if requested
+    if content_type is None or content_type == "analyses":
+        analyses = db.query(DeepDiveAnalysis).filter(
+            DeepDiveAnalysis.project_id == project_id,
+            DeepDiveAnalysis.article_title.ilike(f"%{q}%")
+        ).limit(limit // 2 if content_type is None else limit).all()
+
+        for analysis in analyses:
+            results.append({
+                "type": "analysis",
+                "id": analysis.analysis_id,
+                "title": analysis.article_title,
+                "subtitle": f"PMID: {analysis.article_pmid}",
+                "status": analysis.processing_status,
+                "created_at": analysis.created_at,
+                "has_results": (
+                    analysis.scientific_model_analysis is not None and
+                    analysis.experimental_methods_analysis is not None and
+                    analysis.results_interpretation_analysis is not None
+                )
+            })
+
+    # Sort by relevance (created_at desc for now)
+    results.sort(key=lambda x: x["created_at"], reverse=True)
+
+    return {
+        "query": q,
+        "results": results[:limit],
+        "total_found": len(results)
+    }
 
 @app.get("/projects/{project_id}/deep-dive-analyses/{analysis_id}")
 async def get_deep_dive_analysis(
