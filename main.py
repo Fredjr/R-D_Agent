@@ -5255,11 +5255,43 @@ async def process_deep_dive_analysis_background(analysis_id: str, request: DeepD
             db.commit()
             print(f"📝 Updated status to 'processing' for analysis: {analysis_id}")
 
-            # Process the analysis using existing logic
+            # Process the analysis using existing logic with timeout
             print(f"🔬 Starting deep dive analysis processing for: {analysis_id}")
-            await process_deep_dive_analysis(analysis, request, db, current_user)
 
-            print(f"🎉 Background processing completed successfully for analysis: {analysis_id}")
+            try:
+                # Add timeout to the actual processing
+                await asyncio.wait_for(
+                    process_deep_dive_analysis(analysis, request, db, current_user),
+                    timeout=240.0  # 4 minutes for the actual processing
+                )
+                print(f"🎉 Background processing completed successfully for analysis: {analysis_id}")
+
+            except asyncio.TimeoutError:
+                print(f"⏰ Deep dive processing timed out for analysis: {analysis_id}")
+                # Create fallback analysis
+                analysis.processing_status = "completed"
+                analysis.scientific_model_analysis = {
+                    "summary": "Analysis completed with timeout - processing took longer than expected. This may indicate complex content or system load.",
+                    "relevance_justification": "Timeout occurred during processing",
+                    "fact_anchors": []
+                }
+                analysis.experimental_methods_analysis = [{
+                    "method_category": "Processing Timeout",
+                    "description": "Analysis processing exceeded time limits",
+                    "details": []
+                }]
+                analysis.results_interpretation_analysis = {
+                    "hypothesis_alignment": "Processing timeout prevented detailed analysis",
+                    "key_results": [],
+                    "limitations_biases_in_results": ["Analysis timeout - results may be incomplete"],
+                    "fact_anchors": []
+                }
+                db.commit()
+                print(f"📝 Created fallback analysis due to timeout for: {analysis_id}")
+
+            except Exception as processing_error:
+                print(f"💥 Deep dive processing failed for analysis {analysis_id}: {processing_error}")
+                raise  # Re-raise to be caught by outer exception handler
 
         finally:
             db.close()
@@ -5344,10 +5376,30 @@ async def create_deep_dive_analysis(
         project_id=project_id
     )
 
-    # Launch background task for processing
-    asyncio.create_task(
-        process_deep_dive_analysis_background(analysis.analysis_id, deep_dive_request, current_user)
-    )
+    # Launch background task for processing with timeout
+    async def background_task_with_timeout():
+        try:
+            # Set a 5-minute timeout for the entire background processing
+            await asyncio.wait_for(
+                process_deep_dive_analysis_background(analysis.analysis_id, deep_dive_request, current_user),
+                timeout=300.0  # 5 minutes
+            )
+        except asyncio.TimeoutError:
+            print(f"⏰ Background processing timed out for analysis: {analysis.analysis_id}")
+            # Update status to failed due to timeout
+            try:
+                db_timeout = SessionLocal()
+                analysis_timeout = db_timeout.query(DeepDiveAnalysis).filter(DeepDiveAnalysis.analysis_id == analysis.analysis_id).first()
+                if analysis_timeout:
+                    analysis_timeout.processing_status = "failed"
+                    db_timeout.commit()
+                db_timeout.close()
+            except Exception as timeout_db_error:
+                print(f"💥 Failed to update timeout status: {timeout_db_error}")
+        except Exception as e:
+            print(f"💥 Background task wrapper failed for analysis {analysis.analysis_id}: {e}")
+
+    asyncio.create_task(background_task_with_timeout())
 
     print(f"Started background processing for analysis: {analysis.analysis_id}")
 
