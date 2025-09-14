@@ -3365,46 +3365,53 @@ class ActivityLogResponse(BaseModel):
 # Initialize database on startup
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database tables on startup"""
+    """Initialize database tables on startup - non-blocking"""
     print(" Starting R&D Agent Backend...")
-    
-    # Re-enabled: Force database table creation with more robust error handling
-    # Now that Railway deployment is working, re-enable database initialization
-    try:
-        from database import get_engine, Base
-        from sqlalchemy import text
-        
-        engine = get_engine()
-        
-        # Test basic connection first
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-            print(" Database connection successful")
-        
-        # Create all tables
-        Base.metadata.create_all(bind=engine)
-        print(" Database tables initialized successfully")
-        
-        # Verify critical tables exist
-        with engine.connect() as conn:
-            if engine.url.drivername.startswith('postgresql'):
-                result = conn.execute(text("""
-                    SELECT table_name FROM information_schema.tables 
-                    WHERE table_schema = 'public' AND table_name IN ('users', 'projects')
-                """)).fetchall()
-                tables = [row[0] for row in result]
-                print(f" Verified tables exist: {tables}")
-                
-                if 'users' not in tables or 'projects' not in tables:
-                    print(" Critical tables missing - forcing recreation")
-                    Base.metadata.drop_all(bind=engine)
-                    Base.metadata.create_all(bind=engine)
-                    print(" Tables recreated successfully")
-            
-    except Exception as e:
-        print(f" Database initialization failed: {e}")
-        print(f" Error type: {type(e).__name__}")
-        # Don't fail startup - let the app start and handle DB errors gracefully
+
+    # Run database initialization in background to not block startup
+    async def init_database_background():
+        try:
+            import asyncio
+            await asyncio.sleep(2)  # Let the app start first
+            from database import get_engine, Base
+            from sqlalchemy import text
+
+            engine = get_engine()
+
+            # Test basic connection first
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+                print("✅ Database connection successful")
+
+            # Create all tables
+            Base.metadata.create_all(bind=engine)
+            print("✅ Database tables initialized successfully")
+
+            # Verify critical tables exist
+            with engine.connect() as conn:
+                if engine.url.drivername.startswith('postgresql'):
+                    result = conn.execute(text("""
+                        SELECT table_name FROM information_schema.tables
+                        WHERE table_schema = 'public' AND table_name IN ('users', 'projects')
+                    """)).fetchall()
+                    tables = [row[0] for row in result]
+                    print(f"✅ Verified tables exist: {tables}")
+
+                    if 'users' not in tables or 'projects' not in tables:
+                        print("⚠️ Critical tables missing - forcing recreation")
+                        Base.metadata.drop_all(bind=engine)
+                        Base.metadata.create_all(bind=engine)
+                        print("✅ Tables recreated successfully")
+
+        except Exception as e:
+            print(f"❌ Database initialization failed: {e}")
+            print(f"❌ Error type: {type(e).__name__}")
+            print("⚠️ App will continue running - database endpoints may fail")
+
+    # Start database initialization in background
+    import asyncio
+    asyncio.create_task(init_database_background())
+    print("✅ FastAPI app started - database initializing in background")
 
 @app.get("/")
 async def root():
