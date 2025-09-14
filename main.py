@@ -3368,9 +3368,9 @@ async def startup_event():
     """Initialize database tables on startup"""
     print(" Starting R&D Agent Backend...")
     
-    # DISABLED: Force database table creation with more robust error handling
-    # Database initialization was blocking Railway health checks - disabled temporarily
-    if False:  # try:
+    # Re-enabled: Force database table creation with more robust error handling
+    # Now that Railway deployment is working, re-enable database initialization
+    try:
         from database import get_engine, Base
         from sqlalchemy import text
         
@@ -3401,10 +3401,10 @@ async def startup_event():
                     Base.metadata.create_all(bind=engine)
                     print(" Tables recreated successfully")
             
-    # except Exception as e:
-    #     print(f" Database initialization failed: {e}")
-    #     print(f" Error type: {type(e).__name__}")
-    #     # Don't fail startup - let the app start and handle DB errors gracefully
+    except Exception as e:
+        print(f" Database initialization failed: {e}")
+        print(f" Error type: {type(e).__name__}")
+        # Don't fail startup - let the app start and handle DB errors gracefully
 
 @app.get("/")
 async def root():
