@@ -4620,7 +4620,7 @@ async def get_deep_dive_analysis(
         "scientific_model_analysis": analysis.scientific_model_analysis,
         "experimental_methods_analysis": analysis.experimental_methods_analysis,
         "results_interpretation_analysis": analysis.results_interpretation_analysis,
-        "diagnostics": analysis.diagnostics,
+        "diagnostics": getattr(analysis, 'diagnostics', None),  # Graceful handling for missing column
         "created_at": analysis.created_at,
         "created_by": analysis.created_by
     }
@@ -5059,11 +5059,17 @@ async def process_deep_dive_analysis(analysis: DeepDiveAnalysis, request: DeepDi
             except Exception:
                 pass
 
-        # Step 7: Create diagnostics (SAME AS /deep-dive)
+        # Step 7: Create enhanced diagnostics with user feedback
         diagnostics = {
             "ingested_chars": len(text),
             "grounding": grounding,
             "grounding_source": grounding_source,
+            "content_quality": "full_text" if grounding == "full_text" else "abstract_only",
+            "user_notice": (
+                "✅ Full text analysis - comprehensive results with detailed experimental methods and results interpretation."
+                if grounding == "full_text"
+                else "⚠️ Abstract-only analysis - results based on limited content. For richer analysis, try providing a PMC URL or PDF upload."
+            ),
             **({k: v for k, v in (meta or {}).items() if v is not None}),
         }
 
@@ -5071,7 +5077,13 @@ async def process_deep_dive_analysis(analysis: DeepDiveAnalysis, request: DeepDi
         analysis.scientific_model_analysis = md_structured  # Use full structured data
         analysis.experimental_methods_analysis = mth if isinstance(mth, list) else []
         analysis.results_interpretation_analysis = res if isinstance(res, dict) else {}
-        analysis.diagnostics = diagnostics  # Store diagnostics for consistency with /deep-dive
+
+        # Store diagnostics if the column exists (graceful handling for database migration)
+        try:
+            analysis.diagnostics = diagnostics  # Store diagnostics for consistency with /deep-dive
+        except Exception as e:
+            print(f"Warning: Could not store diagnostics (database migration needed): {e}")
+
         analysis.processing_status = "completed"
 
         db.commit()
@@ -5991,6 +6003,12 @@ async def deep_dive(request: DeepDiveRequest, db: Session = Depends(get_db)):
             "grounding": grounding,
             "grounding_source": grounding_source,
             "latency_ms": took,
+            "content_quality": "full_text" if grounding == "full_text" else "abstract_only",
+            "user_notice": (
+                "✅ Full text analysis - comprehensive results with detailed experimental methods and results interpretation."
+                if grounding == "full_text"
+                else "⚠️ Abstract-only analysis - results based on limited content. For richer analysis, try providing a PMC URL or PDF upload."
+            ),
             **({k: v for k, v in (meta or {}).items() if v is not None}),
         }
         
