@@ -3272,6 +3272,11 @@ class ProjectDetailResponse(BaseModel):
     collaborators: List[dict]
     annotations: List[dict]
     deep_dive_analyses: List[dict]
+    # Statistics fields for dashboard
+    reports_count: int
+    deep_dive_analyses_count: int
+    annotations_count: int
+    active_days: int
 
 class CollaboratorInvite(BaseModel):
     email: str
@@ -4116,7 +4121,13 @@ async def get_project(project_id: str, request: Request, db: Session = Depends(g
     ).all()
     annotations = db.query(Annotation).filter(Annotation.project_id == project_id).all()
     deep_dive_analyses = db.query(DeepDiveAnalysis).filter(DeepDiveAnalysis.project_id == project_id).all()
-    
+
+    # Calculate active days (days with any activity)
+    from sqlalchemy import func, distinct
+    active_days_count = db.query(
+        func.count(distinct(func.date(ActivityLog.created_at)))
+    ).filter(ActivityLog.project_id == project_id).scalar() or 0
+
     return ProjectDetailResponse(
         project_id=project.project_id,
         project_name=project.project_name,
@@ -4153,7 +4164,12 @@ async def get_project(project_id: str, request: Request, db: Session = Depends(g
             "processing_status": d.processing_status,
             "created_at": d.created_at.isoformat(),
             "created_by": d.created_by
-        } for d in deep_dive_analyses]
+        } for d in deep_dive_analyses],
+        # Statistics for dashboard
+        reports_count=len(reports),
+        deep_dive_analyses_count=len(deep_dive_analyses),
+        annotations_count=len(annotations),
+        active_days=active_days_count
     )
 
 # Collaboration Endpoints
