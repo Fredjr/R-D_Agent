@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "export PORT=3000 && chmod +x start.sh && ./start.sh",
+    "startCommand": "chmod +x start.sh && ./start.sh",
     "healthcheckPath": "/",
     "healthcheckTimeout": 300,
     "healthcheckInitialDelay": 300,
