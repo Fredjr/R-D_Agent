@@ -182,44 +182,72 @@ _llm_critic = None
 def get_llm():
     global _llm
     if _llm is None:
-        _llm = ChatGoogleGenerativeAI(
-            model=os.getenv("GEMINI_MODEL", "gemini-1.5-pro"),
-            convert_system_message_to_human=True,
-            google_api_key=_GENAI_KEY,
-        )
+        if not _GENAI_KEY:
+            print("⚠️ Google GenAI API key not found - LLM features disabled")
+            return None
+        try:
+            _llm = ChatGoogleGenerativeAI(
+                model=os.getenv("GEMINI_MODEL", "gemini-1.5-pro"),
+                convert_system_message_to_human=True,
+                google_api_key=_GENAI_KEY,
+            )
+        except Exception as e:
+            print(f"⚠️ Failed to initialize LLM: {e}")
+            return None
     return _llm
 
 def get_llm_analyzer():
     global _llm_analyzer
     if _llm_analyzer is None:
-        _llm_analyzer = ChatGoogleGenerativeAI(
-            model=os.getenv("GEMINI_SMALL_MODEL", os.getenv("GEMINI_MODEL", "gemini-1.5-pro")),
-            convert_system_message_to_human=True,
-            google_api_key=_GENAI_KEY,
-            temperature=0.2,
-        )
+        if not _GENAI_KEY:
+            print("⚠️ Google GenAI API key not found - LLM features disabled")
+            return None
+        try:
+            _llm_analyzer = ChatGoogleGenerativeAI(
+                model=os.getenv("GEMINI_SMALL_MODEL", os.getenv("GEMINI_MODEL", "gemini-1.5-pro")),
+                convert_system_message_to_human=True,
+                google_api_key=_GENAI_KEY,
+                temperature=0.2,
+            )
+        except Exception as e:
+            print(f"⚠️ Failed to initialize LLM analyzer: {e}")
+            return None
     return _llm_analyzer
 
 def get_llm_summary():
     global _llm_summary
     if _llm_summary is None:
-        _llm_summary = ChatGoogleGenerativeAI(
-            model=os.getenv("GEMINI_MAIN_MODEL", os.getenv("GEMINI_MODEL", "gemini-1.5-pro")),
-            convert_system_message_to_human=True,
-            google_api_key=_GENAI_KEY,
-            temperature=0.5,
-        )
+        if not _GENAI_KEY:
+            print("⚠️ Google GenAI API key not found - LLM features disabled")
+            return None
+        try:
+            _llm_summary = ChatGoogleGenerativeAI(
+                model=os.getenv("GEMINI_MAIN_MODEL", os.getenv("GEMINI_MODEL", "gemini-1.5-pro")),
+                convert_system_message_to_human=True,
+                google_api_key=_GENAI_KEY,
+                temperature=0.5,
+            )
+        except Exception as e:
+            print(f"⚠️ Failed to initialize LLM summary: {e}")
+            return None
     return _llm_summary
 
 def get_llm_critic():
     global _llm_critic
     if _llm_critic is None:
-        _llm_critic = ChatGoogleGenerativeAI(
-            model=os.getenv("GEMINI_SMALL_MODEL", os.getenv("GEMINI_MODEL", "gemini-1.5-pro")),
-            convert_system_message_to_human=True,
-            google_api_key=_GENAI_KEY,
-            temperature=0.1,
-        )
+        if not _GENAI_KEY:
+            print("⚠️ Google GenAI API key not found - LLM features disabled")
+            return None
+        try:
+            _llm_critic = ChatGoogleGenerativeAI(
+                model=os.getenv("GEMINI_SMALL_MODEL", os.getenv("GEMINI_MODEL", "gemini-1.5-pro")),
+                convert_system_message_to_human=True,
+                google_api_key=_GENAI_KEY,
+                temperature=0.1,
+            )
+        except Exception as e:
+            print(f"⚠️ Failed to initialize LLM critic: {e}")
+            return None
     return _llm_critic
 _EMBED_MODEL_NAME = os.getenv("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 _EMBEDDINGS_OBJ = None
@@ -2590,9 +2618,19 @@ Objective: "{objective}"
 Output:
 """
 
-# Step 2.2.3: Create the Prompt and LLMChain
+# Step 2.2.3: Create the Prompt and LLMChain (lazy initialization)
 prompt = PromptTemplate(template=query_generation_template, input_variables=["objective"])
-query_generation_chain = LLMChain(llm=get_llm_analyzer(), prompt=prompt)
+query_generation_chain = None  # Will be initialized on first use
+
+def get_query_generation_chain():
+    """Get query generation chain with lazy initialization"""
+    global query_generation_chain
+    if query_generation_chain is None:
+        llm = get_llm_analyzer()
+        if llm is None:
+            return None
+        query_generation_chain = LLMChain(llm=llm, prompt=prompt)
+    return query_generation_chain
 # Dedicated summarization prompt-chain that grounds the summary in a specific article abstract
 summarization_template = """
 You are writing a grounded summary based strictly on an article abstract and the user's objective.
@@ -2616,7 +2654,17 @@ Abstract:
 {abstract}
 """
 summarization_prompt = PromptTemplate(template=summarization_template, input_variables=["objective", "abstract", "memory_context"])
-summarization_chain = LLMChain(llm=get_llm_summary(), prompt=summarization_prompt)
+summarization_chain = None  # Will be initialized on first use
+
+def get_summarization_chain():
+    """Get summarization chain with lazy initialization"""
+    global summarization_chain
+    if summarization_chain is None:
+        llm = get_llm_summary()
+        if llm is None:
+            return None
+        summarization_chain = LLMChain(llm=llm, prompt=summarization_prompt)
+    return summarization_chain
 
 # Critic/refiner prompt to self-correct for factual alignment and clarity
 critic_refine_template = """
@@ -2632,7 +2680,28 @@ Draft JSON:
 {draft_json}
 """
 critic_refine_prompt = PromptTemplate(template=critic_refine_template, input_variables=["objective", "abstract", "draft_json"])
-critic_refine_chain = LLMChain(llm=get_llm_critic(), prompt=critic_refine_prompt)
+critic_refine_chain = None  # Will be initialized on first use
+
+def get_critic_refine_chain():
+    """Get critic refine chain with lazy initialization"""
+    global critic_refine_chain
+    if critic_refine_chain is None:
+        llm = get_llm_critic()
+        if llm is None:
+            return None
+        critic_refine_chain = LLMChain(llm=llm, prompt=critic_refine_prompt)
+    return critic_refine_chain
+
+def safe_create_chain(llm_getter, prompt):
+    """Safely create an LLMChain, returning None if LLM is unavailable"""
+    try:
+        llm = llm_getter()
+        if llm is None:
+            return None
+        return LLMChain(llm=llm, prompt=prompt)
+    except Exception as e:
+        print(f"⚠️ Failed to create LLM chain: {e}")
+        return None
 
 
 # Step 2.2.4: Build the wrapper function
@@ -2655,7 +2724,7 @@ Output:
 - Keep strictly to mechanism of action; no citations, no repetition
 """
 mechanism_analyst_prompt = PromptTemplate(template=mechanism_analyst_template, input_variables=["objective", "findings"])
-mechanism_analyst_chain = LLMChain(llm=get_llm_summary(), prompt=mechanism_analyst_prompt)
+mechanism_analyst_chain = safe_create_chain(get_llm_summary, mechanism_analyst_prompt)
 
 biomarker_analyst_template = """
 You are an Efficacy & Biomarker Analyst.
@@ -2673,7 +2742,7 @@ Output:
 - Focus on PD-1/PD-L1, CTLA-4, TMB, GEP where relevant; no citations
 """
 biomarker_analyst_prompt = PromptTemplate(template=biomarker_analyst_template, input_variables=["objective", "findings"])
-biomarker_analyst_chain = LLMChain(llm=get_llm_summary(), prompt=biomarker_analyst_prompt)
+biomarker_analyst_chain = safe_create_chain(get_llm_summary, biomarker_analyst_prompt)
 
 resistance_analyst_template = """
 You are a Resistance & Limitations Analyst.
@@ -2691,7 +2760,7 @@ Output:
 - Identify WNT/β-catenin, IFN signaling defects, T-cell exclusion where applicable; no citations
 """
 resistance_analyst_prompt = PromptTemplate(template=resistance_analyst_template, input_variables=["objective", "findings"])
-resistance_analyst_chain = LLMChain(llm=get_llm_summary(), prompt=resistance_analyst_prompt)
+resistance_analyst_chain = safe_create_chain(get_llm_summary, resistance_analyst_prompt)
 
 chief_scientist_template = """
 You are the Chief Scientist presenting a strategic executive summary to an R&D lead. Using the analyst briefs below, write a cohesive narrative that connects the dots and directly addresses the user's objective.
@@ -2725,7 +2794,7 @@ Patent/Commercial Brief:
 chief_scientist_prompt = PromptTemplate(template=chief_scientist_template, input_variables=[
     "objective", "mechanism_report", "biomarker_report", "resistance_report", "clinical_report", "patent_report"
 ])
-chief_scientist_chain = LLMChain(llm=get_llm_summary(), prompt=chief_scientist_prompt)
+chief_scientist_chain = safe_create_chain(get_llm_summary, chief_scientist_prompt)
 
 
 def _build_synthesis_plan(objective: str) -> list[str]:
@@ -2954,7 +3023,7 @@ objective_deconstruction_prompt = PromptTemplate(
     template=objective_deconstruction_template,
     input_variables=["objective"],
 )
-objective_deconstruction_chain = LLMChain(llm=get_llm_analyzer(), prompt=objective_deconstruction_prompt)
+objective_deconstruction_chain = safe_create_chain(get_llm_analyzer, objective_deconstruction_prompt)
 
 
 # Clinical Context analyst
@@ -2971,7 +3040,7 @@ Findings:
 {findings}
 """
 clinical_analyst_prompt = PromptTemplate(template=clinical_analyst_template, input_variables=["objective", "findings"])
-clinical_analyst_chain = LLMChain(llm=get_llm_summary(), prompt=clinical_analyst_prompt)
+clinical_analyst_chain = safe_create_chain(get_llm_summary, clinical_analyst_prompt)
 
 
 def _strip_code_fences(text: str) -> str:
@@ -3085,7 +3154,7 @@ def generate_search_queries(objective: str) -> List[str]:
         ]
 
     try:
-        result = query_generation_chain.invoke({"objective": objective})
+        result = get_query_generation_chain().invoke({"objective": objective})
         raw_output = result.get("text", result) if isinstance(result, dict) else str(result)
         if not isinstance(raw_output, str):
             raw_output = str(raw_output)
@@ -3332,10 +3401,10 @@ async def startup_event():
                     Base.metadata.create_all(bind=engine)
                     print(" Tables recreated successfully")
             
-    except Exception as e:
-        print(f" Database initialization failed: {e}")
-        print(f" Error type: {type(e).__name__}")
-        # Don't fail startup - let the app start and handle DB errors gracefully
+    # except Exception as e:
+    #     print(f" Database initialization failed: {e}")
+    #     print(f" Error type: {type(e).__name__}")
+    #     # Don't fail startup - let the app start and handle DB errors gracefully
 
 @app.get("/")
 async def root():
