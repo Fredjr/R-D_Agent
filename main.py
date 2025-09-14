@@ -4741,6 +4741,58 @@ async def get_project_reports(
         for report in reports
     ]
 
+@app.get("/projects/{project_id}/reports/{report_id}")
+async def get_project_report_by_id(
+    project_id: str,
+    report_id: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Get a specific report by ID within a project"""
+    current_user = request.headers.get("User-ID", "default_user")
+
+    # Check project access
+    has_access = (
+        db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == current_user
+        ).first() is not None or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Get the specific report
+    report = db.query(Report).filter(
+        Report.report_id == report_id,
+        Report.project_id == project_id
+    ).first()
+
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    # Return complete report data including content
+    return {
+        "report_id": report.report_id,
+        "title": report.title,
+        "objective": report.objective,
+        "molecule": report.molecule,
+        "status": report.status,
+        "created_at": report.created_at,
+        "created_by": report.created_by,
+        "article_count": report.article_count,
+        "clinical_mode": report.clinical_mode,
+        "dag_mode": report.dag_mode,
+        "full_text_only": report.full_text_only,
+        "preference": report.preference,
+        "content": report.content  # Include the actual report content
+    }
+
 @app.get("/projects/{project_id}/deep-dive-analyses")
 async def get_deep_dive_analyses(
     project_id: str,
@@ -4781,7 +4833,11 @@ async def get_deep_dive_analyses(
             "processing_status": analysis.processing_status,
             "created_at": analysis.created_at,
             "created_by": analysis.created_by,
-            "results": analysis.results
+            "has_results": (
+                analysis.scientific_model_analysis is not None and
+                analysis.experimental_methods_analysis is not None and
+                analysis.results_interpretation_analysis is not None
+            )
         }
         for analysis in analyses
     ]
