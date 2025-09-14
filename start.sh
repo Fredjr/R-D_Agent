@@ -1,26 +1,26 @@
 #!/bin/bash
 
-# Railway startup script with robust port handling
-echo "Environment variables:"
-echo "PORT=$PORT"
-echo "All env vars:"
-env | grep -E "(PORT|RAILWAY)" || echo "No PORT/RAILWAY vars found"
+# Railway startup script - simplified and robust
+echo "=== R&D Agent Backend Startup ==="
+echo "Environment check:"
+echo "PORT=${PORT:-'not set'}"
+echo "RAILWAY_ENVIRONMENT=${RAILWAY_ENVIRONMENT:-'not set'}"
 
-# Set default port if not provided
-if [ -z "$PORT" ]; then
-    echo "PORT not set, using default 8080"
-    export PORT=8080
-else
-    echo "Using PORT=$PORT"
-fi
+# Set port with fallback
+PORT=${PORT:-8080}
+echo "Using PORT: $PORT"
 
 # Validate port is numeric
 if ! [[ "$PORT" =~ ^[0-9]+$ ]]; then
-    echo "ERROR: PORT '$PORT' is not a valid integer, using 8080"
-    export PORT=8080
+    echo "ERROR: PORT '$PORT' is not numeric, using 8080"
+    PORT=8080
 fi
 
-echo "Starting R&D Agent Backend on port $PORT"
+echo "Starting FastAPI server on 0.0.0.0:$PORT"
 
-# Start the application with explicit port
-exec python -m uvicorn main:app --host 0.0.0.0 --port "$PORT"
+# Use exec to replace shell process and handle signals properly
+exec python -m uvicorn main:app \
+    --host 0.0.0.0 \
+    --port "$PORT" \
+    --log-level info \
+    --access-log

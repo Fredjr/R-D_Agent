@@ -1,1 +1,1 @@
-web: bash -c "chmod +x start.sh && ./start.sh"
+web: python -m uvicorn main:app --host 0.0.0.0 --port $PORT
