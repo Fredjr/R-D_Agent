@@ -3338,8 +3338,7 @@ async def startup_event():
 
 @app.get("/")
 async def root():
-    """Simple health check for Railway deployment"""
-    return {"status": "ok", "service": "R&D Agent Backend", "version": "1.0"}
+    return {"status": "ok"}
 
 @app.get("/test")
 async def test():
