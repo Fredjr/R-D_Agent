@@ -4549,8 +4549,148 @@ async def create_report(
         report_id=report.report_id,
         db=db
     )
-    
+
+    # CRITICAL FIX: Trigger background processing for the report
+    print(f"🚀 Starting background processing for report: {report.report_id}")
+
+    # Create ReviewRequest for processing
+    review_request = ReviewRequest(
+        molecule=report.molecule,
+        objective=report.objective,
+        project_id=project_id,
+        clinical_mode=report.clinical_mode,
+        dag_mode=report.dag_mode,
+        full_text_only=report.full_text_only,
+        preference=report.preference
+    )
+
+    # Launch background task for report processing
+    async def process_report_background():
+        try:
+            print(f"📊 Processing report content for: {report.report_id}")
+
+            # Use the same logic as standalone generate-review
+            report_content = await generate_review_internal(review_request, db, current_user)
+
+            # Update report with content
+            db_update = SessionLocal()
+            try:
+                report_update = db_update.query(Report).filter(Report.report_id == report.report_id).first()
+                if report_update:
+                    report_update.content = report_content
+                    report_update.status = "completed"
+                    report_update.article_count = len(report_content.get("results", []))
+                    db_update.commit()
+                    print(f"✅ Report processing completed: {report.report_id}")
+                else:
+                    print(f"❌ Report not found for update: {report.report_id}")
+            finally:
+                db_update.close()
+
+        except Exception as e:
+            print(f"💥 Report processing failed for {report.report_id}: {e}")
+            # Update status to failed
+            try:
+                db_error = SessionLocal()
+                report_error = db_error.query(Report).filter(Report.report_id == report.report_id).first()
+                if report_error:
+                    report_error.status = "failed"
+                    db_error.commit()
+                db_error.close()
+            except Exception as db_error:
+                print(f"💥 Failed to update report error status: {db_error}")
+
+    # Launch background task
+    asyncio.create_task(process_report_background())
+    print(f"🚀 Started background report processing for: {report.report_id}")
+
     return response
+
+@app.post("/projects/{project_id}/reports/sync", response_model=ReportResponse)
+async def create_report_sync(
+    project_id: str,
+    report_data: ReportCreate,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Create and process report synchronously (for debugging)"""
+    current_user = request.headers.get("User-ID", "default_user")
+
+    # Check project access
+    has_access = (
+        db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == current_user
+        ).first() is not None or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    print(f"🔄 Starting SYNCHRONOUS report processing")
+
+    # Create ReviewRequest for processing
+    review_request = ReviewRequest(
+        molecule=report_data.molecule,
+        objective=report_data.objective,
+        project_id=project_id,
+        clinical_mode=report_data.clinical_mode,
+        dag_mode=report_data.dag_mode,
+        full_text_only=report_data.full_text_only,
+        preference=report_data.preference
+    )
+
+    try:
+        # Process synchronously using the same logic as standalone
+        report_content = await generate_review_internal(review_request, db, current_user)
+
+        # Create report with content
+        report_id = str(uuid.uuid4())
+        report = Report(
+            report_id=report_id,
+            project_id=project_id,
+            title=report_data.title,
+            objective=report_data.objective,
+            molecule=report_data.molecule,
+            clinical_mode=report_data.clinical_mode,
+            dag_mode=report_data.dag_mode,
+            full_text_only=report_data.full_text_only,
+            preference=report_data.preference,
+            created_by=current_user,
+            content=report_content,
+            status="completed",
+            article_count=len(report_content.get("results", []))
+        )
+
+        db.add(report)
+        db.commit()
+        db.refresh(report)
+
+        print(f"✅ Synchronous report processing completed: {report.report_id}")
+
+        return ReportResponse(
+            report_id=report.report_id,
+            title=report.title,
+            objective=report.objective,
+            molecule=report.molecule,
+            clinical_mode=report.clinical_mode,
+            dag_mode=report.dag_mode,
+            full_text_only=report.full_text_only,
+            preference=report.preference,
+            status=report.status,
+            created_at=report.created_at,
+            created_by=report.created_by,
+            article_count=report.article_count
+        )
+
+    except Exception as e:
+        print(f"💥 Synchronous report processing failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Report processing failed: {str(e)}")
 
 @app.get("/projects/{project_id}/reports")
 async def get_project_reports(
