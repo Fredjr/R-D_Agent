@@ -4620,6 +4620,7 @@ async def get_deep_dive_analysis(
         "scientific_model_analysis": analysis.scientific_model_analysis,
         "experimental_methods_analysis": analysis.experimental_methods_analysis,
         "results_interpretation_analysis": analysis.results_interpretation_analysis,
+        "diagnostics": analysis.diagnostics,
         "created_at": analysis.created_at,
         "created_by": analysis.created_by
     }
@@ -5070,6 +5071,7 @@ async def process_deep_dive_analysis(analysis: DeepDiveAnalysis, request: DeepDi
         analysis.scientific_model_analysis = md_structured  # Use full structured data
         analysis.experimental_methods_analysis = mth if isinstance(mth, list) else []
         analysis.results_interpretation_analysis = res if isinstance(res, dict) else {}
+        analysis.diagnostics = diagnostics  # Store diagnostics for consistency with /deep-dive
         analysis.processing_status = "completed"
 
         db.commit()
@@ -5994,10 +5996,13 @@ async def deep_dive(request: DeepDiveRequest, db: Session = Depends(get_db)):
         
         response_data = {
             "source": source_info,
+            "scientific_model_analysis": md_json,
             "model_description_structured": md_structured,
             "model_description": md_json,
-            "experimental_methods_structured": mth if grounding == "full_text" else None,
-            "results_interpretation_structured": res if grounding == "full_text" else None,
+            "experimental_methods_analysis": mth,
+            "experimental_methods_structured": mth,
+            "results_interpretation_analysis": res,
+            "results_interpretation_structured": res,
             "diagnostics": diagnostics,
         }
         
