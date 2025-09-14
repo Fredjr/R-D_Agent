@@ -7777,60 +7777,7 @@ class ProjectCreate(BaseModel):
     project_name: str = Field(..., min_length=1, max_length=255, description="Project name")
     description: Optional[str] = Field(None, max_length=1000, description="Project description")
 
-@app.get("/projects/{project_id}")
-async def get_project(project_id: str, db: Session = Depends(get_db)):
-    """Get project details with related data"""
-    try:
-        from database import Project
-        
-        project = db.query(Project).filter(Project.project_id == project_id).first()
-        if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
-        
-        return {
-            "project_id": project.project_id,
-            "project_name": project.project_name,
-            "description": project.description,
-            "owner_user_id": project.owner_user_id,
-            "created_at": project.created_at.isoformat(),
-            "updated_at": project.updated_at.isoformat(),
-            "tags": project.tags,
-            "settings": project.settings,
-            "reports": [
-                {
-                    "report_id": r.report_id,
-                    "title": r.title,
-                    "objective": r.objective,
-                    "created_at": r.created_at.isoformat(),
-                    "created_by": r.created_by,
-                    "status": r.status,
-                    "article_count": r.article_count
-                }
-                for r in project.reports
-            ],
-            "collaborators": [
-                {
-                    "user_id": c.user_id,
-                    "role": c.role,
-                    "invited_at": c.invited_at.isoformat()
-                }
-                for c in project.collaborators
-            ],
-            "annotations": [
-                {
-                    "annotation_id": a.annotation_id,
-                    "content": a.content,
-                    "author_id": a.author_id,
-                    "created_at": a.created_at.isoformat()
-                }
-                for a in project.annotations
-            ]
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving project: {str(e)}")
+
 
 # Cloud Run entry point
 if __name__ == "__main__":
