@@ -4852,109 +4852,92 @@ async def process_pending_analysis(
         raise HTTPException(status_code=500, detail=f"Failed to process analysis: {str(e)}")
 
 async def process_deep_dive_analysis(analysis: DeepDiveAnalysis, request: DeepDiveRequest, db: Session, current_user: str):
-    """Process a deep dive analysis using the same robust logic as the /deep-dive endpoint"""
+    """Process a deep dive analysis using the EXACT same logic as the /deep-dive endpoint"""
     try:
         print(f"Starting deep dive analysis processing for: {analysis.analysis_id}")
 
-        # Use the same robust article content retrieval as /deep-dive endpoint
+        # EXACT SAME LOGIC AS /deep-dive endpoint
+        source_info = {"url": request.url, "pmid": request.pmid, "title": request.title}
+
+        # Ingestion: strictly from provided article (SAME AS /deep-dive)
         text = ""
         grounding = "none"
         grounding_source = "none"
-        landing_html = ""
 
-        # Step 1: Try URL-based retrieval (same as /deep-dive endpoint)
+        # If no URL provided but PMID exists, construct PubMed URL
+        if not request.url and request.pmid:
+            request.url = f"https://pubmed.ncbi.nlm.nih.gov/{request.pmid}/"
+            print(f"Constructed URL from PMID: {request.url}")
+
         if request.url:
-            try:
-                # Use raw HTML for OA resolution and abstract parsing
-                landing_html = _fetch_url_raw_text(request.url)
-                # If this is a PMC article page, treat as full text directly
-                if "ncbi.nlm.nih.gov/pmc/articles/" in (request.url or "") and landing_html:
+            # Use raw HTML for OA resolution and abstract parsing (EXACT SAME AS /deep-dive)
+            landing_html = _fetch_url_raw_text(request.url)
+            # If this is a PMC article page, treat as full text directly
+            if "ncbi.nlm.nih.gov/pmc/articles/" in (request.url or "") and landing_html:
+                text = _strip_html(landing_html)
+                grounding, grounding_source = "full_text", "pmc"
+            else:
+                text, grounding, grounding_source, meta = _resolve_oa_fulltext(request.pmid, landing_html, None)
+                if not text and landing_html:
                     text = _strip_html(landing_html)
-                    grounding, grounding_source = "full_text", "pmc"
-                else:
-                    text, grounding, grounding_source, meta = _resolve_oa_fulltext(request.pmid, landing_html, None)
-                    if not text and landing_html:
-                        text = _strip_html(landing_html)
-                        if text:
-                            grounding = "abstract_only" if "pubmed.ncbi.nlm.nih.gov" in (request.url or "") else "none"
-                            grounding_source = "pubmed_abstract" if grounding == "abstract_only" else "none"
-            except Exception as e:
-                print(f"Error in URL-based retrieval: {e}")
+                    if text:
+                        grounding = "abstract_only" if "pubmed.ncbi.nlm.nih.gov" in (request.url or "") else "none"
+                        grounding_source = "pubmed_abstract" if grounding == "abstract_only" else "none"
 
-        # Step 2: If no text yet, try PMID-based retrieval
-        if not text and request.pmid:
-            try:
-                # Try to construct PubMed URL and use same logic
-                pubmed_url = f"https://pubmed.ncbi.nlm.nih.gov/{request.pmid}/"
-                landing_html = _fetch_url_raw_text(pubmed_url)
-                if landing_html:
-                    text, grounding, grounding_source, meta = _resolve_oa_fulltext(request.pmid, landing_html, None)
-                    if not text:
-                        text = _strip_html(landing_html)
-                        if text:
-                            grounding = "abstract_only"
-                            grounding_source = "pubmed_abstract"
-            except Exception as e:
-                print(f"Error in PMID-based retrieval: {e}")
-
-        # Step 3: Fallback - if still no meaningful text, fail gracefully
-        if not text or len(text.strip()) < 100:
-            print(f"Insufficient article content retrieved. Text length: {len(text) if text else 0}")
+        # EXACT SAME ERROR HANDLING AS /deep-dive
+        if not text:
+            print(f"Unable to fetch or parse article content for analysis {analysis.analysis_id}")
             analysis.processing_status = "failed"
             analysis.scientific_model_analysis = {
-                "summary": "Unable to retrieve sufficient article content for analysis",
-                "relevance_justification": "Content retrieval failed - please provide a direct PMC URL or upload the PDF",
+                "summary": "Unable to fetch or parse article content. Provide full-text URL or upload PDF.",
+                "relevance_justification": "Content retrieval failed",
                 "fact_anchors": []
             }
-            analysis.experimental_methods_analysis = [{
-                "technique": "Content retrieval failed",
-                "measurement": "Unable to analyze experimental methods",
-                "role_in_study": "N/A - insufficient content",
-                "parameters": "",
-                "controls_validation": "",
-                "limitations_reproducibility": "Content not accessible",
-                "validation": "",
-                "accession_ids": [],
+            analysis.experimental_methods_analysis = []
+                "hypothesis_alignment": "Unable to interpret results due to insufficient content",
+                "key_results": [],
+                "limitations_biases_in_results": ["Article content could not be retrieved for analysis"],
                 "fact_anchors": []
-            }]
-            analysis.results_interpretation_analysis = {
-                "results_summary": "Unable to interpret results due to insufficient content",
-                "key_findings": [],
-                "clinical_significance": "N/A - content not accessible",
-                "limitations": ["Article content could not be retrieved for analysis"]
             }
             db.commit()
             return
 
+        # Source verification diagnostics (SAME AS /deep-dive)
+        try:
+            meta = {}
+            if grounding == "full_text":
+                # Gather resolved meta from last OA resolver call if available (not retained here), fallback to landing page
+                meta = _verify_source_match(request.title, request.pmid, meta, landing_html)
+            else:
+                meta = _verify_source_match(request.title, request.pmid, {}, landing_html)
+        except Exception:
+            meta = {}
+
         print(f"Successfully retrieved article content. Length: {len(text)}, Grounding: {grounding}")
 
-        # Step 4: Run the three specialist modules with timeouts (same as /deep-dive endpoint)
+        # Run three specialist modules in parallel (EXACT SAME AS /deep-dive)
         try:
-            # Check if LLM is available before running analysis
-            llm = get_llm_analyzer()
-
-            # Module 1: Scientific Model Analysis with timeout
+            # Module 1 with timeout (EXACT SAME AS /deep-dive)
             md_structured = await _with_timeout(
-                run_in_threadpool(analyze_scientific_model, text, request.objective, llm),
+                run_in_threadpool(analyze_scientific_model, text, request.objective, get_llm_analyzer()),
                 120.0,  # 2 minutes instead of 12 seconds
                 "DeepDiveModel",
                 retries=0,
             )
 
-            # Modules 2 and 3 with timeouts (run in parallel)
+            # Modules 2 and 3 with timeouts (structured) (EXACT SAME AS /deep-dive)
             mth_task = _with_timeout(
-                run_in_threadpool(analyze_experimental_methods, text, request.objective, llm),
-                120.0,  # 2 minutes instead of 12 seconds
+                run_in_threadpool(analyze_experimental_methods, text, request.objective, get_llm_analyzer()),
+                12.0,
                 "DeepDiveMethods",
                 retries=0,
             )
             res_task = _with_timeout(
-                run_in_threadpool(analyze_results_interpretation, text, request.objective, llm),
-                120.0,  # 2 minutes instead of 12 seconds
+                run_in_threadpool(analyze_results_interpretation, text, request.objective, get_llm_analyzer()),
+                12.0,
                 "DeepDiveResults",
                 retries=0,
             )
-
             mth, res = await asyncio.gather(mth_task, res_task)
 
             print("All analysis modules completed successfully")
@@ -5002,8 +4985,16 @@ async def process_deep_dive_analysis(analysis: DeepDiveAnalysis, request: DeepDi
             except Exception:
                 pass
 
-        # Step 7: Update the analysis with structured results
-        analysis.scientific_model_analysis = md_json
+        # Step 7: Create diagnostics (SAME AS /deep-dive)
+        diagnostics = {
+            "ingested_chars": len(text),
+            "grounding": grounding,
+            "grounding_source": grounding_source,
+            **({k: v for k, v in (meta or {}).items() if v is not None}),
+        }
+
+        # Step 8: Update the analysis with structured results (SAME FORMAT AS /deep-dive)
+        analysis.scientific_model_analysis = md_structured  # Use full structured data
         analysis.experimental_methods_analysis = mth if isinstance(mth, list) else []
         analysis.results_interpretation_analysis = res if isinstance(res, dict) else {}
         analysis.processing_status = "completed"
@@ -5011,6 +5002,7 @@ async def process_deep_dive_analysis(analysis: DeepDiveAnalysis, request: DeepDi
         db.commit()
 
         print(f"Deep dive analysis completed successfully: {analysis.analysis_id}")
+        print(f"Diagnostics: {diagnostics}")
 
     except Exception as e:
         print(f"Error processing deep dive analysis: {e}")
