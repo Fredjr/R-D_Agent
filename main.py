@@ -4620,7 +4620,7 @@ async def get_deep_dive_analysis(
         "scientific_model_analysis": analysis.scientific_model_analysis,
         "experimental_methods_analysis": analysis.experimental_methods_analysis,
         "results_interpretation_analysis": analysis.results_interpretation_analysis,
-        "diagnostics": getattr(analysis, 'diagnostics', None),  # Graceful handling for missing column
+        # "diagnostics": getattr(analysis, 'diagnostics', None),  # TODO: Add after database migration
         "created_at": analysis.created_at,
         "created_by": analysis.created_by
     }
@@ -5078,11 +5078,8 @@ async def process_deep_dive_analysis(analysis: DeepDiveAnalysis, request: DeepDi
         analysis.experimental_methods_analysis = mth if isinstance(mth, list) else []
         analysis.results_interpretation_analysis = res if isinstance(res, dict) else {}
 
-        # Store diagnostics if the column exists (graceful handling for database migration)
-        try:
-            analysis.diagnostics = diagnostics  # Store diagnostics for consistency with /deep-dive
-        except Exception as e:
-            print(f"Warning: Could not store diagnostics (database migration needed): {e}")
+        # TODO: Store diagnostics after database migration
+        # analysis.diagnostics = diagnostics
 
         analysis.processing_status = "completed"
 
