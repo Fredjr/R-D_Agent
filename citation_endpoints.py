@@ -15,6 +15,10 @@ from typing import List, Optional
 from fastapi import HTTPException, Depends, Query, Header
 from sqlalchemy.orm import Session
 from database import get_db, Article, ArticleCitation
+
+# Initialize logger first
+logger = logging.getLogger(__name__)
+
 # Temporarily disable heavy dependencies for Railway deployment stability
 try:
     from services.citation_enrichment_service import get_citation_enrichment_service

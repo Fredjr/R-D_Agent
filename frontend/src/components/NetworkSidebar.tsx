@@ -26,6 +26,12 @@ interface NetworkSidebarProps {
   currentMode: string;
   projectId: string;
   collections: any[];
+  // Phase 6: Interactive Graph Navigation props
+  onExpandNode?: (nodeId: string, nodeData: any) => void;
+  onShowSimilarWork?: (pmid: string) => void;
+  onShowCitations?: (pmid: string) => void;
+  onShowReferences?: (pmid: string) => void;
+  onExplorePeople?: (authors: string[]) => void;
 }
 
 export default function NetworkSidebar({
@@ -35,7 +41,12 @@ export default function NetworkSidebar({
   onClose,
   currentMode,
   projectId,
-  collections
+  collections,
+  onExpandNode,
+  onShowSimilarWork,
+  onShowCitations,
+  onShowReferences,
+  onExplorePeople
 }: NetworkSidebarProps) {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
