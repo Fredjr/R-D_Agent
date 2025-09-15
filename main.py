@@ -1,5 +1,5 @@
 # DATABASE_URL secret verified working - testing Cloud Run environment injection
-from fastapi import FastAPI, Response, Depends, HTTPException, WebSocket, WebSocketDisconnect, Request, Header
+from fastapi import FastAPI, Response, Depends, HTTPException, WebSocket, WebSocketDisconnect, Request, Header, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import UploadFile, File, Form
 from sqlalchemy.orm import Session
@@ -9432,6 +9432,294 @@ async def get_collection_network(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get collection network: {str(e)}")
+
+# =============================================================================
+# SIMILAR WORK DISCOVERY ENDPOINTS - Phase 1 ResearchRabbit Feature Parity
+# =============================================================================
+
+@app.get("/articles/{pmid}/similar")
+async def get_similar_articles(
+    pmid: str,
+    limit: int = Query(20, ge=1, le=50, description="Maximum number of similar articles to return"),
+    threshold: float = Query(0.1, ge=0.0, le=1.0, description="Minimum similarity threshold"),
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get articles similar to the specified PMID using content, citation, and author similarity.
+
+    This endpoint implements the core Similar Work Discovery feature for ResearchRabbit parity.
+    """
+    try:
+        # Import similarity engine
+        from services.similarity_engine import get_similarity_engine
+
+        # Get base article
+        base_article = db.query(Article).filter(Article.pmid == pmid).first()
+        if not base_article:
+            raise HTTPException(status_code=404, detail=f"Article with PMID {pmid} not found")
+
+        # Get candidate articles for similarity comparison
+        # Strategy: Start with same journal, then expand to related fields
+        candidates = []
+
+        # First try: Same journal
+        if base_article.journal:
+            same_journal_candidates = db.query(Article).filter(
+                Article.pmid != pmid,
+                Article.journal == base_article.journal
+            ).limit(100).all()
+            candidates.extend(same_journal_candidates)
+
+        # Second try: Similar journal names (broader search)
+        if len(candidates) < 50 and base_article.journal:
+            journal_keywords = base_article.journal.split()[:2]  # First 2 words
+            for keyword in journal_keywords:
+                if len(keyword) > 3:  # Skip short words
+                    similar_journal_candidates = db.query(Article).filter(
+                        Article.pmid != pmid,
+                        Article.journal.ilike(f"%{keyword}%"),
+                        Article.journal != base_article.journal  # Exclude already found
+                    ).limit(50).all()
+                    candidates.extend(similar_journal_candidates)
+
+        # Third try: Recent articles in any field if still not enough candidates
+        if len(candidates) < 20:
+            recent_candidates = db.query(Article).filter(
+                Article.pmid != pmid,
+                Article.publication_year >= 2020
+            ).limit(100).all()
+            candidates.extend(recent_candidates)
+
+        # Fourth try: Any articles if still not enough
+        if len(candidates) < 10:
+            any_candidates = db.query(Article).filter(
+                Article.pmid != pmid
+            ).limit(50).all()
+            candidates.extend(any_candidates)
+
+        # Remove duplicates while preserving order
+        seen_pmids = set()
+        unique_candidates = []
+        for candidate in candidates:
+            if candidate.pmid not in seen_pmids:
+                unique_candidates.append(candidate)
+                seen_pmids.add(candidate.pmid)
+
+        candidates = unique_candidates[:200]  # Limit for performance
+
+        if not candidates:
+            return {
+                "base_article": {
+                    "pmid": base_article.pmid,
+                    "title": base_article.title,
+                    "journal": base_article.journal,
+                    "year": base_article.publication_year
+                },
+                "similar_articles": [],
+                "total_found": 0,
+                "search_parameters": {
+                    "limit": limit,
+                    "threshold": threshold,
+                    "candidates_searched": 0
+                },
+                "message": "No candidate articles found for similarity comparison"
+            }
+
+        # Calculate similarities using the similarity engine
+        similarity_engine = get_similarity_engine()
+        similar_articles = similarity_engine.find_similar_articles(
+            base_article, candidates, limit, threshold
+        )
+
+        # Format response
+        result_articles = []
+        for article, similarity_score in similar_articles:
+            result_articles.append({
+                "pmid": article.pmid,
+                "title": article.title,
+                "authors": article.authors or [],
+                "journal": article.journal,
+                "year": article.publication_year,
+                "doi": article.doi,
+                "citation_count": article.citation_count or 0,
+                "similarity_score": round(similarity_score, 4),
+                "url": f"https://pubmed.ncbi.nlm.nih.gov/{article.pmid}/" if article.pmid else None
+            })
+
+        return {
+            "base_article": {
+                "pmid": base_article.pmid,
+                "title": base_article.title,
+                "authors": base_article.authors or [],
+                "journal": base_article.journal,
+                "year": base_article.publication_year,
+                "citation_count": base_article.citation_count or 0
+            },
+            "similar_articles": result_articles,
+            "total_found": len(result_articles),
+            "search_parameters": {
+                "limit": limit,
+                "threshold": threshold,
+                "candidates_searched": len(candidates)
+            },
+            "cache_stats": similarity_engine.get_cache_stats()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Similar articles error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to find similar articles: {str(e)}")
+
+@app.get("/articles/{pmid}/similar-network")
+async def get_similar_articles_network(
+    pmid: str,
+    limit: int = Query(20, ge=1, le=50, description="Maximum number of similar articles in network"),
+    threshold: float = Query(0.15, ge=0.0, le=1.0, description="Minimum similarity threshold for network"),
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get network visualization data for articles similar to the specified PMID.
+
+    Returns React Flow compatible network data for Similar Work Discovery visualization.
+    """
+    try:
+        # Get similar articles data
+        similar_data = await get_similar_articles(pmid, limit, threshold, user_id, db)
+
+        if not similar_data["similar_articles"]:
+            return {
+                "nodes": [],
+                "edges": [],
+                "metadata": {
+                    "source_type": "similar_articles",
+                    "base_pmid": pmid,
+                    "total_nodes": 0,
+                    "total_edges": 0,
+                    "avg_similarity": 0.0,
+                    "similarity_range": {"min": 0.0, "max": 0.0}
+                },
+                "cached": False
+            }
+
+        # Convert to network format
+        nodes = []
+        edges = []
+
+        # Add base article as central node (larger, different color)
+        base_article = similar_data["base_article"]
+        nodes.append({
+            "id": base_article["pmid"],
+            "type": "article",
+            "position": {"x": 0, "y": 0},  # Center position
+            "data": {
+                "label": base_article["title"][:60] + ("..." if len(base_article["title"]) > 60 else ""),
+                "pmid": base_article["pmid"],
+                "title": base_article["title"],
+                "authors": base_article.get("authors", []),
+                "journal": base_article.get("journal", ""),
+                "year": base_article.get("year"),
+                "citation_count": base_article.get("citation_count", 0),
+                "node_type": "base_article"
+            },
+            "style": {
+                "width": 120,
+                "height": 80,
+                "backgroundColor": "#ff6b6b",  # Red for base article
+                "color": "white",
+                "border": "2px solid #e55555",
+                "borderRadius": "8px"
+            }
+        })
+
+        # Add similar articles as connected nodes
+        similarities = [article["similarity_score"] for article in similar_data["similar_articles"]]
+        max_similarity = max(similarities) if similarities else 1.0
+        min_similarity = min(similarities) if similarities else 0.0
+
+        for i, article in enumerate(similar_data["similar_articles"]):
+            # Calculate node size based on similarity score
+            similarity_ratio = (article["similarity_score"] - min_similarity) / (max_similarity - min_similarity) if max_similarity > min_similarity else 0.5
+            node_size = 60 + (similarity_ratio * 40)  # Size between 60-100
+
+            # Position nodes in a circle around the base article
+            import math
+            angle = (2 * math.pi * i) / len(similar_data["similar_articles"])
+            radius = 200
+            x = radius * math.cos(angle)
+            y = radius * math.sin(angle)
+
+            nodes.append({
+                "id": article["pmid"],
+                "type": "article",
+                "position": {"x": x, "y": y},
+                "data": {
+                    "label": article["title"][:50] + ("..." if len(article["title"]) > 50 else ""),
+                    "pmid": article["pmid"],
+                    "title": article["title"],
+                    "authors": article.get("authors", []),
+                    "journal": article.get("journal", ""),
+                    "year": article.get("year"),
+                    "citation_count": article.get("citation_count", 0),
+                    "similarity_score": article["similarity_score"],
+                    "node_type": "similar_article"
+                },
+                "style": {
+                    "width": int(node_size),
+                    "height": int(node_size * 0.7),
+                    "backgroundColor": "#4ecdc4",  # Teal for similar articles
+                    "color": "white",
+                    "border": "2px solid #45b7aa",
+                    "borderRadius": "6px"
+                }
+            })
+
+            # Add edge from base to similar article
+            edges.append({
+                "id": f"{base_article['pmid']}-{article['pmid']}",
+                "source": base_article["pmid"],
+                "target": article["pmid"],
+                "type": "default",
+                "data": {
+                    "label": f"{article['similarity_score']:.3f}",
+                    "similarity": article["similarity_score"]
+                },
+                "style": {
+                    "stroke": "#95a5a6",
+                    "strokeWidth": max(1, similarity_ratio * 4),  # Thicker lines for higher similarity
+                    "strokeDasharray": "0"
+                },
+                "animated": similarity_ratio > 0.7  # Animate high-similarity connections
+            })
+
+        # Calculate metadata
+        avg_similarity = sum(similarities) / len(similarities) if similarities else 0.0
+
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "metadata": {
+                "source_type": "similar_articles",
+                "base_pmid": pmid,
+                "total_nodes": len(nodes),
+                "total_edges": len(edges),
+                "avg_similarity": round(avg_similarity, 4),
+                "similarity_range": {
+                    "min": round(min_similarity, 4),
+                    "max": round(max_similarity, 4)
+                },
+                "search_parameters": similar_data["search_parameters"]
+            },
+            "cached": False  # TODO: Implement network-level caching
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Similar articles network error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate similar articles network: {str(e)}")
 
 @app.post("/articles/enrich")
 async def enrich_articles_endpoint(

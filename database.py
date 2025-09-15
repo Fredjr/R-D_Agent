@@ -390,6 +390,79 @@ class Article(Base):
         Index('idx_article_updated', 'citation_data_updated'),
     )
 
+class ArticleCitation(Base):
+    """Detailed citation relationships between articles for enhanced network analysis"""
+    __tablename__ = "article_citations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    citing_pmid = Column(String, ForeignKey("articles.pmid"), nullable=False)
+    cited_pmid = Column(String, ForeignKey("articles.pmid"), nullable=False)
+
+    # Citation context and metadata
+    citation_context = Column(Text, nullable=True)  # Context where citation appears
+    citation_type = Column(String, default="reference")  # "reference" or "citation"
+    section = Column(String, nullable=True)  # Introduction, Methods, Results, Discussion
+
+    # Relationship strength indicators
+    co_citation_count = Column(Integer, default=0)  # How often these papers are cited together
+    bibliographic_coupling = Column(Float, default=0.0)  # Shared reference similarity
+
+    # Temporal information
+    citation_year = Column(Integer, nullable=True)  # Year when citation was made
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    citing_article = relationship("Article", foreign_keys=[citing_pmid])
+    cited_article = relationship("Article", foreign_keys=[cited_pmid])
+
+    # Constraints and indexes for performance
+    __table_args__ = (
+        # Unique constraint to prevent duplicate citations
+        Index('idx_unique_citation', 'citing_pmid', 'cited_pmid', unique=True),
+        Index('idx_citing_pmid', 'citing_pmid'),
+        Index('idx_cited_pmid', 'cited_pmid'),
+        Index('idx_citation_year', 'citation_year'),
+        Index('idx_citation_type', 'citation_type'),
+    )
+
+class AuthorCollaboration(Base):
+    """Author collaboration networks for research team discovery"""
+    __tablename__ = "author_collaborations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    author1_name = Column(String, nullable=False)
+    author2_name = Column(String, nullable=False)
+
+    # Collaboration metrics
+    collaboration_count = Column(Integer, default=1)  # Number of shared papers
+    shared_articles = Column(JSON, default=list)  # List of PMIDs of shared papers
+    collaboration_strength = Column(Float, default=0.0)  # Weighted collaboration score
+
+    # Temporal collaboration data
+    first_collaboration = Column(DateTime(timezone=True), nullable=True)
+    last_collaboration = Column(DateTime(timezone=True), nullable=True)
+    collaboration_span_years = Column(Integer, default=0)  # Years of collaboration
+
+    # Research domain overlap
+    shared_journals = Column(JSON, default=list)  # Journals where they co-published
+    research_domains = Column(JSON, default=list)  # Shared research areas/keywords
+
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Constraints and indexes
+    __table_args__ = (
+        # Unique constraint for author pairs (bidirectional)
+        Index('idx_unique_collaboration', 'author1_name', 'author2_name', unique=True),
+        Index('idx_author1', 'author1_name'),
+        Index('idx_author2', 'author2_name'),
+        Index('idx_collaboration_count', 'collaboration_count'),
+        Index('idx_collaboration_strength', 'collaboration_strength'),
+        Index('idx_last_collaboration', 'last_collaboration'),
+    )
+
 class NetworkGraph(Base):
     """Cached network graphs for performance optimization"""
     __tablename__ = "network_graphs"
