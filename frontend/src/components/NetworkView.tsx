@@ -156,8 +156,107 @@ export default function NetworkView({
   const [showSidebar, setShowSidebar] = useState(false);
   const [collections, setCollections] = useState<any[]>([]);
 
+  // Enhanced state for ResearchRabbit-style navigation
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+  const [explorationHistory, setExplorationHistory] = useState<string[]>([]);
+  const [graphDepth, setGraphDepth] = useState<number>(1);
+  const [isExpanding, setIsExpanding] = useState<boolean>(false);
+
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+
+  // ResearchRabbit-style graph expansion
+  const expandNodeNetwork = useCallback(async (nodeId: string, nodeData: any) => {
+    if (expandedNodes.has(nodeId) || isExpanding) return;
+
+    setIsExpanding(true);
+    try {
+      // Fetch citations and references for the selected node
+      const [citationsResponse, referencesResponse] = await Promise.all([
+        fetch(`/api/proxy/articles/${nodeData.pmid}/citations`, {
+          headers: { 'User-ID': user?.email || 'default_user' }
+        }),
+        fetch(`/api/proxy/articles/${nodeData.pmid}/references`, {
+          headers: { 'User-ID': user?.email || 'default_user' }
+        })
+      ]);
+
+      const citations = citationsResponse.ok ? await citationsResponse.json() : [];
+      const references = referencesResponse.ok ? await referencesResponse.json() : [];
+
+      // Add new nodes and edges to the graph
+      const newNodes: Node[] = [];
+      const newEdges: Edge[] = [];
+
+      // Add citation nodes (papers that cite this one)
+      citations.forEach((citation: any, index: number) => {
+        const newNodeId = `citation_${nodeId}_${index}`;
+        newNodes.push({
+          id: newNodeId,
+          type: 'article',
+          position: {
+            x: Math.random() * 400 - 200,
+            y: Math.random() * 400 - 200
+          },
+          data: {
+            metadata: citation,
+            size: Math.max(40, Math.min(citation.citation_count * 2, 100)),
+            color: getNodeColor(citation.year || 2020)
+          }
+        });
+
+        newEdges.push({
+          id: `edge_${newNodeId}_${nodeId}`,
+          source: newNodeId,
+          target: nodeId,
+          type: 'smoothstep',
+          animated: true,
+          style: { stroke: '#10b981', strokeWidth: 2 },
+          label: 'cites'
+        });
+      });
+
+      // Add reference nodes (papers this one cites)
+      references.forEach((reference: any, index: number) => {
+        const newNodeId = `reference_${nodeId}_${index}`;
+        newNodes.push({
+          id: newNodeId,
+          type: 'article',
+          position: {
+            x: Math.random() * 400 - 200,
+            y: Math.random() * 400 - 200
+          },
+          data: {
+            metadata: reference,
+            size: Math.max(40, Math.min(reference.citation_count * 2, 100)),
+            color: getNodeColor(reference.year || 2020)
+          }
+        });
+
+        newEdges.push({
+          id: `edge_${nodeId}_${newNodeId}`,
+          source: nodeId,
+          target: newNodeId,
+          type: 'smoothstep',
+          animated: true,
+          style: { stroke: '#3b82f6', strokeWidth: 2 },
+          label: 'references'
+        });
+      });
+
+      // Update graph state
+      setNodes(prevNodes => [...prevNodes, ...newNodes]);
+      setEdges(prevEdges => [...prevEdges, ...newEdges]);
+      setExpandedNodes(prev => new Set([...prev, nodeId]));
+      setExplorationHistory(prev => [...prev, nodeId]);
+      setGraphDepth(prev => prev + 1);
+
+    } catch (error) {
+      console.error('Error expanding node network:', error);
+    } finally {
+      setIsExpanding(false);
+    }
+  }, [expandedNodes, isExpanding, user?.email, setNodes, setEdges]);
 
   // Fetch network data with navigation mode support
   const fetchNetworkData = useCallback(async () => {
@@ -309,13 +408,19 @@ export default function NetworkView({
     handleNavigationChange(step.mode, step.sourceId);
   }, [navigationTrail, handleNavigationChange]);
 
-  // Handle node click with navigation support
+  // Handle node click with navigation support and expansion
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     const networkNode = networkData?.nodes.find(n => n.id === node.id);
     if (networkNode) {
       setSelectedNode(networkNode);
       setShowSidebar(true);
       onNodeSelect?.(networkNode);
+
+      // ResearchRabbit-style expansion: Double-click or Ctrl+Click to expand
+      if (event.detail === 2 || event.ctrlKey || event.metaKey) {
+        // Double-click or Ctrl/Cmd+Click expands the node
+        expandNodeNetwork(node.id, networkNode);
+      }
 
       // If this is a similar work view and user clicks on a node,
       // we could navigate to that article's similar work
@@ -324,7 +429,7 @@ export default function NetworkView({
         // handleNavigationChange('similar', networkNode.metadata.pmid);
       }
     }
-  }, [networkData, onNodeSelect, navigationMode]);
+  }, [networkData, onNodeSelect, navigationMode, expandNodeNetwork]);
 
   // Handle connection (if needed for future features)
   const onConnect: OnConnect = useCallback(
@@ -614,6 +719,41 @@ export default function NetworkView({
             </div>
           </div>
         </Panel>
+
+        {/* Exploration Controls Panel */}
+        {(expandedNodes.size > 0 || explorationHistory.length > 0) && (
+          <Panel position="bottom-center" className="bg-white p-3 rounded-lg shadow-lg border">
+            <div className="text-sm">
+              <div className="font-semibold text-gray-900 mb-2">Graph Exploration</div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setExpandedNodes(new Set());
+                    setExplorationHistory([]);
+                    setGraphDepth(1);
+                    fetchNetworkData(); // Reset to original network
+                  }}
+                  className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs transition-colors"
+                >
+                  Reset Graph
+                </button>
+                {explorationHistory.length > 0 && (
+                  <div className="text-xs text-gray-600">
+                    Path: {explorationHistory.length} steps
+                  </div>
+                )}
+                {isExpanding && (
+                  <div className="text-xs text-blue-600">
+                    Expanding...
+                  </div>
+                )}
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Double-click or Ctrl+Click nodes to expand
+              </div>
+            </div>
+          </Panel>
+        )}
       </ReactFlow>
 
       {/* Enhanced NetworkSidebar */}
@@ -639,6 +779,11 @@ export default function NetworkView({
             currentMode={navigationMode || 'default'}
             projectId={sourceType === 'project' ? sourceId : ''}
             collections={collections}
+            onExpandNode={(nodeId, nodeData) => expandNodeNetwork(nodeId, nodeData)}
+            onShowSimilarWork={(pmid) => handleNavigationChange('similar', pmid)}
+            onShowCitations={(pmid) => handleNavigationChange('citations', pmid)}
+            onShowReferences={(pmid) => handleNavigationChange('references', pmid)}
+            onExplorePeople={(authors) => handleNavigationChange('authors', authors.join(','))}
           />
         </div>
       )}
