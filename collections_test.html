@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Collections Feature Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .collection {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin: 10px 0;
+            padding: 15px;
+            background: #fafafa;
+        }
+        .collection-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .collection-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+        }
+        .article {
+            background: white;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 5px 0;
+        }
+        .article-title {
+            font-weight: bold;
+            color: #333;
+        }
+        .article-meta {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        .btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+        .btn-danger {
+            background: #dc3545;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        .form-group {
+            margin: 10px 0;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Collections Feature Test</h1>
+        
+        <div id="status"></div>
+        
+        <div>
+            <h2>Create New Collection</h2>
+            <div class="form-group">
+                <label>Collection Name:</label>
+                <input type="text" id="collectionName" placeholder="Enter collection name">
+            </div>
+            <div class="form-group">
+                <label>Description:</label>
+                <textarea id="collectionDescription" placeholder="Enter description"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Color:</label>
+                <input type="color" id="collectionColor" value="#FF5733">
+            </div>
+            <div class="form-group">
+                <label>Icon:</label>
+                <input type="text" id="collectionIcon" placeholder="bookmark" value="bookmark">
+            </div>
+            <button class="btn" onclick="createCollection()">Create Collection</button>
+        </div>
+
+        <div>
+            <h2>Collections</h2>
+            <button class="btn" onclick="loadCollections()">Refresh Collections</button>
+            <div id="collections"></div>
+        </div>
+
+        <div>
+            <h2>Add Article to Collection</h2>
+            <div class="form-group">
+                <label>Collection:</label>
+                <select id="targetCollection">
+                    <option value="">Select a collection</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Article Title:</label>
+                <input type="text" id="articleTitle" placeholder="Enter article title">
+            </div>
+            <div class="form-group">
+                <label>PMID (optional):</label>
+                <input type="text" id="articlePmid" placeholder="Enter PubMed ID">
+            </div>
+            <div class="form-group">
+                <label>Authors (comma-separated):</label>
+                <input type="text" id="articleAuthors" placeholder="Smith, J., Doe, A.">
+            </div>
+            <div class="form-group">
+                <label>Journal:</label>
+                <input type="text" id="articleJournal" placeholder="Enter journal name">
+            </div>
+            <div class="form-group">
+                <label>Year:</label>
+                <input type="number" id="articleYear" placeholder="2023">
+            </div>
+            <div class="form-group">
+                <label>Notes:</label>
+                <textarea id="articleNotes" placeholder="Enter notes about this article"></textarea>
+            </div>
+            <button class="btn" onclick="addArticle()">Add Article</button>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://127.0.0.1:8001';
+        const PROJECT_ID = 'd12c761f-9ff4-41e5-9c4e-92c951c40003';
+        const USER_ID = 'test_user_collections';
+
+        function showStatus(message, isError = false) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `<div class="status ${isError ? 'error' : 'success'}">${message}</div>`;
+            setTimeout(() => statusDiv.innerHTML = '', 5000);
+        }
+
+        async function createCollection() {
+            const name = document.getElementById('collectionName').value;
+            const description = document.getElementById('collectionDescription').value;
+            const color = document.getElementById('collectionColor').value;
+            const icon = document.getElementById('collectionIcon').value;
+
+            if (!name) {
+                showStatus('Please enter a collection name', true);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/projects/${PROJECT_ID}/collections`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'User-ID': USER_ID
+                    },
+                    body: JSON.stringify({
+                        collection_name: name,
+                        description: description,
+                        color: color,
+                        icon: icon
+                    })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    showStatus(`Collection "${result.collection_name}" created successfully!`);
+                    document.getElementById('collectionName').value = '';
+                    document.getElementById('collectionDescription').value = '';
+                    loadCollections();
+                } else {
+                    const error = await response.json();
+                    showStatus(`Error: ${error.detail}`, true);
+                }
+            } catch (error) {
+                showStatus(`Network error: ${error.message}`, true);
+            }
+        }
+
+        async function loadCollections() {
+            try {
+                const response = await fetch(`${API_BASE}/projects/${PROJECT_ID}/collections`, {
+                    headers: { 'User-ID': USER_ID }
+                });
+
+                if (response.ok) {
+                    const collections = await response.json();
+                    displayCollections(collections);
+                    updateCollectionSelect(collections);
+                } else {
+                    const error = await response.json();
+                    showStatus(`Error loading collections: ${error.detail}`, true);
+                }
+            } catch (error) {
+                showStatus(`Network error: ${error.message}`, true);
+            }
+        }
+
+        function displayCollections(collections) {
+            const container = document.getElementById('collections');
+            if (collections.length === 0) {
+                container.innerHTML = '<p>No collections found. Create one above!</p>';
+                return;
+            }
+
+            container.innerHTML = collections.map(collection => `
+                <div class="collection">
+                    <div class="collection-header">
+                        <div class="collection-icon" style="background-color: ${collection.color}"></div>
+                        <h3>${collection.collection_name}</h3>
+                        <button class="btn btn-danger" onclick="deleteCollection('${collection.collection_id}')">Delete</button>
+                    </div>
+                    <p>${collection.description || 'No description'}</p>
+                    <p><strong>Articles:</strong> ${collection.article_count}</p>
+                    <p><strong>Created:</strong> ${new Date(collection.created_at).toLocaleDateString()}</p>
+                    <button class="btn" onclick="loadArticles('${collection.collection_id}')">View Articles</button>
+                    <div id="articles-${collection.collection_id}"></div>
+                </div>
+            `).join('');
+        }
+
+        function updateCollectionSelect(collections) {
+            const select = document.getElementById('targetCollection');
+            select.innerHTML = '<option value="">Select a collection</option>' +
+                collections.map(c => `<option value="${c.collection_id}">${c.collection_name}</option>`).join('');
+        }
+
+        async function loadArticles(collectionId) {
+            try {
+                const response = await fetch(`${API_BASE}/projects/${PROJECT_ID}/collections/${collectionId}/articles`, {
+                    headers: { 'User-ID': USER_ID }
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    displayArticles(collectionId, result.articles);
+                } else {
+                    const error = await response.json();
+                    showStatus(`Error loading articles: ${error.detail}`, true);
+                }
+            } catch (error) {
+                showStatus(`Network error: ${error.message}`, true);
+            }
+        }
+
+        function displayArticles(collectionId, articles) {
+            const container = document.getElementById(`articles-${collectionId}`);
+            if (articles.length === 0) {
+                container.innerHTML = '<p>No articles in this collection.</p>';
+                return;
+            }
+
+            container.innerHTML = articles.map(article => `
+                <div class="article">
+                    <div class="article-title">${article.article_title}</div>
+                    <div class="article-meta">
+                        ${article.article_authors ? `Authors: ${article.article_authors.join(', ')}<br>` : ''}
+                        ${article.article_journal ? `Journal: ${article.article_journal}<br>` : ''}
+                        ${article.article_year ? `Year: ${article.article_year}<br>` : ''}
+                        ${article.article_pmid ? `PMID: ${article.article_pmid}<br>` : ''}
+                        ${article.notes ? `Notes: ${article.notes}<br>` : ''}
+                        Added: ${new Date(article.added_at).toLocaleDateString()}
+                    </div>
+                    <button class="btn btn-danger" onclick="removeArticle('${collectionId}', ${article.id})">Remove</button>
+                </div>
+            `).join('');
+        }
+
+        async function addArticle() {
+            const collectionId = document.getElementById('targetCollection').value;
+            const title = document.getElementById('articleTitle').value;
+            const pmid = document.getElementById('articlePmid').value;
+            const authors = document.getElementById('articleAuthors').value.split(',').map(a => a.trim()).filter(a => a);
+            const journal = document.getElementById('articleJournal').value;
+            const year = document.getElementById('articleYear').value;
+            const notes = document.getElementById('articleNotes').value;
+
+            if (!collectionId || !title) {
+                showStatus('Please select a collection and enter an article title', true);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/projects/${PROJECT_ID}/collections/${collectionId}/articles`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'User-ID': USER_ID
+                    },
+                    body: JSON.stringify({
+                        article_pmid: pmid || null,
+                        article_title: title,
+                        article_authors: authors,
+                        article_journal: journal || null,
+                        article_year: year ? parseInt(year) : null,
+                        source_type: 'manual',
+                        notes: notes || null
+                    })
+                });
+
+                if (response.ok) {
+                    showStatus('Article added successfully!');
+                    // Clear form
+                    document.getElementById('articleTitle').value = '';
+                    document.getElementById('articlePmid').value = '';
+                    document.getElementById('articleAuthors').value = '';
+                    document.getElementById('articleJournal').value = '';
+                    document.getElementById('articleYear').value = '';
+                    document.getElementById('articleNotes').value = '';
+                    loadCollections();
+                } else {
+                    const error = await response.json();
+                    showStatus(`Error: ${error.detail}`, true);
+                }
+            } catch (error) {
+                showStatus(`Network error: ${error.message}`, true);
+            }
+        }
+
+        async function removeArticle(collectionId, articleId) {
+            try {
+                const response = await fetch(`${API_BASE}/projects/${PROJECT_ID}/collections/${collectionId}/articles/${articleId}`, {
+                    method: 'DELETE',
+                    headers: { 'User-ID': USER_ID }
+                });
+
+                if (response.ok) {
+                    showStatus('Article removed successfully!');
+                    loadArticles(collectionId);
+                    loadCollections(); // Refresh to update article counts
+                } else {
+                    const error = await response.json();
+                    showStatus(`Error: ${error.detail}`, true);
+                }
+            } catch (error) {
+                showStatus(`Network error: ${error.message}`, true);
+            }
+        }
+
+        async function deleteCollection(collectionId) {
+            if (!confirm('Are you sure you want to delete this collection?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/projects/${PROJECT_ID}/collections/${collectionId}`, {
+                    method: 'DELETE',
+                    headers: { 'User-ID': USER_ID }
+                });
+
+                if (response.ok) {
+                    showStatus('Collection deleted successfully!');
+                    loadCollections();
+                } else {
+                    const error = await response.json();
+                    showStatus(`Error: ${error.detail}`, true);
+                }
+            } catch (error) {
+                showStatus(`Network error: ${error.message}`, true);
+            }
+        }
+
+        // Load collections on page load
+        loadCollections();
+    </script>
+</body>
+</html>
