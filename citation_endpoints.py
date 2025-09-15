@@ -289,7 +289,7 @@ def register_citation_endpoints(app):
     ):
         """
         Enrich all articles in a collection with citation data.
-        
+
         Batch processes all articles in the collection to fetch
         citation relationships from external APIs.
         """
@@ -301,12 +301,50 @@ def register_citation_endpoints(app):
                 raise HTTPException(status_code=500, detail=result["error"])
 
             return result
-            
+
         except HTTPException:
             raise
         except Exception as e:
             logger.error(f"Error enriching collection {collection_id}: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to enrich collection: {str(e)}")
+
+    @app.post("/admin/populate-citation-articles")
+    async def populate_citation_articles_endpoint(
+        pmid: str = Query("33462507", description="Main article PMID to populate citations for"),
+        max_citations: int = Query(10, ge=1, le=20, description="Maximum citations to create"),
+        max_references: int = Query(5, ge=1, le=10, description="Maximum references to create"),
+        user_id: str = Header(..., alias="User-ID"),
+        db: Session = Depends(get_db)
+    ):
+        """
+        Admin endpoint to populate missing citation articles for network visualization.
+
+        Creates Article records for citation and reference PMIDs to enable
+        network endpoints to show actual nodes and edges.
+        """
+        try:
+            # Import the population function
+            from populate_citation_articles import populate_citation_articles
+
+            result = await populate_citation_articles(pmid, max_citations, max_references)
+
+            if result["status"] == "error":
+                raise HTTPException(status_code=500, detail=result["error"])
+
+            return {
+                "status": "success",
+                "message": "Citation articles populated successfully",
+                "main_pmid": pmid,
+                "created_citations": result["created_citations"],
+                "created_references": result["created_references"],
+                "total_articles": result["total_articles"]
+            }
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error populating citation articles: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to populate citation articles: {str(e)}")
 
 
 # Test endpoint for citation functionality
