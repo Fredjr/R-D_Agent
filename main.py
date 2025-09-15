@@ -8870,6 +8870,109 @@ async def preflight_generate_review() -> Response:
 # DATABASE DEBUG AND INITIALIZATION
 # =============================================================================
 
+@app.post("/admin/migrate-collections")
+async def migrate_collections_schema():
+    """Admin endpoint to migrate database schema for Collections feature"""
+    try:
+        from database import get_engine
+        from sqlalchemy import text
+
+        engine = get_engine()
+
+        with engine.connect() as conn:
+            trans = conn.begin()
+
+            try:
+                # 1. Create collections table
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS collections (
+                        collection_id VARCHAR NOT NULL PRIMARY KEY,
+                        project_id VARCHAR NOT NULL,
+                        collection_name VARCHAR NOT NULL,
+                        description TEXT,
+                        created_by VARCHAR NOT NULL,
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                        is_active BOOLEAN DEFAULT true,
+                        color VARCHAR,
+                        icon VARCHAR,
+                        sort_order INTEGER DEFAULT 0,
+                        FOREIGN KEY(project_id) REFERENCES projects (project_id),
+                        FOREIGN KEY(created_by) REFERENCES users (user_id)
+                    )
+                """))
+
+                # 2. Create article_collections table
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS article_collections (
+                        id SERIAL PRIMARY KEY,
+                        collection_id VARCHAR NOT NULL,
+                        article_pmid VARCHAR,
+                        article_url VARCHAR,
+                        article_title VARCHAR NOT NULL,
+                        article_authors JSON DEFAULT '[]',
+                        article_journal VARCHAR,
+                        article_year INTEGER,
+                        source_type VARCHAR NOT NULL,
+                        source_report_id VARCHAR,
+                        source_analysis_id VARCHAR,
+                        added_by VARCHAR NOT NULL,
+                        added_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                        notes TEXT,
+                        FOREIGN KEY(collection_id) REFERENCES collections (collection_id),
+                        FOREIGN KEY(source_report_id) REFERENCES reports (report_id),
+                        FOREIGN KEY(source_analysis_id) REFERENCES deep_dive_analyses (analysis_id),
+                        FOREIGN KEY(added_by) REFERENCES users (user_id)
+                    )
+                """))
+
+                # 3. Add collection_id column to activity_logs table
+                try:
+                    conn.execute(text("""
+                        ALTER TABLE activity_logs
+                        ADD COLUMN collection_id VARCHAR REFERENCES collections(collection_id)
+                    """))
+                except Exception as e:
+                    if "already exists" in str(e).lower():
+                        pass  # Column already exists
+                    else:
+                        raise
+
+                # 4. Create indexes
+                indexes = [
+                    "CREATE INDEX IF NOT EXISTS idx_collection_project_id ON collections (project_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_collection_created_by ON collections (created_by)",
+                    "CREATE INDEX IF NOT EXISTS idx_collection_name_project ON collections (project_id, collection_name)",
+                    "CREATE INDEX IF NOT EXISTS idx_article_collection_id ON article_collections (collection_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_article_pmid ON article_collections (article_pmid)",
+                    "CREATE INDEX IF NOT EXISTS idx_article_source_report ON article_collections (source_report_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_article_source_analysis ON article_collections (source_analysis_id)"
+                ]
+
+                for index_sql in indexes:
+                    conn.execute(text(index_sql))
+
+                trans.commit()
+
+                return {
+                    "status": "success",
+                    "message": "Collections schema migration completed successfully",
+                    "tables_created": ["collections", "article_collections"],
+                    "columns_added": ["activity_logs.collection_id"],
+                    "indexes_created": len(indexes)
+                }
+
+            except Exception as e:
+                trans.rollback()
+                raise e
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Migration failed: {str(e)}",
+            "error_type": type(e).__name__
+        }
+
 @app.get("/debug/database")
 async def debug_database():
     """Debug endpoint to check database configuration"""
