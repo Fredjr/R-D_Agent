@@ -105,6 +105,15 @@ app = FastAPI(title="R&D Agent API", version="1.0.0")
 from author_endpoints import register_author_endpoints
 register_author_endpoints(app)
 
+# =============================================================================
+# CITATION NETWORK ENDPOINTS - Phase 5 ResearchRabbit Feature Parity
+# =============================================================================
+
+# Import and register citation endpoints
+from citation_endpoints import register_citation_endpoints, add_test_citation_endpoint
+register_citation_endpoints(app)
+add_test_citation_endpoint(app)
+
 # WebSocket Connection Manager for Project Rooms
 class ConnectionManager:
     def __init__(self):
