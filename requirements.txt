@@ -37,3 +37,7 @@ sendgrid>=6.11.0
 
 # Basic scientific computing (no heavy ML dependencies) - Python 3.12 compatible
 numpy>=1.26.0
+
+# Phase 5: Citation Network Foundation dependencies - Python 3.12 compatible
+scikit-learn>=1.3.0
+aiohttp>=3.8.0
