@@ -15,7 +15,6 @@ import {
   ConnectionMode,
   NodeTypes,
   OnConnect,
-  OnNodeClick,
   Panel,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -124,8 +123,8 @@ export default function NetworkView({ sourceType, sourceId, onNodeSelect, classN
   const [error, setError] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<NetworkNode | null>(null);
   
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
   // Fetch network data
   const fetchNetworkData = useCallback(async () => {
@@ -194,7 +193,7 @@ export default function NetworkView({ sourceType, sourceId, onNodeSelect, classN
   }, [fetchNetworkData]);
 
   // Handle node click
-  const onNodeClick: OnNodeClick = useCallback((event, node) => {
+  const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     const networkNode = networkData?.nodes.find(n => n.id === node.id);
     if (networkNode) {
       setSelectedNode(networkNode);
@@ -274,8 +273,8 @@ export default function NetworkView({ sourceType, sourceId, onNodeSelect, classN
         }}
       >
         <Controls />
-        <MiniMap 
-          nodeColor={(node) => node.data.color || '#94a3b8'}
+        <MiniMap
+          nodeColor={(node) => (node.data?.color as string) || '#94a3b8'}
           nodeStrokeWidth={3}
           zoomable
           pannable
@@ -323,7 +322,7 @@ export default function NetworkView({ sourceType, sourceId, onNodeSelect, classN
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded-full bg-gray-500"></div>
-                <span>Very Old (<2010)</span>
+                <span>Very Old (&lt;2010)</span>
               </div>
               <div className="mt-2 pt-2 border-t border-gray-200">
                 <div className="text-xs text-gray-500">Node size = Citation count</div>
