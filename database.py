@@ -136,6 +136,8 @@ class User(Base):
     annotations = relationship("Annotation", back_populates="author", cascade="all, delete-orphan")
     reports = relationship("Report", back_populates="creator", cascade="all, delete-orphan")
     deep_dive_analyses = relationship("DeepDiveAnalysis", back_populates="creator", cascade="all, delete-orphan")
+    collections = relationship("Collection", back_populates="creator", cascade="all, delete-orphan")
+    article_collections = relationship("ArticleCollection", back_populates="adder", cascade="all, delete-orphan")
 
 class Project(Base):
     """Project workspace model - organizes all research activities"""
@@ -159,6 +161,7 @@ class Project(Base):
     reports = relationship("Report", back_populates="project", cascade="all, delete-orphan")
     annotations = relationship("Annotation", back_populates="project", cascade="all, delete-orphan")
     deep_dive_analyses = relationship("DeepDiveAnalysis", back_populates="project", cascade="all, delete-orphan")
+    collections = relationship("Collection", back_populates="project", cascade="all, delete-orphan")
 
 class ProjectCollaborator(Base):
     """Many-to-many relationship between users and projects with roles"""
@@ -274,6 +277,79 @@ class Annotation(Base):
     report = relationship("Report")
     analysis = relationship("DeepDiveAnalysis")
 
+class Collection(Base):
+    """User-curated collections for organizing articles within projects"""
+    __tablename__ = "collections"
+
+    collection_id = Column(String, primary_key=True)  # UUID
+    project_id = Column(String, ForeignKey("projects.project_id"), nullable=False)
+    collection_name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+
+    # Collection metadata
+    created_by = Column(String, ForeignKey("users.user_id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    is_active = Column(Boolean, default=True)
+
+    # Collection settings
+    color = Column(String, nullable=True)  # Hex color for UI display
+    icon = Column(String, nullable=True)  # Icon identifier for UI
+    sort_order = Column(Integer, default=0)  # User-defined ordering
+
+    # Relationships
+    project = relationship("Project", back_populates="collections")
+    creator = relationship("User", back_populates="collections")
+    article_collections = relationship("ArticleCollection", back_populates="collection", cascade="all, delete-orphan")
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_collection_project_id', 'project_id'),
+        Index('idx_collection_created_by', 'created_by'),
+        Index('idx_collection_name_project', 'project_id', 'collection_name'),
+    )
+
+class ArticleCollection(Base):
+    """Junction table linking articles to collections"""
+    __tablename__ = "article_collections"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    collection_id = Column(String, ForeignKey("collections.collection_id"), nullable=False)
+
+    # Article identification (flexible to support different article sources)
+    article_pmid = Column(String, nullable=True)  # PubMed ID
+    article_url = Column(String, nullable=True)   # Direct URL
+    article_title = Column(String, nullable=False)  # Always required for display
+    article_authors = Column(JSON, default=list)  # Author list
+    article_journal = Column(String, nullable=True)
+    article_year = Column(Integer, nullable=True)
+
+    # Source tracking (where the article came from)
+    source_type = Column(String, nullable=False)  # 'report', 'deep_dive', 'manual'
+    source_report_id = Column(String, ForeignKey("reports.report_id"), nullable=True)
+    source_analysis_id = Column(String, ForeignKey("deep_dive_analyses.analysis_id"), nullable=True)
+
+    # Collection metadata
+    added_by = Column(String, ForeignKey("users.user_id"), nullable=False)
+    added_at = Column(DateTime(timezone=True), server_default=func.now())
+    notes = Column(Text, nullable=True)  # User notes about why this article is in the collection
+
+    # Relationships
+    collection = relationship("Collection", back_populates="article_collections")
+    adder = relationship("User", back_populates="article_collections")
+    source_report = relationship("Report")
+    source_analysis = relationship("DeepDiveAnalysis")
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_article_collection_id', 'collection_id'),
+        Index('idx_article_pmid', 'article_pmid'),
+        Index('idx_article_source_report', 'source_report_id'),
+        Index('idx_article_source_analysis', 'source_analysis_id'),
+        # Unique constraint to prevent duplicate articles in same collection
+        Index('idx_unique_article_collection', 'collection_id', 'article_pmid', 'article_url', unique=True),
+    )
+
 class ActivityLog(Base):
     """Activity logging for project collaboration tracking"""
     __tablename__ = "activity_logs"
@@ -291,15 +367,17 @@ class ActivityLog(Base):
     article_pmid = Column(String, nullable=True)
     report_id = Column(String, ForeignKey("reports.report_id"), nullable=True)
     analysis_id = Column(String, ForeignKey("deep_dive_analyses.analysis_id"), nullable=True)
-    
+    collection_id = Column(String, ForeignKey("collections.collection_id"), nullable=True)
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
+
     # Relationships
     project = relationship("Project")
     user = relationship("User")
     report = relationship("Report")
     analysis = relationship("DeepDiveAnalysis")
+    collection = relationship("Collection")
 
 # Database session dependency
 def get_db():

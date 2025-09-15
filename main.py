@@ -59,8 +59,8 @@ from scoring import calculate_publication_score
 
 # Database imports
 from database import (
-    get_db, init_db, User, Project, ProjectCollaborator, 
-    Report, DeepDiveAnalysis, Annotation, create_tables
+    get_db, init_db, User, Project, ProjectCollaborator,
+    Report, DeepDiveAnalysis, Annotation, Collection, ArticleCollection, create_tables
 )
 
 # Embeddings and Pinecone
@@ -6072,6 +6072,558 @@ async def log_activity(
         
     except Exception as e:
         print(f"Failed to log activity: {e}")
+
+# =============================================================================
+# COLLECTIONS MANAGEMENT ENDPOINTS
+# =============================================================================
+
+class CollectionCreate(BaseModel):
+    collection_name: str = Field(..., min_length=1, max_length=200, description="Collection name")
+    description: Optional[str] = Field(None, max_length=1000, description="Collection description")
+    color: Optional[str] = Field(None, pattern=r"^#[0-9A-Fa-f]{6}$", description="Hex color code")
+    icon: Optional[str] = Field(None, max_length=50, description="Icon identifier")
+
+class CollectionUpdate(BaseModel):
+    collection_name: Optional[str] = Field(None, min_length=1, max_length=200, description="Collection name")
+    description: Optional[str] = Field(None, max_length=1000, description="Collection description")
+    color: Optional[str] = Field(None, pattern=r"^#[0-9A-Fa-f]{6}$", description="Hex color code")
+    icon: Optional[str] = Field(None, max_length=50, description="Icon identifier")
+
+class ArticleToCollection(BaseModel):
+    article_pmid: Optional[str] = Field(None, description="PubMed ID")
+    article_url: Optional[str] = Field(None, description="Article URL")
+    article_title: str = Field(..., min_length=1, description="Article title")
+    article_authors: Optional[List[str]] = Field(default_factory=list, description="Author list")
+    article_journal: Optional[str] = Field(None, description="Journal name")
+    article_year: Optional[int] = Field(None, description="Publication year")
+    source_type: str = Field(..., description="Source type: 'report', 'deep_dive', or 'manual'")
+    source_report_id: Optional[str] = Field(None, description="Source report ID if from report")
+    source_analysis_id: Optional[str] = Field(None, description="Source analysis ID if from deep dive")
+    notes: Optional[str] = Field(None, max_length=2000, description="User notes about the article")
+
+@app.post("/projects/{project_id}/collections")
+async def create_collection(
+    project_id: str,
+    collection_data: CollectionCreate,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Create a new collection within a project"""
+    current_user = request.headers.get("User-ID", "default_user")
+
+    # Check project access
+    has_access = (
+        db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == current_user
+        ).first() is not None or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    try:
+        import uuid
+
+        # Create new collection
+        collection = Collection(
+            collection_id=str(uuid.uuid4()),
+            project_id=project_id,
+            collection_name=collection_data.collection_name,
+            description=collection_data.description,
+            created_by=current_user,
+            color=collection_data.color,
+            icon=collection_data.icon
+        )
+
+        db.add(collection)
+        db.commit()
+        db.refresh(collection)
+
+        # Log activity
+        await log_activity(
+            project_id=project_id,
+            user_id=current_user,
+            activity_type="collection_created",
+            description=f"Created collection '{collection_data.collection_name}'",
+            metadata={"collection_id": collection.collection_id},
+            db=db
+        )
+
+        return {
+            "collection_id": collection.collection_id,
+            "collection_name": collection.collection_name,
+            "description": collection.description,
+            "created_by": collection.created_by,
+            "created_at": collection.created_at,
+            "color": collection.color,
+            "icon": collection.icon,
+            "article_count": 0
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create collection: {str(e)}")
+
+@app.get("/projects/{project_id}/collections")
+async def get_project_collections(
+    project_id: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Get all collections for a project"""
+    current_user = request.headers.get("User-ID", "default_user")
+
+    # Check project access
+    has_access = (
+        db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == current_user
+        ).first() is not None or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    try:
+        from sqlalchemy import func
+
+        # Get collections with article counts
+        collections_with_counts = db.query(
+            Collection,
+            func.count(ArticleCollection.id).label('article_count')
+        ).outerjoin(
+            ArticleCollection, Collection.collection_id == ArticleCollection.collection_id
+        ).filter(
+            Collection.project_id == project_id,
+            Collection.is_active == True
+        ).group_by(Collection.collection_id).order_by(
+            Collection.sort_order.asc(),
+            Collection.created_at.desc()
+        ).all()
+
+        return [
+            {
+                "collection_id": collection.collection_id,
+                "collection_name": collection.collection_name,
+                "description": collection.description,
+                "created_by": collection.created_by,
+                "created_at": collection.created_at,
+                "updated_at": collection.updated_at,
+                "color": collection.color,
+                "icon": collection.icon,
+                "sort_order": collection.sort_order,
+                "article_count": article_count or 0
+            }
+            for collection, article_count in collections_with_counts
+        ]
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get collections: {str(e)}")
+
+@app.put("/projects/{project_id}/collections/{collection_id}")
+async def update_collection(
+    project_id: str,
+    collection_id: str,
+    collection_data: CollectionUpdate,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Update a collection"""
+    current_user = request.headers.get("User-ID", "default_user")
+
+    # Check project access
+    has_access = (
+        db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == current_user
+        ).first() is not None or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    try:
+        # Find the collection
+        collection = db.query(Collection).filter(
+            Collection.collection_id == collection_id,
+            Collection.project_id == project_id,
+            Collection.is_active == True
+        ).first()
+
+        if not collection:
+            raise HTTPException(status_code=404, detail="Collection not found")
+
+        # Update fields if provided
+        if collection_data.collection_name is not None:
+            collection.collection_name = collection_data.collection_name
+        if collection_data.description is not None:
+            collection.description = collection_data.description
+        if collection_data.color is not None:
+            collection.color = collection_data.color
+        if collection_data.icon is not None:
+            collection.icon = collection_data.icon
+
+        db.commit()
+        db.refresh(collection)
+
+        # Log activity
+        await log_activity(
+            project_id=project_id,
+            user_id=current_user,
+            activity_type="collection_updated",
+            description=f"Updated collection '{collection.collection_name}'",
+            metadata={"collection_id": collection.collection_id},
+            db=db
+        )
+
+        return {
+            "collection_id": collection.collection_id,
+            "collection_name": collection.collection_name,
+            "description": collection.description,
+            "created_by": collection.created_by,
+            "created_at": collection.created_at,
+            "updated_at": collection.updated_at,
+            "color": collection.color,
+            "icon": collection.icon,
+            "sort_order": collection.sort_order
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update collection: {str(e)}")
+
+@app.delete("/projects/{project_id}/collections/{collection_id}")
+async def delete_collection(
+    project_id: str,
+    collection_id: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Delete a collection (soft delete)"""
+    current_user = request.headers.get("User-ID", "default_user")
+
+    # Check project access
+    has_access = (
+        db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == current_user
+        ).first() is not None or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    try:
+        # Find the collection
+        collection = db.query(Collection).filter(
+            Collection.collection_id == collection_id,
+            Collection.project_id == project_id,
+            Collection.is_active == True
+        ).first()
+
+        if not collection:
+            raise HTTPException(status_code=404, detail="Collection not found")
+
+        # Soft delete the collection
+        collection.is_active = False
+        db.commit()
+
+        # Log activity
+        await log_activity(
+            project_id=project_id,
+            user_id=current_user,
+            activity_type="collection_deleted",
+            description=f"Deleted collection '{collection.collection_name}'",
+            metadata={"collection_id": collection.collection_id},
+            db=db
+        )
+
+        return {"message": "Collection deleted successfully"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete collection: {str(e)}")
+
+@app.post("/projects/{project_id}/collections/{collection_id}/articles")
+async def add_article_to_collection(
+    project_id: str,
+    collection_id: str,
+    article_data: ArticleToCollection,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Add an article to a collection"""
+    current_user = request.headers.get("User-ID", "default_user")
+
+    # Check project access
+    has_access = (
+        db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == current_user
+        ).first() is not None or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    try:
+        # Verify collection exists
+        collection = db.query(Collection).filter(
+            Collection.collection_id == collection_id,
+            Collection.project_id == project_id,
+            Collection.is_active == True
+        ).first()
+
+        if not collection:
+            raise HTTPException(status_code=404, detail="Collection not found")
+
+        # Check if article already exists in collection
+        existing = db.query(ArticleCollection).filter(
+            ArticleCollection.collection_id == collection_id,
+            ArticleCollection.article_pmid == article_data.article_pmid,
+            ArticleCollection.article_url == article_data.article_url
+        ).first()
+
+        if existing:
+            raise HTTPException(status_code=409, detail="Article already exists in collection")
+
+        # Add article to collection
+        article_collection = ArticleCollection(
+            collection_id=collection_id,
+            article_pmid=article_data.article_pmid,
+            article_url=article_data.article_url,
+            article_title=article_data.article_title,
+            article_authors=article_data.article_authors,
+            article_journal=article_data.article_journal,
+            article_year=article_data.article_year,
+            source_type=article_data.source_type,
+            source_report_id=article_data.source_report_id,
+            source_analysis_id=article_data.source_analysis_id,
+            added_by=current_user,
+            notes=article_data.notes
+        )
+
+        db.add(article_collection)
+        db.commit()
+        db.refresh(article_collection)
+
+        # Log activity
+        await log_activity(
+            project_id=project_id,
+            user_id=current_user,
+            activity_type="article_added_to_collection",
+            description=f"Added article '{article_data.article_title}' to collection '{collection.collection_name}'",
+            metadata={
+                "collection_id": collection_id,
+                "article_pmid": article_data.article_pmid,
+                "article_title": article_data.article_title
+            },
+            db=db
+        )
+
+        return {
+            "id": article_collection.id,
+            "collection_id": collection_id,
+            "article_pmid": article_collection.article_pmid,
+            "article_url": article_collection.article_url,
+            "article_title": article_collection.article_title,
+            "article_authors": article_collection.article_authors,
+            "article_journal": article_collection.article_journal,
+            "article_year": article_collection.article_year,
+            "source_type": article_collection.source_type,
+            "source_report_id": article_collection.source_report_id,
+            "source_analysis_id": article_collection.source_analysis_id,
+            "added_by": article_collection.added_by,
+            "added_at": article_collection.added_at,
+            "notes": article_collection.notes
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to add article to collection: {str(e)}")
+
+@app.delete("/projects/{project_id}/collections/{collection_id}/articles/{article_id}")
+async def remove_article_from_collection(
+    project_id: str,
+    collection_id: str,
+    article_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Remove an article from a collection"""
+    current_user = request.headers.get("User-ID", "default_user")
+
+    # Check project access
+    has_access = (
+        db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == current_user
+        ).first() is not None or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    try:
+        # Find the article in the collection
+        article_collection = db.query(ArticleCollection).join(Collection).filter(
+            ArticleCollection.id == article_id,
+            ArticleCollection.collection_id == collection_id,
+            Collection.project_id == project_id,
+            Collection.is_active == True
+        ).first()
+
+        if not article_collection:
+            raise HTTPException(status_code=404, detail="Article not found in collection")
+
+        # Get collection name for logging
+        collection = db.query(Collection).filter(Collection.collection_id == collection_id).first()
+
+        # Remove the article
+        db.delete(article_collection)
+        db.commit()
+
+        # Log activity
+        await log_activity(
+            project_id=project_id,
+            user_id=current_user,
+            activity_type="article_removed_from_collection",
+            description=f"Removed article '{article_collection.article_title}' from collection '{collection.collection_name if collection else 'Unknown'}'",
+            metadata={
+                "collection_id": collection_id,
+                "article_pmid": article_collection.article_pmid,
+                "article_title": article_collection.article_title
+            },
+            db=db
+        )
+
+        return {"message": "Article removed from collection successfully"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to remove article from collection: {str(e)}")
+
+@app.get("/projects/{project_id}/collections/{collection_id}/articles")
+async def get_collection_articles(
+    project_id: str,
+    collection_id: str,
+    request: Request,
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db)
+):
+    """Get all articles in a collection"""
+    current_user = request.headers.get("User-ID", "default_user")
+
+    # Check project access
+    has_access = (
+        db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == current_user
+        ).first() is not None or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    try:
+        # Verify collection exists
+        collection = db.query(Collection).filter(
+            Collection.collection_id == collection_id,
+            Collection.project_id == project_id,
+            Collection.is_active == True
+        ).first()
+
+        if not collection:
+            raise HTTPException(status_code=404, detail="Collection not found")
+
+        # Get articles with pagination
+        articles = db.query(ArticleCollection).filter(
+            ArticleCollection.collection_id == collection_id
+        ).order_by(
+            ArticleCollection.added_at.desc()
+        ).offset(offset).limit(limit).all()
+
+        # Get total count
+        total_count = db.query(ArticleCollection).filter(
+            ArticleCollection.collection_id == collection_id
+        ).count()
+
+        return {
+            "collection_id": collection_id,
+            "collection_name": collection.collection_name,
+            "articles": [
+                {
+                    "id": article.id,
+                    "article_pmid": article.article_pmid,
+                    "article_url": article.article_url,
+                    "article_title": article.article_title,
+                    "article_authors": article.article_authors,
+                    "article_journal": article.article_journal,
+                    "article_year": article.article_year,
+                    "source_type": article.source_type,
+                    "source_report_id": article.source_report_id,
+                    "source_analysis_id": article.source_analysis_id,
+                    "added_by": article.added_by,
+                    "added_at": article.added_at,
+                    "notes": article.notes
+                }
+                for article in articles
+            ],
+            "total_count": total_count,
+            "limit": limit,
+            "offset": offset,
+            "has_more": offset + len(articles) < total_count
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get collection articles: {str(e)}")
 
 def _strip_html(html: str) -> str:
     try:
