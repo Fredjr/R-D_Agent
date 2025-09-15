@@ -7,17 +7,16 @@ import NetworkSidebar from './NetworkSidebar';
 
 interface NetworkNode {
   id: string;
-  label: string;
-  size: number;
-  color: string;
-  metadata: {
+  data: {
     pmid: string;
     title: string;
     authors: string[];
     journal: string;
     year: number;
     citation_count: number;
-    url: string;
+    node_type: string;
+    abstract?: string;
+    url?: string;
   };
 }
 
@@ -41,8 +40,26 @@ export default function NetworkViewWithSidebar({
   const { user } = useAuth();
   const [selectedNode, setSelectedNode] = useState<NetworkNode | null>(null);
 
-  const handleNodeSelect = useCallback((node: NetworkNode | null) => {
-    setSelectedNode(node);
+  const handleNodeSelect = useCallback((node: any | null) => {
+    if (node) {
+      // Convert NetworkView format to NetworkSidebar format
+      const convertedNode: NetworkNode = {
+        id: node.id,
+        data: {
+          pmid: node.metadata.pmid,
+          title: node.metadata.title,
+          authors: node.metadata.authors,
+          journal: node.metadata.journal,
+          year: node.metadata.year,
+          citation_count: node.metadata.citation_count,
+          node_type: 'selected_article',
+          url: node.metadata.url
+        }
+      };
+      setSelectedNode(convertedNode);
+    } else {
+      setSelectedNode(null);
+    }
   }, []);
 
   const handleCloseSidebar = useCallback(() => {
@@ -108,9 +125,17 @@ export default function NetworkViewWithSidebar({
           <NetworkSidebar
             selectedNode={selectedNode}
             onClose={handleCloseSidebar}
-            onDeepDive={projectId ? handleDeepDive : undefined}
-            onSaveToCollection={handleSaveToCollection}
-            className="h-full"
+            onNavigationChange={(mode) => {
+              // Handle navigation mode changes
+              console.log('Navigation mode changed:', mode);
+            }}
+            onAddToCollection={(pmid) => {
+              // Handle adding to collection
+              console.log('Add to collection:', pmid);
+            }}
+            currentMode="default"
+            projectId={projectId || ''}
+            collections={[]}
           />
         </div>
       )}

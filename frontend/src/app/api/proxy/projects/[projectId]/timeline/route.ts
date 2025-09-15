@@ -4,10 +4,10 @@ const BACKEND_URL = "https://r-dagent-production.up.railway.app";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
-    const { id } = await params;
+    const { projectId } = await params;
     const { searchParams } = new URL(request.url);
     
     // Extract query parameters
@@ -15,7 +15,7 @@ export async function GET(
     const min_articles = searchParams.get('min_articles') || '2';
     
     // Build backend URL with query parameters
-    const backendUrl = new URL(`${BACKEND_URL}/projects/${id}/timeline`);
+    const backendUrl = new URL(`${BACKEND_URL}/projects/${projectId}/timeline`);
     backendUrl.searchParams.set('period_strategy', period_strategy);
     backendUrl.searchParams.set('min_articles', min_articles);
     
