@@ -65,10 +65,20 @@ interface NetworkData {
   cached: boolean;
 }
 
-interface NetworkViewProps {
-  sourceType: 'project' | 'collection' | 'report';
+interface NavigationStep {
+  mode: string;
   sourceId: string;
+  sourceType: string;
+  title: string;
+  timestamp: Date;
+}
+
+interface NetworkViewProps {
+  sourceType: 'project' | 'collection' | 'report' | 'article';
+  sourceId: string;
+  navigationMode?: 'default' | 'similar' | 'earlier' | 'later' | 'authors';
   onNodeSelect?: (node: NetworkNode | null) => void;
+  onNavigationChange?: (mode: string, sourceId: string) => void;
   className?: string;
 }
 
@@ -118,24 +128,56 @@ const nodeTypes: NodeTypes = {
   article: ArticleNode,
 };
 
-export default function NetworkView({ sourceType, sourceId, onNodeSelect, className = '' }: NetworkViewProps) {
+export default function NetworkView({
+  sourceType,
+  sourceId,
+  navigationMode = 'default',
+  onNodeSelect,
+  onNavigationChange,
+  className = ''
+}: NetworkViewProps) {
   const { user } = useAuth();
   const [networkData, setNetworkData] = useState<NetworkData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<NetworkNode | null>(null);
-  
+  const [navigationTrail, setNavigationTrail] = useState<NavigationStep[]>([]);
+
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
-  // Fetch network data
+  // Fetch network data with navigation mode support
   const fetchNetworkData = useCallback(async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      const endpoint = `${sourceType}s/${sourceId}/network`;
-      const response = await fetch(`/api/proxy/${endpoint}`, {
+      let endpoint = '';
+
+      // Determine endpoint based on navigation mode and source type
+      switch (navigationMode) {
+        case 'similar':
+          endpoint = `/api/proxy/articles/${sourceId}/similar-network`;
+          break;
+        case 'earlier':
+          endpoint = `/api/proxy/articles/${sourceId}/references-network`;
+          break;
+        case 'later':
+          endpoint = `/api/proxy/articles/${sourceId}/citations-network`;
+          break;
+        case 'authors':
+          endpoint = `/api/proxy/articles/${sourceId}/author-network`;
+          break;
+        default:
+          // Default network view based on source type
+          if (sourceType === 'article') {
+            endpoint = `/api/proxy/articles/${sourceId}/similar-network`;
+          } else {
+            endpoint = `/api/proxy/${sourceType}s/${sourceId}/network`;
+          }
+      }
+
+      const response = await fetch(endpoint, {
         headers: {
           'User-ID': user?.email || 'default_user',
         },
@@ -153,6 +195,19 @@ export default function NetworkView({ sourceType, sourceId, onNodeSelect, classN
 
       const data: NetworkData = await response.json();
       setNetworkData(data);
+
+      // Update navigation trail for non-default modes
+      if (navigationMode !== 'default') {
+        const step: NavigationStep = {
+          mode: navigationMode,
+          sourceId,
+          sourceType,
+          title: data.metadata?.title || `${navigationMode} view`,
+          timestamp: new Date()
+        };
+
+        setNavigationTrail(prev => [...prev, step]);
+      }
       
       // Convert network data to react-flow format
       const flowNodes: Node[] = data.nodes.map((node, index) => ({
@@ -194,20 +249,43 @@ export default function NetworkView({ sourceType, sourceId, onNodeSelect, classN
     } finally {
       setLoading(false);
     }
-  }, [sourceType, sourceId]);
+  }, [sourceType, sourceId, navigationMode, user]);
 
   useEffect(() => {
     fetchNetworkData();
   }, [fetchNetworkData]);
 
-  // Handle node click
+  // Handle navigation mode changes
+  const handleNavigationChange = useCallback((newMode: string, newSourceId?: string) => {
+    const targetSourceId = newSourceId || sourceId;
+    onNavigationChange?.(newMode, targetSourceId);
+  }, [sourceId, onNavigationChange]);
+
+  // Handle breadcrumb navigation
+  const handleBreadcrumbClick = useCallback((step: NavigationStep) => {
+    // Remove steps after the clicked step
+    const stepIndex = navigationTrail.findIndex(s => s === step);
+    setNavigationTrail(prev => prev.slice(0, stepIndex + 1));
+
+    // Navigate to the clicked step
+    handleNavigationChange(step.mode, step.sourceId);
+  }, [navigationTrail, handleNavigationChange]);
+
+  // Handle node click with navigation support
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     const networkNode = networkData?.nodes.find(n => n.id === node.id);
     if (networkNode) {
       setSelectedNode(networkNode);
       onNodeSelect?.(networkNode);
+
+      // If this is a similar work view and user clicks on a node,
+      // we could navigate to that article's similar work
+      if (navigationMode === 'similar' && networkNode.metadata.pmid) {
+        // This would be handled by the parent component
+        // handleNavigationChange('similar', networkNode.metadata.pmid);
+      }
     }
-  }, [networkData, onNodeSelect]);
+  }, [networkData, onNodeSelect, navigationMode]);
 
   // Handle connection (if needed for future features)
   const onConnect: OnConnect = useCallback(
@@ -288,6 +366,79 @@ export default function NetworkView({ sourceType, sourceId, onNodeSelect, classN
           pannable
         />
         <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
+
+        {/* Navigation Breadcrumb Trail */}
+        {navigationTrail.length > 0 && (
+          <Panel position="bottom-left" className="bg-white p-2 rounded-lg shadow-lg border max-w-md">
+            <div className="text-xs">
+              <div className="font-semibold text-gray-900 mb-1">Navigation Trail</div>
+              <div className="flex flex-wrap gap-1">
+                {navigationTrail.map((step, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleBreadcrumbClick(step)}
+                    className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded text-xs transition-colors"
+                    title={`${step.mode} view - ${step.title}`}
+                  >
+                    {step.mode}
+                    {index < navigationTrail.length - 1 && <span className="ml-1">→</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </Panel>
+        )}
+
+        {/* Navigation Mode Controls */}
+        {sourceType === 'article' && (
+          <Panel position="bottom-right" className="bg-white p-3 rounded-lg shadow-lg border">
+            <div className="text-sm">
+              <div className="font-semibold text-gray-900 mb-2">Navigation Modes</div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <button
+                  onClick={() => handleNavigationChange('similar')}
+                  className={`px-2 py-1 rounded transition-colors ${
+                    navigationMode === 'similar'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                  }`}
+                >
+                  Similar Work
+                </button>
+                <button
+                  onClick={() => handleNavigationChange('earlier')}
+                  className={`px-2 py-1 rounded transition-colors ${
+                    navigationMode === 'earlier'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                  }`}
+                >
+                  Earlier Work
+                </button>
+                <button
+                  onClick={() => handleNavigationChange('later')}
+                  className={`px-2 py-1 rounded transition-colors ${
+                    navigationMode === 'later'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                  }`}
+                >
+                  Later Work
+                </button>
+                <button
+                  onClick={() => handleNavigationChange('authors')}
+                  className={`px-2 py-1 rounded transition-colors ${
+                    navigationMode === 'authors'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                  }`}
+                >
+                  Authors
+                </button>
+              </div>
+            </div>
+          </Panel>
+        )}
 
         {/* Network Statistics Panel */}
         <Panel position="top-left" className="bg-white p-3 rounded-lg shadow-lg border">
