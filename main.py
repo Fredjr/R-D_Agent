@@ -6480,9 +6480,28 @@ async def get_or_create_network_graph(source_type: str, source_id: str, db: Sess
             if not collection:
                 return {"nodes": [], "edges": [], "metadata": {"error": "Collection not found"}}
 
-            pmids = [ac.article_pmid for ac in collection.article_collections if ac.article_pmid]
-            if pmids:
-                articles = db.query(Article).filter(Article.pmid.in_(pmids)).all()
+            # For collections, work directly with ArticleCollection data since articles may not exist in main Article table
+            article_collections = collection.article_collections
+            articles = []
+
+            for ac in article_collections:
+                # Create Article-like objects from ArticleCollection data
+                article_dict = {
+                    'pmid': ac.article_pmid or f"collection_{ac.id}",
+                    'title': ac.article_title,
+                    'authors': ac.article_authors or [],
+                    'journal': ac.article_journal,
+                    'publication_year': ac.article_year,
+                    'citation_count': 0,  # Default for collection articles
+                    'cited_by_pmids': [],  # No citation data for collection articles
+                    'references_pmids': [],  # No citation data for collection articles
+                    'abstract': None,
+                    'doi': None,
+                    'relevance_score': 0.0,
+                    'centrality_score': 0.0,
+                    'cluster_id': None
+                }
+                articles.append(article_dict)
 
         # Build network graph
         graph_data = build_network_graph(articles, source_type)
