@@ -3,7 +3,7 @@ Google Cloud SQL Database Configuration for R&D Agent
 Complete data persistence for users, projects, dossiers, and deep dive analyses
 """
 import os
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Boolean, ForeignKey, JSON, Index, text
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Boolean, ForeignKey, JSON, Index, Float, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.sql import func
@@ -350,19 +350,83 @@ class ArticleCollection(Base):
         Index('idx_unique_article_collection', 'collection_id', 'article_pmid', 'article_url', unique=True),
     )
 
+class Article(Base):
+    """Centralized article storage with citation relationships"""
+    __tablename__ = "articles"
+
+    # Primary identification
+    pmid = Column(String, primary_key=True)  # PubMed ID as primary key
+
+    # Basic article metadata
+    title = Column(String, nullable=False)
+    authors = Column(JSON, default=list)  # List of author names
+    journal = Column(String, nullable=True)
+    publication_year = Column(Integer, nullable=True)
+    doi = Column(String, nullable=True)
+    abstract = Column(Text, nullable=True)
+
+    # Citation relationships for network analysis
+    cited_by_pmids = Column(JSON, default=list)  # Articles that cite this paper
+    references_pmids = Column(JSON, default=list)  # Articles this paper references
+    citation_count = Column(Integer, default=0)  # Total citation count
+
+    # Network analysis metadata
+    relevance_score = Column(Float, default=0.0)  # Computed relevance score
+    centrality_score = Column(Float, default=0.0)  # Network centrality measure
+    cluster_id = Column(String, nullable=True)  # Research cluster/topic
+
+    # Data freshness tracking
+    citation_data_updated = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Performance indexes
+    __table_args__ = (
+        Index('idx_article_title', 'title'),
+        Index('idx_article_journal', 'journal'),
+        Index('idx_article_year', 'publication_year'),
+        Index('idx_article_citation_count', 'citation_count'),
+        Index('idx_article_relevance', 'relevance_score'),
+        Index('idx_article_updated', 'citation_data_updated'),
+    )
+
+class NetworkGraph(Base):
+    """Cached network graphs for performance optimization"""
+    __tablename__ = "network_graphs"
+
+    graph_id = Column(String, primary_key=True)  # UUID
+    source_type = Column(String, nullable=False)  # 'project', 'report', 'collection'
+    source_id = Column(String, nullable=False)  # ID of the source (project_id, report_id, etc.)
+
+    # Graph data
+    nodes = Column(JSON, nullable=False)  # Network nodes data
+    edges = Column(JSON, nullable=False)  # Network edges data
+    graph_metadata = Column(JSON, default=dict)  # Additional graph metadata
+
+    # Cache management
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    is_active = Column(Boolean, default=True)
+
+    # Performance indexes
+    __table_args__ = (
+        Index('idx_network_source', 'source_type', 'source_id'),
+        Index('idx_network_active', 'is_active', 'expires_at'),
+    )
+
 class ActivityLog(Base):
     """Activity logging for project collaboration tracking"""
     __tablename__ = "activity_logs"
-    
+
     activity_id = Column(String, primary_key=True)  # UUID
     project_id = Column(String, ForeignKey("projects.project_id"), nullable=False)
     user_id = Column(String, ForeignKey("users.user_id"), nullable=False)
-    
+
     # Activity details
     activity_type = Column(String, nullable=False)  # annotation_created, report_generated, etc.
     description = Column(Text, nullable=False)
     activity_metadata = Column(JSON, nullable=True)  # Additional context data
-    
+
     # Optional links to specific items
     article_pmid = Column(String, nullable=True)
     report_id = Column(String, ForeignKey("reports.report_id"), nullable=True)

@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network View Test Interface</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .content {
+            padding: 20px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #5a6fd8;
+        }
+        .response {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .network-viz {
+            width: 100%;
+            height: 500px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+            position: relative;
+        }
+        .node {
+            fill: #4CAF50;
+            stroke: #333;
+            stroke-width: 2px;
+            cursor: pointer;
+        }
+        .node:hover {
+            fill: #45a049;
+        }
+        .edge {
+            stroke: #666;
+            stroke-width: 1px;
+            marker-end: url(#arrowhead);
+        }
+        .node-label {
+            font-size: 12px;
+            text-anchor: middle;
+            pointer-events: none;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🕸️ Network View Test Interface</h1>
+            <p>Test the Network View feature for R&D Agent</p>
+        </div>
+        
+        <div class="content">
+            <!-- Configuration Section -->
+            <div class="test-section">
+                <h3>⚙️ Configuration</h3>
+                <div class="form-group">
+                    <label for="baseUrl">Base URL:</label>
+                    <input type="text" id="baseUrl" value="http://127.0.0.1:8002">
+                </div>
+                <div class="form-group">
+                    <label for="userId">User ID:</label>
+                    <input type="text" id="userId" value="network_test_user">
+                </div>
+                <div class="form-group">
+                    <label for="projectId">Project ID:</label>
+                    <input type="text" id="projectId" value="f350cca2-c70a-44eb-8b75-e07e5ba8eaeb">
+                </div>
+                <div class="form-group">
+                    <label for="collectionId">Collection ID:</label>
+                    <input type="text" id="collectionId" value="5c681b8d-449c-44b0-9ce3-8d1025e7d05f">
+                </div>
+            </div>
+
+            <!-- Article Enrichment Section -->
+            <div class="test-section">
+                <h3>📚 Article Enrichment</h3>
+                <div class="form-group">
+                    <label for="pmids">PMIDs (comma-separated):</label>
+                    <input type="text" id="pmids" value="33462507,32887946,31978945,32015507,31992443">
+                </div>
+                <button onclick="enrichArticles()">Enrich Articles</button>
+                <div id="enrichResponse" class="response" style="display:none;"></div>
+            </div>
+
+            <!-- Network View Testing Section -->
+            <div class="test-section">
+                <h3>🕸️ Network View Testing</h3>
+                <button onclick="getProjectNetwork()">Get Project Network</button>
+                <button onclick="getCollectionNetwork()">Get Collection Network</button>
+                <button onclick="clearNetworkCache()">Clear Cache</button>
+                <div id="networkResponse" class="response" style="display:none;"></div>
+                
+                <!-- Network Statistics -->
+                <div id="networkStats" class="stats" style="display:none;">
+                    <div class="stat-card">
+                        <div class="stat-value" id="nodeCount">0</div>
+                        <div class="stat-label">Nodes</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="edgeCount">0</div>
+                        <div class="stat-label">Edges</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="avgCitations">0</div>
+                        <div class="stat-label">Avg Citations</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="yearRange">-</div>
+                        <div class="stat-label">Year Range</div>
+                    </div>
+                </div>
+
+                <!-- Network Visualization -->
+                <div id="networkViz" class="network-viz" style="display:none;">
+                    <svg width="100%" height="100%">
+                        <defs>
+                            <marker id="arrowhead" markerWidth="10" markerHeight="7" 
+                                    refX="9" refY="3.5" orient="auto">
+                                <polygon points="0 0, 10 3.5, 0 7" fill="#666" />
+                            </marker>
+                        </defs>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentNetworkData = null;
+
+        async function makeRequest(url, options = {}) {
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'User-ID': document.getElementById('userId').value,
+                        ...options.headers
+                    },
+                    ...options
+                });
+                
+                const data = await response.json();
+                return { success: response.ok, data, status: response.status };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+
+        function showResponse(elementId, result) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            
+            if (result.success) {
+                element.className = 'response success';
+                element.textContent = JSON.stringify(result.data, null, 2);
+            } else {
+                element.className = 'response error';
+                element.textContent = result.error || JSON.stringify(result.data, null, 2);
+            }
+        }
+
+        async function enrichArticles() {
+            const baseUrl = document.getElementById('baseUrl').value;
+            const pmids = document.getElementById('pmids').value.split(',').map(p => p.trim());
+            
+            const result = await makeRequest(`${baseUrl}/articles/enrich`, {
+                method: 'POST',
+                body: JSON.stringify({ pmids })
+            });
+            
+            showResponse('enrichResponse', result);
+        }
+
+        async function getProjectNetwork() {
+            const baseUrl = document.getElementById('baseUrl').value;
+            const projectId = document.getElementById('projectId').value;
+            
+            const result = await makeRequest(`${baseUrl}/projects/${projectId}/network`);
+            showResponse('networkResponse', result);
+            
+            if (result.success) {
+                currentNetworkData = result.data;
+                updateNetworkStats(result.data);
+                visualizeNetwork(result.data);
+            }
+        }
+
+        async function getCollectionNetwork() {
+            const baseUrl = document.getElementById('baseUrl').value;
+            const collectionId = document.getElementById('collectionId').value;
+            
+            const result = await makeRequest(`${baseUrl}/collections/${collectionId}/network`);
+            showResponse('networkResponse', result);
+            
+            if (result.success) {
+                currentNetworkData = result.data;
+                updateNetworkStats(result.data);
+                visualizeNetwork(result.data);
+            }
+        }
+
+        async function clearNetworkCache() {
+            const baseUrl = document.getElementById('baseUrl').value;
+            const projectId = document.getElementById('projectId').value;
+            
+            const result = await makeRequest(`${baseUrl}/network-cache/project/${projectId}`, {
+                method: 'DELETE'
+            });
+            
+            showResponse('networkResponse', result);
+        }
+
+        function updateNetworkStats(data) {
+            const stats = document.getElementById('networkStats');
+            stats.style.display = 'grid';
+            
+            document.getElementById('nodeCount').textContent = data.metadata.total_nodes;
+            document.getElementById('edgeCount').textContent = data.metadata.total_edges;
+            document.getElementById('avgCitations').textContent = data.metadata.avg_citations;
+            
+            const yearRange = data.metadata.year_range;
+            if (yearRange && yearRange.min && yearRange.max) {
+                document.getElementById('yearRange').textContent = `${yearRange.min}-${yearRange.max}`;
+            } else {
+                document.getElementById('yearRange').textContent = '-';
+            }
+        }
+
+        function visualizeNetwork(data) {
+            const viz = document.getElementById('networkViz');
+            viz.style.display = 'block';
+            
+            const svg = viz.querySelector('svg');
+            const width = viz.clientWidth;
+            const height = viz.clientHeight;
+            
+            // Clear previous visualization
+            svg.innerHTML = `
+                <defs>
+                    <marker id="arrowhead" markerWidth="10" markerHeight="7" 
+                            refX="9" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="#666" />
+                    </marker>
+                </defs>
+            `;
+            
+            if (!data.nodes || data.nodes.length === 0) {
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', width / 2);
+                text.setAttribute('y', height / 2);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('fill', '#666');
+                text.textContent = 'No network data to visualize';
+                svg.appendChild(text);
+                return;
+            }
+            
+            // Simple circular layout for nodes
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const radius = Math.min(width, height) / 3;
+            
+            data.nodes.forEach((node, index) => {
+                const angle = (2 * Math.PI * index) / data.nodes.length;
+                const x = centerX + radius * Math.cos(angle);
+                const y = centerY + radius * Math.sin(angle);
+                
+                // Create node circle
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', x);
+                circle.setAttribute('cy', y);
+                circle.setAttribute('r', Math.max(10, node.size / 5));
+                circle.setAttribute('fill', node.color);
+                circle.setAttribute('stroke', '#333');
+                circle.setAttribute('stroke-width', '2');
+                circle.setAttribute('class', 'node');
+                circle.setAttribute('title', node.metadata.title);
+                svg.appendChild(circle);
+                
+                // Create node label
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', x);
+                text.setAttribute('y', y + Math.max(10, node.size / 5) + 15);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('class', 'node-label');
+                text.setAttribute('fill', '#333');
+                text.textContent = node.label.substring(0, 20) + '...';
+                svg.appendChild(text);
+                
+                // Store position for edges
+                node._x = x;
+                node._y = y;
+            });
+            
+            // Draw edges
+            data.edges.forEach(edge => {
+                const fromNode = data.nodes.find(n => n.id === edge.from);
+                const toNode = data.nodes.find(n => n.id === edge.to);
+                
+                if (fromNode && toNode) {
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('x1', fromNode._x);
+                    line.setAttribute('y1', fromNode._y);
+                    line.setAttribute('x2', toNode._x);
+                    line.setAttribute('y2', toNode._y);
+                    line.setAttribute('class', 'edge');
+                    svg.appendChild(line);
+                }
+            });
+        }
+    </script>
+</body>
+</html>
