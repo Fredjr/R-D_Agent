@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   ReactFlow,
   Node,
@@ -118,6 +119,7 @@ const nodeTypes: NodeTypes = {
 };
 
 export default function NetworkView({ sourceType, sourceId, onNodeSelect, className = '' }: NetworkViewProps) {
+  const { user } = useAuth();
   const [networkData, setNetworkData] = useState<NetworkData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -135,7 +137,7 @@ export default function NetworkView({ sourceType, sourceId, onNodeSelect, classN
       const endpoint = `${sourceType}s/${sourceId}/network`;
       const response = await fetch(`/api/proxy/${endpoint}`, {
         headers: {
-          'User-ID': 'default_user', // This should come from auth context
+          'User-ID': user?.email || 'default_user',
         },
       });
 

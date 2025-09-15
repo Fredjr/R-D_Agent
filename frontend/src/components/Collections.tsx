@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { PlusIcon, FolderIcon, DocumentTextIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '@/contexts/AuthContext';
 import NetworkViewWithSidebar from './NetworkViewWithSidebar';
 
 interface Collection {
@@ -21,6 +22,7 @@ interface CollectionsProps {
 }
 
 export default function Collections({ projectId, onRefresh }: CollectionsProps) {
+  const { user } = useAuth();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +44,7 @@ export default function Collections({ projectId, onRefresh }: CollectionsProps) 
     try {
       const response = await fetch(`/api/proxy/projects/${projectId}/collections`, {
         headers: {
-          'User-ID': 'default_user', // This should come from auth context
+          'User-ID': user?.email || 'default_user',
         },
       });
 
@@ -77,7 +79,7 @@ export default function Collections({ projectId, onRefresh }: CollectionsProps) 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'User-ID': 'default_user',
+          'User-ID': user?.email || 'default_user',
         },
         body: JSON.stringify(newCollection),
       });
