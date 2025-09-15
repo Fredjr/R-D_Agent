@@ -1,5 +1,5 @@
 # DATABASE_URL secret verified working - testing Cloud Run environment injection
-from fastapi import FastAPI, Response, Depends, HTTPException, WebSocket, WebSocketDisconnect, Request
+from fastapi import FastAPI, Response, Depends, HTTPException, WebSocket, WebSocketDisconnect, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import UploadFile, File, Form
 from sqlalchemy.orm import Session
@@ -60,7 +60,8 @@ from scoring import calculate_publication_score
 # Database imports
 from database import (
     get_db, init_db, User, Project, ProjectCollaborator,
-    Report, DeepDiveAnalysis, Annotation, Collection, ArticleCollection, create_tables
+    Report, DeepDiveAnalysis, Annotation, Collection, ArticleCollection,
+    Article, NetworkGraph, create_tables
 )
 
 # Embeddings and Pinecone
@@ -6074,6 +6075,437 @@ async def log_activity(
         print(f"Failed to log activity: {e}")
 
 # =============================================================================
+# ARTICLE MANAGEMENT AND CITATION ENRICHMENT
+# =============================================================================
+
+async def enrich_article_with_citations(pmid: str, db: Session) -> bool:
+    """
+    Enrich an article with citation data from PubMed and iCite APIs
+    Returns True if successful, False otherwise
+    """
+    try:
+        import requests
+        import xml.etree.ElementTree as ET
+        from datetime import datetime, timedelta
+
+        # Check if article already exists and is recently updated
+        existing_article = db.query(Article).filter(Article.pmid == pmid).first()
+        if existing_article and existing_article.citation_data_updated:
+            # Skip if updated within last 7 days
+            if existing_article.citation_data_updated > datetime.now() - timedelta(days=7):
+                return True
+
+        # Fetch article details from PubMed
+        fetch_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+        fetch_params = {
+            "db": "pubmed",
+            "id": pmid,
+            "retmode": "xml",
+            "rettype": "abstract"
+        }
+
+        response = requests.get(fetch_url, params=fetch_params, timeout=15)
+        response.raise_for_status()
+
+        root = ET.fromstring(response.content)
+        article_elem = root.find(".//PubmedArticle")
+
+        if article_elem is None:
+            return False
+
+        # Extract basic article data
+        title_elem = article_elem.find(".//ArticleTitle")
+        title = (title_elem.text or "").strip() if title_elem is not None else ""
+
+        # Extract authors
+        author_list = article_elem.findall(".//Author")
+        authors = []
+        for author in author_list:
+            last_name = author.find("LastName")
+            fore_name = author.find("ForeName")
+            if last_name is not None and fore_name is not None and last_name.text and fore_name.text:
+                authors.append(f"{fore_name.text} {last_name.text}")
+            elif last_name is not None and last_name.text:
+                authors.append(last_name.text)
+
+        # Extract journal and year
+        journal_elem = article_elem.find(".//Journal/Title")
+        journal = (journal_elem.text or "").strip() if journal_elem is not None else ""
+
+        year_elem = article_elem.find(".//PubDate/Year")
+        pub_year = None
+        if year_elem is not None and year_elem.text and year_elem.text.isdigit():
+            pub_year = int(year_elem.text)
+
+        # Extract DOI
+        doi = ""
+        for el in article_elem.findall(".//ArticleIdList/ArticleId"):
+            if el.get('IdType') == 'doi' and el.text:
+                doi = el.text.strip()
+                break
+
+        # Extract abstract
+        abstract_parts = []
+        for ab in article_elem.findall(".//Abstract/AbstractText"):
+            txt = (ab.text or "").strip()
+            if txt:
+                abstract_parts.append(txt)
+        abstract = " ".join(abstract_parts)
+
+        # Fetch citation data from iCite API
+        citation_count = 0
+        cited_by_pmids = []
+        references_pmids = []
+
+        try:
+            icite_url = "https://icite.od.nih.gov/api/pubs"
+            icite_response = requests.get(icite_url, params={"pmids": pmid}, timeout=15)
+            icite_response.raise_for_status()
+            icite_data = icite_response.json()
+
+            if isinstance(icite_data, dict) and "data" in icite_data:
+                data = icite_data["data"]
+                if isinstance(data, list) and len(data) > 0:
+                    entry = data[0]
+
+                    # Get citation count
+                    if isinstance(entry.get("cited_by"), list):
+                        citation_count = len(entry.get("cited_by", []))
+                        cited_by_pmids = [str(pmid) for pmid in entry.get("cited_by", [])]
+                    elif isinstance(entry.get("citation_count"), int):
+                        citation_count = entry.get("citation_count", 0)
+
+                    # Get references
+                    if isinstance(entry.get("references"), list):
+                        references_pmids = [str(pmid) for pmid in entry.get("references", [])]
+
+        except Exception as e:
+            print(f"Warning: Failed to fetch citation data for PMID {pmid}: {e}")
+
+        # Create or update article record
+        if existing_article:
+            existing_article.title = title
+            existing_article.authors = authors
+            existing_article.journal = journal
+            existing_article.publication_year = pub_year
+            existing_article.doi = doi
+            existing_article.abstract = abstract
+            existing_article.cited_by_pmids = cited_by_pmids
+            existing_article.references_pmids = references_pmids
+            existing_article.citation_count = citation_count
+            existing_article.citation_data_updated = datetime.now()
+            existing_article.updated_at = datetime.now()
+        else:
+            article = Article(
+                pmid=pmid,
+                title=title,
+                authors=authors,
+                journal=journal,
+                publication_year=pub_year,
+                doi=doi,
+                abstract=abstract,
+                cited_by_pmids=cited_by_pmids,
+                references_pmids=references_pmids,
+                citation_count=citation_count,
+                citation_data_updated=datetime.now()
+            )
+            db.add(article)
+
+        db.commit()
+        return True
+
+    except Exception as e:
+        print(f"Error enriching article {pmid}: {e}")
+        db.rollback()
+        return False
+
+async def batch_enrich_articles(pmids: list, db: Session) -> dict:
+    """
+    Batch enrich multiple articles with citation data
+    Returns summary of enrichment results
+    """
+    results = {
+        "total": len(pmids),
+        "successful": 0,
+        "failed": 0,
+        "skipped": 0
+    }
+
+    for pmid in pmids:
+        if not pmid or not pmid.strip():
+            results["skipped"] += 1
+            continue
+
+        success = await enrich_article_with_citations(pmid.strip(), db)
+        if success:
+            results["successful"] += 1
+        else:
+            results["failed"] += 1
+
+    return results
+
+# =============================================================================
+# NETWORK GRAPH CONSTRUCTION
+# =============================================================================
+
+def build_network_graph(articles: list, source_type: str = "unknown") -> dict:
+    """
+    Build a network graph from a list of articles with citation relationships
+
+    Args:
+        articles: List of Article objects or article dictionaries
+        source_type: Type of source ('project', 'report', 'collection')
+
+    Returns:
+        Dictionary with nodes, edges, and metadata
+    """
+    try:
+        nodes = []
+        edges = []
+        pmid_to_article = {}
+
+        # Create nodes from articles
+        for article in articles:
+            # Handle both Article objects and dictionaries
+            if hasattr(article, 'pmid'):
+                pmid = article.pmid
+                title = article.title
+                authors = article.authors if isinstance(article.authors, list) else []
+                journal = article.journal or ""
+                year = article.publication_year or 0
+                citation_count = article.citation_count or 0
+                cited_by = article.cited_by_pmids if isinstance(article.cited_by_pmids, list) else []
+                references = article.references_pmids if isinstance(article.references_pmids, list) else []
+            else:
+                pmid = article.get('pmid', '')
+                title = article.get('title', '')
+                authors = article.get('authors', [])
+                if isinstance(authors, str):
+                    authors = [authors]
+                journal = article.get('journal', '')
+                year = article.get('pub_year', 0) or article.get('publication_year', 0)
+                citation_count = article.get('citation_count', 0)
+                cited_by = article.get('cited_by_pmids', [])
+                references = article.get('references_pmids', [])
+
+            if not pmid:
+                continue
+
+            pmid_to_article[pmid] = article
+
+            # Calculate node size based on citation count (min 20, max 100)
+            node_size = min(100, max(20, 20 + (citation_count * 2)))
+
+            # Determine node color based on publication year
+            current_year = 2024
+            if year >= current_year - 2:
+                color = "#4CAF50"  # Green for recent papers
+            elif year >= current_year - 5:
+                color = "#2196F3"  # Blue for moderately recent
+            elif year >= current_year - 10:
+                color = "#FF9800"  # Orange for older papers
+            else:
+                color = "#9E9E9E"  # Gray for very old papers
+
+            node = {
+                "id": pmid,
+                "label": title[:60] + "..." if len(title) > 60 else title,
+                "size": node_size,
+                "color": color,
+                "metadata": {
+                    "pmid": pmid,
+                    "title": title,
+                    "authors": authors,
+                    "journal": journal,
+                    "year": year,
+                    "citation_count": citation_count,
+                    "url": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
+                }
+            }
+            nodes.append(node)
+
+        # Create edges from citation relationships
+        article_pmids = set(pmid_to_article.keys())
+
+        for article in articles:
+            if hasattr(article, 'pmid'):
+                source_pmid = article.pmid
+                references = article.references_pmids if isinstance(article.references_pmids, list) else []
+            else:
+                source_pmid = article.get('pmid', '')
+                references = article.get('references_pmids', [])
+
+            if not source_pmid or not references:
+                continue
+
+            # Create edges for references that are also in our article set
+            for ref_pmid in references:
+                if ref_pmid in article_pmids and ref_pmid != source_pmid:
+                    edge = {
+                        "id": f"{source_pmid}->{ref_pmid}",
+                        "from": source_pmid,
+                        "to": ref_pmid,
+                        "arrows": "to",
+                        "color": "#666666",
+                        "width": 1,
+                        "relationship": "references"
+                    }
+                    edges.append(edge)
+
+        # Calculate network statistics
+        total_nodes = len(nodes)
+        total_edges = len(edges)
+        avg_citations = sum(node["metadata"]["citation_count"] for node in nodes) / total_nodes if total_nodes > 0 else 0
+
+        # Find most cited paper
+        most_cited = max(nodes, key=lambda n: n["metadata"]["citation_count"]) if nodes else None
+
+        metadata = {
+            "source_type": source_type,
+            "total_nodes": total_nodes,
+            "total_edges": total_edges,
+            "avg_citations": round(avg_citations, 2),
+            "most_cited": {
+                "pmid": most_cited["metadata"]["pmid"],
+                "title": most_cited["metadata"]["title"],
+                "citations": most_cited["metadata"]["citation_count"]
+            } if most_cited else None,
+            "year_range": {
+                "min": min(node["metadata"]["year"] for node in nodes if node["metadata"]["year"] > 0) if nodes else None,
+                "max": max(node["metadata"]["year"] for node in nodes if node["metadata"]["year"] > 0) if nodes else None
+            }
+        }
+
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "metadata": metadata
+        }
+
+    except Exception as e:
+        print(f"Error building network graph: {e}")
+        return {
+            "nodes": [],
+            "edges": [],
+            "metadata": {"error": str(e)}
+        }
+
+async def get_or_create_network_graph(source_type: str, source_id: str, db: Session) -> dict:
+    """
+    Get cached network graph or create new one
+
+    Args:
+        source_type: 'project', 'report', or 'collection'
+        source_id: ID of the source
+        db: Database session
+
+    Returns:
+        Network graph data
+    """
+    try:
+        import uuid
+        from datetime import datetime, timedelta
+
+        # Check for existing cached graph
+        cached_graph = db.query(NetworkGraph).filter(
+            NetworkGraph.source_type == source_type,
+            NetworkGraph.source_id == source_id,
+            NetworkGraph.is_active == True,
+            NetworkGraph.expires_at > datetime.now()
+        ).first()
+
+        if cached_graph:
+            return {
+                "nodes": cached_graph.nodes,
+                "edges": cached_graph.edges,
+                "metadata": cached_graph.graph_metadata,
+                "cached": True
+            }
+
+        # Fetch articles based on source type
+        articles = []
+
+        if source_type == "project":
+            # Get all articles from project reports and collections
+            project = db.query(Project).filter(Project.project_id == source_id).first()
+            if not project:
+                return {"nodes": [], "edges": [], "metadata": {"error": "Project not found"}}
+
+            # Get PMIDs from reports
+            pmids = set()
+            for report in project.reports:
+                if report.results and isinstance(report.results, dict):
+                    for section in report.results.get("results", []):
+                        for article in section.get("articles", []):
+                            if article.get("pmid"):
+                                pmids.add(article["pmid"])
+
+            # Get PMIDs from collections
+            for collection in project.collections:
+                for article_collection in collection.article_collections:
+                    if article_collection.article_pmid:
+                        pmids.add(article_collection.article_pmid)
+
+            # Fetch Article objects
+            if pmids:
+                articles = db.query(Article).filter(Article.pmid.in_(pmids)).all()
+
+        elif source_type == "report":
+            # Get articles from specific report
+            report = db.query(Report).filter(Report.report_id == source_id).first()
+            if not report:
+                return {"nodes": [], "edges": [], "metadata": {"error": "Report not found"}}
+
+            pmids = set()
+            if report.results and isinstance(report.results, dict):
+                for section in report.results.get("results", []):
+                    for article in section.get("articles", []):
+                        if article.get("pmid"):
+                            pmids.add(article["pmid"])
+
+            if pmids:
+                articles = db.query(Article).filter(Article.pmid.in_(pmids)).all()
+
+        elif source_type == "collection":
+            # Get articles from specific collection
+            collection = db.query(Collection).filter(Collection.collection_id == source_id).first()
+            if not collection:
+                return {"nodes": [], "edges": [], "metadata": {"error": "Collection not found"}}
+
+            pmids = [ac.article_pmid for ac in collection.article_collections if ac.article_pmid]
+            if pmids:
+                articles = db.query(Article).filter(Article.pmid.in_(pmids)).all()
+
+        # Build network graph
+        graph_data = build_network_graph(articles, source_type)
+
+        # Cache the graph (expires in 24 hours)
+        graph_id = str(uuid.uuid4())
+        cached_graph = NetworkGraph(
+            graph_id=graph_id,
+            source_type=source_type,
+            source_id=source_id,
+            nodes=graph_data["nodes"],
+            edges=graph_data["edges"],
+            graph_metadata=graph_data["metadata"],
+            expires_at=datetime.now() + timedelta(hours=24)
+        )
+
+        db.add(cached_graph)
+        db.commit()
+
+        graph_data["cached"] = False
+        return graph_data
+
+    except Exception as e:
+        print(f"Error getting/creating network graph: {e}")
+        return {
+            "nodes": [],
+            "edges": [],
+            "metadata": {"error": str(e)}
+        }
+
+# =============================================================================
 # COLLECTIONS MANAGEMENT ENDPOINTS
 # =============================================================================
 
@@ -8867,6 +9299,174 @@ async def preflight_generate_review() -> Response:
     })
 
 # =============================================================================
+# NETWORK VIEW ENDPOINTS
+# =============================================================================
+
+@app.get("/projects/{project_id}/network")
+async def get_project_network(
+    project_id: str,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """Get network graph for all articles in a project"""
+    try:
+        # Verify project access
+        project = db.query(Project).filter(Project.project_id == project_id).first()
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        # Check if user has access to this project
+        if project.owner_user_id != user_id:
+            collaborator = db.query(ProjectCollaborator).filter(
+                ProjectCollaborator.project_id == project_id,
+                ProjectCollaborator.user_id == user_id
+            ).first()
+            if not collaborator:
+                raise HTTPException(status_code=403, detail="Access denied")
+
+        # Get or create network graph
+        graph_data = await get_or_create_network_graph("project", project_id, db)
+
+        # Log activity
+        await log_activity(
+            project_id, user_id,
+            "network_viewed",
+            f"Viewed network graph for project: {project.project_name}",
+            {"source_type": "project", "node_count": len(graph_data.get("nodes", []))},
+            db=db
+        )
+
+        return graph_data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get project network: {str(e)}")
+
+@app.get("/reports/{report_id}/network")
+async def get_report_network(
+    report_id: str,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """Get network graph for articles in a specific report"""
+    try:
+        # Verify report access
+        report = db.query(Report).filter(Report.report_id == report_id).first()
+        if not report:
+            raise HTTPException(status_code=404, detail="Report not found")
+
+        # Check if user has access to this report's project
+        project = db.query(Project).filter(Project.project_id == report.project_id).first()
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        if project.owner_user_id != user_id:
+            collaborator = db.query(ProjectCollaborator).filter(
+                ProjectCollaborator.project_id == project.project_id,
+                ProjectCollaborator.user_id == user_id
+            ).first()
+            if not collaborator:
+                raise HTTPException(status_code=403, detail="Access denied")
+
+        # Get or create network graph
+        graph_data = await get_or_create_network_graph("report", report_id, db)
+
+        # Log activity
+        await log_activity(
+            project.project_id, user_id,
+            "network_viewed",
+            f"Viewed network graph for report: {report.objective[:100]}...",
+            {"source_type": "report", "report_id": report_id, "node_count": len(graph_data.get("nodes", []))},
+            db=db
+        )
+
+        return graph_data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get report network: {str(e)}")
+
+@app.get("/collections/{collection_id}/network")
+async def get_collection_network(
+    collection_id: str,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """Get network graph for articles in a specific collection"""
+    try:
+        # Verify collection access
+        collection = db.query(Collection).filter(Collection.collection_id == collection_id).first()
+        if not collection:
+            raise HTTPException(status_code=404, detail="Collection not found")
+
+        # Check if user has access to this collection's project
+        project = db.query(Project).filter(Project.project_id == collection.project_id).first()
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        if project.owner_user_id != user_id:
+            collaborator = db.query(ProjectCollaborator).filter(
+                ProjectCollaborator.project_id == project.project_id,
+                ProjectCollaborator.user_id == user_id
+            ).first()
+            if not collaborator:
+                raise HTTPException(status_code=403, detail="Access denied")
+
+        # Get or create network graph
+        graph_data = await get_or_create_network_graph("collection", collection_id, db)
+
+        # Log activity
+        await log_activity(
+            project.project_id, user_id,
+            "network_viewed",
+            f"Viewed network graph for collection: {collection.collection_name}",
+            {"source_type": "collection", "collection_id": collection_id, "node_count": len(graph_data.get("nodes", []))},
+            db=db
+        )
+
+        return graph_data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get collection network: {str(e)}")
+
+@app.post("/articles/enrich")
+async def enrich_articles_endpoint(
+    request: dict,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Enrich articles with citation data
+    Request body: {"pmids": ["12345", "67890", ...]}
+    """
+    try:
+        pmids = request.get("pmids", [])
+        if not pmids or not isinstance(pmids, list):
+            raise HTTPException(status_code=400, detail="pmids list is required")
+
+        # Limit to 50 articles per request to prevent abuse
+        if len(pmids) > 50:
+            raise HTTPException(status_code=400, detail="Maximum 50 PMIDs per request")
+
+        # Enrich articles
+        results = await batch_enrich_articles(pmids, db)
+
+        return {
+            "status": "completed",
+            "results": results,
+            "message": f"Enriched {results['successful']} articles successfully"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to enrich articles: {str(e)}")
+
+# =============================================================================
 # DATABASE DEBUG AND INITIALIZATION
 # =============================================================================
 
@@ -8959,6 +9559,91 @@ async def migrate_collections_schema():
                     "message": "Collections schema migration completed successfully",
                     "tables_created": ["collections", "article_collections"],
                     "columns_added": ["activity_logs.collection_id"],
+                    "indexes_created": len(indexes)
+                }
+
+            except Exception as e:
+                trans.rollback()
+                raise e
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Migration failed: {str(e)}",
+            "error_type": type(e).__name__
+        }
+
+@app.post("/admin/migrate-network-view")
+async def migrate_network_view_schema():
+    """Admin endpoint to migrate database schema for Network View feature"""
+    try:
+        from database import get_engine
+        from sqlalchemy import text
+
+        engine = get_engine()
+
+        with engine.connect() as conn:
+            trans = conn.begin()
+
+            try:
+                # 1. Create articles table for centralized article storage
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS articles (
+                        pmid VARCHAR NOT NULL PRIMARY KEY,
+                        title VARCHAR NOT NULL,
+                        authors JSON DEFAULT '[]',
+                        journal VARCHAR,
+                        publication_year INTEGER,
+                        doi VARCHAR,
+                        abstract TEXT,
+                        cited_by_pmids JSON DEFAULT '[]',
+                        references_pmids JSON DEFAULT '[]',
+                        citation_count INTEGER DEFAULT 0,
+                        relevance_score FLOAT DEFAULT 0.0,
+                        centrality_score FLOAT DEFAULT 0.0,
+                        cluster_id VARCHAR,
+                        citation_data_updated TIMESTAMP WITH TIME ZONE,
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                    )
+                """))
+
+                # 2. Create network_graphs table for caching
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS network_graphs (
+                        graph_id VARCHAR NOT NULL PRIMARY KEY,
+                        source_type VARCHAR NOT NULL,
+                        source_id VARCHAR NOT NULL,
+                        nodes JSON NOT NULL,
+                        edges JSON NOT NULL,
+                        graph_metadata JSON DEFAULT '{}',
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                        expires_at TIMESTAMP WITH TIME ZONE,
+                        is_active BOOLEAN DEFAULT true
+                    )
+                """))
+
+                # 3. Create indexes for performance
+                indexes = [
+                    "CREATE INDEX IF NOT EXISTS idx_article_title ON articles (title)",
+                    "CREATE INDEX IF NOT EXISTS idx_article_journal ON articles (journal)",
+                    "CREATE INDEX IF NOT EXISTS idx_article_year ON articles (publication_year)",
+                    "CREATE INDEX IF NOT EXISTS idx_article_citation_count ON articles (citation_count)",
+                    "CREATE INDEX IF NOT EXISTS idx_article_relevance ON articles (relevance_score)",
+                    "CREATE INDEX IF NOT EXISTS idx_article_updated ON articles (citation_data_updated)",
+                    "CREATE INDEX IF NOT EXISTS idx_network_source ON network_graphs (source_type, source_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_network_active ON network_graphs (is_active, expires_at)"
+                ]
+
+                for index_sql in indexes:
+                    conn.execute(text(index_sql))
+
+                trans.commit()
+
+                return {
+                    "status": "success",
+                    "message": "Network View schema migration completed successfully",
+                    "tables_created": ["articles", "network_graphs"],
                     "indexes_created": len(indexes)
                 }
 
