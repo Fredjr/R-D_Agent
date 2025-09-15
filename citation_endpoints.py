@@ -47,13 +47,11 @@ def register_citation_endpoints(app):
             if not article:
                 raise HTTPException(status_code=404, detail=f"Article {pmid} not found")
             
-            # Get citation relationships
-            citation_records = db.query(ArticleCitation).filter(
-                ArticleCitation.cited_pmid == pmid
-            ).limit(limit).all()
-            
+            # Get citing articles from Article model's cited_by_pmids field
+            citing_pmids = article.cited_by_pmids or []
+            citing_pmids = citing_pmids[:limit]  # Apply limit
+
             # Get citing articles
-            citing_pmids = [cr.citing_pmid for cr in citation_records]
             citing_articles = db.query(Article).filter(
                 Article.pmid.in_(citing_pmids)
             ).all() if citing_pmids else []
@@ -79,7 +77,7 @@ def register_citation_endpoints(app):
                     "title": article.title
                 },
                 "citations": citations,
-                "total_count": len(citations),
+                "total_count": len(article.cited_by_pmids or []),
                 "limit": limit
             }
             
@@ -108,13 +106,11 @@ def register_citation_endpoints(app):
             if not article:
                 raise HTTPException(status_code=404, detail=f"Article {pmid} not found")
             
-            # Get reference relationships
-            reference_records = db.query(ArticleCitation).filter(
-                ArticleCitation.citing_pmid == pmid
-            ).limit(limit).all()
-            
+            # Get referenced articles from Article model's references_pmids field
+            referenced_pmids = article.references_pmids or []
+            referenced_pmids = referenced_pmids[:limit]  # Apply limit
+
             # Get referenced articles
-            referenced_pmids = [rr.cited_pmid for rr in reference_records]
             referenced_articles = db.query(Article).filter(
                 Article.pmid.in_(referenced_pmids)
             ).all() if referenced_pmids else []
@@ -140,7 +136,7 @@ def register_citation_endpoints(app):
                     "title": article.title
                 },
                 "references": references,
-                "total_count": len(references),
+                "total_count": len(article.references_pmids or []),
                 "limit": limit
             }
             
