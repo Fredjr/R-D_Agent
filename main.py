@@ -9814,32 +9814,33 @@ async def get_article_references(
     This endpoint implements Earlier Work Discovery for ResearchRabbit parity.
     """
     try:
-        # Import citation service
-        from services.citation_service import get_citation_service
-
         # Get base article from database
         base_article = db.query(Article).filter(Article.pmid == pmid).first()
         if not base_article:
             raise HTTPException(status_code=404, detail=f"Article with PMID {pmid} not found")
 
-        # Fetch references using citation service
-        citation_service = await get_citation_service()
-        async with citation_service:
-            references = await citation_service.fetch_references(pmid)
+        # Get reference articles from Article model's references_pmids field
+        reference_pmids = base_article.references_pmids or []
+        reference_pmids = reference_pmids[:limit]  # Apply limit
+
+        # Get reference articles from database
+        reference_articles_db = db.query(Article).filter(
+            Article.pmid.in_(reference_pmids)
+        ).all() if reference_pmids else []
 
         # Format response
         reference_articles = []
-        for ref in references[:limit]:
+        for article in reference_articles_db:
             reference_articles.append({
-                "pmid": ref.pmid,
-                "title": ref.title,
-                "authors": ref.authors or [],
-                "journal": ref.journal,
-                "year": ref.year,
-                "doi": ref.doi,
-                "citation_count": ref.citation_count or 0,
-                "abstract": ref.abstract,
-                "url": ref.url or f"https://pubmed.ncbi.nlm.nih.gov/{ref.pmid}/" if ref.pmid else None
+                "pmid": article.pmid,
+                "title": article.title,
+                "authors": article.authors or [],
+                "journal": article.journal,
+                "year": article.publication_year,
+                "doi": article.doi,
+                "citation_count": article.citation_count or 0,
+                "abstract": article.abstract,
+                "url": f"https://pubmed.ncbi.nlm.nih.gov/{article.pmid}/" if article.pmid else None
             })
 
         return {
@@ -10037,32 +10038,33 @@ async def get_article_citations(
     This endpoint implements Later Work Discovery for ResearchRabbit parity.
     """
     try:
-        # Import citation service
-        from services.citation_service import get_citation_service
-
         # Get base article from database
         base_article = db.query(Article).filter(Article.pmid == pmid).first()
         if not base_article:
             raise HTTPException(status_code=404, detail=f"Article with PMID {pmid} not found")
 
-        # Fetch citations using citation service
-        citation_service = await get_citation_service()
-        async with citation_service:
-            citations = await citation_service.fetch_citations(pmid)
+        # Get citing articles from Article model's cited_by_pmids field
+        citing_pmids = base_article.cited_by_pmids or []
+        citing_pmids = citing_pmids[:limit]  # Apply limit
+
+        # Get citing articles from database
+        citing_articles_db = db.query(Article).filter(
+            Article.pmid.in_(citing_pmids)
+        ).all() if citing_pmids else []
 
         # Format response
         citing_articles = []
-        for citation in citations[:limit]:
+        for article in citing_articles_db:
             citing_articles.append({
-                "pmid": citation.pmid,
-                "title": citation.title,
-                "authors": citation.authors or [],
-                "journal": citation.journal,
-                "year": citation.year,
-                "doi": citation.doi,
-                "citation_count": citation.citation_count or 0,
-                "abstract": citation.abstract,
-                "url": citation.url or f"https://pubmed.ncbi.nlm.nih.gov/{citation.pmid}/" if citation.pmid else None
+                "pmid": article.pmid,
+                "title": article.title,
+                "authors": article.authors or [],
+                "journal": article.journal,
+                "year": article.publication_year,
+                "doi": article.doi,
+                "citation_count": article.citation_count or 0,
+                "abstract": article.abstract,
+                "url": f"https://pubmed.ncbi.nlm.nih.gov/{article.pmid}/" if article.pmid else None
             })
 
         return {
