@@ -1,0 +1,337 @@
+'use client';
+
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  ReactFlow,
+  Node,
+  Edge,
+  addEdge,
+  useNodesState,
+  useEdgesState,
+  Controls,
+  MiniMap,
+  Background,
+  BackgroundVariant,
+  ConnectionMode,
+  NodeTypes,
+  OnConnect,
+  OnNodeClick,
+  Panel,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+
+interface NetworkNode {
+  id: string;
+  label: string;
+  size: number;
+  color: string;
+  metadata: {
+    pmid: string;
+    title: string;
+    authors: string[];
+    journal: string;
+    year: number;
+    citation_count: number;
+    url: string;
+  };
+}
+
+interface NetworkEdge {
+  id: string;
+  from: string;
+  to: string;
+  arrows: string;
+  relationship: string;
+}
+
+interface NetworkData {
+  nodes: NetworkNode[];
+  edges: NetworkEdge[];
+  metadata: {
+    source_type: string;
+    total_nodes: number;
+    total_edges: number;
+    avg_citations: number;
+    most_cited: {
+      pmid: string;
+      title: string;
+      citations: number;
+    };
+    year_range: {
+      min: number;
+      max: number;
+    };
+  };
+  cached: boolean;
+}
+
+interface NetworkViewProps {
+  sourceType: 'project' | 'collection' | 'report';
+  sourceId: string;
+  onNodeSelect?: (node: NetworkNode | null) => void;
+  className?: string;
+}
+
+// Custom node component for articles
+const ArticleNode = ({ data }: { data: any }) => {
+  const { metadata, size, color } = data;
+  const nodeSize = Math.max(40, Math.min(size, 120));
+  
+  return (
+    <div
+      className="article-node"
+      style={{
+        width: nodeSize,
+        height: nodeSize,
+        backgroundColor: color,
+        border: '2px solid #fff',
+        borderRadius: '50%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+        transition: 'all 0.2s ease',
+      }}
+      title={`${metadata.title}\nCitations: ${metadata.citation_count}\nYear: ${metadata.year}`}
+    >
+      <div
+        className="node-content"
+        style={{
+          color: '#fff',
+          fontSize: Math.max(8, nodeSize / 8),
+          fontWeight: 'bold',
+          textAlign: 'center',
+          textShadow: '0 1px 2px rgba(0,0,0,0.5)',
+          padding: '2px',
+          overflow: 'hidden',
+          lineHeight: '1.1',
+        }}
+      >
+        {metadata.citation_count}
+      </div>
+    </div>
+  );
+};
+
+const nodeTypes: NodeTypes = {
+  article: ArticleNode,
+};
+
+export default function NetworkView({ sourceType, sourceId, onNodeSelect, className = '' }: NetworkViewProps) {
+  const [networkData, setNetworkData] = useState<NetworkData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedNode, setSelectedNode] = useState<NetworkNode | null>(null);
+  
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+
+  // Fetch network data
+  const fetchNetworkData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const endpoint = `${sourceType}s/${sourceId}/network`;
+      const response = await fetch(`/api/proxy/${endpoint}`, {
+        headers: {
+          'User-ID': 'default_user', // This should come from auth context
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch network data: ${response.statusText}`);
+      }
+
+      const data: NetworkData = await response.json();
+      setNetworkData(data);
+      
+      // Convert network data to react-flow format
+      const flowNodes: Node[] = data.nodes.map((node, index) => ({
+        id: node.id,
+        type: 'article',
+        position: {
+          x: Math.cos((index * 2 * Math.PI) / data.nodes.length) * 200 + 300,
+          y: Math.sin((index * 2 * Math.PI) / data.nodes.length) * 200 + 300,
+        },
+        data: {
+          ...node,
+          label: node.label,
+        },
+        draggable: true,
+      }));
+
+      const flowEdges: Edge[] = data.edges.map((edge) => ({
+        id: edge.id,
+        source: edge.from,
+        target: edge.to,
+        type: 'smoothstep',
+        animated: true,
+        style: {
+          stroke: '#94a3b8',
+          strokeWidth: 2,
+        },
+        markerEnd: {
+          type: 'arrowclosed',
+          color: '#94a3b8',
+        },
+      }));
+
+      setNodes(flowNodes);
+      setEdges(flowEdges);
+      
+    } catch (err) {
+      console.error('Error fetching network data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load network data');
+    } finally {
+      setLoading(false);
+    }
+  }, [sourceType, sourceId]);
+
+  useEffect(() => {
+    fetchNetworkData();
+  }, [fetchNetworkData]);
+
+  // Handle node click
+  const onNodeClick: OnNodeClick = useCallback((event, node) => {
+    const networkNode = networkData?.nodes.find(n => n.id === node.id);
+    if (networkNode) {
+      setSelectedNode(networkNode);
+      onNodeSelect?.(networkNode);
+    }
+  }, [networkData, onNodeSelect]);
+
+  // Handle connection (if needed for future features)
+  const onConnect: OnConnect = useCallback(
+    (params) => setEdges((eds) => addEdge(params, eds)),
+    [setEdges]
+  );
+
+  if (loading) {
+    return (
+      <div className={`flex items-center justify-center h-96 bg-gray-50 rounded-lg ${className}`}>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading network...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={`flex items-center justify-center h-96 bg-gray-50 rounded-lg ${className}`}>
+        <div className="text-center">
+          <div className="text-red-500 mb-4">
+            <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <p className="text-red-600 mb-4">{error}</p>
+          <button
+            onClick={fetchNetworkData}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!networkData || networkData.nodes.length === 0) {
+    return (
+      <div className={`flex items-center justify-center h-96 bg-gray-50 rounded-lg ${className}`}>
+        <div className="text-center">
+          <div className="text-gray-400 mb-4">
+            <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          </div>
+          <p className="text-gray-600 mb-2">No network data available</p>
+          <p className="text-gray-500 text-sm">Add articles to see citation relationships</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`relative h-96 bg-white rounded-lg border ${className}`}>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onNodeClick={onNodeClick}
+        nodeTypes={nodeTypes}
+        connectionMode={ConnectionMode.Loose}
+        fitView
+        fitViewOptions={{
+          padding: 0.2,
+          includeHiddenNodes: false,
+        }}
+      >
+        <Controls />
+        <MiniMap 
+          nodeColor={(node) => node.data.color || '#94a3b8'}
+          nodeStrokeWidth={3}
+          zoomable
+          pannable
+        />
+        <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
+
+        {/* Network Statistics Panel */}
+        <Panel position="top-left" className="bg-white p-3 rounded-lg shadow-lg border">
+          <div className="text-sm">
+            <div className="font-semibold text-gray-900 mb-2">Network Overview</div>
+            <div className="space-y-1 text-xs text-gray-600">
+              <div>Articles: {networkData.metadata.total_nodes}</div>
+              <div>Citations: {networkData.metadata.total_edges}</div>
+              <div>Avg Citations: {Math.round(networkData.metadata.avg_citations)}</div>
+              <div>Years: {networkData.metadata.year_range.min}-{networkData.metadata.year_range.max}</div>
+            </div>
+            {networkData.metadata.most_cited && (
+              <div className="mt-2 pt-2 border-t border-gray-200">
+                <div className="text-xs text-gray-500">Most Cited:</div>
+                <div className="text-xs font-medium text-gray-900 truncate" title={networkData.metadata.most_cited.title}>
+                  {networkData.metadata.most_cited.title.substring(0, 30)}...
+                </div>
+                <div className="text-xs text-blue-600">{networkData.metadata.most_cited.citations} citations</div>
+              </div>
+            )}
+          </div>
+        </Panel>
+
+        {/* Legend Panel */}
+        <Panel position="top-right" className="bg-white p-3 rounded-lg shadow-lg border">
+          <div className="text-sm">
+            <div className="font-semibold text-gray-900 mb-2">Legend</div>
+            <div className="space-y-2 text-xs">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-green-500"></div>
+                <span>Recent (2020+)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-blue-500"></div>
+                <span>Moderate (2015-2019)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-orange-500"></div>
+                <span>Older (2010-2014)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-gray-500"></div>
+                <span>Very Old (<2010)</span>
+              </div>
+              <div className="mt-2 pt-2 border-t border-gray-200">
+                <div className="text-xs text-gray-500">Node size = Citation count</div>
+              </div>
+            </div>
+          </div>
+        </Panel>
+      </ReactFlow>
+    </div>
+  );
+}
