@@ -141,8 +141,14 @@ export default function NetworkView({ sourceType, sourceId, onNodeSelect, classN
         },
       });
 
+      if (response.status === 403) {
+        throw new Error('Access denied. You do not have permission to view network data for this project.');
+      }
+
       if (!response.ok) {
-        throw new Error(`Failed to fetch network data: ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || errorData.detail || `HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(`Failed to fetch network data: ${errorMessage}`);
       }
 
       const data: NetworkData = await response.json();

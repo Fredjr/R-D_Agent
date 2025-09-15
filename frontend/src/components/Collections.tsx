@@ -48,8 +48,14 @@ export default function Collections({ projectId, onRefresh }: CollectionsProps) 
         },
       });
 
+      if (response.status === 403) {
+        throw new Error('Access denied. You do not have permission to view collections for this project.');
+      }
+
       if (!response.ok) {
-        throw new Error(`Failed to fetch collections: ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || errorData.detail || `HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(`Failed to fetch collections: ${errorMessage}`);
       }
 
       const data = await response.json();
