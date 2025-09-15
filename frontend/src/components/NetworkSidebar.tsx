@@ -59,7 +59,7 @@ export default function NetworkSidebar({
       const referencesResponse = await fetch(
         `/api/proxy/articles/${pmid}/references?limit=10`,
         {
-          headers: { 'User-ID': user?.id || 'default_user' }
+          headers: { 'User-ID': user?.user_id || 'default_user' }
         }
       );
       if (referencesResponse.ok) {
@@ -71,7 +71,7 @@ export default function NetworkSidebar({
       const citationsResponse = await fetch(
         `/api/proxy/articles/${pmid}/citations?limit=10`,
         {
-          headers: { 'User-ID': user?.id || 'default_user' }
+          headers: { 'User-ID': user?.user_id || 'default_user' }
         }
       );
       if (citationsResponse.ok) {
@@ -93,7 +93,7 @@ export default function NetworkSidebar({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'User-ID': user?.id || 'default_user'
+          'User-ID': user?.user_id || 'default_user'
         },
         body: JSON.stringify({
           pmid: selectedNode.data.pmid,

@@ -78,6 +78,7 @@ interface NavigationStep {
 interface NetworkViewProps {
   sourceType: 'project' | 'collection' | 'report' | 'article';
   sourceId: string;
+  // Navigation modes including timeline view
   navigationMode?: 'default' | 'similar' | 'earlier' | 'later' | 'authors' | 'timeline';
   onNodeSelect?: (node: NetworkNode | null) => void;
   onNavigationChange?: (mode: string, sourceId: string) => void;
@@ -219,7 +220,7 @@ export default function NetworkView({
           mode: navigationMode,
           sourceId,
           sourceType,
-          title: data.metadata?.title || `${navigationMode} view`,
+          title: data.metadata?.most_cited?.title || `${navigationMode} view`,
           timestamp: new Date()
         };
 
@@ -393,27 +394,7 @@ export default function NetworkView({
         <TimelineView
           pmid={sourceType === 'article' ? sourceId : undefined}
           projectId={sourceType === 'project' ? sourceId : undefined}
-          onArticleSelect={(article) => {
-            // Convert timeline article to network node format for sidebar
-            const networkNode: NetworkNode = {
-              id: article.pmid,
-              label: article.title,
-              size: Math.max(40, Math.min(article.citation_count * 2, 120)),
-              color: getNodeColor(article.year),
-              metadata: {
-                pmid: article.pmid,
-                title: article.title,
-                authors: article.authors,
-                journal: article.journal,
-                year: article.year,
-                citation_count: article.citation_count,
-                url: article.url
-              }
-            };
-            setSelectedNode(networkNode);
-            setShowSidebar(true);
-            onNodeSelect?.(networkNode);
-          }}
+
           className="h-full"
         />
 
@@ -572,7 +553,7 @@ export default function NetworkView({
                 <button
                   onClick={() => handleNavigationChange('timeline')}
                   className={`px-2 py-1 rounded transition-colors col-span-2 ${
-                    navigationMode === 'timeline'
+                    (navigationMode as string) === 'timeline'
                       ? 'bg-purple-600 text-white'
                       : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
                   }`}
