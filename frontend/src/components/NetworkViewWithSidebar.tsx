@@ -1,0 +1,117 @@
+'use client';
+
+import React, { useState, useCallback } from 'react';
+import NetworkView from './NetworkView';
+import NetworkSidebar from './NetworkSidebar';
+
+interface NetworkNode {
+  id: string;
+  label: string;
+  size: number;
+  color: string;
+  metadata: {
+    pmid: string;
+    title: string;
+    authors: string[];
+    journal: string;
+    year: number;
+    citation_count: number;
+    url: string;
+  };
+}
+
+interface NetworkViewWithSidebarProps {
+  sourceType: 'project' | 'collection' | 'report';
+  sourceId: string;
+  projectId?: string; // For deep dive and collection actions
+  onDeepDiveCreated?: () => void;
+  onArticleSaved?: () => void;
+  className?: string;
+}
+
+export default function NetworkViewWithSidebar({
+  sourceType,
+  sourceId,
+  projectId,
+  onDeepDiveCreated,
+  onArticleSaved,
+  className = ''
+}: NetworkViewWithSidebarProps) {
+  const [selectedNode, setSelectedNode] = useState<NetworkNode | null>(null);
+
+  const handleNodeSelect = useCallback((node: NetworkNode | null) => {
+    setSelectedNode(node);
+  }, []);
+
+  const handleCloseSidebar = useCallback(() => {
+    setSelectedNode(null);
+  }, []);
+
+  const handleDeepDive = useCallback(async (pmid: string, title: string) => {
+    if (!projectId) {
+      alert('Project ID is required for deep dive analysis');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/proxy/projects/${projectId}/deep-dive-analyses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': 'default_user', // This should come from auth context
+        },
+        body: JSON.stringify({
+          article_title: title,
+          article_pmid: pmid,
+          objective: `Deep dive analysis of: ${title}`,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create deep dive analysis');
+      }
+
+      alert('✅ Deep dive analysis started successfully!');
+      onDeepDiveCreated?.();
+      
+    } catch (error) {
+      console.error('Error creating deep dive:', error);
+      alert('❌ Failed to start deep dive analysis. Please try again.');
+      throw error;
+    }
+  }, [projectId, onDeepDiveCreated]);
+
+  const handleSaveToCollection = useCallback(async (pmid: string, title: string) => {
+    // For now, we'll show a simple alert. In a full implementation,
+    // this would open a collection selection modal
+    alert(`Save to Collection feature coming soon!\n\nArticle: ${title}\nPMID: ${pmid}`);
+    onArticleSaved?.();
+  }, [onArticleSaved]);
+
+  return (
+    <div className={`flex h-full ${className}`}>
+      {/* Main Network View */}
+      <div className={`flex-1 ${selectedNode ? 'mr-80' : ''} transition-all duration-300`}>
+        <NetworkView
+          sourceType={sourceType}
+          sourceId={sourceId}
+          onNodeSelect={handleNodeSelect}
+          className="h-full"
+        />
+      </div>
+
+      {/* Sidebar */}
+      {selectedNode && (
+        <div className="fixed right-0 top-0 bottom-0 w-80 z-50">
+          <NetworkSidebar
+            selectedNode={selectedNode}
+            onClose={handleCloseSidebar}
+            onDeepDive={projectId ? handleDeepDive : undefined}
+            onSaveToCollection={handleSaveToCollection}
+            className="h-full"
+          />
+        </div>
+      )}
+    </div>
+  );
+}

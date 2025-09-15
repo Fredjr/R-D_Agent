@@ -6,6 +6,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import AnnotationsFeed from '@/components/AnnotationsFeed';
 import ActivityFeed from '@/components/ActivityFeed';
 import ResultsList from '@/components/ResultsList';
+import NetworkViewWithSidebar from '@/components/NetworkViewWithSidebar';
+import Collections from '@/components/Collections';
 
 interface Project {
   project_id: string;
@@ -84,6 +86,9 @@ export default function ProjectPage() {
     role: 'viewer'
   });
   const [sendingInvite, setSendingInvite] = useState(false);
+
+  // Tab navigation state
+  const [activeTab, setActiveTab] = useState<'overview' | 'collections' | 'network' | 'activity'>('overview');
 
   // Report generation results (same as Welcome Page)
   const [reportResults, setReportResults] = useState<any[]>([]);
@@ -498,6 +503,54 @@ export default function ProjectPage() {
           </div>
         </div>
 
+        {/* Tab Navigation */}
+        <div className="mb-8">
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => setActiveTab('overview')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'overview'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Overview
+              </button>
+              <button
+                onClick={() => setActiveTab('collections')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'collections'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Collections
+              </button>
+              <button
+                onClick={() => setActiveTab('network')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'network'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Network View
+              </button>
+              <button
+                onClick={() => setActiveTab('activity')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'activity'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Activity & Notes
+              </button>
+            </nav>
+          </div>
+        </div>
+
         {/* Add Note Modal */}
         {showNoteModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -868,8 +921,11 @@ export default function ProjectPage() {
           </div>
         )}
 
-        {/* Project Data Sections */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-8 mb-8">
+        {/* Tab Content */}
+        {activeTab === 'overview' && (
+          <>
+            {/* Project Data Sections */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-8 mb-8">
           {/* Reports Section */}
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Reports ({project.reports?.length || 0})</h3>
@@ -1116,16 +1172,56 @@ export default function ProjectPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Annotations</h2>
-            <AnnotationsFeed projectId={projectId} />
+            </>
+        )}
+
+        {/* Collections Tab */}
+        {activeTab === 'collections' && (
+          <div className="mb-8">
+            <Collections
+              projectId={projectId}
+              onRefresh={fetchProjectData}
+            />
           </div>
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Activity</h2>
-            <ActivityFeed projectId={projectId} />
+        )}
+
+        {/* Network View Tab */}
+        {activeTab === 'network' && (
+          <div className="mb-8">
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="mb-4">
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Citation Network</h2>
+                <p className="text-gray-600">
+                  Explore the relationships between articles in this project through citation networks.
+                  Click on nodes to see article details and discover related research.
+                </p>
+              </div>
+              <div className="h-[600px]">
+                <NetworkViewWithSidebar
+                  sourceType="project"
+                  sourceId={projectId}
+                  projectId={projectId}
+                  onDeepDiveCreated={fetchProjectData}
+                  onArticleSaved={fetchProjectData}
+                />
+              </div>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Activity & Notes Tab */}
+        {activeTab === 'activity' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Annotations</h2>
+              <AnnotationsFeed projectId={projectId} />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Activity</h2>
+              <ActivityFeed projectId={projectId} />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
