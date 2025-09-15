@@ -115,9 +115,18 @@ export default function ProjectPage() {
           'User-ID': user?.email || 'default_user',
         },
       });
-      if (!response.ok) {
-        throw new Error('Failed to fetch project');
+
+      if (response.status === 403) {
+        setError('Access denied. You do not have permission to view this project. Please check if you are logged in with the correct account or if you have been granted access to this project.');
+        return;
       }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || errorData.detail || `HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(errorMessage);
+      }
+
       const projectData = await response.json();
       setProject(projectData);
     } catch (err) {
