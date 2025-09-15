@@ -15,7 +15,35 @@ from typing import List, Optional
 from fastapi import HTTPException, Depends, Query, Header
 from sqlalchemy.orm import Session
 from database import get_db, Article, ArticleCitation
-from services.citation_enrichment_service import get_citation_enrichment_service
+# Temporarily disable heavy dependencies for Railway deployment stability
+try:
+    from services.citation_enrichment_service import get_citation_enrichment_service
+    CITATION_SERVICE_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Citation enrichment service not available: {e}")
+    CITATION_SERVICE_AVAILABLE = False
+
+    # Mock service for deployment stability
+    def get_citation_enrichment_service():
+        class MockCitationService:
+            async def enrich_article_citations(self, pmid: str, db):
+                return {
+                    "status": "mock",
+                    "message": "Citation enrichment service temporarily unavailable",
+                    "pmid": pmid,
+                    "citations_added": 0,
+                    "references_added": 0
+                }
+
+            async def batch_enrich_collection(self, collection_id: str, db):
+                return {
+                    "status": "mock",
+                    "message": "Collection enrichment service temporarily unavailable",
+                    "collection_id": collection_id,
+                    "articles_enriched": 0,
+                    "total_citations_added": 0
+                }
+        return MockCitationService()
 
 logger = logging.getLogger(__name__)
 
@@ -189,15 +217,19 @@ def register_citation_endpoints(app):
         - Author overlap
         """
         try:
-            from services.similarity_engine import get_similarity_engine
-
-            similarity_engine = get_similarity_engine()
-            similar_articles = await similarity_engine.find_similar_articles(
-                pmid=pmid,
-                limit=limit,
-                min_similarity=min_similarity,
-                db=db
-            )
+            # Try to import similarity engine with fallback
+            try:
+                from services.similarity_engine import get_similarity_engine
+                similarity_engine = get_similarity_engine()
+                similar_articles = await similarity_engine.find_similar_articles(
+                    pmid=pmid,
+                    limit=limit,
+                    min_similarity=min_similarity,
+                    db=db
+                )
+            except ImportError:
+                # Fallback to empty results if similarity engine not available
+                similar_articles = []
             
             # Format for network visualization
             nodes = []
