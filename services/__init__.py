@@ -10,9 +10,28 @@ This package contains all service modules for the R&D Agent backend:
 - timeline_service: Timeline data processing and visualization
 """
 
-# Make services importable
-from .author_network_service import *
-from .citation_enrichment_service import *
-from .citation_service import *
-from .similarity_engine import *
-from .timeline_service import *
+# Make services importable with error handling
+try:
+    from .author_network_service import *
+except ImportError:
+    pass
+
+try:
+    from .citation_enrichment_service import *
+except ImportError:
+    pass
+
+try:
+    from .citation_service import *
+except ImportError:
+    pass
+
+try:
+    from .similarity_engine import *
+except ImportError:
+    pass
+
+try:
+    from .timeline_service import *
+except ImportError:
+    pass
