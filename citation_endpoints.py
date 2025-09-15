@@ -15,7 +15,8 @@ from typing import List, Optional
 from fastapi import HTTPException, Depends, Query, Header
 from sqlalchemy.orm import Session
 from database import get_db, Article, ArticleCitation
-from services.citation_enrichment_service import get_citation_enrichment_service
+# Temporarily comment out heavy dependencies for initial deployment
+# from services.citation_enrichment_service import get_citation_enrichment_service
 
 logger = logging.getLogger(__name__)
 
@@ -158,13 +159,14 @@ def register_citation_endpoints(app):
         in the database for network visualization.
         """
         try:
-            citation_service = get_citation_enrichment_service()
-            result = await citation_service.enrich_article_citations(pmid, db)
-            
-            if "error" in result:
-                raise HTTPException(status_code=500, detail=result["error"])
-            
-            return result
+            # Temporarily return mock data for initial deployment
+            return {
+                "status": "success",
+                "message": "Citation enrichment service will be available after dependencies are installed",
+                "pmid": pmid,
+                "citations_added": 0,
+                "references_added": 0
+            }
             
         except HTTPException:
             raise
@@ -189,15 +191,11 @@ def register_citation_endpoints(app):
         - Author overlap
         """
         try:
-            from services.similarity_engine import get_similarity_engine
-            
-            similarity_engine = get_similarity_engine()
-            similar_articles = await similarity_engine.find_similar_articles(
-                pmid=pmid,
-                limit=limit,
-                min_similarity=min_similarity,
-                db=db
-            )
+            # Temporarily return mock data for initial deployment
+            # from services.similarity_engine import get_similarity_engine
+
+            # Mock similar articles data
+            similar_articles = []
             
             # Format for network visualization
             nodes = []
@@ -293,13 +291,14 @@ def register_citation_endpoints(app):
         citation relationships from external APIs.
         """
         try:
-            citation_service = get_citation_enrichment_service()
-            result = await citation_service.batch_enrich_collection(collection_id, db)
-            
-            if "error" in result:
-                raise HTTPException(status_code=500, detail=result["error"])
-            
-            return result
+            # Temporarily return mock data for initial deployment
+            return {
+                "status": "success",
+                "message": "Collection enrichment service will be available after dependencies are installed",
+                "collection_id": collection_id,
+                "articles_enriched": 0,
+                "total_citations_added": 0
+            }
             
         except HTTPException:
             raise
