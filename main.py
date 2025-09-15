@@ -9856,9 +9856,8 @@ async def get_article_references(
             "total_found": len(reference_articles),
             "search_parameters": {
                 "limit": limit,
-                "source": "citation_service"
-            },
-            "cache_stats": citation_service.get_cache_stats()
+                "source": "article_model"
+            }
         }
 
     except HTTPException:
@@ -10080,9 +10079,8 @@ async def get_article_citations(
             "total_found": len(citing_articles),
             "search_parameters": {
                 "limit": limit,
-                "source": "citation_service"
-            },
-            "cache_stats": citation_service.get_cache_stats()
+                "source": "article_model"
+            }
         }
 
     except HTTPException:
