@@ -19,6 +19,8 @@ import {
   Panel,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import NetworkSidebar from './NetworkSidebar';
+import TimelineView from './TimelineView';
 
 interface NetworkNode {
   id: string;
@@ -76,7 +78,7 @@ interface NavigationStep {
 interface NetworkViewProps {
   sourceType: 'project' | 'collection' | 'report' | 'article';
   sourceId: string;
-  navigationMode?: 'default' | 'similar' | 'earlier' | 'later' | 'authors';
+  navigationMode?: 'default' | 'similar' | 'earlier' | 'later' | 'authors' | 'timeline';
   onNodeSelect?: (node: NetworkNode | null) => void;
   onNavigationChange?: (mode: string, sourceId: string) => void;
   className?: string;
@@ -128,6 +130,14 @@ const nodeTypes: NodeTypes = {
   article: ArticleNode,
 };
 
+// Utility function to get node color based on year
+const getNodeColor = (year: number): string => {
+  if (year >= 2020) return '#10b981'; // Green for recent
+  if (year >= 2015) return '#3b82f6'; // Blue for moderate
+  if (year >= 2010) return '#f59e0b'; // Orange for older
+  return '#6b7280'; // Gray for very old
+};
+
 export default function NetworkView({
   sourceType,
   sourceId,
@@ -142,6 +152,8 @@ export default function NetworkView({
   const [error, setError] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<NetworkNode | null>(null);
   const [navigationTrail, setNavigationTrail] = useState<NavigationStep[]>([]);
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [collections, setCollections] = useState<any[]>([]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -168,6 +180,11 @@ export default function NetworkView({
         case 'authors':
           endpoint = `/api/proxy/articles/${sourceId}/author-network`;
           break;
+        case 'timeline':
+          // Timeline mode doesn't use network data, skip fetch
+          setNetworkData(null);
+          setLoading(false);
+          return;
         default:
           // Default network view based on source type
           if (sourceType === 'article') {
@@ -253,7 +270,27 @@ export default function NetworkView({
 
   useEffect(() => {
     fetchNetworkData();
+    fetchCollections();
   }, [fetchNetworkData]);
+
+  // Fetch collections for sidebar
+  const fetchCollections = useCallback(async () => {
+    if (sourceType === 'project') {
+      try {
+        const response = await fetch(`/api/proxy/projects/${sourceId}/collections`, {
+          headers: {
+            'User-ID': user?.email || 'default_user',
+          },
+        });
+        if (response.ok) {
+          const collectionsData = await response.json();
+          setCollections(collectionsData);
+        }
+      } catch (error) {
+        console.error('Error fetching collections:', error);
+      }
+    }
+  }, [sourceType, sourceId, user]);
 
   // Handle navigation mode changes
   const handleNavigationChange = useCallback((newMode: string, newSourceId?: string) => {
@@ -276,6 +313,7 @@ export default function NetworkView({
     const networkNode = networkData?.nodes.find(n => n.id === node.id);
     if (networkNode) {
       setSelectedNode(networkNode);
+      setShowSidebar(true);
       onNodeSelect?.(networkNode);
 
       // If this is a similar work view and user clicks on a node,
@@ -292,6 +330,29 @@ export default function NetworkView({
     (params) => setEdges((eds) => addEdge(params, eds)),
     [setEdges]
   );
+
+  // Sidebar handlers
+  const handleSidebarNavigationChange = useCallback((mode: 'similar' | 'references' | 'citations' | 'authors') => {
+    if (selectedNode?.metadata.pmid) {
+      const modeMap = {
+        similar: 'similar',
+        references: 'earlier',
+        citations: 'later',
+        authors: 'authors'
+      };
+      handleNavigationChange(modeMap[mode], selectedNode.metadata.pmid);
+    }
+  }, [selectedNode, handleNavigationChange]);
+
+  const handleAddToCollection = useCallback((pmid: string) => {
+    // Refresh collections after adding
+    fetchCollections();
+  }, [fetchCollections]);
+
+  const handleCloseSidebar = useCallback(() => {
+    setShowSidebar(false);
+    setSelectedNode(null);
+  }, []);
 
   if (loading) {
     return (
@@ -321,6 +382,79 @@ export default function NetworkView({
             Retry
           </button>
         </div>
+      </div>
+    );
+  }
+
+  // Timeline mode rendering
+  if (navigationMode === 'timeline') {
+    return (
+      <div className={`relative h-96 bg-white rounded-lg border ${className}`}>
+        <TimelineView
+          pmid={sourceType === 'article' ? sourceId : undefined}
+          projectId={sourceType === 'project' ? sourceId : undefined}
+          onArticleSelect={(article) => {
+            // Convert timeline article to network node format for sidebar
+            const networkNode: NetworkNode = {
+              id: article.pmid,
+              label: article.title,
+              size: Math.max(40, Math.min(article.citation_count * 2, 120)),
+              color: getNodeColor(article.year),
+              metadata: {
+                pmid: article.pmid,
+                title: article.title,
+                authors: article.authors,
+                journal: article.journal,
+                year: article.year,
+                citation_count: article.citation_count,
+                url: article.url
+              }
+            };
+            setSelectedNode(networkNode);
+            setShowSidebar(true);
+            onNodeSelect?.(networkNode);
+          }}
+          className="h-full"
+        />
+
+        {/* Timeline Mode Controls */}
+        {sourceType === 'article' && (
+          <div className="absolute top-4 right-4 bg-white p-3 rounded-lg shadow-lg border">
+            <div className="text-sm">
+              <div className="font-semibold text-gray-900 mb-2">Timeline View</div>
+              <div className="text-xs text-gray-600">
+                Chronological research evolution
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Enhanced NetworkSidebar for Timeline */}
+        {showSidebar && selectedNode && (
+          <div className="absolute top-0 right-0 h-full z-10">
+            <NetworkSidebar
+              selectedNode={{
+                id: selectedNode.id,
+                data: {
+                  pmid: selectedNode.metadata.pmid,
+                  title: selectedNode.metadata.title,
+                  authors: selectedNode.metadata.authors,
+                  journal: selectedNode.metadata.journal,
+                  year: selectedNode.metadata.year,
+                  citation_count: selectedNode.metadata.citation_count,
+                  node_type: 'article',
+                  url: selectedNode.metadata.url
+                }
+              }}
+              onNavigationChange={handleSidebarNavigationChange}
+              onAddToCollection={handleAddToCollection}
+              onClose={handleCloseSidebar}
+              currentMode={navigationMode || 'timeline'}
+              projectId={sourceType === 'project' ? sourceId : ''}
+              collections={collections}
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -435,6 +569,16 @@ export default function NetworkView({
                 >
                   Authors
                 </button>
+                <button
+                  onClick={() => handleNavigationChange('timeline')}
+                  className={`px-2 py-1 rounded transition-colors col-span-2 ${
+                    navigationMode === 'timeline'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                  }`}
+                >
+                  Timeline View
+                </button>
               </div>
             </div>
           </Panel>
@@ -490,6 +634,33 @@ export default function NetworkView({
           </div>
         </Panel>
       </ReactFlow>
+
+      {/* Enhanced NetworkSidebar */}
+      {showSidebar && selectedNode && (
+        <div className="absolute top-0 right-0 h-full z-10">
+          <NetworkSidebar
+            selectedNode={{
+              id: selectedNode.id,
+              data: {
+                pmid: selectedNode.metadata.pmid,
+                title: selectedNode.metadata.title,
+                authors: selectedNode.metadata.authors,
+                journal: selectedNode.metadata.journal,
+                year: selectedNode.metadata.year,
+                citation_count: selectedNode.metadata.citation_count,
+                node_type: 'article',
+                url: selectedNode.metadata.url
+              }
+            }}
+            onNavigationChange={handleSidebarNavigationChange}
+            onAddToCollection={handleAddToCollection}
+            onClose={handleCloseSidebar}
+            currentMode={navigationMode || 'default'}
+            projectId={sourceType === 'project' ? sourceId : ''}
+            collections={collections}
+          />
+        </div>
+      )}
     </div>
   );
 }

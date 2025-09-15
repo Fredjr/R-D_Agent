@@ -61,7 +61,7 @@ from scoring import calculate_publication_score
 from database import (
     get_db, init_db, User, Project, ProjectCollaborator,
     Report, DeepDiveAnalysis, Annotation, Collection, ArticleCollection,
-    Article, NetworkGraph, create_tables
+    Article, NetworkGraph, AuthorCollaboration, create_tables
 )
 
 # Embeddings and Pinecone
@@ -96,6 +96,14 @@ def verify_password(password: str, hashed: str) -> bool:
 
 # Initialize FastAPI app
 app = FastAPI(title="R&D Agent API", version="1.0.0")
+
+# =============================================================================
+# AUTHOR NETWORK ENDPOINTS - Phase 4 ResearchRabbit Feature Parity
+# =============================================================================
+
+# Import and register author endpoints
+from author_endpoints import register_author_endpoints
+register_author_endpoints(app)
 
 # WebSocket Connection Manager for Project Rooms
 class ConnectionManager:
@@ -9720,6 +9728,701 @@ async def get_similar_articles_network(
     except Exception as e:
         print(f"Similar articles network error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to generate similar articles network: {str(e)}")
+
+# =============================================================================
+# EARLIER WORK NAVIGATION ENDPOINTS - Phase 2 ResearchRabbit Feature Parity
+# =============================================================================
+
+@app.get("/articles/{pmid}/references")
+async def get_article_references(
+    pmid: str,
+    limit: int = Query(20, ge=1, le=50, description="Maximum number of references to return"),
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get reference papers (earlier work) for the specified PMID using citation data.
+
+    This endpoint implements Earlier Work Discovery for ResearchRabbit parity.
+    """
+    try:
+        # Import citation service
+        from services.citation_service import get_citation_service
+
+        # Get base article from database
+        base_article = db.query(Article).filter(Article.pmid == pmid).first()
+        if not base_article:
+            raise HTTPException(status_code=404, detail=f"Article with PMID {pmid} not found")
+
+        # Fetch references using citation service
+        citation_service = await get_citation_service()
+        async with citation_service:
+            references = await citation_service.fetch_references(pmid)
+
+        # Format response
+        reference_articles = []
+        for ref in references[:limit]:
+            reference_articles.append({
+                "pmid": ref.pmid,
+                "title": ref.title,
+                "authors": ref.authors or [],
+                "journal": ref.journal,
+                "year": ref.year,
+                "doi": ref.doi,
+                "citation_count": ref.citation_count or 0,
+                "abstract": ref.abstract,
+                "url": ref.url or f"https://pubmed.ncbi.nlm.nih.gov/{ref.pmid}/" if ref.pmid else None
+            })
+
+        return {
+            "base_article": {
+                "pmid": base_article.pmid,
+                "title": base_article.title,
+                "authors": base_article.authors or [],
+                "journal": base_article.journal,
+                "year": base_article.publication_year,
+                "citation_count": base_article.citation_count or 0
+            },
+            "references": reference_articles,
+            "total_found": len(reference_articles),
+            "search_parameters": {
+                "limit": limit,
+                "source": "citation_service"
+            },
+            "cache_stats": citation_service.get_cache_stats()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"References fetch error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch references: {str(e)}")
+
+@app.get("/articles/{pmid}/references-network")
+async def get_article_references_network(
+    pmid: str,
+    limit: int = Query(20, ge=1, le=50, description="Maximum number of references in network"),
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get network visualization data for reference papers (earlier work).
+
+    Returns React Flow compatible network data for Earlier Work Discovery visualization.
+    """
+    try:
+        # Get references data
+        references_data = await get_article_references(pmid, limit, user_id, db)
+
+        if not references_data["references"]:
+            return {
+                "nodes": [],
+                "edges": [],
+                "metadata": {
+                    "source_type": "references",
+                    "base_pmid": pmid,
+                    "total_nodes": 0,
+                    "total_edges": 0,
+                    "avg_year": 0,
+                    "year_range": {"min": 0, "max": 0}
+                },
+                "cached": False
+            }
+
+        # Convert to network format
+        nodes = []
+        edges = []
+
+        # Add base article as central node (larger, different color)
+        base_article = references_data["base_article"]
+        nodes.append({
+            "id": base_article["pmid"],
+            "type": "article",
+            "position": {"x": 0, "y": 0},  # Center position
+            "data": {
+                "label": base_article["title"][:60] + ("..." if len(base_article["title"]) > 60 else ""),
+                "pmid": base_article["pmid"],
+                "title": base_article["title"],
+                "authors": base_article.get("authors", []),
+                "journal": base_article.get("journal", ""),
+                "year": base_article.get("year"),
+                "citation_count": base_article.get("citation_count", 0),
+                "node_type": "base_article"
+            },
+            "style": {
+                "width": 120,
+                "height": 80,
+                "backgroundColor": "#3b82f6",  # Blue for base article
+                "color": "white",
+                "border": "2px solid #2563eb",
+                "borderRadius": "8px"
+            }
+        })
+
+        # Add reference articles as connected nodes
+        years = [ref["year"] for ref in references_data["references"] if ref["year"]]
+        max_year = max(years) if years else base_article.get("year", 2023)
+        min_year = min(years) if years else base_article.get("year", 2023)
+
+        for i, ref in enumerate(references_data["references"]):
+            # Calculate node size based on citation count
+            citation_count = ref.get("citation_count", 0)
+            node_size = 60 + min(citation_count / 10, 40)  # Size between 60-100
+
+            # Position nodes in a circle around the base article
+            import math
+            angle = (2 * math.pi * i) / len(references_data["references"])
+            radius = 200
+            x = radius * math.cos(angle)
+            y = radius * math.sin(angle)
+
+            # Color based on publication year (older = darker)
+            year_ratio = (ref["year"] - min_year) / (max_year - min_year) if max_year > min_year else 0.5
+            color_intensity = int(255 * (0.3 + 0.7 * year_ratio))  # Darker for older papers
+
+            nodes.append({
+                "id": ref["pmid"],
+                "type": "article",
+                "position": {"x": x, "y": y},
+                "data": {
+                    "label": ref["title"][:50] + ("..." if len(ref["title"]) > 50 else ""),
+                    "pmid": ref["pmid"],
+                    "title": ref["title"],
+                    "authors": ref.get("authors", []),
+                    "journal": ref.get("journal", ""),
+                    "year": ref.get("year"),
+                    "citation_count": ref.get("citation_count", 0),
+                    "node_type": "reference_article"
+                },
+                "style": {
+                    "width": int(node_size),
+                    "height": int(node_size * 0.7),
+                    "backgroundColor": f"rgb({color_intensity}, {color_intensity}, {color_intensity})",
+                    "color": "white" if color_intensity < 128 else "black",
+                    "border": "2px solid #6b7280",
+                    "borderRadius": "6px"
+                }
+            })
+
+            # Add edge from reference to base article (showing citation direction)
+            edges.append({
+                "id": f"{ref['pmid']}-{base_article['pmid']}",
+                "source": ref["pmid"],
+                "target": base_article["pmid"],
+                "type": "default",
+                "data": {
+                    "label": "cites",
+                    "relationship": "reference"
+                },
+                "style": {
+                    "stroke": "#9ca3af",
+                    "strokeWidth": 2,
+                    "strokeDasharray": "5,5"  # Dashed line for references
+                },
+                "markerEnd": {
+                    "type": "arrowclosed",
+                    "color": "#9ca3af"
+                }
+            })
+
+        # Calculate metadata
+        avg_year = sum(years) / len(years) if years else 0
+
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "metadata": {
+                "source_type": "references",
+                "base_pmid": pmid,
+                "total_nodes": len(nodes),
+                "total_edges": len(edges),
+                "avg_year": round(avg_year),
+                "year_range": {
+                    "min": min_year,
+                    "max": max_year
+                },
+                "search_parameters": references_data["search_parameters"]
+            },
+            "cached": False  # TODO: Implement network-level caching
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"References network error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate references network: {str(e)}")
+
+# =============================================================================
+# LATER WORK NAVIGATION ENDPOINTS - Phase 2 ResearchRabbit Feature Parity
+# =============================================================================
+
+@app.get("/articles/{pmid}/citations")
+async def get_article_citations(
+    pmid: str,
+    limit: int = Query(20, ge=1, le=50, description="Maximum number of citations to return"),
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get citing papers (later work) for the specified PMID using citation data.
+
+    This endpoint implements Later Work Discovery for ResearchRabbit parity.
+    """
+    try:
+        # Import citation service
+        from services.citation_service import get_citation_service
+
+        # Get base article from database
+        base_article = db.query(Article).filter(Article.pmid == pmid).first()
+        if not base_article:
+            raise HTTPException(status_code=404, detail=f"Article with PMID {pmid} not found")
+
+        # Fetch citations using citation service
+        citation_service = await get_citation_service()
+        async with citation_service:
+            citations = await citation_service.fetch_citations(pmid)
+
+        # Format response
+        citing_articles = []
+        for citation in citations[:limit]:
+            citing_articles.append({
+                "pmid": citation.pmid,
+                "title": citation.title,
+                "authors": citation.authors or [],
+                "journal": citation.journal,
+                "year": citation.year,
+                "doi": citation.doi,
+                "citation_count": citation.citation_count or 0,
+                "abstract": citation.abstract,
+                "url": citation.url or f"https://pubmed.ncbi.nlm.nih.gov/{citation.pmid}/" if citation.pmid else None
+            })
+
+        return {
+            "base_article": {
+                "pmid": base_article.pmid,
+                "title": base_article.title,
+                "authors": base_article.authors or [],
+                "journal": base_article.journal,
+                "year": base_article.publication_year,
+                "citation_count": base_article.citation_count or 0
+            },
+            "citations": citing_articles,
+            "total_found": len(citing_articles),
+            "search_parameters": {
+                "limit": limit,
+                "source": "citation_service"
+            },
+            "cache_stats": citation_service.get_cache_stats()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Citations fetch error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch citations: {str(e)}")
+
+@app.get("/articles/{pmid}/citations-network")
+async def get_article_citations_network(
+    pmid: str,
+    limit: int = Query(20, ge=1, le=50, description="Maximum number of citations in network"),
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get network visualization data for citing papers (later work).
+
+    Returns React Flow compatible network data for Later Work Discovery visualization.
+    """
+    try:
+        # Get citations data
+        citations_data = await get_article_citations(pmid, limit, user_id, db)
+
+        if not citations_data["citations"]:
+            return {
+                "nodes": [],
+                "edges": [],
+                "metadata": {
+                    "source_type": "citations",
+                    "base_pmid": pmid,
+                    "total_nodes": 0,
+                    "total_edges": 0,
+                    "avg_year": 0,
+                    "year_range": {"min": 0, "max": 0}
+                },
+                "cached": False
+            }
+
+        # Convert to network format
+        nodes = []
+        edges = []
+
+        # Add base article as central node (larger, different color)
+        base_article = citations_data["base_article"]
+        nodes.append({
+            "id": base_article["pmid"],
+            "type": "article",
+            "position": {"x": 0, "y": 0},  # Center position
+            "data": {
+                "label": base_article["title"][:60] + ("..." if len(base_article["title"]) > 60 else ""),
+                "pmid": base_article["pmid"],
+                "title": base_article["title"],
+                "authors": base_article.get("authors", []),
+                "journal": base_article.get("journal", ""),
+                "year": base_article.get("year"),
+                "citation_count": base_article.get("citation_count", 0),
+                "node_type": "base_article"
+            },
+            "style": {
+                "width": 120,
+                "height": 80,
+                "backgroundColor": "#10b981",  # Green for base article
+                "color": "white",
+                "border": "2px solid #059669",
+                "borderRadius": "8px"
+            }
+        })
+
+        # Add citing articles as connected nodes
+        years = [cite["year"] for cite in citations_data["citations"] if cite["year"]]
+        max_year = max(years) if years else base_article.get("year", 2023)
+        min_year = min(years) if years else base_article.get("year", 2023)
+
+        for i, cite in enumerate(citations_data["citations"]):
+            # Calculate node size based on citation count
+            citation_count = cite.get("citation_count", 0)
+            node_size = 60 + min(citation_count / 10, 40)  # Size between 60-100
+
+            # Position nodes in a circle around the base article
+            import math
+            angle = (2 * math.pi * i) / len(citations_data["citations"])
+            radius = 200
+            x = radius * math.cos(angle)
+            y = radius * math.sin(angle)
+
+            # Color based on publication year (newer = brighter)
+            year_ratio = (cite["year"] - min_year) / (max_year - min_year) if max_year > min_year else 0.5
+            green_intensity = int(100 + 155 * year_ratio)  # Brighter green for newer papers
+
+            nodes.append({
+                "id": cite["pmid"],
+                "type": "article",
+                "position": {"x": x, "y": y},
+                "data": {
+                    "label": cite["title"][:50] + ("..." if len(cite["title"]) > 50 else ""),
+                    "pmid": cite["pmid"],
+                    "title": cite["title"],
+                    "authors": cite.get("authors", []),
+                    "journal": cite.get("journal", ""),
+                    "year": cite.get("year"),
+                    "citation_count": cite.get("citation_count", 0),
+                    "node_type": "citing_article"
+                },
+                "style": {
+                    "width": int(node_size),
+                    "height": int(node_size * 0.7),
+                    "backgroundColor": f"rgb(16, {green_intensity}, 129)",
+                    "color": "white",
+                    "border": "2px solid #059669",
+                    "borderRadius": "6px"
+                }
+            })
+
+            # Add edge from base article to citing article (showing citation direction)
+            edges.append({
+                "id": f"{base_article['pmid']}-{cite['pmid']}",
+                "source": base_article["pmid"],
+                "target": cite["pmid"],
+                "type": "default",
+                "data": {
+                    "label": "cited by",
+                    "relationship": "citation"
+                },
+                "style": {
+                    "stroke": "#10b981",
+                    "strokeWidth": 2,
+                    "strokeDasharray": "0"  # Solid line for citations
+                },
+                "markerEnd": {
+                    "type": "arrowclosed",
+                    "color": "#10b981"
+                }
+            })
+
+        # Calculate metadata
+        avg_year = sum(years) / len(years) if years else 0
+
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "metadata": {
+                "source_type": "citations",
+                "base_pmid": pmid,
+                "total_nodes": len(nodes),
+                "total_edges": len(edges),
+                "avg_year": round(avg_year),
+                "year_range": {
+                    "min": min_year,
+                    "max": max_year
+                },
+                "search_parameters": citations_data["search_parameters"]
+            },
+            "cached": False  # TODO: Implement network-level caching
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Citations network error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate citations network: {str(e)}")
+
+# =============================================================================
+# TIMELINE VISUALIZATION ENDPOINTS - Phase 3 ResearchRabbit Feature Parity
+# =============================================================================
+
+@app.get("/articles/{pmid}/timeline")
+async def get_article_timeline(
+    pmid: str,
+    period_strategy: str = Query('lustrum', description="Time period strategy: decade, lustrum, triennium, annual"),
+    min_articles: int = Query(1, ge=1, le=10, description="Minimum articles per period"),
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get timeline visualization data for an article and its related papers.
+
+    This endpoint implements Timeline Visualization for ResearchRabbit parity.
+    """
+    try:
+        # Import timeline service
+        from services.timeline_service import get_timeline_processor
+
+        # Get base article from database
+        base_article = db.query(Article).filter(Article.pmid == pmid).first()
+        if not base_article:
+            raise HTTPException(status_code=404, detail=f"Article with PMID {pmid} not found")
+
+        # Get related articles (similar work, references, citations)
+        related_articles = []
+
+        # Add base article
+        related_articles.append({
+            'pmid': base_article.pmid,
+            'title': base_article.title,
+            'authors': base_article.authors or [],
+            'journal': base_article.journal,
+            'year': base_article.publication_year,
+            'citation_count': base_article.citation_count or 0,
+            'abstract': base_article.abstract,
+            'doi': base_article.doi,
+            'url': f"https://pubmed.ncbi.nlm.nih.gov/{base_article.pmid}/"
+        })
+
+        # Get similar articles from similarity engine
+        try:
+            from services.similarity_engine import get_similarity_engine
+            similarity_engine = get_similarity_engine()
+            similar_articles = similarity_engine.find_similar_articles(pmid, limit=20, threshold=0.1)
+
+            for similar in similar_articles:
+                article = db.query(Article).filter(Article.pmid == similar['pmid']).first()
+                if article:
+                    related_articles.append({
+                        'pmid': article.pmid,
+                        'title': article.title,
+                        'authors': article.authors or [],
+                        'journal': article.journal,
+                        'year': article.publication_year,
+                        'citation_count': article.citation_count or 0,
+                        'abstract': article.abstract,
+                        'doi': article.doi,
+                        'url': f"https://pubmed.ncbi.nlm.nih.gov/{article.pmid}/"
+                    })
+        except Exception as e:
+            print(f"Error getting similar articles for timeline: {e}")
+
+        # Process articles for timeline visualization
+        timeline_processor = get_timeline_processor()
+        timeline_data = timeline_processor.process_articles_for_timeline(
+            related_articles,
+            period_strategy=period_strategy,
+            min_articles_per_period=min_articles
+        )
+
+        return {
+            "base_article": {
+                "pmid": base_article.pmid,
+                "title": base_article.title,
+                "authors": base_article.authors or [],
+                "journal": base_article.journal,
+                "year": base_article.publication_year,
+                "citation_count": base_article.citation_count or 0
+            },
+            "timeline_data": {
+                "periods": [
+                    {
+                        "start_year": period.start_year,
+                        "end_year": period.end_year,
+                        "label": period.label,
+                        "total_articles": period.total_articles,
+                        "avg_citations": period.avg_citations,
+                        "top_journals": period.top_journals,
+                        "key_authors": period.key_authors,
+                        "research_trends": period.research_trends,
+                        "articles": [
+                            {
+                                "pmid": article.pmid,
+                                "title": article.title,
+                                "authors": article.authors,
+                                "journal": article.journal,
+                                "year": article.year,
+                                "citation_count": article.citation_count,
+                                "url": article.url if hasattr(article, 'url') and article.url else f"https://pubmed.ncbi.nlm.nih.gov/{article.pmid}/"
+                            } for article in period.articles
+                        ]
+                    } for period in timeline_data.periods
+                ],
+                "total_articles": timeline_data.total_articles,
+                "year_range": timeline_data.year_range,
+                "citation_trends": timeline_data.citation_trends,
+                "research_evolution": timeline_data.research_evolution,
+                "key_milestones": timeline_data.key_milestones
+            },
+            "search_parameters": {
+                "period_strategy": period_strategy,
+                "min_articles_per_period": min_articles,
+                "total_related_articles": len(related_articles)
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Timeline fetch error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch timeline data: {str(e)}")
+
+@app.get("/projects/{project_id}/timeline")
+async def get_project_timeline(
+    project_id: str,
+    period_strategy: str = Query('lustrum', description="Time period strategy: decade, lustrum, triennium, annual"),
+    min_articles: int = Query(2, ge=1, le=10, description="Minimum articles per period"),
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get timeline visualization data for all articles in a project.
+
+    This endpoint provides project-level timeline analysis.
+    """
+    try:
+        # Import timeline service
+        from services.timeline_service import get_timeline_processor
+
+        # Verify project exists and user has access
+        project = db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == user_id
+        ).first()
+
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found or access denied")
+
+        # Get all articles in the project
+        articles = db.query(Article).filter(Article.project_id == project_id).all()
+
+        if not articles:
+            return {
+                "project": {
+                    "project_id": project.project_id,
+                    "name": project.project_name,
+                    "description": project.description
+                },
+                "timeline_data": {
+                    "periods": [],
+                    "total_articles": 0,
+                    "year_range": (0, 0),
+                    "citation_trends": {},
+                    "research_evolution": {},
+                    "key_milestones": []
+                },
+                "search_parameters": {
+                    "period_strategy": period_strategy,
+                    "min_articles_per_period": min_articles,
+                    "total_articles": 0
+                }
+            }
+
+        # Convert articles to timeline format
+        timeline_articles = []
+        for article in articles:
+            timeline_articles.append({
+                'pmid': article.pmid,
+                'title': article.title,
+                'authors': article.authors or [],
+                'journal': article.journal,
+                'year': article.publication_year,
+                'citation_count': article.citation_count or 0,
+                'abstract': article.abstract,
+                'doi': article.doi,
+                'url': f"https://pubmed.ncbi.nlm.nih.gov/{article.pmid}/"
+            })
+
+        # Process articles for timeline visualization
+        timeline_processor = get_timeline_processor()
+        timeline_data = timeline_processor.process_articles_for_timeline(
+            timeline_articles,
+            period_strategy=period_strategy,
+            min_articles_per_period=min_articles
+        )
+
+        return {
+            "project": {
+                "project_id": project.project_id,
+                "name": project.project_name,
+                "description": project.description,
+                "total_articles": len(articles)
+            },
+            "timeline_data": {
+                "periods": [
+                    {
+                        "start_year": period.start_year,
+                        "end_year": period.end_year,
+                        "label": period.label,
+                        "total_articles": period.total_articles,
+                        "avg_citations": period.avg_citations,
+                        "top_journals": period.top_journals,
+                        "key_authors": period.key_authors,
+                        "research_trends": period.research_trends,
+                        "articles": [
+                            {
+                                "pmid": article.pmid,
+                                "title": article.title,
+                                "authors": article.authors,
+                                "journal": article.journal,
+                                "year": article.year,
+                                "citation_count": article.citation_count,
+                                "url": article.url if hasattr(article, 'url') and article.url else f"https://pubmed.ncbi.nlm.nih.gov/{article.pmid}/"
+                            } for article in period.articles
+                        ]
+                    } for period in timeline_data.periods
+                ],
+                "total_articles": timeline_data.total_articles,
+                "year_range": timeline_data.year_range,
+                "citation_trends": timeline_data.citation_trends,
+                "research_evolution": timeline_data.research_evolution,
+                "key_milestones": timeline_data.key_milestones
+            },
+            "search_parameters": {
+                "period_strategy": period_strategy,
+                "min_articles_per_period": min_articles,
+                "total_articles": len(timeline_articles)
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Project timeline error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch project timeline: {str(e)}")
 
 @app.post("/articles/enrich")
 async def enrich_articles_endpoint(
