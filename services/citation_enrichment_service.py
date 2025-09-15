@@ -13,7 +13,7 @@ import asyncio
 import aiohttp
 import json
 from typing import Dict, List, Optional, Set
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
 from sqlalchemy.orm import Session
 from database import get_db, Article, ArticleCitation
@@ -46,9 +46,15 @@ class CitationEnrichmentService:
                 return {"error": "Article not found"}
             
             # Check if recently updated (within 7 days)
-            if (article.citation_data_updated and
-                datetime.now() - article.citation_data_updated < timedelta(days=7)):
-                return {"status": "recently_updated", "citations": len(article.cited_by_pmids or [])}
+            if article.citation_data_updated:
+                # Handle timezone-aware comparison
+                now = datetime.now(timezone.utc)
+                last_updated = article.citation_data_updated
+                if not last_updated.tzinfo:
+                    last_updated = last_updated.replace(tzinfo=timezone.utc)
+
+                if now - last_updated < timedelta(days=7):
+                    return {"status": "recently_updated", "citations": len(article.cited_by_pmids or [])}
 
             # Fetch citation data from OpenAlex
             citations_data = await self._fetch_openalex_citations(pmid)
@@ -58,7 +64,7 @@ class CitationEnrichmentService:
             article.cited_by_pmids = [c.citing_pmid for c in citations_data]
             article.references_pmids = [r.cited_pmid for r in references_data]
             article.citation_count = len(citations_data)
-            article.citation_data_updated = datetime.now()
+            article.citation_data_updated = datetime.now(timezone.utc)
             # Note: citation_data_source field doesn't exist in current model
             
             # Store detailed citation relationships
