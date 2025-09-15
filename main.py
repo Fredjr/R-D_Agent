@@ -114,6 +114,46 @@ from citation_endpoints import register_citation_endpoints, add_test_citation_en
 register_citation_endpoints(app)
 add_test_citation_endpoint(app)
 
+# Database migration endpoint for Phase 5
+@app.post("/admin/migrate-citation-schema")
+async def migrate_citation_schema(user_id: str = Header(..., alias="User-ID")):
+    """Run the citation schema migration on Railway PostgreSQL"""
+    try:
+        import sys
+        import os
+        sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+        from migrations.enhance_citation_schema import upgrade, get_migration_status
+
+        # Check if already applied
+        if get_migration_status():
+            return {
+                "status": "already_applied",
+                "message": "Citation schema migration already applied",
+                "timestamp": datetime.now().isoformat()
+            }
+
+        # Run the migration
+        upgrade()
+
+        return {
+            "status": "success",
+            "message": "Citation schema migration completed successfully",
+            "timestamp": datetime.now().isoformat(),
+            "enhancements": [
+                "article_citations: relevance_score, citation_source",
+                "articles: citations_last_updated, citation_data_source",
+                "Performance indexes for citation queries"
+            ]
+        }
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Migration failed: {str(e)}",
+            "timestamp": datetime.now().isoformat()
+        }
+
 # WebSocket Connection Manager for Project Rooms
 class ConnectionManager:
     def __init__(self):
