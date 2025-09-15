@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import NetworkView from './NetworkView';
 import NetworkSidebar from './NetworkSidebar';
 
@@ -37,6 +38,7 @@ export default function NetworkViewWithSidebar({
   onArticleSaved,
   className = ''
 }: NetworkViewWithSidebarProps) {
+  const { user } = useAuth();
   const [selectedNode, setSelectedNode] = useState<NetworkNode | null>(null);
 
   const handleNodeSelect = useCallback((node: NetworkNode | null) => {
@@ -58,7 +60,7 @@ export default function NetworkViewWithSidebar({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'User-ID': 'default_user', // This should come from auth context
+          'User-ID': user?.email || 'default_user',
         },
         body: JSON.stringify({
           article_title: title,
