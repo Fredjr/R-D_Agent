@@ -447,7 +447,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             demoData.metadata = {
               ...demoData.metadata,
               demo_mode: true,
-              demo_message: "Demo: Showing sample citation network (project has no articles yet)"
+              demo_message: `Demo: Sample citation network (add articles to your ${sourceType} to see real data)`
             };
             setNetworkData(demoData);
             return;
@@ -667,14 +667,30 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   if (!networkData || networkData.nodes.length === 0) {
     return (
       <div className={`flex items-center justify-center h-96 bg-gray-50 rounded-lg ${className}`}>
-        <div className="text-center">
+        <div className="text-center max-w-md">
           <div className="text-gray-400 mb-4">
-            <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
           </div>
-          <p className="text-gray-600 mb-2">No network data available</p>
-          <p className="text-gray-500 text-sm">Add articles to see citation relationships</p>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Network Data Available</h3>
+          <p className="text-gray-600 mb-4">
+            {sourceType === 'project'
+              ? "Add articles to your project to see citation relationships and build your research network."
+              : sourceType === 'collection'
+              ? "Add articles to this collection to explore citation networks and discover related research."
+              : "No articles available to create a network visualization."
+            }
+          </p>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left">
+            <h4 className="font-medium text-blue-900 mb-2">💡 Getting Started:</h4>
+            <ul className="text-sm text-blue-800 space-y-1">
+              <li>• Use the search bar to find relevant articles</li>
+              <li>• Add articles to your {sourceType === 'project' ? 'project' : 'collection'}</li>
+              <li>• Return here to explore citation networks</li>
+              <li>• Click nodes to discover related research</li>
+            </ul>
+          </div>
         </div>
       </div>
     );
@@ -796,7 +812,10 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
               <>
                 <div className="font-semibold text-blue-900 mb-1">🎯 Demo Network</div>
                 <div className="text-xs text-blue-700 mb-2">
-                  Sample citation network (add articles to your project)
+                  Sample citation network - add articles to see your data
+                </div>
+                <div className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">
+                  💡 Try clicking nodes to explore the multi-column layout!
                 </div>
               </>
             ) : (

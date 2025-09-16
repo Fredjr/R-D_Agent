@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { PlusIcon, FolderIcon, DocumentTextIcon, EyeIcon, ListBulletIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import NetworkViewWithSidebar from './NetworkViewWithSidebar';
+import MultiColumnNetworkView from './MultiColumnNetworkView';
 import CollectionArticles from './CollectionArticles';
 
 interface Collection {
@@ -189,7 +190,7 @@ export default function Collections({ projectId, onRefresh }: CollectionsProps) 
             </p>
           </div>
           <div className="h-[600px]">
-            <NetworkViewWithSidebar
+            <MultiColumnNetworkView
               sourceType="collection"
               sourceId={selectedCollection.collection_id}
               projectId={projectId}
