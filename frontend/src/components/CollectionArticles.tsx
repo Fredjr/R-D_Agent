@@ -129,7 +129,7 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
         <div className="grid gap-4">
           {articles.map((article) => (
             <div
-              key={article.article_id}
+              key={article.id}
               onClick={() => handleArticleSelect(article)}
               className="bg-white rounded-lg shadow border hover:shadow-md hover:border-blue-300 transition-all cursor-pointer p-6"
             >
