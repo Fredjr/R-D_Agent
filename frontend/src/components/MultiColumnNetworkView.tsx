@@ -277,6 +277,14 @@ export default function MultiColumnNetworkView({
                 onNodeSelect={(node) => handleColumnNodeSelect(column.id, node)}
                 className="h-full"
                 forceNetworkType="citations"
+                articleMetadata={column.paper?.data ? {
+                  pmid: column.paper.data.pmid,
+                  title: column.paper.data.title,
+                  authors: column.paper.data.authors || [],
+                  journal: column.paper.data.journal || '',
+                  year: column.paper.data.year || new Date().getFullYear(),
+                  citation_count: column.paper.data.citation_count || 0
+                } : undefined}
               />
 
               {/* Column Sidebar */}
