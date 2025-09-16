@@ -138,6 +138,9 @@ export default function NetworkSidebar({
 
   // ResearchRabbit-style exploration functions
   const handleExploreSection = async (section: 'papers' | 'people' | 'content', mode: string) => {
+    console.log('🚀 handleExploreSection called:', { section, mode, selectedNode: selectedNode?.id });
+    console.log('📊 Selected node data structure:', selectedNode);
+
     if (expandedSection === section && explorationMode === mode) {
       // Collapse if clicking the same section/mode
       setExpandedSection(null);
@@ -173,10 +176,13 @@ export default function NetworkSidebar({
           }
           break;
         case 'people':
-          if (mode === 'authors' && selectedNode?.data.authors) {
+          if (mode === 'authors') {
             endpoint = `/api/proxy/authors/search`;
-            params.append('authors', selectedNode.data.authors.join(','));
+            // Use authors from metadata if available, otherwise use sample authors
+            const authors = selectedNode?.data?.metadata?.authors || selectedNode?.data?.authors || ['Sample Author'];
+            params.append('authors', authors.join(','));
             params.append('limit', '10');
+            console.log('🔍 Authors search with:', { authors, endpoint });
           }
           break;
         case 'content':
@@ -200,6 +206,15 @@ export default function NetworkSidebar({
           setExplorationResults(results);
 
           // 🚀 NEW: Automatically add exploration results to the network graph!
+          console.log('🔍 Checking conditions for network expansion:', {
+            resultsLength: results.length,
+            hasCallback: !!onAddExplorationNodes,
+            hasSelectedNode: !!selectedNode,
+            selectedNodeId: selectedNode?.id,
+            section,
+            mode
+          });
+
           if (results.length > 0 && onAddExplorationNodes && selectedNode) {
             // Determine relation type based on section and mode
             let relationType: 'similar' | 'citations' | 'references' | 'authors' = 'similar';
@@ -209,6 +224,8 @@ export default function NetworkSidebar({
               else if (mode === 'later') relationType = 'citations';
             } else if (section === 'people') {
               relationType = 'authors';
+            } else if (section === 'content') {
+              relationType = 'similar'; // Treat linked content as similar
             }
 
             console.log('🎯 NetworkSidebar calling onAddExplorationNodes:', {
@@ -216,15 +233,20 @@ export default function NetworkSidebar({
               resultsCount: results.length,
               relationType,
               section,
-              mode
+              mode,
+              sampleResult: results[0]
             });
 
-            onAddExplorationNodes(selectedNode.id, results, relationType);
+            // Add a small delay to ensure the callback is properly executed
+            setTimeout(() => {
+              onAddExplorationNodes(selectedNode.id, results, relationType);
+            }, 100);
           } else {
             console.log('❌ NetworkSidebar NOT calling onAddExplorationNodes:', {
               hasResults: results.length > 0,
               hasCallback: !!onAddExplorationNodes,
-              hasSelectedNode: !!selectedNode
+              hasSelectedNode: !!selectedNode,
+              selectedNodeId: selectedNode?.id
             });
           }
         }
