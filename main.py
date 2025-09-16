@@ -35,6 +35,7 @@ from urllib.parse import urlparse
 import asyncio
 import random
 import requests
+import sys
 try:
     # Optional lightweight PDF text extraction
     import io
@@ -11086,4 +11087,43 @@ def _generate_fallback_results_interpretation_analysis(text: str, title: str, ob
             "limitations": ["Analysis limited due to system constraints"],
             "hypothesis_alignment": "Results relevant to study objectives",
             "limitations_biases_in_results": ["Detailed analysis not available"]
+        }
+
+# Railway PostgreSQL Database Migration Endpoint
+@app.get("/migrate-railway-database")
+async def migrate_railway_database_endpoint():
+    """Endpoint to trigger Railway PostgreSQL database migration"""
+    try:
+        # Import and run the Railway migration
+        import subprocess
+        result = subprocess.run([
+            sys.executable, "database_migration_railway.py"
+        ], capture_output=True, text=True, timeout=300)
+
+        if result.returncode == 0:
+            return {
+                "status": "success",
+                "message": "Railway PostgreSQL migration completed successfully",
+                "output": result.stdout,
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            return {
+                "status": "error",
+                "message": "Railway PostgreSQL migration failed",
+                "error": result.stderr,
+                "output": result.stdout,
+                "timestamp": datetime.now().isoformat()
+            }
+    except subprocess.TimeoutExpired:
+        return {
+            "status": "error",
+            "message": "Database migration timed out after 5 minutes",
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Migration endpoint error: {str(e)}",
+            "timestamp": datetime.now().isoformat()
         }
