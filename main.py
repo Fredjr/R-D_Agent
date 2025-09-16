@@ -6997,8 +6997,7 @@ async def add_article_to_collection(
                     title=article_data.article_title,
                     authors=article_data.article_authors,
                     journal=article_data.article_journal,
-                    pub_year=article_data.article_year,
-                    url=article_data.article_url or f"https://pubmed.ncbi.nlm.nih.gov/{article_data.article_pmid}/",
+                    publication_year=article_data.article_year,
                     abstract="",  # Will be enriched later
                     doi="",      # Will be enriched later
                     created_at=datetime.utcnow(),
@@ -7113,8 +7112,7 @@ async def migrate_collection_articles_to_main_table(
                     title=article_collection.article_title,
                     authors=article_collection.article_authors or [],
                     journal=article_collection.article_journal or "",
-                    pub_year=article_collection.article_year or 2024,
-                    url=article_collection.article_url or f"https://pubmed.ncbi.nlm.nih.gov/{article_collection.article_pmid}/",
+                    publication_year=article_collection.article_year or 2024,
                     abstract="",  # Will be enriched later
                     doi="",      # Will be enriched later
                     created_at=datetime.utcnow(),
