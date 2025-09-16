@@ -55,21 +55,34 @@ export default function MultiColumnNetworkView({
 
   // Handle node selection in the main network view
   const handleMainNodeSelect = useCallback((node: any | null) => {
+    console.log('🔍 handleMainNodeSelect called with node:', node);
+    console.log('🔍 Node structure:', {
+      id: node?.id,
+      hasMetadata: !!node?.metadata,
+      metadata: node?.metadata,
+      nodeKeys: node ? Object.keys(node) : 'null'
+    });
+
     if (node) {
+      // Handle different node structures - check if metadata exists
+      const metadata = node.metadata || node;
+
       const convertedNode: NetworkNode = {
         id: node.id,
         data: {
-          pmid: node.metadata.pmid,
-          title: node.metadata.title,
-          authors: node.metadata.authors,
-          journal: node.metadata.journal,
-          year: node.metadata.year,
-          citation_count: node.metadata.citation_count,
+          pmid: metadata.pmid || node.id,
+          title: metadata.title || `Article ${node.id}`,
+          authors: metadata.authors || [],
+          journal: metadata.journal || '',
+          year: metadata.year || new Date().getFullYear(),
+          citation_count: metadata.citation_count || 0,
           node_type: 'selected_article',
-          url: node.metadata.url,
-          abstract: node.metadata.abstract
+          url: metadata.url || `https://pubmed.ncbi.nlm.nih.gov/${metadata.pmid || node.id}/`,
+          abstract: metadata.abstract || ''
         }
       };
+
+      console.log('✅ Converted node for sidebar:', convertedNode);
       setMainSelectedNode(convertedNode);
     } else {
       setMainSelectedNode(null);
@@ -121,21 +134,28 @@ export default function MultiColumnNetworkView({
 
   // Handle node selection within a column
   const handleColumnNodeSelect = useCallback((columnId: string, node: any | null) => {
+    console.log('🔍 handleColumnNodeSelect called:', { columnId, node });
+
     if (node) {
+      // Handle different node structures - check if metadata exists
+      const metadata = node.metadata || node;
+
       const convertedNode: NetworkNode = {
         id: node.id,
         data: {
-          pmid: node.metadata.pmid,
-          title: node.metadata.title,
-          authors: node.metadata.authors,
-          journal: node.metadata.journal,
-          year: node.metadata.year,
-          citation_count: node.metadata.citation_count,
+          pmid: metadata.pmid || node.id,
+          title: metadata.title || `Article ${node.id}`,
+          authors: metadata.authors || [],
+          journal: metadata.journal || '',
+          year: metadata.year || new Date().getFullYear(),
+          citation_count: metadata.citation_count || 0,
           node_type: 'selected_article',
-          url: node.metadata.url,
-          abstract: node.metadata.abstract
+          url: metadata.url || `https://pubmed.ncbi.nlm.nih.gov/${metadata.pmid || node.id}/`,
+          abstract: metadata.abstract || ''
         }
       };
+
+      console.log('✅ Column converted node:', convertedNode);
 
       setColumns(prev => prev.map(col => 
         col.id === columnId 
