@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   ReactFlow,
@@ -140,14 +140,14 @@ const getNodeColor = (year: number): string => {
   return '#6b7280'; // Gray for very old
 };
 
-export default function NetworkView({
+const NetworkView = forwardRef<any, NetworkViewProps>(({
   sourceType,
   sourceId,
   navigationMode = 'default',
   onNodeSelect,
   onNavigationChange,
   className = ''
-}: NetworkViewProps) {
+}, ref) => {
   const { user } = useAuth();
   const [networkData, setNetworkData] = useState<NetworkData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -165,6 +165,11 @@ export default function NetworkView({
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+
+  // Expose addExplorationNodesToGraph function via ref
+  useImperativeHandle(ref, () => ({
+    addExplorationNodesToGraph
+  }), [addExplorationNodesToGraph]);
 
   // ResearchRabbit-style graph expansion
   const expandNodeNetwork = useCallback(async (nodeId: string, nodeData: any) => {
@@ -914,4 +919,8 @@ export default function NetworkView({
       )}
     </div>
   );
-}
+});
+
+NetworkView.displayName = 'NetworkView';
+
+export default NetworkView;
