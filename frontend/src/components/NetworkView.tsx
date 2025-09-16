@@ -591,7 +591,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         throw new Error(`Failed to fetch network data: ${errorMessage}`);
       }
 
-      const data: NetworkData = await response.json();
+      let data: NetworkData = await response.json();
 
       console.log('🔍 NetworkView API Response:', {
         endpoint,
