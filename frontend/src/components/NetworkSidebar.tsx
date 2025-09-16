@@ -87,28 +87,38 @@ export default function NetworkSidebar({
   const fetchPaperDetails = async (pmid: string) => {
     setIsLoading(true);
     try {
-      // Fetch references
+      console.log(`🔍 NetworkSidebar fetching paper details for PMID: ${pmid}`);
+
+      // Fetch references using PubMed API
       const referencesResponse = await fetch(
-        `/api/proxy/articles/${pmid}/references?limit=10`,
+        `/api/proxy/pubmed/references?pmid=${pmid}&limit=10`,
         {
           headers: { 'User-ID': user?.user_id || 'default_user' }
         }
       );
       if (referencesResponse.ok) {
         const referencesData = await referencesResponse.json();
+        console.log(`📊 Found ${referencesData.references?.length || 0} references from PubMed`);
         setReferences(referencesData.references || []);
+      } else {
+        console.log(`⚠️ PubMed references API failed: ${referencesResponse.status}`);
+        setReferences([]);
       }
 
-      // Fetch citations
+      // Fetch citations using PubMed API
       const citationsResponse = await fetch(
-        `/api/proxy/articles/${pmid}/citations?limit=10`,
+        `/api/proxy/pubmed/citations?pmid=${pmid}&type=citations&limit=10`,
         {
           headers: { 'User-ID': user?.user_id || 'default_user' }
         }
       );
       if (citationsResponse.ok) {
         const citationsData = await citationsResponse.json();
+        console.log(`📊 Found ${citationsData.citations?.length || 0} citations from PubMed`);
         setCitations(citationsData.citations || []);
+      } else {
+        console.log(`⚠️ PubMed citations API failed: ${citationsResponse.status}`);
+        setCitations([]);
       }
     } catch (error) {
       console.error('Error fetching paper details:', error);
