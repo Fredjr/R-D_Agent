@@ -174,7 +174,7 @@ const createArticleSpecificNetwork = (originalArticle: any, sourceId: string) =>
   }
 
   // Generate topic-related nodes based on title keywords
-  const titleWords = title.toLowerCase().split(' ').filter(word =>
+  const titleWords = title.toLowerCase().split(' ').filter((word: string) =>
     word.length > 4 && !['with', 'from', 'this', 'that', 'they', 'were', 'been', 'have'].includes(word)
   );
 
