@@ -311,6 +311,30 @@ export default function NetworkView({
       }
 
       const data: NetworkData = await response.json();
+
+      // DEMO FALLBACK: If project/collection network is empty, show demo article network
+      if (sourceType !== 'article' && (!data.nodes || data.nodes.length === 0)) {
+        console.log('Project network empty, loading demo article network...');
+        const demoResponse = await fetch('/api/proxy/articles/33462507/citations-network?limit=5', {
+          headers: {
+            'User-ID': user?.email || 'default_user',
+          },
+        });
+        if (demoResponse.ok) {
+          const demoData = await demoResponse.json();
+          if (demoData.nodes && demoData.nodes.length > 0) {
+            // Add demo indicator to metadata
+            demoData.metadata = {
+              ...demoData.metadata,
+              demo_mode: true,
+              demo_message: "Demo: Showing sample citation network (project has no articles yet)"
+            };
+            setNetworkData(demoData);
+            return;
+          }
+        }
+      }
+
       setNetworkData(data);
 
       // Update navigation trail for non-default modes
@@ -671,9 +695,18 @@ export default function NetworkView({
         )}
 
         {/* Network Statistics Panel */}
-        <Panel position="top-left" className="bg-white p-3 rounded-lg shadow-lg border">
+        <Panel position="top-left" className={`p-3 rounded-lg shadow-lg border ${networkData?.metadata?.demo_mode ? 'bg-blue-50 border-blue-200' : 'bg-white'}`}>
           <div className="text-sm">
-            <div className="font-semibold text-gray-900 mb-2">Network Overview</div>
+            {networkData?.metadata?.demo_mode ? (
+              <>
+                <div className="font-semibold text-blue-900 mb-1">🎯 Demo Network</div>
+                <div className="text-xs text-blue-700 mb-2">
+                  Sample citation network (add articles to your project)
+                </div>
+              </>
+            ) : (
+              <div className="font-semibold text-gray-900 mb-2">Network Overview</div>
+            )}
             <div className="space-y-1 text-xs text-gray-600">
               <div>Articles: {networkData.metadata.total_nodes}</div>
               <div>Citations: {networkData.metadata.total_edges}</div>
