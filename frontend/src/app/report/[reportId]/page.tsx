@@ -119,13 +119,15 @@ export default function ReportDetailPage() {
           'User-ID': user?.email || 'default_user',
         },
         body: JSON.stringify({
-          pmid: selectedArticleForCollection.pmid || '',
-          title: selectedArticleForCollection.title,
-          authors: selectedArticleForCollection.authors || [],
-          journal: selectedArticleForCollection.journal || '',
-          year: selectedArticleForCollection.year || new Date().getFullYear(),
-          notes: `Added from Report: ${report?.title || reportId}`,
-          projectId: report?.project_id
+          article_pmid: selectedArticleForCollection.pmid || '',
+          article_title: selectedArticleForCollection.title,
+          article_authors: selectedArticleForCollection.authors || [],
+          article_journal: selectedArticleForCollection.journal || '',
+          article_year: selectedArticleForCollection.year || new Date().getFullYear(),
+          source_type: 'report',
+          source_report_id: reportId,
+          source_analysis_id: null,
+          notes: `Added from Report: ${report?.title || reportId}`
         }),
       });
 
