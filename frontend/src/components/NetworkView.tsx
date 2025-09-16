@@ -949,18 +949,36 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       console.log('🔄 Node not in original networkData, creating from React Flow node data');
       networkNode = {
         id: node.id,
-        label: node.data.label || node.data.title || 'Unknown Article',
-        size: node.data.size || 20,
-        color: node.data.color || '#4CAF50',
-        metadata: node.data.metadata || {
-          pmid: node.data.pmid || node.id,
-          title: node.data.title || node.data.label || 'Unknown Article',
-          authors: node.data.authors || [],
-          journal: node.data.journal || '',
-          year: node.data.year || new Date().getFullYear(),
-          citation_count: node.data.citation_count || 0,
-          url: node.data.url || `https://pubmed.ncbi.nlm.nih.gov/${node.data.pmid || node.id}/`,
-          abstract: node.data.abstract || ''
+        label: (typeof node.data.label === 'string' ? node.data.label : '') ||
+               (typeof node.data.title === 'string' ? node.data.title : '') ||
+               'Unknown Article',
+        size: (typeof node.data.size === 'number' ? node.data.size : 0) || 20,
+        color: (typeof node.data.color === 'string' ? node.data.color : '') || '#4CAF50',
+        metadata: {
+          pmid: ((node.data as any).metadata?.pmid && typeof (node.data as any).metadata.pmid === 'string' ? (node.data as any).metadata.pmid : '') ||
+                (typeof (node.data as any).pmid === 'string' ? (node.data as any).pmid : '') ||
+                node.id,
+          title: ((node.data as any).metadata?.title && typeof (node.data as any).metadata.title === 'string' ? (node.data as any).metadata.title : '') ||
+                 (typeof (node.data as any).title === 'string' ? (node.data as any).title : '') ||
+                 (typeof (node.data as any).label === 'string' ? (node.data as any).label : '') ||
+                 'Unknown Article',
+          authors: ((node.data as any).metadata?.authors && Array.isArray((node.data as any).metadata.authors) ? (node.data as any).metadata.authors : []) ||
+                   (Array.isArray((node.data as any).authors) ? (node.data as any).authors : []),
+          journal: ((node.data as any).metadata?.journal && typeof (node.data as any).metadata.journal === 'string' ? (node.data as any).metadata.journal : '') ||
+                   (typeof (node.data as any).journal === 'string' ? (node.data as any).journal : '') ||
+                   '',
+          year: ((node.data as any).metadata?.year && typeof (node.data as any).metadata.year === 'number' ? (node.data as any).metadata.year : 0) ||
+                (typeof (node.data as any).year === 'number' ? (node.data as any).year : 0) ||
+                new Date().getFullYear(),
+          citation_count: ((node.data as any).metadata?.citation_count && typeof (node.data as any).metadata.citation_count === 'number' ? (node.data as any).metadata.citation_count : 0) ||
+                          (typeof (node.data as any).citation_count === 'number' ? (node.data as any).citation_count : 0) ||
+                          0,
+          url: ((node.data as any).metadata?.url && typeof (node.data as any).metadata.url === 'string' ? (node.data as any).metadata.url : '') ||
+               (typeof (node.data as any).url === 'string' ? (node.data as any).url : '') ||
+               `https://pubmed.ncbi.nlm.nih.gov/${(node.data as any).pmid || node.id}/`,
+          abstract: ((node.data as any).metadata?.abstract && typeof (node.data as any).metadata.abstract === 'string' ? (node.data as any).metadata.abstract : '') ||
+                    (typeof (node.data as any).abstract === 'string' ? (node.data as any).abstract : '') ||
+                    ''
         }
       };
       console.log('✅ Created networkNode from React Flow data:', networkNode);
