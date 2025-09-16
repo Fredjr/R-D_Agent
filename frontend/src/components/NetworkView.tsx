@@ -261,7 +261,12 @@ export default function NetworkView({
 
   // NEW: ResearchRabbit-style dynamic node addition from sidebar exploration
   const addExplorationNodesToGraph = useCallback(async (sourceNodeId: string, explorationResults: any[], relationType: 'similar' | 'citations' | 'references' | 'authors') => {
-    if (isExpanding || explorationResults.length === 0) return;
+    console.log('🚀 addExplorationNodesToGraph called:', { sourceNodeId, resultsCount: explorationResults.length, relationType });
+
+    if (isExpanding || explorationResults.length === 0) {
+      console.log('❌ Early return:', { isExpanding, resultsLength: explorationResults.length });
+      return;
+    }
 
     setIsExpanding(true);
 
@@ -272,6 +277,8 @@ export default function NetworkView({
       // Find the source node position for better positioning
       const sourceNode = nodes.find(n => n.id === sourceNodeId);
       const sourcePosition = sourceNode?.position || { x: 300, y: 300 };
+
+      console.log('📍 Source node found:', { sourceNode: !!sourceNode, sourcePosition, totalNodes: nodes.length });
 
       // Create nodes for each exploration result
       explorationResults.forEach((paper: any, index: number) => {
@@ -332,15 +339,24 @@ export default function NetworkView({
 
       // Update graph state
       if (newNodes.length > 0) {
-        setNodes(prevNodes => [...prevNodes, ...newNodes]);
-        setEdges(prevEdges => [...prevEdges, ...newEdges]);
+        console.log('✅ Adding nodes to graph:', { newNodesCount: newNodes.length, newEdgesCount: newEdges.length });
+        setNodes(prevNodes => {
+          console.log('📊 Previous nodes:', prevNodes.length, 'New nodes:', newNodes.length);
+          return [...prevNodes, ...newNodes];
+        });
+        setEdges(prevEdges => {
+          console.log('🔗 Previous edges:', prevEdges.length, 'New edges:', newEdges.length);
+          return [...prevEdges, ...newEdges];
+        });
         setExpandedNodes(prev => new Set([...prev, sourceNodeId]));
         setExplorationHistory(prev => [...prev, sourceNodeId]);
         setGraphDepth(prev => prev + 1);
+      } else {
+        console.log('❌ No new nodes to add');
       }
 
     } catch (error) {
-      console.error('Error adding exploration nodes to graph:', error);
+      console.error('❌ Error adding exploration nodes to graph:', error);
     } finally {
       setIsExpanding(false);
     }
