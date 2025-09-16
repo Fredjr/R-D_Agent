@@ -4,12 +4,13 @@ const BACKEND_URL = process.env.BACKEND_URL || 'https://r-dagent-production.up.r
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { pmid: string } }
+  { params }: { params: Promise<{ pmid: string }> }
 ) {
   try {
     const { searchParams } = new URL(request.url);
     const limit = searchParams.get('limit') || '10';
-    const pmid = params.pmid;
+    const resolvedParams = await params;
+    const pmid = resolvedParams.pmid;
     
     // Get user ID from headers
     const userID = request.headers.get('User-ID') || 'default_user';
