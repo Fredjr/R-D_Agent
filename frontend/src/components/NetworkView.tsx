@@ -932,14 +932,49 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
   // Handle node click with navigation support and expansion
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
-    const networkNode = networkData?.nodes.find(n => n.id === node.id);
+    console.log('🎯 NODE CLICK DETECTED:', {
+      nodeId: node.id,
+      nodeType: node.type,
+      hasData: !!node.data,
+      dataKeys: node.data ? Object.keys(node.data) : [],
+      position: node.position,
+      clickType: event.detail === 2 ? 'double' : event.ctrlKey || event.metaKey ? 'ctrl' : 'single'
+    });
+
+    // First try to find in original networkData
+    let networkNode = networkData?.nodes.find(n => n.id === node.id);
+
+    // If not found, create a networkNode from the React Flow node data
+    if (!networkNode && node.data) {
+      console.log('🔄 Node not in original networkData, creating from React Flow node data');
+      networkNode = {
+        id: node.id,
+        label: node.data.label || node.data.title || 'Unknown Article',
+        size: node.data.size || 20,
+        color: node.data.color || '#4CAF50',
+        metadata: node.data.metadata || {
+          pmid: node.data.pmid || node.id,
+          title: node.data.title || node.data.label || 'Unknown Article',
+          authors: node.data.authors || [],
+          journal: node.data.journal || '',
+          year: node.data.year || new Date().getFullYear(),
+          citation_count: node.data.citation_count || 0,
+          url: node.data.url || `https://pubmed.ncbi.nlm.nih.gov/${node.data.pmid || node.id}/`,
+          abstract: node.data.abstract || ''
+        }
+      };
+      console.log('✅ Created networkNode from React Flow data:', networkNode);
+    }
+
     if (networkNode) {
+      console.log('📊 Setting selected node:', networkNode.id);
       setSelectedNode(networkNode);
       setShowSidebar(true);
       onNodeSelect?.(networkNode);
 
       // ResearchRabbit-style expansion: Double-click or Ctrl+Click to expand
       if (event.detail === 2 || event.ctrlKey || event.metaKey) {
+        console.log('🚀 Expanding node network for:', networkNode.id);
         // Double-click or Ctrl/Cmd+Click expands the node
         expandNodeNetwork(node.id, networkNode);
       }
@@ -947,9 +982,12 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       // If this is a similar work view and user clicks on a node,
       // we could navigate to that article's similar work
       if (navigationMode === 'similar' && networkNode.metadata.pmid) {
+        console.log('🔍 Similar work navigation could be triggered for:', networkNode.metadata.pmid);
         // This would be handled by the parent component
         // handleNavigationChange('similar', networkNode.metadata.pmid);
       }
+    } else {
+      console.log('❌ No networkNode found or created for:', node.id);
     }
   }, [networkData, onNodeSelect, navigationMode, expandNodeNetwork]);
 
