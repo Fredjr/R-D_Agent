@@ -200,17 +200,9 @@ export default function MultiColumnNetworkView({
                 projectId={projectId || ''}
                 collections={[]}
                 onAddExplorationNodes={handleMainAddExplorationNodes}
+                onCreatePaperColumn={handleCreatePaperColumn}
+                showCreateColumnButton={true}
               />
-              
-              {/* Create Paper Column Button */}
-              <div className="absolute bottom-4 left-4 right-4">
-                <button
-                  onClick={() => handleCreatePaperColumn(mainSelectedNode)}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                >
-                  📄 Create Paper Column
-                </button>
-              </div>
             </div>
           )}
         </div>
@@ -272,6 +264,8 @@ export default function MultiColumnNetworkView({
                     onAddExplorationNodes={(sourceNodeId, explorationResults, relationType) =>
                       handleColumnAddExplorationNodes(column.id, sourceNodeId, explorationResults, relationType)
                     }
+                    onCreatePaperColumn={handleCreatePaperColumn}
+                    showCreateColumnButton={true}
                   />
                 </div>
               )}
