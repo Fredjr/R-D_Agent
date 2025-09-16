@@ -767,7 +767,13 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           position,
           data: {
             ...node,
-            label: node.label,
+            label: node.label || node.metadata?.title || `Article ${node.id}`,
+            title: node.metadata?.title || node.title || `Article ${node.id}`,
+            pmid: node.metadata?.pmid || node.pmid || node.id,
+            authors: node.metadata?.authors || node.authors || [],
+            journal: node.metadata?.journal || node.journal || '',
+            year: node.metadata?.year || node.year || new Date().getFullYear(),
+            citation_count: node.metadata?.citation_count || node.citation_count || 0,
           },
           draggable: true,
         };
