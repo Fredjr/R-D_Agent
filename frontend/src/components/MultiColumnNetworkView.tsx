@@ -216,16 +216,22 @@ export default function MultiColumnNetworkView({
           style={{ width: columnWidth }}
         >
           <div className="h-full flex flex-col">
-            {/* Column Header */}
-            <div className="bg-blue-50 border-b border-gray-200 p-3 flex justify-between items-start">
+            {/* Column Header - ResearchRabbit Style */}
+            <div className="bg-gray-50 border-b border-gray-200 p-3 flex justify-between items-start">
               <div className="flex-1 min-w-0">
-                <div className="text-xs text-blue-600 font-medium mb-1">Selected Paper</div>
-                <h3 className="text-sm font-semibold text-gray-900 leading-tight truncate">
-                  {column.paper.data.title}
-                </h3>
-                <div className="text-xs text-gray-500 mt-1">
-                  {column.paper.data.authors.slice(0, 2).join(', ')}
-                  {column.paper.data.authors.length > 2 && ` +${column.paper.data.authors.length - 2} more`}
+                <div className="text-sm font-semibold text-gray-900 mb-1">Similar Work</div>
+                <div className="text-xs text-gray-600 mb-2">
+                  Connections between your collection and 20 papers
+                </div>
+                <div className="bg-white border border-gray-200 rounded p-2">
+                  <div className="text-xs font-medium text-gray-900 mb-1">1 selected paper</div>
+                  <h3 className="text-xs text-gray-700 leading-tight truncate">
+                    {column.paper.data.title}
+                  </h3>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {column.paper.data.authors.slice(0, 2).join(', ')}
+                    {column.paper.data.authors.length > 2 && ` +${column.paper.data.authors.length - 2} more`}
+                  </div>
                 </div>
               </div>
               <button
