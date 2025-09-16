@@ -34,6 +34,9 @@ interface NetworkSidebarProps {
   onExplorePeople?: (authors: string[]) => void;
   // NEW: Dynamic graph expansion from exploration results
   onAddExplorationNodes?: (sourceNodeId: string, explorationResults: any[], relationType: 'similar' | 'citations' | 'references' | 'authors') => void;
+  // NEW: Multi-column support
+  onCreatePaperColumn?: (paper: NetworkNode) => void;
+  showCreateColumnButton?: boolean;
 }
 
 export default function NetworkSidebar({
@@ -49,7 +52,9 @@ export default function NetworkSidebar({
   onShowCitations,
   onShowReferences,
   onExplorePeople,
-  onAddExplorationNodes
+  onAddExplorationNodes,
+  onCreatePaperColumn,
+  showCreateColumnButton = false
 }: NetworkSidebarProps) {
   console.log('🔍 NetworkSidebar rendered with props:', {
     hasSelectedNode: !!selectedNode,
@@ -377,6 +382,16 @@ export default function NetworkSidebar({
             >
               View Full Paper
             </a>
+          )}
+
+          {/* Create Paper Column Button - ResearchRabbit Style */}
+          {showCreateColumnButton && onCreatePaperColumn && (
+            <button
+              onClick={() => onCreatePaperColumn(selectedNode!)}
+              className="w-full px-3 py-2 text-xs bg-green-600 text-white rounded hover:bg-green-700 font-medium transition-colors"
+            >
+              📄 Create Paper Column
+            </button>
           )}
 
           <button
