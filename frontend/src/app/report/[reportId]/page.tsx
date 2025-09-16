@@ -80,8 +80,10 @@ export default function ReportDetailPage() {
       if (response.ok) {
         const data = await response.json();
         console.log('Report page - Collections data received:', data);
-        setCollections(data.collections || []);
-        console.log('Report page - Collections set to state:', data.collections || []);
+        // Backend returns collections directly as array, not wrapped in collections property
+        const collectionsArray = Array.isArray(data) ? data : (data.collections || []);
+        setCollections(collectionsArray);
+        console.log('Report page - Collections set to state:', collectionsArray);
       } else {
         const errorText = await response.text();
         console.error('Report page - Collections fetch failed:', response.status, errorText);
