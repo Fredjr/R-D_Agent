@@ -366,7 +366,7 @@ export default function ProjectPage() {
     if (!selectedArticleForCollection) return;
 
     try {
-      const response = await fetch(`/api/proxy/collections/${collectionId}/articles`, {
+      const response = await fetch(`/api/proxy/collections/${collectionId}/articles?projectId=${projectId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -378,7 +378,8 @@ export default function ProjectPage() {
           authors: selectedArticleForCollection.authors || [],
           journal: selectedArticleForCollection.journal || '',
           year: selectedArticleForCollection.year || new Date().getFullYear(),
-          notes: `Added from ${selectedArticleForCollection.source === 'report' ? 'Report' : 'Deep Dive Analysis'}: ${selectedArticleForCollection.source_id}`
+          notes: `Added from ${selectedArticleForCollection.source === 'report' ? 'Report' : 'Deep Dive Analysis'}: ${selectedArticleForCollection.source_id}`,
+          projectId: projectId
         }),
       });
 

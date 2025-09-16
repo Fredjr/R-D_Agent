@@ -99,7 +99,7 @@ export default function ReportDetailPage() {
     if (!selectedArticleForCollection) return;
 
     try {
-      const response = await fetch(`/api/proxy/collections/${collectionId}/articles`, {
+      const response = await fetch(`/api/proxy/collections/${collectionId}/articles?projectId=${report?.project_id}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -111,7 +111,8 @@ export default function ReportDetailPage() {
           authors: selectedArticleForCollection.authors || [],
           journal: selectedArticleForCollection.journal || '',
           year: selectedArticleForCollection.year || new Date().getFullYear(),
-          notes: `Added from Report: ${report?.title || reportId}`
+          notes: `Added from Report: ${report?.title || reportId}`,
+          projectId: report?.project_id
         }),
       });
 

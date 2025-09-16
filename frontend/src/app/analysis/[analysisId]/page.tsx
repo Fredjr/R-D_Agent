@@ -92,7 +92,7 @@ export default function AnalysisDetailPage() {
     if (!analysis) return;
 
     try {
-      const response = await fetch(`/api/proxy/collections/${collectionId}/articles`, {
+      const response = await fetch(`/api/proxy/collections/${collectionId}/articles?projectId=${analysis.project_id}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -104,7 +104,8 @@ export default function AnalysisDetailPage() {
           authors: [],
           journal: '',
           year: new Date().getFullYear(),
-          notes: `Added from Deep Dive Analysis: ${analysis.analysis_id}`
+          notes: `Added from Deep Dive Analysis: ${analysis.analysis_id}`,
+          projectId: analysis.project_id
         }),
       });
 
