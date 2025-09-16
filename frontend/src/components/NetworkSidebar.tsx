@@ -313,6 +313,16 @@ export default function NetworkSidebar({
           </div>
         </div>
 
+        {/* Paper Abstract/Summary - ResearchRabbit Style */}
+        {data.abstract && (
+          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+            <div className="text-xs font-medium text-gray-700 mb-2">Abstract</div>
+            <div className="text-xs text-gray-600 leading-relaxed">
+              {data.abstract}
+            </div>
+          </div>
+        )}
+
         {/* Action Buttons */}
         <div className="mt-4 space-y-2">
           {data.url && (
