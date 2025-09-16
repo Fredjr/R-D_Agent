@@ -602,11 +602,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         },
       });
 
-      const response = await fetch(endpoint, {
-        headers: {
-          'User-ID': user?.email || 'default_user',
-        },
-      });
+      let data: NetworkData;
 
       if (response.status === 403) {
         throw new Error('Access denied. You do not have permission to view network data for this project.');

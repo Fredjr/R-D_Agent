@@ -170,6 +170,7 @@ export default function NetworkSidebar({
       let endpoint = '';
       let usePubMed = false;
       const pmid = selectedNode?.data?.pmid || selectedNode?.id;
+      const params = new URLSearchParams();
 
       switch (section) {
         case 'papers':

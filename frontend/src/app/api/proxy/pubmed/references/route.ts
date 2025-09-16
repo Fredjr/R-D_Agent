@@ -40,7 +40,7 @@ function parseArticleXML(xmlText: string): PubMedArticle[] {
       const pmidMatch = articleXML.match(/<PMID[^>]*>(\d+)<\/PMID>/);
       const pmid = pmidMatch ? pmidMatch[1] : '';
       
-      const titleMatch = articleXML.match(/<ArticleTitle>(.*?)<\/ArticleTitle>/s);
+      const titleMatch = articleXML.match(/<ArticleTitle>([\s\S]*?)<\/ArticleTitle>/);
       const title = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, '').trim() : '';
       
       const authors: string[] = [];
@@ -61,7 +61,7 @@ function parseArticleXML(xmlText: string): PubMedArticle[] {
       const yearMatch = articleXML.match(/<PubDate>[\s\S]*?<Year>(\d{4})<\/Year>/);
       const year = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
       
-      const abstractMatch = articleXML.match(/<AbstractText[^>]*>(.*?)<\/AbstractText>/s);
+      const abstractMatch = articleXML.match(/<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/);
       const abstract = abstractMatch ? abstractMatch[1].replace(/<[^>]*>/g, '').trim() : '';
       
       const doiMatch = articleXML.match(/<ArticleId IdType="doi">(.*?)<\/ArticleId>/);
