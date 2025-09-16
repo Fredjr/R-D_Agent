@@ -387,7 +387,14 @@ export default function NetworkSidebar({
           {/* Create Paper Column Button - ResearchRabbit Style */}
           {showCreateColumnButton && onCreatePaperColumn && (
             <button
-              onClick={() => onCreatePaperColumn(selectedNode!)}
+              onClick={() => {
+                console.log('🎯 Create Paper Column button clicked!', selectedNode);
+                if (selectedNode) {
+                  onCreatePaperColumn(selectedNode);
+                } else {
+                  console.error('❌ No selected node for column creation');
+                }
+              }}
               className="w-full px-3 py-2 text-xs bg-green-600 text-white rounded hover:bg-green-700 font-medium transition-colors"
             >
               📄 Create Paper Column

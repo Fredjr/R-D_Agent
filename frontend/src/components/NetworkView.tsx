@@ -822,10 +822,10 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
               <div className="font-semibold text-gray-900 mb-2">Network Overview</div>
             )}
             <div className="space-y-1 text-xs text-gray-600">
-              <div>Articles: {networkData.metadata.total_nodes}</div>
-              <div>Citations: {networkData.metadata.total_edges}</div>
-              <div>Avg Citations: {Math.round(networkData.metadata.avg_citations)}</div>
-              <div>Years: {networkData.metadata.year_range.min}-{networkData.metadata.year_range.max}</div>
+              <div>Articles: {networkData.metadata.total_nodes || 0}</div>
+              <div>Citations: {networkData.metadata.total_edges || 0}</div>
+              <div>Avg Citations: {Math.round(networkData.metadata.avg_citations || 0)}</div>
+              <div>Years: {networkData.metadata.year_range?.min || 'N/A'}-{networkData.metadata.year_range?.max || 'N/A'}</div>
             </div>
             {networkData.metadata.most_cited && (
               <div className="mt-2 pt-2 border-t border-gray-200">

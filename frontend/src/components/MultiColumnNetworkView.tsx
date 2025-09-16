@@ -79,18 +79,28 @@ export default function MultiColumnNetworkView({
   // Handle creating a new column for a selected paper
   const handleCreatePaperColumn = useCallback((paper: NetworkNode) => {
     console.log('🎯 Creating new paper column for:', paper.data.title);
+    console.log('📊 Paper data structure:', paper);
 
-    const newColumn: PaperColumn = {
-      id: `column-${paper.data.pmid}-${Date.now()}`,
-      paper,
-      sourceType: 'article',
-      sourceId: paper.data.pmid,
-      selectedNode: null,
-      networkViewRef: React.createRef()
-    };
+    try {
+      const newColumn: PaperColumn = {
+        id: `column-${paper.data.pmid}-${Date.now()}`,
+        paper,
+        sourceType: 'article',
+        sourceId: paper.data.pmid,
+        selectedNode: null,
+        networkViewRef: React.createRef()
+      };
 
-    setColumns(prev => [...prev, newColumn]);
-    setMainSelectedNode(null); // Close main sidebar
+      console.log('✅ New column created:', newColumn);
+      setColumns(prev => {
+        const newColumns = [...prev, newColumn];
+        console.log('📊 Updated columns:', newColumns);
+        return newColumns;
+      });
+      setMainSelectedNode(null); // Close main sidebar
+    } catch (error) {
+      console.error('❌ Error creating paper column:', error);
+    }
   }, []);
 
   // Handle node selection within a column
