@@ -7,6 +7,7 @@ import AnnotationsFeed from '@/components/AnnotationsFeed';
 import ActivityFeed from '@/components/ActivityFeed';
 import ResultsList from '@/components/ResultsList';
 import NetworkViewWithSidebar from '@/components/NetworkViewWithSidebar';
+import MultiColumnNetworkView from '@/components/MultiColumnNetworkView';
 import Collections from '@/components/Collections';
 
 interface Project {
@@ -1422,7 +1423,7 @@ export default function ProjectPage() {
                 </p>
               </div>
               <div className="h-[600px]">
-                <NetworkViewWithSidebar
+                <MultiColumnNetworkView
                   sourceType="project"
                   sourceId={projectId}
                   projectId={projectId}
