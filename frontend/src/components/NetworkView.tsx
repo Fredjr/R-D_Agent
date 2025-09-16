@@ -286,7 +286,7 @@ export default function NetworkView({
         const newNodeId = `${relationType}_${sourceNodeId}_${paperPmid}_${Date.now()}_${index}`;
 
         // Skip if node already exists (check by PMID to avoid duplicates)
-        if (nodes.some(n => n.data?.metadata?.pmid === paperPmid)) {
+        if (nodes.some(n => (n.data as any)?.pmid === paperPmid || (n.data as any)?.metadata?.pmid === paperPmid)) {
           console.log('⚠️ Skipping duplicate node:', paperPmid);
           return;
         }
