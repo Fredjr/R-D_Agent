@@ -52,6 +52,7 @@ export default function MultiColumnNetworkView({
   const mainNetworkViewRef = useRef<any>(null);
 
   console.log('🔍 MultiColumnNetworkView rendered with:', { sourceType, sourceId, projectId, columnsCount: columns.length });
+  console.log('🚨 DEPLOYMENT CHECK - Version 2.0 - Should see new debugging!');
   console.log('🔍 Main sidebar state:', {
     hasMainSelectedNode: !!mainSelectedNode,
     mainSelectedNodeId: mainSelectedNode?.id,
