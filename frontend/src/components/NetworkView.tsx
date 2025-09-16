@@ -603,9 +603,9 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         firstFewNodes: data.nodes?.slice(0, 3)
       });
 
-      // DEMO FALLBACK: If project/collection network is empty, show demo article network
+      // DEMO FALLBACK: Only if project/collection network is completely empty (0 nodes)
       if (sourceType !== 'article' && (!data.nodes || data.nodes.length === 0)) {
-        console.log('Project network empty, loading demo article network...');
+        console.log('Project/collection network completely empty, loading demo article network...');
         const demoResponse = await fetch('/api/proxy/articles/33462507/citations-network?limit=5', {
           headers: {
             'User-ID': user?.email || 'default_user',
@@ -624,6 +624,14 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             return;
           }
         }
+      }
+
+      // SINGLE NODE HANDLING: If collection has 1 node, display it properly
+      if (sourceType !== 'article' && data.nodes && data.nodes.length === 1) {
+        console.log('Collection has single node, displaying it:', data.nodes[0].label);
+        // Ensure single nodes are displayed properly
+        setNetworkData(data);
+        return;
       }
 
       // ARTICLE NETWORK FALLBACK: If article network is empty or has only 1 node, try citations-network
@@ -735,21 +743,33 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       }
       
       // Convert network data to react-flow format
-      const flowNodes: Node[] = data.nodes.map((node, index) => ({
-        id: node.id,
-        type: 'article',
-        position: {
-          x: Math.cos((index * 2 * Math.PI) / data.nodes.length) * 200 + 300,
-          y: Math.sin((index * 2 * Math.PI) / data.nodes.length) * 200 + 300,
-        },
-        data: {
-          ...node,
-          label: node.label,
-        },
-        draggable: true,
-      }));
+      const flowNodes: Node[] = data.nodes.map((node, index) => {
+        let position;
 
-      const flowEdges: Edge[] = data.edges.map((edge) => ({
+        if (data.nodes.length === 1) {
+          // Single node: center it in the view
+          position = { x: 300, y: 300 };
+        } else {
+          // Multiple nodes: arrange in circle
+          position = {
+            x: Math.cos((index * 2 * Math.PI) / data.nodes.length) * 200 + 300,
+            y: Math.sin((index * 2 * Math.PI) / data.nodes.length) * 200 + 300,
+          };
+        }
+
+        return {
+          id: node.id,
+          type: 'article',
+          position,
+          data: {
+            ...node,
+            label: node.label,
+          },
+          draggable: true,
+        };
+      });
+
+      const flowEdges: Edge[] = (data.edges || []).map((edge) => ({
         id: edge.id,
         source: edge.from,
         target: edge.to,
@@ -764,6 +784,14 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           color: '#94a3b8',
         },
       }));
+
+      console.log('🎯 NetworkView rendering:', {
+        sourceType,
+        sourceId,
+        nodesCount: flowNodes.length,
+        edgesCount: flowEdges.length,
+        nodes: flowNodes.map(n => ({ id: n.id, label: n.data.label }))
+      });
 
       setNodes(flowNodes);
       setEdges(flowEdges);
