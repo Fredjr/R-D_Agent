@@ -768,12 +768,20 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           data: {
             ...node,
             label: node.label || node.metadata?.title || `Article ${node.id}`,
-            title: node.metadata?.title || `Article ${node.id}`,
-            pmid: node.metadata?.pmid || node.id,
-            authors: node.metadata?.authors || [],
-            journal: node.metadata?.journal || '',
-            year: node.metadata?.year || new Date().getFullYear(),
-            citation_count: node.metadata?.citation_count || 0,
+            // Keep the original metadata structure for ArticleNode component
+            metadata: {
+              pmid: node.metadata?.pmid || node.id,
+              title: node.metadata?.title || `Article ${node.id}`,
+              authors: node.metadata?.authors || [],
+              journal: node.metadata?.journal || '',
+              year: node.metadata?.year || new Date().getFullYear(),
+              citation_count: node.metadata?.citation_count || 0,
+              url: node.metadata?.url || `https://pubmed.ncbi.nlm.nih.gov/${node.metadata?.pmid || node.id}/`,
+              abstract: node.metadata?.abstract || '',
+            },
+            // Also add direct properties for compatibility
+            size: node.size || 60,
+            color: node.color || '#2196F3',
           },
           draggable: true,
         };
