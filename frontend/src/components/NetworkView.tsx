@@ -629,9 +629,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       // SINGLE NODE HANDLING: If collection has 1 node, display it properly
       if (sourceType !== 'article' && data.nodes && data.nodes.length === 1) {
         console.log('Collection has single node, displaying it:', data.nodes[0].label);
-        // Ensure single nodes are displayed properly
-        setNetworkData(data);
-        return;
+        // Ensure single nodes are displayed properly - but don't return early!
+        // Let it fall through to the React Flow conversion below
       }
 
       // ARTICLE NETWORK FALLBACK: If article network is empty or has only 1 node, try citations-network
@@ -790,11 +789,19 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         sourceId,
         nodesCount: flowNodes.length,
         edgesCount: flowEdges.length,
-        nodes: flowNodes.map(n => ({ id: n.id, label: n.data.label }))
+        nodes: flowNodes.map(n => ({ id: n.id, label: n.data.label })),
+        networkDataSet: !!data,
+        networkDataNodesLength: data.nodes?.length || 0
       });
 
       setNodes(flowNodes);
       setEdges(flowEdges);
+
+      console.log('✅ NetworkView state updated:', {
+        networkDataSet: !!networkData,
+        flowNodesSet: flowNodes.length,
+        flowEdgesSet: flowEdges.length
+      });
       
     } catch (err) {
       console.error('Error fetching network data:', err);
@@ -956,7 +963,23 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
     );
   }
 
+  console.log('🔍 NetworkView render check:', {
+    networkData: !!networkData,
+    networkDataNodes: networkData?.nodes?.length || 0,
+    nodesLength: nodes.length,
+    edgesLength: edges.length,
+    loading,
+    error
+  });
+
   if (!networkData || networkData.nodes.length === 0) {
+    console.log('❌ NetworkView showing no data message:', {
+      networkDataExists: !!networkData,
+      networkDataNodesLength: networkData?.nodes?.length || 0,
+      sourceType,
+      sourceId
+    });
+
     return (
       <div className={`flex items-center justify-center h-96 bg-gray-50 rounded-lg ${className}`}>
         <div className="text-center max-w-md">
