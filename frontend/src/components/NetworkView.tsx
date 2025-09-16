@@ -86,6 +86,15 @@ interface NetworkViewProps {
   className?: string;
   // Force citations network for multi-column view
   forceNetworkType?: 'citations' | 'similar' | 'references';
+  // Article metadata for synthetic network generation
+  articleMetadata?: {
+    pmid: string;
+    title: string;
+    authors: string[];
+    journal: string;
+    year: number;
+    citation_count?: number;
+  };
 }
 
 // Function to create article-specific network when backend data is unavailable
@@ -290,7 +299,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   onNodeSelect,
   onNavigationChange,
   className = '',
-  forceNetworkType
+  forceNetworkType,
+  articleMetadata
 }, ref) => {
   const { user } = useAuth();
   const [networkData, setNetworkData] = useState<NetworkData | null>(null);
@@ -645,18 +655,43 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         // ARTICLE-SPECIFIC FALLBACK: Create a network based on the selected article's metadata
         console.log('Both article networks empty, creating article-specific network...');
 
-        // Try to get the original article data from the current network nodes
-        const currentNodes = networkData?.nodes || [];
-        const originalArticle = currentNodes.find(node => node.id === sourceId);
+        // Use passed articleMetadata if available, otherwise try to find in current network
+        let originalArticle;
 
-        if (originalArticle) {
-          console.log('🎯 Creating article-specific network for:', originalArticle.metadata?.title);
+        if (articleMetadata) {
+          console.log('🎯 Using passed article metadata:', articleMetadata.title);
+          originalArticle = {
+            id: sourceId,
+            metadata: articleMetadata
+          };
+        } else {
+          // Try to get the original article data from the current network nodes
+          const currentNodes = networkData?.nodes || [];
+          originalArticle = currentNodes.find(node => node.id === sourceId);
 
-          // Create a synthetic network based on the article's metadata
-          const syntheticNetwork = createArticleSpecificNetwork(originalArticle, sourceId);
-          setNetworkData(syntheticNetwork);
-          return;
+          // If not found in current network, create a basic article node from the sourceId
+          if (!originalArticle) {
+            console.log('🔧 Article not found in current network, creating from sourceId:', sourceId);
+            originalArticle = {
+              id: sourceId,
+              metadata: {
+                pmid: sourceId,
+                title: `Article ${sourceId}`,
+                authors: [],
+                journal: '',
+                year: new Date().getFullYear(),
+                citation_count: 0
+              }
+            };
+          }
         }
+
+        console.log('🎯 Creating article-specific network for:', originalArticle.metadata?.title);
+
+        // Create a synthetic network based on the article's metadata
+        const syntheticNetwork = createArticleSpecificNetwork(originalArticle, sourceId);
+        setNetworkData(syntheticNetwork);
+        return;
 
         // FINAL DEMO FALLBACK: If we can't create article-specific network, show demo
         console.log('Creating final demo fallback network...');
