@@ -71,6 +71,21 @@ def migrate_database():
         -- Add missing columns to articles table if they don't exist
         DO $$
         BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='articles' AND column_name='pmid') THEN
+                ALTER TABLE articles ADD COLUMN pmid VARCHAR(50);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='articles' AND column_name='authors') THEN
+                ALTER TABLE articles ADD COLUMN authors TEXT[];
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='articles' AND column_name='journal') THEN
+                ALTER TABLE articles ADD COLUMN journal VARCHAR(500);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='articles' AND column_name='abstract') THEN
+                ALTER TABLE articles ADD COLUMN abstract TEXT;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='articles' AND column_name='citation_count') THEN
+                ALTER TABLE articles ADD COLUMN citation_count INTEGER DEFAULT 0;
+            END IF;
             IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='articles' AND column_name='year') THEN
                 ALTER TABLE articles ADD COLUMN year INTEGER;
             END IF;
