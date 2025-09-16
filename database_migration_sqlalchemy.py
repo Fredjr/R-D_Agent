@@ -31,7 +31,7 @@ def migrate_database():
         logger.info("✅ Connected successfully!")
         logger.info("📝 Executing migration SQL...")
         
-        # Migration SQL
+        # Migration SQL - Handle existing schema gracefully
         migration_sql = """
         -- Users table
         CREATE TABLE IF NOT EXISTS users (
@@ -41,7 +41,7 @@ def migrate_database():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
-        
+
         -- Projects table
         CREATE TABLE IF NOT EXISTS projects (
             project_id VARCHAR(255) PRIMARY KEY,
@@ -53,25 +53,40 @@ def migrate_database():
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (owner_user_id) REFERENCES users(user_id) ON DELETE CASCADE
         );
-        
-        -- Articles table (enhanced with citation data)
+
+        -- Articles table (enhanced with citation data) - Add columns if they don't exist
         CREATE TABLE IF NOT EXISTS articles (
             article_id VARCHAR(255) PRIMARY KEY,
             pmid VARCHAR(50),
             title TEXT NOT NULL,
             authors TEXT[],
             journal VARCHAR(500),
-            year INTEGER,
             abstract TEXT,
             url VARCHAR(1000),
             citation_count INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            references_data JSONB,
-            citations_data JSONB,
-            similar_papers_data JSONB,
-            author_network_data JSONB
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+
+        -- Add missing columns to articles table if they don't exist
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='articles' AND column_name='year') THEN
+                ALTER TABLE articles ADD COLUMN year INTEGER;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='articles' AND column_name='references_data') THEN
+                ALTER TABLE articles ADD COLUMN references_data JSONB;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='articles' AND column_name='citations_data') THEN
+                ALTER TABLE articles ADD COLUMN citations_data JSONB;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='articles' AND column_name='similar_papers_data') THEN
+                ALTER TABLE articles ADD COLUMN similar_papers_data JSONB;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='articles' AND column_name='author_network_data') THEN
+                ALTER TABLE articles ADD COLUMN author_network_data JSONB;
+            END IF;
+        END $$;
         
         -- Collections table
         CREATE TABLE IF NOT EXISTS collections (
