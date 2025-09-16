@@ -6987,6 +6987,26 @@ async def add_article_to_collection(
         if existing:
             raise HTTPException(status_code=409, detail="Article already exists in collection")
 
+        # First, ensure the article exists in the main Article table for exploration features
+        if article_data.article_pmid:
+            existing_article = db.query(Article).filter(Article.pmid == article_data.article_pmid).first()
+            if not existing_article:
+                # Create article in main table for ResearchRabbit-style exploration
+                new_article = Article(
+                    pmid=article_data.article_pmid,
+                    title=article_data.article_title,
+                    authors=article_data.article_authors,
+                    journal=article_data.article_journal,
+                    pub_year=article_data.article_year,
+                    url=article_data.article_url or f"https://pubmed.ncbi.nlm.nih.gov/{article_data.article_pmid}/",
+                    abstract="",  # Will be enriched later
+                    doi="",      # Will be enriched later
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
+                )
+                db.add(new_article)
+                db.flush()  # Ensure article is created before adding to collection
+
         # Add article to collection
         article_collection = ArticleCollection(
             collection_id=collection_id,
