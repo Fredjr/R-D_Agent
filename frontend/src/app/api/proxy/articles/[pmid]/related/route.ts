@@ -104,7 +104,7 @@ export async function GET(
           abstract: "We developed integrated treatment strategies for patients with both diabetes and cardiovascular disease. Our multidisciplinary approach reduced major adverse cardiovascular events by 35% over 24 months."
         }
       ].slice(0, limit),
-      total_found: 8,
+      total_found: Math.min(8, limit),
       limit: limit,
       search_parameters: {
         content_type: "linked",
