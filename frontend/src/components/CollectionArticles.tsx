@@ -6,14 +6,18 @@ import { ArrowLeftIcon, BeakerIcon } from '@heroicons/react/24/outline';
 import NetworkViewWithSidebar from './NetworkViewWithSidebar';
 
 interface Article {
-  article_id: string;
-  pmid: string;
-  title: string;
-  authors: string[];
-  journal: string;
-  year: number;
+  id: number;
+  article_pmid: string;
+  article_title: string;
+  article_authors: string[];
+  article_journal: string;
+  article_year: number;
   notes?: string;
   added_at: string;
+  source_type: string;
+  source_report_id?: string;
+  source_analysis_id?: string;
+  added_by: string;
 }
 
 interface Collection {
@@ -71,7 +75,7 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
       <div className="h-full">
         <NetworkViewWithSidebar
           sourceType="article"
-          sourceId={selectedArticle.pmid}
+          sourceId={selectedArticle.article_pmid}
           projectId={projectId}
           onBack={() => setShowNetworkExploration(false)}
         />
@@ -132,26 +136,26 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-gray-900 mb-2 hover:text-blue-600 transition-colors">
-                    {article.title}
+                    {article.article_title}
                   </h3>
-                  
+
                   <div className="space-y-2 text-sm text-gray-600">
                     <div>
-                      <span className="font-medium">Authors:</span> {article.authors.slice(0, 3).join(', ')}
-                      {article.authors.length > 3 && ` +${article.authors.length - 3} more`}
+                      <span className="font-medium">Authors:</span> {article.article_authors.slice(0, 3).join(', ')}
+                      {article.article_authors.length > 3 && ` +${article.article_authors.length - 3} more`}
                     </div>
-                    
+
                     <div className="flex items-center gap-4">
                       <div>
-                        <span className="font-medium">Journal:</span> {article.journal || 'Unknown'}
+                        <span className="font-medium">Journal:</span> {article.article_journal || 'Unknown'}
                       </div>
                       <div>
-                        <span className="font-medium">Year:</span> {article.year || 'Unknown'}
+                        <span className="font-medium">Year:</span> {article.article_year || 'Unknown'}
                       </div>
-                      {article.pmid && (
+                      {article.article_pmid && (
                         <div>
-                          <span className="font-medium">PMID:</span> 
-                          <span className="font-mono text-blue-600 ml-1">{article.pmid}</span>
+                          <span className="font-medium">PMID:</span>
+                          <span className="font-mono text-blue-600 ml-1">{article.article_pmid}</span>
                         </div>
                       )}
                     </div>
