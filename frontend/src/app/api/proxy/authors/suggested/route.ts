@@ -17,12 +17,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User-ID required' }, { status: 401 });
     }
 
-    // Validate required parameters
+    // Handle empty author lists gracefully
     if (based_on_authors.length === 0) {
-      return NextResponse.json(
-        { error: 'At least one base author is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({
+        suggested_authors: [],
+        total_count: 0,
+        limit: parseInt(limit),
+        message: "No base authors provided for suggestions"
+      });
     }
 
     // Build query string for multiple authors
@@ -42,6 +44,16 @@ export async function GET(request: NextRequest) {
     });
 
     if (!response.ok) {
+      // If backend doesn't have this endpoint yet, return empty results
+      if (response.status === 404) {
+        return NextResponse.json({
+          suggested_authors: [],
+          total_count: 0,
+          limit: parseInt(limit),
+          message: "Suggested authors not yet implemented"
+        });
+      }
+
       const errorText = await response.text();
       return NextResponse.json(
         { error: `Backend error: ${errorText}` },
