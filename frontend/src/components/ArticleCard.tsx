@@ -6,11 +6,23 @@ import ResultsInterpretationCard from '@/components/ResultsInterpretationCard';
 import AnnotationsFeed from '@/components/AnnotationsFeed';
 import { BookmarkIcon } from '@heroicons/react/24/outline';
 import { BookmarkIcon as BookmarkSolidIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/solid';
+import { useAuth } from '@/contexts/AuthContext';
 import type { SearchResult } from '@/lib/dummy-data';
 
-type Props = { item: SearchResult };
+type Props = {
+  item: SearchResult;
+  projectId?: string; // For collection functionality
+  onAddToCollection?: (article: {
+    pmid?: string;
+    title: string;
+    authors?: string[];
+    journal?: string;
+    year?: number;
+  }) => void;
+};
 
-export default function ArticleCard({ item }: Props) {
+export default function ArticleCard({ item, projectId, onAddToCollection }: Props) {
+  const { user } = useAuth();
   const headerTitle = (item as any).top_article?.title ?? item.articles?.[0]?.title ?? 'Untitled';
   const headerPmid = (item as any).top_article?.pmid ?? item.articles?.[0]?.pmid;
   const headerUrl = (item as any).top_article?.url ?? (headerPmid ? `https://pubmed.ncbi.nlm.nih.gov/${headerPmid}/` : undefined);
@@ -329,6 +341,23 @@ export default function ArticleCard({ item }: Props) {
             <ChatBubbleLeftRightIcon className="h-4 w-4 mr-1" />
             Annotate
           </button>
+
+          {/* Add to Collection Button */}
+          {onAddToCollection && (
+            <button
+              onClick={() => onAddToCollection({
+                pmid: headerPmid,
+                title: headerTitle,
+                authors: item.authors || [],
+                journal: item.journal || '',
+                year: item.year
+              })}
+              className="inline-flex items-center px-3 py-2 rounded-lg text-sm bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
+              title="Add this article to a collection"
+            >
+              📚 Add to Collection
+            </button>
+          )}
         </div>
         
         <div className="flex flex-col sm:flex-row gap-2">

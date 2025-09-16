@@ -31,6 +31,10 @@ export default function AnalysisDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'Model' | 'Methods' | 'Results'>('Model');
 
+  // Collection management state
+  const [collections, setCollections] = useState<any[]>([]);
+  const [showAddToCollectionModal, setShowAddToCollectionModal] = useState(false);
+
   useEffect(() => {
     if (!analysisId || !user) return;
 
@@ -48,6 +52,11 @@ export default function AnalysisDetailPage() {
 
         const data = await response.json();
         setAnalysis(data);
+
+        // Fetch collections for the project
+        if (data.project_id) {
+          fetchCollections(data.project_id);
+        }
       } catch (err) {
         console.error('Error fetching analysis:', err);
         setError('Failed to load analysis');
@@ -58,6 +67,61 @@ export default function AnalysisDetailPage() {
 
     fetchAnalysis();
   }, [analysisId, user]);
+
+  const fetchCollections = async (projectId: string) => {
+    try {
+      const response = await fetch(`/api/proxy/projects/${projectId}/collections`, {
+        headers: {
+          'User-ID': user?.email || 'default_user',
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCollections(data.collections || []);
+      }
+    } catch (error) {
+      console.error('Error fetching collections:', error);
+    }
+  };
+
+  const handleAddToCollection = () => {
+    setShowAddToCollectionModal(true);
+  };
+
+  const handleConfirmAddToCollection = async (collectionId: string) => {
+    if (!analysis) return;
+
+    try {
+      const response = await fetch(`/api/proxy/collections/${collectionId}/articles`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user?.email || 'default_user',
+        },
+        body: JSON.stringify({
+          pmid: analysis.article_pmid || '',
+          title: analysis.article_title,
+          authors: [],
+          journal: '',
+          year: new Date().getFullYear(),
+          notes: `Added from Deep Dive Analysis: ${analysis.analysis_id}`
+        }),
+      });
+
+      if (response.ok) {
+        alert('✅ Article added to collection successfully!');
+        setShowAddToCollectionModal(false);
+        if (analysis.project_id) {
+          fetchCollections(analysis.project_id); // Refresh collections
+        }
+      } else {
+        throw new Error('Failed to add article to collection');
+      }
+    } catch (error) {
+      console.error('Error adding to collection:', error);
+      alert('❌ Failed to add article to collection. Please try again.');
+    }
+  };
 
   if (loading) {
     return (
@@ -102,12 +166,21 @@ export default function AnalysisDetailPage() {
         <div className="bg-white rounded-lg shadow p-6 mb-8">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-2xl font-bold text-gray-900">{analysis.article_title}</h1>
-            <button
-              onClick={() => window.history.back()}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-            >
-              ← Back
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleAddToCollection}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                title="Add this analyzed article to a collection"
+              >
+                📚 Add to Collection
+              </button>
+              <button
+                onClick={() => window.history.back()}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                ← Back
+              </button>
+            </div>
           </div>
           
           <div className="flex items-center gap-4 mb-4">
@@ -238,6 +311,62 @@ export default function AnalysisDetailPage() {
             </div>
           )}
         </div>
+
+        {/* Add to Collection Modal */}
+        {showAddToCollectionModal && analysis && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Add to Collection</h3>
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm font-medium text-gray-900">{analysis.article_title}</p>
+                {analysis.article_pmid && (
+                  <p className="text-xs text-blue-600 mt-1">PMID: {analysis.article_pmid}</p>
+                )}
+                <p className="text-xs text-gray-500 mt-1">From Deep Dive Analysis</p>
+              </div>
+
+              {collections.length > 0 ? (
+                <div className="space-y-2 mb-4">
+                  <label className="block text-sm font-medium text-gray-700">Select Collection:</label>
+                  {collections.map((collection) => (
+                    <button
+                      key={collection.collection_id}
+                      onClick={() => handleConfirmAddToCollection(collection.collection_id)}
+                      className="w-full text-left p-3 border border-gray-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-colors"
+                    >
+                      <div className="font-medium text-gray-900">{collection.collection_name}</div>
+                      <div className="text-sm text-gray-600">{collection.description || 'No description'}</div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {collection.article_count || 0} articles
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="mb-4 p-3 bg-yellow-50 rounded-lg">
+                  <p className="text-sm text-yellow-800">No collections found. Create a collection first in your project.</p>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowAddToCollectionModal(false)}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                {analysis.project_id && (
+                  <button
+                    onClick={() => window.open(`/project/${analysis.project_id}?tab=collections`, '_blank')}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                  >
+                    Manage Collections
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
