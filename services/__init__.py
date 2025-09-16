@@ -22,6 +22,11 @@ except ImportError:
     pass
 
 try:
+    from .ai_recommendations_service import *
+except ImportError:
+    pass
+
+try:
     from .citation_service import *
 except ImportError:
     pass
