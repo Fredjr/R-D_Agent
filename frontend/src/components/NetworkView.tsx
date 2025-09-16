@@ -807,6 +807,13 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         flowNodesSet: flowNodes.length,
         flowEdgesSet: flowEdges.length
       });
+
+      console.log('🔍 React Flow nodes being set:', flowNodes.map(n => ({
+        id: n.id,
+        position: n.position,
+        label: n.data.label,
+        type: n.type
+      })));
       
     } catch (err) {
       console.error('Error fetching network data:', err);
@@ -1015,6 +1022,12 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       </div>
     );
   }
+
+  console.log('🎨 React Flow rendering with:', {
+    nodesCount: nodes.length,
+    edgesCount: edges.length,
+    nodes: nodes.map(n => ({ id: n.id, position: n.position, label: n.data?.label }))
+  });
 
   return (
     <div className={`relative h-96 bg-white rounded-lg border ${className}`}>
