@@ -55,8 +55,15 @@ export default function MultiColumnNetworkView({
   console.log('🔍 Main sidebar state:', {
     hasMainSelectedNode: !!mainSelectedNode,
     mainSelectedNodeId: mainSelectedNode?.id,
-    mainSelectedNodeData: mainSelectedNode?.data
+    mainSelectedNodeData: mainSelectedNode?.data,
+    willRenderSidebar: !!mainSelectedNode
   });
+
+  if (mainSelectedNode) {
+    console.log('🎯 SIDEBAR SHOULD BE VISIBLE - mainSelectedNode exists:', mainSelectedNode);
+  } else {
+    console.log('❌ SIDEBAR NOT VISIBLE - mainSelectedNode is null/undefined');
+  }
 
   // Handle node selection in the main network view
   const handleMainNodeSelect = useCallback((node: any | null) => {
@@ -88,7 +95,9 @@ export default function MultiColumnNetworkView({
       };
 
       console.log('✅ Converted node for sidebar:', convertedNode);
+      console.log('🔄 Setting mainSelectedNode state...');
       setMainSelectedNode(convertedNode);
+      console.log('✅ mainSelectedNode state set, should trigger re-render');
     } else {
       setMainSelectedNode(null);
     }
@@ -238,10 +247,13 @@ export default function MultiColumnNetworkView({
           
           {/* Main Sidebar */}
           {mainSelectedNode && (
-            <div className="absolute top-0 right-0 w-80 h-full z-10 bg-white border-l-4 border-blue-500 shadow-lg" style={{ backgroundColor: 'rgba(255, 255, 255, 0.98)' }}>
+            <div className="absolute top-0 right-0 w-80 h-full z-50 bg-red-500 border-l-8 border-yellow-500 shadow-2xl" style={{ backgroundColor: 'rgba(255, 0, 0, 0.9)' }}>
               {console.log('🎨 RENDERING MAIN SIDEBAR:', { mainSelectedNode, visible: true })}
+              <div className="p-4 bg-yellow-200 text-red-800 text-lg font-bold border-b-4 border-red-500">
+                🚨 MAIN SIDEBAR IS VISIBLE! 🚨
+              </div>
               <div className="p-2 bg-blue-100 text-blue-800 text-sm font-bold">
-                📄 MAIN SIDEBAR - Article Details
+                📄 Article: {mainSelectedNode?.data?.title || 'Unknown'}
               </div>
               <NetworkSidebar
                 selectedNode={mainSelectedNode}
