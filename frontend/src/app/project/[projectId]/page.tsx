@@ -384,13 +384,15 @@ export default function ProjectPage() {
           'User-ID': user?.email || 'default_user',
         },
         body: JSON.stringify({
-          pmid: selectedArticleForCollection.pmid || '',
-          title: selectedArticleForCollection.title,
-          authors: selectedArticleForCollection.authors || [],
-          journal: selectedArticleForCollection.journal || '',
-          year: selectedArticleForCollection.year || new Date().getFullYear(),
-          notes: `Added from ${selectedArticleForCollection.source === 'report' ? 'Report' : 'Deep Dive Analysis'}: ${selectedArticleForCollection.source_id}`,
-          projectId: projectId
+          article_pmid: selectedArticleForCollection.pmid || '',
+          article_title: selectedArticleForCollection.title,
+          article_authors: selectedArticleForCollection.authors || [],
+          article_journal: selectedArticleForCollection.journal || '',
+          article_year: selectedArticleForCollection.year || new Date().getFullYear(),
+          source_type: selectedArticleForCollection.source || 'manual',
+          source_report_id: selectedArticleForCollection.source === 'report' ? selectedArticleForCollection.source_id : null,
+          source_analysis_id: selectedArticleForCollection.source === 'deep_dive' ? selectedArticleForCollection.source_id : null,
+          notes: `Added from ${selectedArticleForCollection.source === 'report' ? 'Report' : 'Deep Dive Analysis'}: ${selectedArticleForCollection.source_id}`
         }),
       });
 

@@ -112,13 +112,15 @@ export default function AnalysisDetailPage() {
           'User-ID': user?.email || 'default_user',
         },
         body: JSON.stringify({
-          pmid: analysis.article_pmid || '',
-          title: analysis.article_title,
-          authors: [],
-          journal: '',
-          year: new Date().getFullYear(),
-          notes: `Added from Deep Dive Analysis: ${analysis.analysis_id}`,
-          projectId: analysis.project_id
+          article_pmid: analysis.article_pmid || '',
+          article_title: analysis.article_title,
+          article_authors: [],
+          article_journal: '',
+          article_year: new Date().getFullYear(),
+          source_type: 'deep_dive',
+          source_report_id: null,
+          source_analysis_id: analysis.analysis_id,
+          notes: `Added from Deep Dive Analysis: ${analysis.analysis_id}`
         }),
       });
 
