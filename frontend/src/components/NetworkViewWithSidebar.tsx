@@ -137,6 +137,10 @@ export default function NetworkViewWithSidebar({
             currentMode="default"
             projectId={projectId || ''}
             collections={[]}
+            onAddExplorationNodes={(sourceNodeId, explorationResults, relationType) => {
+              console.log('🎯 NetworkViewWithSidebar: onAddExplorationNodes called but not implemented yet');
+              console.log({ sourceNodeId, resultsCount: explorationResults.length, relationType });
+            }}
           />
         </div>
       )}
