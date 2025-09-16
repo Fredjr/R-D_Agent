@@ -31,182 +31,107 @@ def migrate_database():
         logger.info("✅ Connected successfully!")
         logger.info("📝 Executing migration SQL...")
         
-        # Migration SQL - Handle existing schema gracefully
-        migration_sql = """
-        -- Users table
-        CREATE TABLE IF NOT EXISTS users (
-            user_id VARCHAR(255) PRIMARY KEY,
-            email VARCHAR(255) UNIQUE NOT NULL,
-            name VARCHAR(255),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
+        # Simple migration SQL - Just create essential tables
+        migration_statements = [
+            """CREATE TABLE IF NOT EXISTS users (
+                user_id VARCHAR(255) PRIMARY KEY,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                name VARCHAR(255),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
 
-        -- Projects table
-        CREATE TABLE IF NOT EXISTS projects (
-            project_id VARCHAR(255) PRIMARY KEY,
-            project_name VARCHAR(255) NOT NULL,
-            description TEXT,
-            owner_user_id VARCHAR(255) NOT NULL,
-            is_active BOOLEAN DEFAULT TRUE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (owner_user_id) REFERENCES users(user_id) ON DELETE CASCADE
-        );
+            """CREATE TABLE IF NOT EXISTS projects (
+                project_id VARCHAR(255) PRIMARY KEY,
+                project_name VARCHAR(255) NOT NULL,
+                description TEXT,
+                owner_user_id VARCHAR(255) NOT NULL,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
 
-        -- Articles table (enhanced with citation data) - Add columns if they don't exist
-        CREATE TABLE IF NOT EXISTS articles (
-            article_id VARCHAR(255) PRIMARY KEY,
-            pmid VARCHAR(50),
-            title TEXT NOT NULL,
-            authors TEXT[],
-            journal VARCHAR(500),
-            abstract TEXT,
-            url VARCHAR(1000),
-            citation_count INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
+            """CREATE TABLE IF NOT EXISTS collections (
+                collection_id VARCHAR(255) PRIMARY KEY,
+                collection_name VARCHAR(255) NOT NULL,
+                description TEXT,
+                color VARCHAR(7) DEFAULT '#3B82F6',
+                icon VARCHAR(50) DEFAULT 'folder',
+                project_id VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
 
-        -- Add missing columns to articles table if they don't exist
-        DO $$
-        BEGIN
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='articles' AND column_name='pmid') THEN
-                ALTER TABLE articles ADD COLUMN pmid VARCHAR(50);
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='articles' AND column_name='authors') THEN
-                ALTER TABLE articles ADD COLUMN authors TEXT[];
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='articles' AND column_name='journal') THEN
-                ALTER TABLE articles ADD COLUMN journal VARCHAR(500);
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='articles' AND column_name='abstract') THEN
-                ALTER TABLE articles ADD COLUMN abstract TEXT;
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='articles' AND column_name='citation_count') THEN
-                ALTER TABLE articles ADD COLUMN citation_count INTEGER DEFAULT 0;
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='articles' AND column_name='year') THEN
-                ALTER TABLE articles ADD COLUMN year INTEGER;
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='articles' AND column_name='references_data') THEN
-                ALTER TABLE articles ADD COLUMN references_data JSONB;
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='articles' AND column_name='citations_data') THEN
-                ALTER TABLE articles ADD COLUMN citations_data JSONB;
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='articles' AND column_name='similar_papers_data') THEN
-                ALTER TABLE articles ADD COLUMN similar_papers_data JSONB;
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='articles' AND column_name='author_network_data') THEN
-                ALTER TABLE articles ADD COLUMN author_network_data JSONB;
-            END IF;
-        END $$;
+            """CREATE TABLE IF NOT EXISTS article_collections (
+                id SERIAL PRIMARY KEY,
+                collection_id VARCHAR(255) NOT NULL,
+                article_id VARCHAR(255),
+                pmid VARCHAR(50),
+                title TEXT NOT NULL,
+                authors TEXT[],
+                journal VARCHAR(500),
+                year INTEGER,
+                notes TEXT,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
+
+            """CREATE TABLE IF NOT EXISTS reports (
+                report_id VARCHAR(255) PRIMARY KEY,
+                title VARCHAR(500) NOT NULL,
+                query TEXT,
+                content TEXT,
+                project_id VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
+
+            """CREATE TABLE IF NOT EXISTS deep_dive_analyses (
+                analysis_id VARCHAR(255) PRIMARY KEY,
+                article_pmid VARCHAR(50),
+                article_title TEXT,
+                scientific_model JSONB,
+                experimental_methods JSONB,
+                results_interpretation JSONB,
+                project_id VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
+
+            """CREATE TABLE IF NOT EXISTS citation_relationships (
+                id SERIAL PRIMARY KEY,
+                source_pmid VARCHAR(50) NOT NULL,
+                target_pmid VARCHAR(50) NOT NULL,
+                relationship_type VARCHAR(50) NOT NULL,
+                confidence_score FLOAT DEFAULT 0.0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(source_pmid, target_pmid, relationship_type)
+            )""",
+
+            """CREATE TABLE IF NOT EXISTS author_collaborations (
+                id SERIAL PRIMARY KEY,
+                author1 VARCHAR(255) NOT NULL,
+                author2 VARCHAR(255) NOT NULL,
+                collaboration_count INTEGER DEFAULT 1,
+                shared_papers TEXT[],
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(author1, author2)
+            )"""
+        ]
         
-        -- Collections table
-        CREATE TABLE IF NOT EXISTS collections (
-            collection_id VARCHAR(255) PRIMARY KEY,
-            collection_name VARCHAR(255) NOT NULL,
-            description TEXT,
-            color VARCHAR(7) DEFAULT '#3B82F6',
-            icon VARCHAR(50) DEFAULT 'folder',
-            project_id VARCHAR(255) NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE
-        );
-        
-        -- Article Collections junction table
-        CREATE TABLE IF NOT EXISTS article_collections (
-            id SERIAL PRIMARY KEY,
-            collection_id VARCHAR(255) NOT NULL,
-            article_id VARCHAR(255),
-            pmid VARCHAR(50),
-            title TEXT NOT NULL,
-            authors TEXT[],
-            journal VARCHAR(500),
-            year INTEGER,
-            notes TEXT,
-            added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (collection_id) REFERENCES collections(collection_id) ON DELETE CASCADE
-        );
-        
-        -- Reports table
-        CREATE TABLE IF NOT EXISTS reports (
-            report_id VARCHAR(255) PRIMARY KEY,
-            title VARCHAR(500) NOT NULL,
-            query TEXT,
-            content TEXT,
-            project_id VARCHAR(255) NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE
-        );
-        
-        -- Deep Dive Analyses table
-        CREATE TABLE IF NOT EXISTS deep_dive_analyses (
-            analysis_id VARCHAR(255) PRIMARY KEY,
-            article_pmid VARCHAR(50),
-            article_title TEXT,
-            scientific_model JSONB,
-            experimental_methods JSONB,
-            results_interpretation JSONB,
-            project_id VARCHAR(255) NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE
-        );
-        
-        -- Citation relationships table
-        CREATE TABLE IF NOT EXISTS citation_relationships (
-            id SERIAL PRIMARY KEY,
-            source_pmid VARCHAR(50) NOT NULL,
-            target_pmid VARCHAR(50) NOT NULL,
-            relationship_type VARCHAR(50) NOT NULL,
-            confidence_score FLOAT DEFAULT 0.0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(source_pmid, target_pmid, relationship_type)
-        );
-        
-        -- Author collaborations table
-        CREATE TABLE IF NOT EXISTS author_collaborations (
-            id SERIAL PRIMARY KEY,
-            author1 VARCHAR(255) NOT NULL,
-            author2 VARCHAR(255) NOT NULL,
-            collaboration_count INTEGER DEFAULT 1,
-            shared_papers TEXT[],
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(author1, author2)
-        );
-        
-        -- Create indexes
-        CREATE INDEX IF NOT EXISTS idx_articles_pmid ON articles(pmid);
-        CREATE INDEX IF NOT EXISTS idx_articles_year ON articles(year);
-        CREATE INDEX IF NOT EXISTS idx_collections_project_id ON collections(project_id);
-        CREATE INDEX IF NOT EXISTS idx_article_collections_collection_id ON article_collections(collection_id);
-        CREATE INDEX IF NOT EXISTS idx_article_collections_pmid ON article_collections(pmid);
-        CREATE INDEX IF NOT EXISTS idx_reports_project_id ON reports(project_id);
-        CREATE INDEX IF NOT EXISTS idx_citation_relationships_source ON citation_relationships(source_pmid);
-        CREATE INDEX IF NOT EXISTS idx_citation_relationships_target ON citation_relationships(target_pmid);
-        CREATE INDEX IF NOT EXISTS idx_author_collaborations_author1 ON author_collaborations(author1);
-        CREATE INDEX IF NOT EXISTS idx_author_collaborations_author2 ON author_collaborations(author2);
-        """
-        
-        # Execute migration SQL in separate statements to avoid issues
+        # Execute migration statements individually
         with engine.connect() as conn:
-            # Split migration into separate statements
-            statements = [stmt.strip() for stmt in migration_sql.split(';') if stmt.strip()]
+            logger.info(f"Executing {len(migration_statements)} migration statements...")
 
-            logger.info(f"Executing {len(statements)} migration statements...")
-
-            for i, stmt in enumerate(statements):
+            for i, stmt in enumerate(migration_statements):
                 try:
-                    logger.info(f"Executing statement {i+1}/{len(statements)}")
+                    logger.info(f"Executing statement {i+1}/{len(migration_statements)}: {stmt[:50]}...")
                     conn.execute(text(stmt))
                     conn.commit()
+                    logger.info(f"✅ Statement {i+1} completed successfully")
                 except Exception as e:
-                    logger.warning(f"Statement {i+1} failed (may be expected): {str(e)[:200]}")
+                    logger.warning(f"⚠️ Statement {i+1} failed (may be expected): {str(e)[:200]}")
+                    conn.rollback()
                     # Continue with other statements
             
             logger.info("✅ Migration SQL executed successfully!")
