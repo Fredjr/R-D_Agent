@@ -695,9 +695,9 @@ export default function NetworkView({
         )}
 
         {/* Network Statistics Panel */}
-        <Panel position="top-left" className={`p-3 rounded-lg shadow-lg border ${networkData?.metadata?.demo_mode ? 'bg-blue-50 border-blue-200' : 'bg-white'}`}>
+        <Panel position="top-left" className={`p-3 rounded-lg shadow-lg border ${(networkData?.metadata as any)?.demo_mode ? 'bg-blue-50 border-blue-200' : 'bg-white'}`}>
           <div className="text-sm">
-            {networkData?.metadata?.demo_mode ? (
+            {(networkData?.metadata as any)?.demo_mode ? (
               <>
                 <div className="font-semibold text-blue-900 mb-1">🎯 Demo Network</div>
                 <div className="text-xs text-blue-700 mb-2">
