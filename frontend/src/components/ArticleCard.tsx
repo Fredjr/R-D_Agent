@@ -348,9 +348,9 @@ export default function ArticleCard({ item, projectId, onAddToCollection }: Prop
               onClick={() => onAddToCollection({
                 pmid: headerPmid,
                 title: headerTitle,
-                authors: item.authors || [],
-                journal: item.journal || '',
-                year: item.year
+                authors: [], // SearchResult doesn't have authors, will be extracted from articles if needed
+                journal: '', // SearchResult doesn't have journal, will be extracted from articles if needed
+                year: (item as any).top_article?.pub_year ?? item.articles?.[0]?.pub_year ?? new Date().getFullYear()
               })}
               className="inline-flex items-center px-3 py-2 rounded-lg text-sm bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
               title="Add this article to a collection"
