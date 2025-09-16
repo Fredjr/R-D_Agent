@@ -258,6 +258,92 @@ export default function NetworkView({
     }
   }, [expandedNodes, isExpanding, user?.email, setNodes, setEdges]);
 
+  // NEW: ResearchRabbit-style dynamic node addition from sidebar exploration
+  const addExplorationNodesToGraph = useCallback(async (sourceNodeId: string, explorationResults: any[], relationType: 'similar' | 'citations' | 'references' | 'authors') => {
+    if (isExpanding || explorationResults.length === 0) return;
+
+    setIsExpanding(true);
+
+    try {
+      const newNodes: Node[] = [];
+      const newEdges: Edge[] = [];
+
+      // Find the source node position for better positioning
+      const sourceNode = nodes.find(n => n.id === sourceNodeId);
+      const sourcePosition = sourceNode?.position || { x: 300, y: 300 };
+
+      // Create nodes for each exploration result
+      explorationResults.forEach((paper: any, index: number) => {
+        const newNodeId = `${relationType}_${sourceNodeId}_${paper.pmid || paper.id || index}`;
+
+        // Skip if node already exists
+        if (nodes.some(n => n.id === newNodeId)) return;
+
+        // Calculate position in a circle around the source node
+        const angle = (index * 2 * Math.PI) / explorationResults.length;
+        const radius = 150 + (index % 3) * 50; // Vary radius for visual appeal
+
+        newNodes.push({
+          id: newNodeId,
+          type: 'article',
+          position: {
+            x: sourcePosition.x + Math.cos(angle) * radius,
+            y: sourcePosition.y + Math.sin(angle) * radius
+          },
+          data: {
+            metadata: {
+              pmid: paper.pmid || paper.id,
+              title: paper.title,
+              authors: paper.authors || [],
+              journal: paper.journal || '',
+              year: paper.year || 0,
+              citation_count: paper.citation_count || 0,
+              url: paper.url
+            },
+            size: Math.max(40, Math.min((paper.citation_count || 0) * 2, 100)),
+            color: getNodeColor(paper.year || 2020),
+            label: paper.title
+          },
+          draggable: true
+        });
+
+        // Create edge based on relation type
+        const edgeStyle = {
+          similar: { stroke: '#f59e0b', strokeWidth: 2, label: 'similar to' },
+          citations: { stroke: '#10b981', strokeWidth: 2, label: 'cites' },
+          references: { stroke: '#3b82f6', strokeWidth: 2, label: 'referenced by' },
+          authors: { stroke: '#8b5cf6', strokeWidth: 2, label: 'co-authored' }
+        };
+
+        const style = edgeStyle[relationType];
+
+        newEdges.push({
+          id: `edge_${sourceNodeId}_${newNodeId}`,
+          source: sourceNodeId,
+          target: newNodeId,
+          type: 'smoothstep',
+          animated: true,
+          style: { stroke: style.stroke, strokeWidth: style.strokeWidth },
+          label: style.label
+        });
+      });
+
+      // Update graph state
+      if (newNodes.length > 0) {
+        setNodes(prevNodes => [...prevNodes, ...newNodes]);
+        setEdges(prevEdges => [...prevEdges, ...newEdges]);
+        setExpandedNodes(prev => new Set([...prev, sourceNodeId]));
+        setExplorationHistory(prev => [...prev, sourceNodeId]);
+        setGraphDepth(prev => prev + 1);
+      }
+
+    } catch (error) {
+      console.error('Error adding exploration nodes to graph:', error);
+    } finally {
+      setIsExpanding(false);
+    }
+  }, [isExpanding, nodes, setNodes, setEdges]);
+
   // Fetch network data with navigation mode support
   const fetchNetworkData = useCallback(async () => {
     setLoading(true);
@@ -562,6 +648,12 @@ export default function NetworkView({
               currentMode={navigationMode || 'timeline'}
               projectId={sourceType === 'project' ? sourceId : ''}
               collections={collections}
+              onExpandNode={(nodeId, nodeData) => expandNodeNetwork(nodeId, nodeData)}
+              onShowSimilarWork={(pmid) => handleNavigationChange('similar', pmid)}
+              onShowCitations={(pmid) => handleNavigationChange('citations', pmid)}
+              onShowReferences={(pmid) => handleNavigationChange('references', pmid)}
+              onExplorePeople={(authors) => handleNavigationChange('authors', authors.join(','))}
+              onAddExplorationNodes={addExplorationNodesToGraph}
             />
           </div>
         )}
@@ -817,6 +909,7 @@ export default function NetworkView({
             onShowCitations={(pmid) => handleNavigationChange('citations', pmid)}
             onShowReferences={(pmid) => handleNavigationChange('references', pmid)}
             onExplorePeople={(authors) => handleNavigationChange('authors', authors.join(','))}
+            onAddExplorationNodes={addExplorationNodesToGraph}
           />
         </div>
       )}

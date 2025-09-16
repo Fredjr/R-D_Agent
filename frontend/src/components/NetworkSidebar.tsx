@@ -32,6 +32,8 @@ interface NetworkSidebarProps {
   onShowCitations?: (pmid: string) => void;
   onShowReferences?: (pmid: string) => void;
   onExplorePeople?: (authors: string[]) => void;
+  // NEW: Dynamic graph expansion from exploration results
+  onAddExplorationNodes?: (sourceNodeId: string, explorationResults: any[], relationType: 'similar' | 'citations' | 'references' | 'authors') => void;
 }
 
 export default function NetworkSidebar({
@@ -46,7 +48,8 @@ export default function NetworkSidebar({
   onShowSimilarWork,
   onShowCitations,
   onShowReferences,
-  onExplorePeople
+  onExplorePeople,
+  onAddExplorationNodes
 }: NetworkSidebarProps) {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
@@ -192,9 +195,24 @@ export default function NetworkSidebar({
         if (response.ok) {
           const data = await response.json();
           // Handle different response structures
-          const results = data.similar_papers || data.references || data.citations ||
+          const results = data.similar_papers || data.similar_articles || data.references || data.citations ||
                           data.authors || data.related_papers || data.results || [];
           setExplorationResults(results);
+
+          // 🚀 NEW: Automatically add exploration results to the network graph!
+          if (results.length > 0 && onAddExplorationNodes && selectedNode) {
+            // Determine relation type based on section and mode
+            let relationType: 'similar' | 'citations' | 'references' | 'authors' = 'similar';
+            if (section === 'papers') {
+              if (mode === 'similar') relationType = 'similar';
+              else if (mode === 'earlier') relationType = 'references';
+              else if (mode === 'later') relationType = 'citations';
+            } else if (section === 'people') {
+              relationType = 'authors';
+            }
+
+            onAddExplorationNodes(selectedNode.id, results, relationType);
+          }
         }
       }
     } catch (error) {
