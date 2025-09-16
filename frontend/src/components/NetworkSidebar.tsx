@@ -211,7 +211,21 @@ export default function NetworkSidebar({
               relationType = 'authors';
             }
 
+            console.log('🎯 NetworkSidebar calling onAddExplorationNodes:', {
+              selectedNodeId: selectedNode.id,
+              resultsCount: results.length,
+              relationType,
+              section,
+              mode
+            });
+
             onAddExplorationNodes(selectedNode.id, results, relationType);
+          } else {
+            console.log('❌ NetworkSidebar NOT calling onAddExplorationNodes:', {
+              hasResults: results.length > 0,
+              hasCallback: !!onAddExplorationNodes,
+              hasSelectedNode: !!selectedNode
+            });
           }
         }
       }
