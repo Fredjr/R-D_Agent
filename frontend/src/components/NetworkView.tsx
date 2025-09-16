@@ -136,10 +136,10 @@ const createArticleSpecificNetwork = (originalArticle: any, sourceId: string) =>
 
     edges.push({
       id: `edge-${sourceId}-${nodeId}`,
-      source: sourceId,
-      target: nodeId,
-      type: 'default',
-      style: { stroke: '#3498db', strokeWidth: 2 }
+      from: sourceId,
+      to: nodeId,
+      arrows: 'to',
+      relationship: 'co-authored'
     });
   });
 
@@ -165,10 +165,10 @@ const createArticleSpecificNetwork = (originalArticle: any, sourceId: string) =>
 
       edges.push({
         id: `edge-${sourceId}-${nodeId}`,
-        source: sourceId,
-        target: nodeId,
-        type: 'default',
-        style: { stroke: '#2ecc71', strokeWidth: 1 }
+        from: sourceId,
+        to: nodeId,
+        arrows: 'to',
+        relationship: 'same-journal'
       });
     }
   }
@@ -198,10 +198,10 @@ const createArticleSpecificNetwork = (originalArticle: any, sourceId: string) =>
 
     edges.push({
       id: `edge-${sourceId}-${nodeId}`,
-      source: sourceId,
-      target: nodeId,
-      type: 'default',
-      style: { stroke: '#f39c12', strokeWidth: 1 }
+      from: sourceId,
+      to: nodeId,
+      arrows: 'to',
+      relationship: 'topic-related'
     });
   });
 
