@@ -639,7 +639,8 @@ export default function NetworkView({
                   year: selectedNode.metadata.year,
                   citation_count: selectedNode.metadata.citation_count,
                   node_type: 'article',
-                  url: selectedNode.metadata.url
+                  url: selectedNode.metadata.url,
+                  abstract: selectedNode.metadata.abstract
                 }
               }}
               onNavigationChange={handleSidebarNavigationChange}
@@ -895,7 +896,8 @@ export default function NetworkView({
                 year: selectedNode.metadata.year,
                 citation_count: selectedNode.metadata.citation_count,
                 node_type: 'article',
-                url: selectedNode.metadata.url
+                url: selectedNode.metadata.url,
+                abstract: selectedNode.metadata.abstract
               }
             }}
             onNavigationChange={handleSidebarNavigationChange}
