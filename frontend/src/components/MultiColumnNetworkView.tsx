@@ -52,6 +52,11 @@ export default function MultiColumnNetworkView({
   const mainNetworkViewRef = useRef<any>(null);
 
   console.log('🔍 MultiColumnNetworkView rendered with:', { sourceType, sourceId, projectId, columnsCount: columns.length });
+  console.log('🔍 Main sidebar state:', {
+    hasMainSelectedNode: !!mainSelectedNode,
+    mainSelectedNodeId: mainSelectedNode?.id,
+    mainSelectedNodeData: mainSelectedNode?.data
+  });
 
   // Handle node selection in the main network view
   const handleMainNodeSelect = useCallback((node: any | null) => {
@@ -232,7 +237,11 @@ export default function MultiColumnNetworkView({
           
           {/* Main Sidebar */}
           {mainSelectedNode && (
-            <div className="absolute top-0 right-0 w-80 h-full z-10 bg-white border-l border-gray-200">
+            <div className="absolute top-0 right-0 w-80 h-full z-10 bg-white border-l-4 border-blue-500 shadow-lg" style={{ backgroundColor: 'rgba(255, 255, 255, 0.98)' }}>
+              {console.log('🎨 RENDERING MAIN SIDEBAR:', { mainSelectedNode, visible: true })}
+              <div className="p-2 bg-blue-100 text-blue-800 text-sm font-bold">
+                📄 MAIN SIDEBAR - Article Details
+              </div>
               <NetworkSidebar
                 selectedNode={mainSelectedNode}
                 onClose={handleCloseMainSidebar}
