@@ -22,6 +22,17 @@ export default function ReportDetailPage() {
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Collection management state
+  const [collections, setCollections] = useState<any[]>([]);
+  const [showAddToCollectionModal, setShowAddToCollectionModal] = useState(false);
+  const [selectedArticleForCollection, setSelectedArticleForCollection] = useState<{
+    pmid?: string;
+    title: string;
+    authors?: string[];
+    journal?: string;
+    year?: number;
+  } | null>(null);
   const [regenerating, setRegenerating] = useState(false);
 
   useEffect(() => {
@@ -41,6 +52,11 @@ export default function ReportDetailPage() {
 
         const data = await response.json();
         setReport(data);
+
+        // Fetch collections for the project
+        if (data.project_id) {
+          fetchCollections(data.project_id);
+        }
       } catch (err) {
         console.error('Error fetching report:', err);
         setError('Failed to load report');
@@ -51,6 +67,69 @@ export default function ReportDetailPage() {
 
     fetchReport();
   }, [reportId, user]);
+
+  const fetchCollections = async (projectId: string) => {
+    try {
+      const response = await fetch(`/api/proxy/projects/${projectId}/collections`, {
+        headers: {
+          'User-ID': user?.email || 'default_user',
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCollections(data.collections || []);
+      }
+    } catch (error) {
+      console.error('Error fetching collections:', error);
+    }
+  };
+
+  const handleAddToCollection = (article: {
+    pmid?: string;
+    title: string;
+    authors?: string[];
+    journal?: string;
+    year?: number;
+  }) => {
+    setSelectedArticleForCollection(article);
+    setShowAddToCollectionModal(true);
+  };
+
+  const handleConfirmAddToCollection = async (collectionId: string) => {
+    if (!selectedArticleForCollection) return;
+
+    try {
+      const response = await fetch(`/api/proxy/collections/${collectionId}/articles`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user?.email || 'default_user',
+        },
+        body: JSON.stringify({
+          pmid: selectedArticleForCollection.pmid || '',
+          title: selectedArticleForCollection.title,
+          authors: selectedArticleForCollection.authors || [],
+          journal: selectedArticleForCollection.journal || '',
+          year: selectedArticleForCollection.year || new Date().getFullYear(),
+          notes: `Added from Report: ${report?.title || reportId}`
+        }),
+      });
+
+      if (response.ok) {
+        alert('✅ Article added to collection successfully!');
+        setShowAddToCollectionModal(false);
+        setSelectedArticleForCollection(null);
+        if (report?.project_id) {
+          fetchCollections(report.project_id); // Refresh collections
+        }
+      } else {
+        throw new Error('Failed to add article to collection');
+      }
+    } catch (error) {
+      console.error('Error adding to collection:', error);
+      alert('❌ Failed to add article to collection. Please try again.');
+    }
+  };
 
   const handleRegenerateContent = async () => {
     if (!reportId || !user) return;
@@ -261,7 +340,12 @@ export default function ReportDetailPage() {
               {/* Article Results (same structure as Generate Dossier) */}
               <div className="space-y-6">
                 {parsedResults.map((item, idx) => (
-                  <ArticleCard key={idx} item={item} />
+                  <ArticleCard
+                    key={idx}
+                    item={item}
+                    projectId={report?.project_id}
+                    onAddToCollection={handleAddToCollection}
+                  />
                 ))}
               </div>
             </>
@@ -276,6 +360,65 @@ export default function ReportDetailPage() {
             </div>
           )}
         </div>
+
+        {/* Add to Collection Modal */}
+        {showAddToCollectionModal && selectedArticleForCollection && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Add to Collection</h3>
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm font-medium text-gray-900">{selectedArticleForCollection.title}</p>
+                {selectedArticleForCollection.pmid && (
+                  <p className="text-xs text-blue-600 mt-1">PMID: {selectedArticleForCollection.pmid}</p>
+                )}
+                <p className="text-xs text-gray-500 mt-1">From Report: {report?.title}</p>
+              </div>
+
+              {collections.length > 0 ? (
+                <div className="space-y-2 mb-4">
+                  <label className="block text-sm font-medium text-gray-700">Select Collection:</label>
+                  {collections.map((collection) => (
+                    <button
+                      key={collection.collection_id}
+                      onClick={() => handleConfirmAddToCollection(collection.collection_id)}
+                      className="w-full text-left p-3 border border-gray-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-colors"
+                    >
+                      <div className="font-medium text-gray-900">{collection.collection_name}</div>
+                      <div className="text-sm text-gray-600">{collection.description || 'No description'}</div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {collection.article_count || 0} articles
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="mb-4 p-3 bg-yellow-50 rounded-lg">
+                  <p className="text-sm text-yellow-800">No collections found. Create a collection first in your project.</p>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowAddToCollectionModal(false);
+                    setSelectedArticleForCollection(null);
+                  }}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                {report?.project_id && (
+                  <button
+                    onClick={() => window.open(`/project/${report.project_id}?tab=collections`, '_blank')}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                  >
+                    Manage Collections
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
