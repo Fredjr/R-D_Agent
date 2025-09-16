@@ -282,14 +282,36 @@ export default function NetworkView({
 
       // Create nodes for each exploration result
       explorationResults.forEach((paper: any, index: number) => {
-        const newNodeId = `${relationType}_${sourceNodeId}_${paper.pmid || paper.id || index}`;
+        const paperPmid = paper.pmid || paper.id || `paper_${index}`;
+        const newNodeId = `${relationType}_${sourceNodeId}_${paperPmid}_${Date.now()}_${index}`;
 
-        // Skip if node already exists
-        if (nodes.some(n => n.id === newNodeId)) return;
+        // Skip if node already exists (check by PMID to avoid duplicates)
+        if (nodes.some(n => n.data?.metadata?.pmid === paperPmid)) {
+          console.log('⚠️ Skipping duplicate node:', paperPmid);
+          return;
+        }
 
         // Calculate position in a circle around the source node
         const angle = (index * 2 * Math.PI) / explorationResults.length;
         const radius = 150 + (index % 3) * 50; // Vary radius for visual appeal
+
+        // Create node with same structure as initial nodes
+        const nodeData = {
+          id: newNodeId,
+          label: paper.title,
+          size: Math.max(40, Math.min((paper.citation_count || 0) * 2, 100)),
+          color: getNodeColor(paper.year || 2020),
+          metadata: {
+            pmid: paper.pmid || paper.id,
+            title: paper.title,
+            authors: paper.authors || [],
+            journal: paper.journal || '',
+            year: paper.year || 0,
+            citation_count: paper.citation_count || 0,
+            url: paper.url,
+            abstract: paper.abstract
+          }
+        };
 
         newNodes.push({
           id: newNodeId,
@@ -299,19 +321,8 @@ export default function NetworkView({
             y: sourcePosition.y + Math.sin(angle) * radius
           },
           data: {
-            metadata: {
-              pmid: paper.pmid || paper.id,
-              title: paper.title,
-              authors: paper.authors || [],
-              journal: paper.journal || '',
-              year: paper.year || 0,
-              citation_count: paper.citation_count || 0,
-              url: paper.url,
-              abstract: paper.abstract
-            },
-            size: Math.max(40, Math.min((paper.citation_count || 0) * 2, 100)),
-            color: getNodeColor(paper.year || 2020),
-            label: paper.title
+            ...nodeData,
+            label: nodeData.label
           },
           draggable: true
         });
