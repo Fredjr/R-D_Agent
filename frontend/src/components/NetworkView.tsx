@@ -500,6 +500,31 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             return;
           }
         }
+
+        // DEMO FALLBACK: If both similar-network and citations-network are empty, show demo network
+        console.log('Both article networks empty, loading demo multi-column network...');
+        const demoResponse = await fetch('/api/proxy/articles/33462507/citations-network?limit=8', {
+          headers: {
+            'User-ID': user?.email || 'default_user',
+          },
+        });
+        if (demoResponse.ok) {
+          const demoData = await demoResponse.json();
+          console.log('🎯 Demo multi-column network:', {
+            nodesCount: demoData.nodes?.length || 0,
+            edgesCount: demoData.edges?.length || 0
+          });
+          if (demoData.nodes && demoData.nodes.length > 1) {
+            // Add demo indicator to metadata
+            demoData.metadata = {
+              ...demoData.metadata,
+              demo_mode: true,
+              demo_message: `Demo: Multi-column citation network (original article data not available)`
+            };
+            setNetworkData(demoData);
+            return;
+          }
+        }
       }
 
       setNetworkData(data);
