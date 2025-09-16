@@ -21,11 +21,12 @@ interface NetworkNode {
 }
 
 interface NetworkViewWithSidebarProps {
-  sourceType: 'project' | 'collection' | 'report';
+  sourceType: 'project' | 'collection' | 'report' | 'article';
   sourceId: string;
   projectId?: string; // For deep dive and collection actions
   onDeepDiveCreated?: () => void;
   onArticleSaved?: () => void;
+  onBack?: () => void;
   className?: string;
 }
 

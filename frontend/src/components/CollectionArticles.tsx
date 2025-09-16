@@ -74,7 +74,6 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
           sourceId={selectedArticle.pmid}
           projectId={projectId}
           onBack={() => setShowNetworkExploration(false)}
-          initialMode="similar"
         />
       </div>
     );
