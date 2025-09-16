@@ -210,12 +210,22 @@ const createArticleSpecificNetwork = (originalArticle: any, sourceId: string) =>
     edges: edges,
     metadata: {
       source_type: 'article_specific',
-      source_pmid: sourceId,
       total_nodes: relatedNodes.length + 1,
       total_edges: edges.length,
+      avg_citations: Math.floor(Math.random() * 30) + 15,
+      most_cited: {
+        pmid: sourceId,
+        title: title,
+        citations: Math.floor(Math.random() * 100) + 50
+      },
+      year_range: {
+        min: year - 5,
+        max: year
+      },
       synthetic_mode: true,
       synthetic_message: `Article-specific network based on: ${title.substring(0, 60)}...`
-    }
+    },
+    cached: false
   };
 };
 
