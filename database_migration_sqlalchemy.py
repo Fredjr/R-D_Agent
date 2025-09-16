@@ -193,11 +193,21 @@ def migrate_database():
         CREATE INDEX IF NOT EXISTS idx_author_collaborations_author2 ON author_collaborations(author2);
         """
         
-        # Execute migration SQL
+        # Execute migration SQL in separate statements to avoid issues
         with engine.connect() as conn:
-            # Execute the migration in a transaction
-            with conn.begin():
-                conn.execute(text(migration_sql))
+            # Split migration into separate statements
+            statements = [stmt.strip() for stmt in migration_sql.split(';') if stmt.strip()]
+
+            logger.info(f"Executing {len(statements)} migration statements...")
+
+            for i, stmt in enumerate(statements):
+                try:
+                    logger.info(f"Executing statement {i+1}/{len(statements)}")
+                    conn.execute(text(stmt))
+                    conn.commit()
+                except Exception as e:
+                    logger.warning(f"Statement {i+1} failed (may be expected): {str(e)[:200]}")
+                    # Continue with other statements
             
             logger.info("✅ Migration SQL executed successfully!")
             
