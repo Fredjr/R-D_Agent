@@ -95,6 +95,8 @@ interface NetworkViewProps {
     year: number;
     citation_count?: number;
   };
+  // Disable internal sidebar when used in MultiColumnNetworkView
+  disableInternalSidebar?: boolean;
 }
 
 // Function to create article-specific network when backend data is unavailable
@@ -300,7 +302,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   onNavigationChange,
   className = '',
   forceNetworkType,
-  articleMetadata
+  articleMetadata,
+  disableInternalSidebar = false
 }, ref) => {
   const { user } = useAuth();
   const [networkData, setNetworkData] = useState<NetworkData | null>(null);
@@ -1250,8 +1253,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         )}
       </ReactFlow>
 
-      {/* Enhanced NetworkSidebar */}
-      {showSidebar && selectedNode && (
+      {/* Enhanced NetworkSidebar - Only show if not disabled */}
+      {!disableInternalSidebar && showSidebar && selectedNode && (
         <div className="absolute top-0 right-0 h-full z-10">
           <NetworkSidebar
             selectedNode={{

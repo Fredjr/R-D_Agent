@@ -233,6 +233,7 @@ export default function MultiColumnNetworkView({
             sourceId={sourceId}
             onNodeSelect={handleMainNodeSelect}
             className="h-full"
+            disableInternalSidebar={true}
           />
           
           {/* Main Sidebar */}
