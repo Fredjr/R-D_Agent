@@ -654,39 +654,7 @@ export default function NetworkView({
           </div>
         )}
 
-        {/* Enhanced NetworkSidebar for Timeline */}
-        {showSidebar && selectedNode && (
-          <div className="absolute top-0 right-0 h-full z-10">
-            <NetworkSidebar
-              selectedNode={{
-                id: selectedNode.id,
-                data: {
-                  pmid: selectedNode.metadata.pmid,
-                  title: selectedNode.metadata.title,
-                  authors: selectedNode.metadata.authors,
-                  journal: selectedNode.metadata.journal,
-                  year: selectedNode.metadata.year,
-                  citation_count: selectedNode.metadata.citation_count,
-                  node_type: 'article',
-                  url: selectedNode.metadata.url,
-                  abstract: selectedNode.metadata.abstract
-                }
-              }}
-              onNavigationChange={handleSidebarNavigationChange}
-              onAddToCollection={handleAddToCollection}
-              onClose={handleCloseSidebar}
-              currentMode={navigationMode || 'timeline'}
-              projectId={sourceType === 'project' ? sourceId : ''}
-              collections={collections}
-              onExpandNode={(nodeId, nodeData) => expandNodeNetwork(nodeId, nodeData)}
-              onShowSimilarWork={(pmid) => handleNavigationChange('similar', pmid)}
-              onShowCitations={(pmid) => handleNavigationChange('citations', pmid)}
-              onShowReferences={(pmid) => handleNavigationChange('references', pmid)}
-              onExplorePeople={(authors) => handleNavigationChange('authors', authors.join(','))}
-              onAddExplorationNodes={addExplorationNodesToGraph}
-            />
-          </div>
-        )}
+
       </div>
     );
   }
