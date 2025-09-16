@@ -166,11 +166,6 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
-  // Expose addExplorationNodesToGraph function via ref
-  useImperativeHandle(ref, () => ({
-    addExplorationNodesToGraph
-  }), [addExplorationNodesToGraph]);
-
   // ResearchRabbit-style graph expansion
   const expandNodeNetwork = useCallback(async (nodeId: string, nodeData: any) => {
     if (expandedNodes.has(nodeId) || isExpanding) return;
@@ -377,6 +372,11 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       setIsExpanding(false);
     }
   }, [isExpanding, nodes, setNodes, setEdges]);
+
+  // Expose addExplorationNodesToGraph function via ref
+  useImperativeHandle(ref, () => ({
+    addExplorationNodesToGraph
+  }), [addExplorationNodesToGraph]);
 
   // Fetch network data with navigation mode support
   const fetchNetworkData = useCallback(async () => {
