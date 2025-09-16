@@ -152,14 +152,21 @@ export default function ProjectPage() {
 
   const fetchCollections = async () => {
     try {
+      console.log('Fetching collections for project:', projectId);
       const response = await fetch(`/api/proxy/projects/${projectId}/collections`, {
         headers: {
           'User-ID': user?.email || 'default_user',
         },
       });
+      console.log('Collections response status:', response.status);
       if (response.ok) {
         const data = await response.json();
+        console.log('Collections data received:', data);
         setCollections(data.collections || []);
+        console.log('Collections set to state:', data.collections || []);
+      } else {
+        const errorText = await response.text();
+        console.error('Collections fetch failed:', response.status, errorText);
       }
     } catch (error) {
       console.error('Error fetching collections:', error);
@@ -360,6 +367,8 @@ export default function ProjectPage() {
   }) => {
     setSelectedArticleForCollection(article);
     setShowAddToCollectionModal(true);
+    // Refresh collections when modal opens to ensure we have the latest data
+    fetchCollections();
   };
 
   const handleConfirmAddToCollection = async (collectionId: string) => {
@@ -907,28 +916,33 @@ export default function ProjectPage() {
                 </p>
               </div>
 
-              {collections.length > 0 ? (
-                <div className="space-y-2 mb-4">
-                  <label className="block text-sm font-medium text-gray-700">Select Collection:</label>
-                  {collections.map((collection) => (
-                    <button
-                      key={collection.collection_id}
-                      onClick={() => handleConfirmAddToCollection(collection.collection_id)}
-                      className="w-full text-left p-3 border border-gray-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-colors"
-                    >
-                      <div className="font-medium text-gray-900">{collection.collection_name}</div>
-                      <div className="text-sm text-gray-600">{collection.description || 'No description'}</div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {collection.article_count || 0} articles
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="mb-4 p-3 bg-yellow-50 rounded-lg">
-                  <p className="text-sm text-yellow-800">No collections found. Create a collection first in the Collections tab.</p>
-                </div>
-              )}
+              {(() => {
+                console.log('Modal rendering - collections state:', collections);
+                console.log('Modal rendering - collections length:', collections.length);
+                return collections.length > 0 ? (
+                  <div className="space-y-2 mb-4">
+                    <label className="block text-sm font-medium text-gray-700">Select Collection:</label>
+                    {collections.map((collection) => (
+                      <button
+                        key={collection.collection_id}
+                        onClick={() => handleConfirmAddToCollection(collection.collection_id)}
+                        className="w-full text-left p-3 border border-gray-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-colors"
+                      >
+                        <div className="font-medium text-gray-900">{collection.collection_name}</div>
+                        <div className="text-sm text-gray-600">{collection.description || 'No description'}</div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {collection.article_count || 0} articles
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mb-4 p-3 bg-yellow-50 rounded-lg">
+                    <p className="text-sm text-yellow-800">No collections found. Create a collection first in the Collections tab.</p>
+                    <p className="text-xs text-gray-600 mt-1">Debug: Collections array length = {collections.length}</p>
+                  </div>
+                );
+              })()}
 
               <div className="flex justify-end gap-3">
                 <button
