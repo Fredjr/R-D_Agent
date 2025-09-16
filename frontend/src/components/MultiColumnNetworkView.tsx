@@ -91,6 +91,7 @@ export default function MultiColumnNetworkView({
     }
 
     try {
+      // Use article sourceType - NetworkView will try similar-network then fallback to citations-network
       const newColumn: PaperColumn = {
         id: `column-${paper.data.pmid}-${Date.now()}`,
         paper,
@@ -103,7 +104,7 @@ export default function MultiColumnNetworkView({
       console.log('🔍 Column will use NetworkView with:', {
         sourceType: 'article',
         sourceId: paper.data.pmid,
-        expectedEndpoint: `/api/proxy/articles/${paper.data.pmid}/similar-network`
+        expectedEndpoint: `/api/proxy/articles/${paper.data.pmid}/similar-network (with citations fallback)`
       });
 
       console.log('✅ New column created:', newColumn);
@@ -275,6 +276,7 @@ export default function MultiColumnNetworkView({
                 sourceId={column.sourceId}
                 onNodeSelect={(node) => handleColumnNodeSelect(column.id, node)}
                 className="h-full"
+                forceNetworkType="citations"
               />
 
               {/* Column Sidebar */}
