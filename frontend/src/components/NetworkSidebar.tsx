@@ -56,6 +56,12 @@ export default function NetworkSidebar({
   const [showCitations, setShowCitations] = useState(false);
   const [selectedCollection, setSelectedCollection] = useState<string>('');
 
+  // ResearchRabbit-style exploration state
+  const [expandedSection, setExpandedSection] = useState<'papers' | 'people' | 'content' | null>(null);
+  const [explorationResults, setExplorationResults] = useState<any[]>([]);
+  const [explorationLoading, setExplorationLoading] = useState(false);
+  const [explorationMode, setExplorationMode] = useState<string>('');
+
   // Fetch references and citations when node is selected
   useEffect(() => {
     if (selectedNode?.data.pmid) {
@@ -123,6 +129,100 @@ export default function NetworkSidebar({
     } catch (error) {
       console.error('Error adding to collection:', error);
       alert('Failed to add paper to collection');
+    }
+  };
+
+  // ResearchRabbit-style exploration functions
+  const handleExploreSection = async (section: 'papers' | 'people' | 'content', mode: string) => {
+    if (expandedSection === section && explorationMode === mode) {
+      // Collapse if clicking the same section/mode
+      setExpandedSection(null);
+      setExplorationResults([]);
+      setExplorationMode('');
+      return;
+    }
+
+    setExpandedSection(section);
+    setExplorationMode(mode);
+    setExplorationLoading(true);
+    setExplorationResults([]);
+
+    try {
+      let endpoint = '';
+      let params = new URLSearchParams();
+
+      switch (section) {
+        case 'papers':
+          switch (mode) {
+            case 'similar':
+              endpoint = `/api/proxy/articles/${selectedNode?.data.pmid}/similar`;
+              params.append('limit', '10');
+              break;
+            case 'earlier':
+              endpoint = `/api/proxy/articles/${selectedNode?.data.pmid}/references`;
+              params.append('limit', '10');
+              break;
+            case 'later':
+              endpoint = `/api/proxy/articles/${selectedNode?.data.pmid}/citations`;
+              params.append('limit', '10');
+              break;
+          }
+          break;
+        case 'people':
+          if (mode === 'authors' && selectedNode?.data.authors) {
+            endpoint = `/api/proxy/authors/search`;
+            params.append('authors', selectedNode.data.authors.join(','));
+            params.append('limit', '10');
+          }
+          break;
+        case 'content':
+          if (mode === 'linked') {
+            endpoint = `/api/proxy/articles/${selectedNode?.data.pmid}/related`;
+            params.append('limit', '10');
+          }
+          break;
+      }
+
+      if (endpoint) {
+        const response = await fetch(`${endpoint}?${params.toString()}`, {
+          headers: { 'User-ID': user?.user_id || 'default_user' }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          // Handle different response structures
+          const results = data.similar_papers || data.references || data.citations ||
+                          data.authors || data.related_papers || data.results || [];
+          setExplorationResults(results);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching exploration data:', error);
+    } finally {
+      setExplorationLoading(false);
+    }
+  };
+
+  const handleExplorationPaperClick = (paper: any) => {
+    // Create a new node from the exploration result
+    const newNode: NetworkNode = {
+      id: paper.pmid || paper.id,
+      data: {
+        pmid: paper.pmid || paper.id,
+        title: paper.title,
+        authors: paper.authors || [],
+        journal: paper.journal || '',
+        year: paper.year || 0,
+        citation_count: paper.citation_count || 0,
+        node_type: 'paper',
+        abstract: paper.abstract,
+        url: paper.url
+      }
+    };
+
+    // Trigger navigation to this new paper
+    if (onExpandNode) {
+      onExpandNode(newNode.id, newNode.data);
     }
   };
 
@@ -220,84 +320,141 @@ export default function NetworkSidebar({
         </div>
       </div>
 
-      {/* Navigation Options */}
-      <div className="p-4 border-b border-gray-200">
-        <h4 className="font-medium text-sm text-gray-900 mb-3">Explore Network</h4>
-
-        <div className="space-y-2">
-          <button
-            onClick={() => onNavigationChange('references')}
-            className={`w-full px-3 py-2 text-xs rounded transition-colors flex items-center justify-between ${
-              currentMode === 'references'
-                ? 'bg-gray-100 text-gray-800 border border-gray-300'
-                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-            }`}
-          >
-            <span>📚 Earlier Work ({references.length})</span>
+      {/* ResearchRabbit-style Exploration Sections */}
+      <div className="flex-1 overflow-y-auto">
+        {/* Explore Papers Section */}
+        <div className="border-b border-gray-200">
+          <div className="p-3 bg-gray-50">
+            <h4 className="font-medium text-sm text-gray-900">📄 Explore Papers</h4>
+          </div>
+          <div className="p-2 space-y-1">
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowReferences(!showReferences);
-              }}
-              className="text-gray-400 hover:text-gray-600"
+              onClick={() => handleExploreSection('papers', 'similar')}
+              className={`w-full px-3 py-2 text-xs rounded transition-colors text-left ${
+                expandedSection === 'papers' && explorationMode === 'similar'
+                  ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+              }`}
             >
-              {showReferences ? '▼' : '▶'}
+              Similar Work
             </button>
-          </button>
-
-          {showReferences && references.length > 0 && (
-            <div className="ml-4 space-y-1 max-h-32 overflow-y-auto">
-              {references.slice(0, 5).map((ref, index) => (
-                <div key={index} className="text-xs text-gray-600 p-2 bg-gray-50 rounded">
-                  <div className="font-medium truncate">{ref.title}</div>
-                  <div className="text-gray-500">{ref.year} • {ref.citation_count || 0} citations</div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <button
-            onClick={() => onNavigationChange('citations')}
-            className={`w-full px-3 py-2 text-xs rounded transition-colors flex items-center justify-between ${
-              currentMode === 'citations'
-                ? 'bg-green-100 text-green-800 border border-green-300'
-                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-            }`}
-          >
-            <span>📈 Later Work ({citations.length})</span>
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowCitations(!showCitations);
-              }}
-              className="text-gray-400 hover:text-gray-600"
+              onClick={() => handleExploreSection('papers', 'earlier')}
+              className={`w-full px-3 py-2 text-xs rounded transition-colors text-left ${
+                expandedSection === 'papers' && explorationMode === 'earlier'
+                  ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+              }`}
             >
-              {showCitations ? '▼' : '▶'}
+              Earlier Work
             </button>
-          </button>
-
-          {showCitations && citations.length > 0 && (
-            <div className="ml-4 space-y-1 max-h-32 overflow-y-auto">
-              {citations.slice(0, 5).map((cite, index) => (
-                <div key={index} className="text-xs text-gray-600 p-2 bg-gray-50 rounded">
-                  <div className="font-medium truncate">{cite.title}</div>
-                  <div className="text-gray-500">{cite.year} • {cite.citation_count || 0} citations</div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <button
-            onClick={() => onNavigationChange('authors')}
-            className={`w-full px-3 py-2 text-xs rounded transition-colors ${
-              currentMode === 'authors'
-                ? 'bg-purple-100 text-purple-800 border border-purple-300'
-                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-            }`}
-          >
-            👥 Author Networks
-          </button>
+            <button
+              onClick={() => handleExploreSection('papers', 'later')}
+              className={`w-full px-3 py-2 text-xs rounded transition-colors text-left ${
+                expandedSection === 'papers' && explorationMode === 'later'
+                  ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+              }`}
+            >
+              Later Work
+            </button>
+          </div>
         </div>
+
+        {/* Explore People Section */}
+        <div className="border-b border-gray-200">
+          <div className="p-3 bg-gray-50">
+            <h4 className="font-medium text-sm text-gray-900">👥 Explore People</h4>
+          </div>
+          <div className="p-2 space-y-1">
+            <button
+              onClick={() => handleExploreSection('people', 'authors')}
+              className={`w-full px-3 py-2 text-xs rounded transition-colors text-left ${
+                expandedSection === 'people' && explorationMode === 'authors'
+                  ? 'bg-purple-100 text-purple-800 border border-purple-300'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+              }`}
+            >
+              These Authors
+            </button>
+            <button
+              onClick={() => handleExploreSection('people', 'suggested')}
+              className={`w-full px-3 py-2 text-xs rounded transition-colors text-left ${
+                expandedSection === 'people' && explorationMode === 'suggested'
+                  ? 'bg-purple-100 text-purple-800 border border-purple-300'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+              }`}
+            >
+              Suggested Authors
+            </button>
+          </div>
+        </div>
+
+        {/* Explore Other Content Section */}
+        <div className="border-b border-gray-200">
+          <div className="p-3 bg-gray-50">
+            <h4 className="font-medium text-sm text-gray-900">🔗 Explore Other Content</h4>
+          </div>
+          <div className="p-2 space-y-1">
+            <button
+              onClick={() => handleExploreSection('content', 'linked')}
+              className={`w-full px-3 py-2 text-xs rounded transition-colors text-left ${
+                expandedSection === 'content' && explorationMode === 'linked'
+                  ? 'bg-green-100 text-green-800 border border-green-300'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+              }`}
+            >
+              Linked Content
+            </button>
+          </div>
+        </div>
+
+        {/* Exploration Results */}
+        {expandedSection && (
+          <div className="border-b border-gray-200 bg-gray-50">
+            <div className="p-3">
+              <div className="flex items-center justify-between mb-2">
+                <h5 className="font-medium text-xs text-gray-700">
+                  {explorationMode.charAt(0).toUpperCase() + explorationMode.slice(1)} Results
+                </h5>
+                {explorationLoading && (
+                  <div className="text-xs text-gray-500">Loading...</div>
+                )}
+              </div>
+
+              {explorationLoading ? (
+                <div className="text-center py-4">
+                  <div className="text-xs text-gray-500">Finding related papers...</div>
+                </div>
+              ) : explorationResults.length > 0 ? (
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {explorationResults.map((paper, index) => (
+                    <div
+                      key={index}
+                      onClick={() => handleExplorationPaperClick(paper)}
+                      className="p-2 bg-white rounded border border-gray-200 hover:border-blue-300 hover:bg-blue-50 cursor-pointer transition-colors"
+                    >
+                      <div className="font-medium text-xs text-gray-900 truncate">
+                        {paper.title}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {paper.authors?.slice(0, 2).join(', ')}
+                        {paper.authors?.length > 2 && ` +${paper.authors.length - 2} more`}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        {paper.year} • {paper.citation_count || 0} citations
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <div className="text-xs text-gray-500">No results found</div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Collection Management */}
