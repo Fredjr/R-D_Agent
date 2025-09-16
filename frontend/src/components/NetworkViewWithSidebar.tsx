@@ -42,6 +42,8 @@ export default function NetworkViewWithSidebar({
   const [selectedNode, setSelectedNode] = useState<NetworkNode | null>(null);
   const networkViewRef = useRef<any>(null);
 
+  console.log('🔍 NetworkViewWithSidebar rendered with:', { sourceType, sourceId, projectId });
+
   const handleNodeSelect = useCallback((node: any | null) => {
     if (node) {
       // Convert NetworkView format to NetworkSidebar format
@@ -65,8 +67,26 @@ export default function NetworkViewWithSidebar({
   }, []);
 
   const handleCloseSidebar = useCallback(() => {
+    console.log('🚪 NetworkViewWithSidebar: Closing sidebar');
     setSelectedNode(null);
   }, []);
+
+  // Create the onAddExplorationNodes callback
+  const handleAddExplorationNodes = useCallback((sourceNodeId: string, explorationResults: any[], relationType: 'similar' | 'citations' | 'references' | 'authors') => {
+    console.log('🎯 NetworkViewWithSidebar: onAddExplorationNodes called!');
+    console.log({ sourceNodeId, resultsCount: explorationResults.length, relationType });
+
+    // Call the NetworkView's addExplorationNodesToGraph function if available
+    if (networkViewRef.current && networkViewRef.current.addExplorationNodesToGraph) {
+      console.log('✅ Calling NetworkView addExplorationNodesToGraph');
+      networkViewRef.current.addExplorationNodesToGraph(sourceNodeId, explorationResults, relationType);
+    } else {
+      console.log('❌ NetworkView addExplorationNodesToGraph not available');
+      console.log('NetworkView ref:', networkViewRef.current);
+    }
+  }, []);
+
+  console.log('🔧 NetworkViewWithSidebar: handleAddExplorationNodes callback created:', !!handleAddExplorationNodes);
 
   const handleDeepDive = useCallback(async (pmid: string, title: string) => {
     if (!projectId) {
@@ -139,18 +159,7 @@ export default function NetworkViewWithSidebar({
             currentMode="default"
             projectId={projectId || ''}
             collections={[]}
-            onAddExplorationNodes={(sourceNodeId, explorationResults, relationType) => {
-              console.log('🎯 NetworkViewWithSidebar: onAddExplorationNodes called!');
-              console.log({ sourceNodeId, resultsCount: explorationResults.length, relationType });
-
-              // Call the NetworkView's addExplorationNodesToGraph function if available
-              if (networkViewRef.current && networkViewRef.current.addExplorationNodesToGraph) {
-                console.log('✅ Calling NetworkView addExplorationNodesToGraph');
-                networkViewRef.current.addExplorationNodesToGraph(sourceNodeId, explorationResults, relationType);
-              } else {
-                console.log('❌ NetworkView addExplorationNodesToGraph not available');
-              }
-            }}
+            onAddExplorationNodes={handleAddExplorationNodes}
           />
         </div>
       )}
