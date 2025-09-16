@@ -70,17 +70,24 @@ export default function ReportDetailPage() {
 
   const fetchCollections = async (projectId: string) => {
     try {
+      console.log('Report page - Fetching collections for project:', projectId);
       const response = await fetch(`/api/proxy/projects/${projectId}/collections`, {
         headers: {
           'User-ID': user?.email || 'default_user',
         },
       });
+      console.log('Report page - Collections response status:', response.status);
       if (response.ok) {
         const data = await response.json();
+        console.log('Report page - Collections data received:', data);
         setCollections(data.collections || []);
+        console.log('Report page - Collections set to state:', data.collections || []);
+      } else {
+        const errorText = await response.text();
+        console.error('Report page - Collections fetch failed:', response.status, errorText);
       }
     } catch (error) {
-      console.error('Error fetching collections:', error);
+      console.error('Report page - Error fetching collections:', error);
     }
   };
 
@@ -93,6 +100,10 @@ export default function ReportDetailPage() {
   }) => {
     setSelectedArticleForCollection(article);
     setShowAddToCollectionModal(true);
+    // Refresh collections when modal opens to ensure we have the latest data
+    if (report?.project_id) {
+      fetchCollections(report.project_id);
+    }
   };
 
   const handleConfirmAddToCollection = async (collectionId: string) => {
