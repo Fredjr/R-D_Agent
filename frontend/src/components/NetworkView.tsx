@@ -432,6 +432,16 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
       const data: NetworkData = await response.json();
 
+      console.log('🔍 NetworkView API Response:', {
+        endpoint,
+        sourceType,
+        sourceId,
+        nodesCount: data.nodes?.length || 0,
+        edgesCount: data.edges?.length || 0,
+        metadata: data.metadata,
+        firstFewNodes: data.nodes?.slice(0, 3)
+      });
+
       // DEMO FALLBACK: If project/collection network is empty, show demo article network
       if (sourceType !== 'article' && (!data.nodes || data.nodes.length === 0)) {
         console.log('Project network empty, loading demo article network...');
@@ -450,6 +460,33 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
               demo_message: `Demo: Sample citation network (add articles to your ${sourceType} to see real data)`
             };
             setNetworkData(demoData);
+            return;
+          }
+        }
+      }
+
+      // ARTICLE NETWORK FALLBACK: If article network is empty or has only 1 node, try citations-network
+      if (sourceType === 'article' && (!data.nodes || data.nodes.length <= 1)) {
+        console.log('Article similar-network empty/single node, trying citations-network...');
+        const fallbackResponse = await fetch(`/api/proxy/articles/${sourceId}/citations-network?limit=10`, {
+          headers: {
+            'User-ID': user?.email || 'default_user',
+          },
+        });
+        if (fallbackResponse.ok) {
+          const fallbackData = await fallbackResponse.json();
+          console.log('🔄 Article citations-network fallback:', {
+            nodesCount: fallbackData.nodes?.length || 0,
+            edgesCount: fallbackData.edges?.length || 0
+          });
+          if (fallbackData.nodes && fallbackData.nodes.length > 1) {
+            // Add fallback indicator to metadata
+            fallbackData.metadata = {
+              ...fallbackData.metadata,
+              fallback_mode: true,
+              fallback_message: `Showing citation network (similar articles not found)`
+            };
+            setNetworkData(fallbackData);
             return;
           }
         }
