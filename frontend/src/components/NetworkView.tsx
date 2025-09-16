@@ -84,6 +84,8 @@ interface NetworkViewProps {
   onNodeSelect?: (node: NetworkNode | null) => void;
   onNavigationChange?: (mode: string, sourceId: string) => void;
   className?: string;
+  // Force citations network for multi-column view
+  forceNetworkType?: 'citations' | 'similar' | 'references';
 }
 
 // Custom node component for articles
@@ -146,7 +148,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   navigationMode = 'default',
   onNodeSelect,
   onNavigationChange,
-  className = ''
+  className = '',
+  forceNetworkType
 }, ref) => {
   const { user } = useAuth();
   const [networkData, setNetworkData] = useState<NetworkData | null>(null);
@@ -408,7 +411,14 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         default:
           // Default network view based on source type
           if (sourceType === 'article') {
-            endpoint = `/api/proxy/articles/${sourceId}/similar-network`;
+            // Use forceNetworkType for multi-column views to ensure multiple nodes
+            if (forceNetworkType === 'citations') {
+              endpoint = `/api/proxy/articles/${sourceId}/citations-network`;
+            } else if (forceNetworkType === 'references') {
+              endpoint = `/api/proxy/articles/${sourceId}/references-network`;
+            } else {
+              endpoint = `/api/proxy/articles/${sourceId}/similar-network`;
+            }
           } else {
             endpoint = `/api/proxy/${sourceType}s/${sourceId}/network`;
           }
