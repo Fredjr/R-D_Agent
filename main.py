@@ -112,6 +112,22 @@ register_author_endpoints(app)
 # Import and register citation endpoints
 from citation_endpoints import register_citation_endpoints, add_test_citation_endpoint
 register_citation_endpoints(app)
+
+# =============================================================================
+# AI RECOMMENDATIONS ENDPOINTS - Phase 8 ResearchRabbit Feature Parity
+# =============================================================================
+
+# Import and register AI recommendations endpoints
+from ai_recommendations_endpoints import register_ai_recommendations_endpoints
+register_ai_recommendations_endpoints(app)
+
+# =============================================================================
+# PERFORMANCE OPTIMIZATION ENDPOINTS - Phase 9 ResearchRabbit Feature Parity
+# =============================================================================
+
+# Import and register performance optimization endpoints
+from performance_optimization_endpoints import register_performance_endpoints
+register_performance_endpoints(app)
 add_test_citation_endpoint(app)
 
 # Database migration endpoint for Phase 5
