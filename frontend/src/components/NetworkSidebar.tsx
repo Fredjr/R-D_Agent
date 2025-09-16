@@ -51,6 +51,13 @@ export default function NetworkSidebar({
   onExplorePeople,
   onAddExplorationNodes
 }: NetworkSidebarProps) {
+  console.log('🔍 NetworkSidebar rendered with props:', {
+    hasSelectedNode: !!selectedNode,
+    hasOnAddExplorationNodes: !!onAddExplorationNodes,
+    currentMode,
+    projectId,
+    collectionsCount: collections?.length || 0
+  });
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [references, setReferences] = useState<any[]>([]);
