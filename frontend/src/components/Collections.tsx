@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { PlusIcon, FolderIcon, DocumentTextIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, FolderIcon, DocumentTextIcon, EyeIcon, ListBulletIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import NetworkViewWithSidebar from './NetworkViewWithSidebar';
+import CollectionArticles from './CollectionArticles';
 
 interface Collection {
   collection_id: string;
@@ -29,6 +30,7 @@ export default function Collections({ projectId, onRefresh }: CollectionsProps) 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null);
   const [showNetworkView, setShowNetworkView] = useState(false);
+  const [showArticlesList, setShowArticlesList] = useState(false);
   
   const [newCollection, setNewCollection] = useState({
     collection_name: '',
@@ -119,6 +121,11 @@ export default function Collections({ projectId, onRefresh }: CollectionsProps) 
     setShowNetworkView(true);
   };
 
+  const handleViewArticles = (collection: Collection) => {
+    setSelectedCollection(collection);
+    setShowArticlesList(true);
+  };
+
   const colors = [
     '#3B82F6', '#EF4444', '#10B981', '#F59E0B', 
     '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'
@@ -195,6 +202,16 @@ export default function Collections({ projectId, onRefresh }: CollectionsProps) 
     );
   }
 
+  if (showArticlesList && selectedCollection) {
+    return (
+      <CollectionArticles
+        collection={selectedCollection}
+        projectId={projectId}
+        onBack={() => setShowArticlesList(false)}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -260,6 +277,13 @@ export default function Collections({ projectId, onRefresh }: CollectionsProps) 
                 </div>
                 
                 <div className="flex gap-2">
+                  <button
+                    onClick={() => handleViewArticles(collection)}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-sm"
+                  >
+                    <ListBulletIcon className="w-4 h-4" />
+                    Explore Articles
+                  </button>
                   <button
                     onClick={() => handleViewNetwork(collection)}
                     className="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-sm"
