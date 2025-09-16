@@ -11097,7 +11097,7 @@ async def migrate_railway_database_endpoint():
         # Import and run the Railway migration
         import subprocess
         result = subprocess.run([
-            sys.executable, "database_migration_railway.py"
+            sys.executable, "database_migration_sqlalchemy.py"
         ], capture_output=True, text=True, timeout=300)
 
         if result.returncode == 0:
