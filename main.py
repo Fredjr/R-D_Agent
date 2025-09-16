@@ -7064,6 +7064,77 @@ async def add_article_to_collection(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to add article to collection: {str(e)}")
 
+@app.post("/projects/{project_id}/collections/migrate-articles")
+async def migrate_collection_articles_to_main_table(
+    project_id: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Migrate existing collection articles to main Article table for exploration features"""
+    current_user = request.headers.get("User-ID", "default_user")
+
+    # Check project access
+    has_access = (
+        db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == current_user
+        ).first() is not None or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    try:
+        # Get all collection articles for this project
+        collection_articles = db.query(ArticleCollection).join(
+            Collection, ArticleCollection.collection_id == Collection.collection_id
+        ).filter(
+            Collection.project_id == project_id,
+            Collection.is_active == True,
+            ArticleCollection.article_pmid.isnot(None)
+        ).all()
+
+        migrated_count = 0
+        for article_collection in collection_articles:
+            # Check if article already exists in main table
+            existing_article = db.query(Article).filter(
+                Article.pmid == article_collection.article_pmid
+            ).first()
+
+            if not existing_article:
+                # Create article in main table
+                new_article = Article(
+                    pmid=article_collection.article_pmid,
+                    title=article_collection.article_title,
+                    authors=article_collection.article_authors or [],
+                    journal=article_collection.article_journal or "",
+                    pub_year=article_collection.article_year or 2024,
+                    url=article_collection.article_url or f"https://pubmed.ncbi.nlm.nih.gov/{article_collection.article_pmid}/",
+                    abstract="",  # Will be enriched later
+                    doi="",      # Will be enriched later
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
+                )
+                db.add(new_article)
+                migrated_count += 1
+
+        db.commit()
+
+        return {
+            "message": f"Successfully migrated {migrated_count} articles to main table",
+            "migrated_count": migrated_count,
+            "total_collection_articles": len(collection_articles)
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to migrate articles: {str(e)}")
+
 @app.delete("/projects/{project_id}/collections/{collection_id}/articles/{article_id}")
 async def remove_article_from_collection(
     project_id: str,
