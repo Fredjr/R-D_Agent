@@ -458,7 +458,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
         // Calculate position in a circle around the source node
         const angle = (index * 2 * Math.PI) / explorationResults.length;
-        const radius = 150 + (index % 3) * 50; // Vary radius for visual appeal
+        const radius = 250 + (index % 3) * 80; // Larger radius for better visibility
 
         // Create node with same structure as initial nodes
         const nodeData = {
@@ -518,7 +518,9 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         console.log('✅ Adding nodes to graph:', { newNodesCount: newNodes.length, newEdgesCount: newEdges.length });
         setNodes(prevNodes => {
           console.log('📊 Previous nodes:', prevNodes.length, 'New nodes:', newNodes.length);
-          return [...prevNodes, ...newNodes];
+          const updatedNodes = [...prevNodes, ...newNodes];
+          console.log('🔍 Updated nodes array:', updatedNodes.map(n => ({ id: n.id, position: n.position, type: n.type })));
+          return updatedNodes;
         });
         setEdges(prevEdges => {
           console.log('🔗 Previous edges:', prevEdges.length, 'New edges:', newEdges.length);
@@ -527,6 +529,9 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         setExpandedNodes(prev => new Set([...prev, sourceNodeId]));
         setExplorationHistory(prev => [...prev, sourceNodeId]);
         setGraphDepth(prev => prev + 1);
+
+        // Log final positions for debugging
+        console.log('🎯 New nodes positioned at:', newNodes.map(n => ({ id: n.id, position: n.position })));
       } else {
         console.log('❌ No new nodes to add');
       }
@@ -1094,6 +1099,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   return (
     <div className={`relative h-96 bg-white rounded-lg border ${className}`}>
       <ReactFlow
+        key={`network-${nodes.length}-${edges.length}`}
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
@@ -1102,10 +1108,12 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
         connectionMode={ConnectionMode.Loose}
-        fitView
+        fitView={true}
         fitViewOptions={{
-          padding: 0.2,
+          padding: 0.3,
           includeHiddenNodes: false,
+          maxZoom: 1.5,
+          minZoom: 0.1,
         }}
       >
         <Controls />
