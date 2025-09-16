@@ -35,6 +35,7 @@ interface NetworkNode {
     year: number;
     citation_count: number;
     url: string;
+    abstract?: string;
   };
 }
 
@@ -298,7 +299,8 @@ export default function NetworkView({
               journal: paper.journal || '',
               year: paper.year || 0,
               citation_count: paper.citation_count || 0,
-              url: paper.url
+              url: paper.url,
+              abstract: paper.abstract
             },
             size: Math.max(40, Math.min((paper.citation_count || 0) * 2, 100)),
             color: getNodeColor(paper.year || 2020),

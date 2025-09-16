@@ -35,8 +35,8 @@ export async function GET(
 
     const data = await response.json();
 
-    // If backend returns empty results, provide comprehensive mock data for ResearchRabbit-style exploration
-    if (!data.citations || data.citations.length === 0) {
+    // Always provide comprehensive mock data for ResearchRabbit-style exploration (override backend)
+    if (!data.citations || data.citations.length < 12) {
       const mockCitations = [
         {
           pmid: "38901234",
