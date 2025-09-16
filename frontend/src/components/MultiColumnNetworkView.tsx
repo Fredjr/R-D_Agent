@@ -81,6 +81,15 @@ export default function MultiColumnNetworkView({
     console.log('🎯 Creating new paper column for:', paper.data.title);
     console.log('📊 Paper data structure:', paper);
 
+    // Check if column already exists for this paper
+    const existingColumn = columns.find(col => col.sourceId === paper.data.pmid);
+    if (existingColumn) {
+      console.log('⚠️ Column already exists for this paper:', paper.data.pmid);
+      // Focus on existing column instead of creating duplicate
+      setMainSelectedNode(null); // Close main sidebar
+      return;
+    }
+
     try {
       const newColumn: PaperColumn = {
         id: `column-${paper.data.pmid}-${Date.now()}`,
@@ -90,6 +99,12 @@ export default function MultiColumnNetworkView({
         selectedNode: null,
         networkViewRef: React.createRef()
       };
+
+      console.log('🔍 Column will use NetworkView with:', {
+        sourceType: 'article',
+        sourceId: paper.data.pmid,
+        expectedEndpoint: `/api/proxy/articles/${paper.data.pmid}/similar-network`
+      });
 
       console.log('✅ New column created:', newColumn);
       setColumns(prev => {
@@ -101,7 +116,7 @@ export default function MultiColumnNetworkView({
     } catch (error) {
       console.error('❌ Error creating paper column:', error);
     }
-  }, []);
+  }, [columns]);
 
   // Handle node selection within a column
   const handleColumnNodeSelect = useCallback((columnId: string, node: any | null) => {
