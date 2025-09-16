@@ -323,24 +323,32 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
-  // ResearchRabbit-style graph expansion
+  // ResearchRabbit-style graph expansion - NOW USING PUBMED APIs
   const expandNodeNetwork = useCallback(async (nodeId: string, nodeData: any) => {
     if (expandedNodes.has(nodeId) || isExpanding) return;
 
     setIsExpanding(true);
     try {
-      // Fetch citations and references for the selected node
+      const pmid = nodeData.pmid || nodeId;
+      console.log(`🚀 Expanding node network for PMID: ${pmid}`);
+
+      // Fetch citations and references using PubMed APIs
       const [citationsResponse, referencesResponse] = await Promise.all([
-        fetch(`/api/proxy/articles/${nodeData.pmid}/citations`, {
+        fetch(`/api/proxy/pubmed/citations?pmid=${pmid}&type=citations&limit=10`, {
           headers: { 'User-ID': user?.email || 'default_user' }
         }),
-        fetch(`/api/proxy/articles/${nodeData.pmid}/references`, {
+        fetch(`/api/proxy/pubmed/references?pmid=${pmid}&limit=10`, {
           headers: { 'User-ID': user?.email || 'default_user' }
         })
       ]);
 
-      const citations = citationsResponse.ok ? await citationsResponse.json() : [];
-      const references = referencesResponse.ok ? await referencesResponse.json() : [];
+      const citationsData = citationsResponse.ok ? await citationsResponse.json() : { citations: [] };
+      const referencesData = referencesResponse.ok ? await referencesResponse.json() : { references: [] };
+
+      const citations = citationsData.citations || [];
+      const references = referencesData.references || [];
+
+      console.log(`📊 Found ${citations.length} citations and ${references.length} references for expansion`);
 
       // Add new nodes and edges to the graph
       const newNodes: Node[] = [];
@@ -535,24 +543,28 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
     addExplorationNodesToGraph
   }), [addExplorationNodesToGraph]);
 
-  // Fetch network data with navigation mode support
+  // Fetch network data with navigation mode support - NOW USING PUBMED APIs
   const fetchNetworkData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
       let endpoint = '';
+      let usePubMed = false;
 
       // Determine endpoint based on navigation mode and source type
       switch (navigationMode) {
         case 'similar':
-          endpoint = `/api/proxy/articles/${sourceId}/similar-network`;
+          endpoint = `/api/proxy/pubmed/network?pmid=${sourceId}&type=similar&limit=15`;
+          usePubMed = true;
           break;
         case 'earlier':
-          endpoint = `/api/proxy/articles/${sourceId}/references-network`;
+          endpoint = `/api/proxy/pubmed/network?pmid=${sourceId}&type=references&limit=15`;
+          usePubMed = true;
           break;
         case 'later':
-          endpoint = `/api/proxy/articles/${sourceId}/citations-network`;
+          endpoint = `/api/proxy/pubmed/network?pmid=${sourceId}&type=citations&limit=15`;
+          usePubMed = true;
           break;
         case 'authors':
           endpoint = `/api/proxy/articles/${sourceId}/author-network`;
@@ -565,18 +577,30 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         default:
           // Default network view based on source type
           if (sourceType === 'article') {
-            // Use forceNetworkType for multi-column views to ensure multiple nodes
+            // Use PubMed for article networks - mixed network with citations and references
             if (forceNetworkType === 'citations') {
-              endpoint = `/api/proxy/articles/${sourceId}/citations-network`;
+              endpoint = `/api/proxy/pubmed/network?pmid=${sourceId}&type=citations&limit=15`;
+              usePubMed = true;
             } else if (forceNetworkType === 'references') {
-              endpoint = `/api/proxy/articles/${sourceId}/references-network`;
+              endpoint = `/api/proxy/pubmed/network?pmid=${sourceId}&type=references&limit=15`;
+              usePubMed = true;
             } else {
-              endpoint = `/api/proxy/articles/${sourceId}/similar-network`;
+              // Default: mixed network with both citations and references
+              endpoint = `/api/proxy/pubmed/network?pmid=${sourceId}&type=mixed&limit=20`;
+              usePubMed = true;
             }
           } else {
             endpoint = `/api/proxy/${sourceType}s/${sourceId}/network`;
           }
       }
+
+      console.log(`🔍 NetworkView fetching from: ${endpoint} (PubMed: ${usePubMed})`);
+
+      const response = await fetch(endpoint, {
+        headers: {
+          'User-ID': user?.email || 'default_user',
+        },
+      });
 
       const response = await fetch(endpoint, {
         headers: {
@@ -591,15 +615,40 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = errorData.error || errorData.detail || `HTTP ${response.status}: ${response.statusText}`;
-        throw new Error(`Failed to fetch network data: ${errorMessage}`);
-      }
 
-      let data: NetworkData = await response.json();
+        // If PubMed API fails, fall back to backend API for non-article sources
+        if (usePubMed && sourceType === 'article') {
+          console.log(`⚠️ PubMed API failed, falling back to backend API: ${errorMessage}`);
+          // Try backend API as fallback
+          const fallbackEndpoint = forceNetworkType === 'citations'
+            ? `/api/proxy/articles/${sourceId}/citations-network`
+            : forceNetworkType === 'references'
+            ? `/api/proxy/articles/${sourceId}/references-network`
+            : `/api/proxy/articles/${sourceId}/similar-network`;
+
+          const fallbackResponse = await fetch(fallbackEndpoint, {
+            headers: { 'User-ID': user?.email || 'default_user' }
+          });
+
+          if (fallbackResponse.ok) {
+            const fallbackData = await fallbackResponse.json();
+            console.log('✅ Using backend API fallback data');
+            data = fallbackData;
+          } else {
+            throw new Error(`Both PubMed and backend APIs failed: ${errorMessage}`);
+          }
+        } else {
+          throw new Error(`Failed to fetch network data: ${errorMessage}`);
+        }
+      } else {
+        data = await response.json();
+      }
 
       console.log('🔍 NetworkView API Response:', {
         endpoint,
         sourceType,
         sourceId,
+        usedPubMed: usePubMed,
         nodesCount: data.nodes?.length || 0,
         edgesCount: data.edges?.length || 0,
         metadata: data.metadata,

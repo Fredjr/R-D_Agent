@@ -148,7 +148,7 @@ export default function NetworkSidebar({
     }
   };
 
-  // ResearchRabbit-style exploration functions
+  // ResearchRabbit-style exploration functions - NOW USING PUBMED APIs
   const handleExploreSection = async (section: 'papers' | 'people' | 'content', mode: string) => {
     console.log('🚀 handleExploreSection called:', { section, mode, selectedNode: selectedNode?.id });
     console.log('📊 Selected node data structure:', selectedNode);
@@ -168,22 +168,23 @@ export default function NetworkSidebar({
 
     try {
       let endpoint = '';
-      let params = new URLSearchParams();
+      let usePubMed = false;
+      const pmid = selectedNode?.data?.pmid || selectedNode?.id;
 
       switch (section) {
         case 'papers':
           switch (mode) {
             case 'similar':
-              endpoint = `/api/proxy/articles/${selectedNode?.data.pmid}/similar`;
-              params.append('limit', '10');
+              endpoint = `/api/proxy/pubmed/citations?pmid=${pmid}&type=similar&limit=20`;
+              usePubMed = true;
               break;
             case 'earlier':
-              endpoint = `/api/proxy/articles/${selectedNode?.data.pmid}/references`;
-              params.append('limit', '10');
+              endpoint = `/api/proxy/pubmed/references?pmid=${pmid}&limit=20`;
+              usePubMed = true;
               break;
             case 'later':
-              endpoint = `/api/proxy/articles/${selectedNode?.data.pmid}/citations`;
-              params.append('limit', '10');
+              endpoint = `/api/proxy/pubmed/citations?pmid=${pmid}&type=citations&limit=20`;
+              usePubMed = true;
               break;
           }
           break;
@@ -206,15 +207,29 @@ export default function NetworkSidebar({
       }
 
       if (endpoint) {
-        const response = await fetch(`${endpoint}?${params.toString()}`, {
+        const fetchUrl = usePubMed ? endpoint : `${endpoint}?${params.toString()}`;
+        console.log(`🌐 Fetching exploration data from: ${fetchUrl} (PubMed: ${usePubMed})`);
+
+        const response = await fetch(fetchUrl, {
           headers: { 'User-ID': user?.user_id || 'default_user' }
         });
 
         if (response.ok) {
           const data = await response.json();
+          console.log('📊 Exploration API response:', data);
+
           // Handle different response structures
-          const results = data.similar_papers || data.similar_articles || data.references || data.citations ||
-                          data.authors || data.related_papers || data.results || [];
+          let results = [];
+          if (usePubMed) {
+            // PubMed API responses
+            results = data.citations || data.references || [];
+          } else {
+            // Backend API responses
+            results = data.similar_papers || data.similar_articles || data.references || data.citations ||
+                      data.authors || data.related_papers || data.results || [];
+          }
+
+          console.log(`✅ Found ${results.length} exploration results`);
           setExplorationResults(results);
 
           // 🚀 NEW: Automatically add exploration results to the network graph!
