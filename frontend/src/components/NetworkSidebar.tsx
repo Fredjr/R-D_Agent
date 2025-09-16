@@ -178,8 +178,8 @@ export default function NetworkSidebar({
         case 'people':
           if (mode === 'authors') {
             endpoint = `/api/proxy/authors/search`;
-            // Use authors from metadata if available, otherwise use sample authors
-            const authors = selectedNode?.data?.metadata?.authors || selectedNode?.data?.authors || ['Sample Author'];
+            // Use authors from data, with fallback to sample authors
+            const authors = selectedNode?.data?.authors || ['Sample Author'];
             params.append('authors', authors.join(','));
             params.append('limit', '10');
             console.log('🔍 Authors search with:', { authors, endpoint });
