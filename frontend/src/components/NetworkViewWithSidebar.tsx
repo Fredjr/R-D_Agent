@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import NetworkView from './NetworkView';
 import NetworkSidebar from './NetworkSidebar';
@@ -40,6 +40,7 @@ export default function NetworkViewWithSidebar({
 }: NetworkViewWithSidebarProps) {
   const { user } = useAuth();
   const [selectedNode, setSelectedNode] = useState<NetworkNode | null>(null);
+  const networkViewRef = useRef<any>(null);
 
   const handleNodeSelect = useCallback((node: any | null) => {
     if (node) {
@@ -113,6 +114,7 @@ export default function NetworkViewWithSidebar({
       {/* Main Network View */}
       <div className={`flex-1 ${selectedNode ? 'mr-80' : ''} transition-all duration-300`}>
         <NetworkView
+          ref={networkViewRef}
           sourceType={sourceType}
           sourceId={sourceId}
           onNodeSelect={handleNodeSelect}
@@ -138,8 +140,16 @@ export default function NetworkViewWithSidebar({
             projectId={projectId || ''}
             collections={[]}
             onAddExplorationNodes={(sourceNodeId, explorationResults, relationType) => {
-              console.log('🎯 NetworkViewWithSidebar: onAddExplorationNodes called but not implemented yet');
+              console.log('🎯 NetworkViewWithSidebar: onAddExplorationNodes called!');
               console.log({ sourceNodeId, resultsCount: explorationResults.length, relationType });
+
+              // Call the NetworkView's addExplorationNodesToGraph function if available
+              if (networkViewRef.current && networkViewRef.current.addExplorationNodesToGraph) {
+                console.log('✅ Calling NetworkView addExplorationNodesToGraph');
+                networkViewRef.current.addExplorationNodesToGraph(sourceNodeId, explorationResults, relationType);
+              } else {
+                console.log('❌ NetworkView addExplorationNodesToGraph not available');
+              }
             }}
           />
         </div>
