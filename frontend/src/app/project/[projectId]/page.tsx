@@ -87,6 +87,19 @@ export default function ProjectPage() {
   });
   const [sendingInvite, setSendingInvite] = useState(false);
 
+  // Collection management state
+  const [collections, setCollections] = useState<any[]>([]);
+  const [showAddToCollectionModal, setShowAddToCollectionModal] = useState(false);
+  const [selectedArticleForCollection, setSelectedArticleForCollection] = useState<{
+    pmid?: string;
+    title: string;
+    authors?: string[];
+    journal?: string;
+    year?: number;
+    source: 'report' | 'deep_dive';
+    source_id: string;
+  } | null>(null);
+
   // Tab navigation state
   const [activeTab, setActiveTab] = useState<'overview' | 'collections' | 'network' | 'activity'>('overview');
 
@@ -105,6 +118,7 @@ export default function ProjectPage() {
   useEffect(() => {
     if (projectId && user) {
       fetchProjectData();
+      fetchCollections();
     }
   }, [projectId, user]);
 
@@ -133,6 +147,22 @@ export default function ProjectPage() {
       setError(err instanceof Error ? err.message : 'Failed to load project');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCollections = async () => {
+    try {
+      const response = await fetch(`/api/proxy/projects/${projectId}/collections`, {
+        headers: {
+          'User-ID': user?.email || 'default_user',
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCollections(data.collections || []);
+      }
+    } catch (error) {
+      console.error('Error fetching collections:', error);
     }
   };
 
@@ -316,6 +346,53 @@ export default function ProjectPage() {
       alert('Failed to start deep dive analysis. Please try again.');
     } finally {
       setCreatingDeepDive(false);
+    }
+  };
+
+  const handleAddToCollection = (article: {
+    pmid?: string;
+    title: string;
+    authors?: string[];
+    journal?: string;
+    year?: number;
+    source: 'report' | 'deep_dive';
+    source_id: string;
+  }) => {
+    setSelectedArticleForCollection(article);
+    setShowAddToCollectionModal(true);
+  };
+
+  const handleConfirmAddToCollection = async (collectionId: string) => {
+    if (!selectedArticleForCollection) return;
+
+    try {
+      const response = await fetch(`/api/proxy/collections/${collectionId}/articles`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user?.email || 'default_user',
+        },
+        body: JSON.stringify({
+          pmid: selectedArticleForCollection.pmid || '',
+          title: selectedArticleForCollection.title,
+          authors: selectedArticleForCollection.authors || [],
+          journal: selectedArticleForCollection.journal || '',
+          year: selectedArticleForCollection.year || new Date().getFullYear(),
+          notes: `Added from ${selectedArticleForCollection.source === 'report' ? 'Report' : 'Deep Dive Analysis'}: ${selectedArticleForCollection.source_id}`
+        }),
+      });
+
+      if (response.ok) {
+        alert('✅ Article added to collection successfully!');
+        setShowAddToCollectionModal(false);
+        setSelectedArticleForCollection(null);
+        fetchCollections(); // Refresh collections
+      } else {
+        throw new Error('Failed to add article to collection');
+      }
+    } catch (error) {
+      console.error('Error adding to collection:', error);
+      alert('❌ Failed to add article to collection. Please try again.');
     }
   };
 
@@ -814,6 +891,65 @@ export default function ProjectPage() {
           </div>
         )}
 
+        {/* Add to Collection Modal */}
+        {showAddToCollectionModal && selectedArticleForCollection && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Add to Collection</h3>
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm font-medium text-gray-900">{selectedArticleForCollection.title}</p>
+                {selectedArticleForCollection.pmid && (
+                  <p className="text-xs text-blue-600 mt-1">PMID: {selectedArticleForCollection.pmid}</p>
+                )}
+                <p className="text-xs text-gray-500 mt-1">
+                  From {selectedArticleForCollection.source === 'report' ? 'Report' : 'Deep Dive Analysis'}
+                </p>
+              </div>
+
+              {collections.length > 0 ? (
+                <div className="space-y-2 mb-4">
+                  <label className="block text-sm font-medium text-gray-700">Select Collection:</label>
+                  {collections.map((collection) => (
+                    <button
+                      key={collection.collection_id}
+                      onClick={() => handleConfirmAddToCollection(collection.collection_id)}
+                      className="w-full text-left p-3 border border-gray-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-colors"
+                    >
+                      <div className="font-medium text-gray-900">{collection.collection_name}</div>
+                      <div className="text-sm text-gray-600">{collection.description || 'No description'}</div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {collection.article_count || 0} articles
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="mb-4 p-3 bg-yellow-50 rounded-lg">
+                  <p className="text-sm text-yellow-800">No collections found. Create a collection first in the Collections tab.</p>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowAddToCollectionModal(false);
+                    setSelectedArticleForCollection(null);
+                  }}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => setActiveTab('collections')}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                >
+                  Manage Collections
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Summary Report Modal */}
         {showSummaryModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -941,16 +1077,47 @@ export default function ProjectPage() {
             {project.reports && project.reports.length > 0 ? (
               <div className="space-y-3">
                 {project.reports.map((report) => (
-                  <div 
-                    key={report.report_id} 
-                    className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
-                    onClick={() => window.open(`/report/${report.report_id}`, '_blank')}
+                  <div
+                    key={report.report_id}
+                    className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-md transition-all"
                   >
-                    <h4 className="font-medium text-gray-900 mb-1">{report.title}</h4>
-                    <p className="text-sm text-gray-600 mb-2">{report.objective}</p>
-                    <div className="flex justify-between items-center text-xs text-gray-500">
-                      <span>By {report.created_by}</span>
-                      <span>{new Date(report.created_at).toLocaleDateString()}</span>
+                    <div
+                      className="cursor-pointer"
+                      onClick={() => window.open(`/report/${report.report_id}`, '_blank')}
+                    >
+                      <h4 className="font-medium text-gray-900 mb-1">{report.title}</h4>
+                      <p className="text-sm text-gray-600 mb-2">{report.objective}</p>
+                      <div className="flex justify-between items-center text-xs text-gray-500 mb-3">
+                        <span>By {report.created_by}</span>
+                        <span>{new Date(report.created_at).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-2 border-t border-gray-100">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddToCollection({
+                            title: report.title,
+                            source: 'report',
+                            source_id: report.report_id,
+                            // Extract PMID from report if available
+                            pmid: report.objective.match(/PMID[:\s]*(\d+)/i)?.[1]
+                          });
+                        }}
+                        className="flex-1 px-3 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                        title="Add articles from this report to a collection"
+                      >
+                        📚 Add to Collection
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(`/report/${report.report_id}`, '_blank');
+                        }}
+                        className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                      >
+                        View Report
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -1024,29 +1191,59 @@ export default function ProjectPage() {
             {project.deep_dive_analyses && project.deep_dive_analyses.length > 0 ? (
               <div className="space-y-3">
                 {project.deep_dive_analyses.map((analysis) => (
-                  <div 
-                    key={analysis.analysis_id} 
-                    className="border border-gray-200 rounded-lg p-4 hover:border-purple-300 hover:shadow-md transition-all cursor-pointer"
-                    onClick={() => window.open(`/analysis/${analysis.analysis_id}`, '_blank')}
+                  <div
+                    key={analysis.analysis_id}
+                    className="border border-gray-200 rounded-lg p-4 hover:border-purple-300 hover:shadow-md transition-all"
                   >
-                    <h4 className="font-medium text-gray-900 mb-1">{analysis.article_title}</h4>
-                    {analysis.article_pmid && (
-                      <p className="text-sm text-blue-600 mb-1">PMID: {analysis.article_pmid}</p>
-                    )}
-                    <div className="flex justify-between items-center mb-2">
-                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                        analysis.processing_status === 'completed' 
-                          ? 'bg-green-100 text-green-800'
-                          : analysis.processing_status === 'processing'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {analysis.processing_status}
-                      </span>
+                    <div
+                      className="cursor-pointer"
+                      onClick={() => window.open(`/analysis/${analysis.analysis_id}`, '_blank')}
+                    >
+                      <h4 className="font-medium text-gray-900 mb-1">{analysis.article_title}</h4>
+                      {analysis.article_pmid && (
+                        <p className="text-sm text-blue-600 mb-1">PMID: {analysis.article_pmid}</p>
+                      )}
+                      <div className="flex justify-between items-center mb-2">
+                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                          analysis.processing_status === 'completed'
+                            ? 'bg-green-100 text-green-800'
+                            : analysis.processing_status === 'processing'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {analysis.processing_status}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs text-gray-500 mb-3">
+                        <span>By {analysis.created_by}</span>
+                        <span>{new Date(analysis.created_at).toLocaleDateString()}</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between items-center text-xs text-gray-500">
-                      <span>By {analysis.created_by}</span>
-                      <span>{new Date(analysis.created_at).toLocaleDateString()}</span>
+                    <div className="flex gap-2 pt-2 border-t border-gray-100">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddToCollection({
+                            title: analysis.article_title,
+                            pmid: analysis.article_pmid,
+                            source: 'deep_dive',
+                            source_id: analysis.analysis_id
+                          });
+                        }}
+                        className="flex-1 px-3 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                        title="Add this analyzed article to a collection"
+                      >
+                        📚 Add to Collection
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(`/analysis/${analysis.analysis_id}`, '_blank');
+                        }}
+                        className="px-3 py-1.5 text-xs bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
+                      >
+                        View Analysis
+                      </button>
                     </div>
                   </div>
                 ))}
