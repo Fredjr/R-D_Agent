@@ -52,19 +52,6 @@ export default function MultiColumnNetworkView({
   const mainNetworkViewRef = useRef<any>(null);
 
   console.log('🔍 MultiColumnNetworkView rendered with:', { sourceType, sourceId, projectId, columnsCount: columns.length });
-  console.log('🚨 DEPLOYMENT CHECK - Version 2.0 - Should see new debugging!');
-  console.log('🔍 Main sidebar state:', {
-    hasMainSelectedNode: !!mainSelectedNode,
-    mainSelectedNodeId: mainSelectedNode?.id,
-    mainSelectedNodeData: mainSelectedNode?.data,
-    willRenderSidebar: !!mainSelectedNode
-  });
-
-  if (mainSelectedNode) {
-    console.log('🎯 SIDEBAR SHOULD BE VISIBLE - mainSelectedNode exists:', mainSelectedNode);
-  } else {
-    console.log('❌ SIDEBAR NOT VISIBLE - mainSelectedNode is null/undefined');
-  }
 
   // Handle node selection in the main network view
   const handleMainNodeSelect = useCallback((node: any | null) => {
@@ -247,15 +234,11 @@ export default function MultiColumnNetworkView({
           />
           
           {/* Main Sidebar */}
-          {mainSelectedNode && (() => {
-            console.log('🎨 RENDERING MAIN SIDEBAR:', { mainSelectedNode, visible: true });
-            return (
-              <div className="absolute top-0 right-0 w-80 h-full z-50 bg-red-500 border-l-8 border-yellow-500 shadow-2xl" style={{ backgroundColor: 'rgba(255, 0, 0, 0.9)' }}>
-                <div className="p-4 bg-yellow-200 text-red-800 text-lg font-bold border-b-4 border-red-500">
-                  🚨 MAIN SIDEBAR IS VISIBLE! 🚨
-                </div>
-                <div className="p-2 bg-blue-100 text-blue-800 text-sm font-bold">
-                  📄 Article: {mainSelectedNode?.data?.title || 'Unknown'}
+          {mainSelectedNode && (
+              <div className="absolute top-0 right-0 w-80 h-full z-10 bg-white border-l border-gray-200 shadow-lg">
+                <div className="p-3 bg-blue-50 border-b border-blue-200">
+                  <h3 className="text-sm font-semibold text-blue-800 mb-1">📄 Article Details</h3>
+                  <p className="text-xs text-blue-600">Click options below to explore related research</p>
                 </div>
               <NetworkSidebar
                 selectedNode={mainSelectedNode}
@@ -274,8 +257,7 @@ export default function MultiColumnNetworkView({
                 showCreateColumnButton={true}
               />
               </div>
-            );
-          })()}
+            )}
         </div>
       </div>
 
