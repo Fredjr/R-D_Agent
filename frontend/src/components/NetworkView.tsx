@@ -620,8 +620,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
               demo_mode: true,
               demo_message: `Demo: Sample citation network (add articles to your ${sourceType} to see real data)`
             };
-            setNetworkData(demoData);
-            return;
+            console.log('🔧 Using demo data, will convert to React Flow format');
+            data = demoData;
           }
         }
       }
@@ -654,8 +654,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
               fallback_mode: true,
               fallback_message: `Showing citation network (similar articles not found)`
             };
-            setNetworkData(fallbackData);
-            return;
+            console.log('🔧 Using fallback data, will convert to React Flow format');
+            data = fallbackData;
           }
         }
 
@@ -697,8 +697,13 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
         // Create a synthetic network based on the article's metadata
         const syntheticNetwork = createArticleSpecificNetwork(originalArticle, sourceId);
-        setNetworkData(syntheticNetwork);
-        return;
+        console.log('🔧 Synthetic network created:', {
+          nodesCount: syntheticNetwork.nodes.length,
+          edgesCount: syntheticNetwork.edges.length
+        });
+
+        // Set the synthetic network data and let it fall through to React Flow conversion
+        data = syntheticNetwork;
 
         // FINAL DEMO FALLBACK: If we can't create article-specific network, show demo
         console.log('Creating final demo fallback network...');
@@ -720,8 +725,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
               demo_mode: true,
               demo_message: `Demo: Multi-column citation network (original article data not available)`
             };
-            setNetworkData(demoData);
-            return;
+            console.log('🔧 Using final demo fallback, will convert to React Flow format');
+            data = demoData;
           }
         }
       }
