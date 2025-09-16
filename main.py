@@ -9755,23 +9755,23 @@ async def get_similar_articles(
 
         # Calculate similarities using the similarity engine
         similarity_engine = get_similarity_engine()
-        similar_articles = similarity_engine.find_similar_articles(
-            base_article, candidates, limit, threshold
+        similar_results = await similarity_engine.find_similar_articles(
+            pmid, limit, threshold, db
         )
 
         # Format response
         result_articles = []
-        for article, similarity_score in similar_articles:
+        for result in similar_results:
             result_articles.append({
-                "pmid": article.pmid,
-                "title": article.title,
-                "authors": article.authors or [],
-                "journal": article.journal,
-                "year": article.publication_year,
-                "doi": article.doi,
-                "citation_count": article.citation_count or 0,
-                "similarity_score": round(similarity_score, 4),
-                "url": f"https://pubmed.ncbi.nlm.nih.gov/{article.pmid}/" if article.pmid else None
+                "pmid": result.pmid,
+                "title": result.title,
+                "authors": [],  # Will be populated from database if needed
+                "journal": result.journal,
+                "year": result.year,
+                "doi": "",  # Will be populated from database if needed
+                "citation_count": result.citation_count or 0,
+                "similarity_score": round(result.similarity_score, 4),
+                "url": f"https://pubmed.ncbi.nlm.nih.gov/{result.pmid}/" if result.pmid else None
             })
 
         return {
@@ -9788,7 +9788,7 @@ async def get_similar_articles(
             "search_parameters": {
                 "limit": limit,
                 "threshold": threshold,
-                "candidates_searched": len(candidates)
+                "candidates_searched": len(similar_results)
             },
             "cache_stats": similarity_engine.get_cache_stats()
         }
