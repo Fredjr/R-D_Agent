@@ -106,7 +106,7 @@ export default function NetworkSidebar({
     if (!selectedNode || !selectedCollection) return;
 
     try {
-      const response = await fetch(`/api/proxy/collections/${selectedCollection}/articles`, {
+      const response = await fetch(`/api/proxy/collections/${selectedCollection}/articles?projectId=${projectId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -117,7 +117,8 @@ export default function NetworkSidebar({
           title: selectedNode.data.title,
           authors: selectedNode.data.authors,
           journal: selectedNode.data.journal,
-          year: selectedNode.data.year
+          year: selectedNode.data.year,
+          projectId: projectId
         })
       });
 

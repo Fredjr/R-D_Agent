@@ -44,7 +44,7 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
   const fetchArticles = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/proxy/collections/${collection.collection_id}/articles`, {
+      const response = await fetch(`/api/proxy/collections/${collection.collection_id}/articles?projectId=${projectId}`, {
         headers: {
           'User-ID': user?.email || 'default_user',
         },
