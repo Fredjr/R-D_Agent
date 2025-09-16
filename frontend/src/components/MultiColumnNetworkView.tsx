@@ -247,15 +247,16 @@ export default function MultiColumnNetworkView({
           />
           
           {/* Main Sidebar */}
-          {mainSelectedNode && (
-            <div className="absolute top-0 right-0 w-80 h-full z-50 bg-red-500 border-l-8 border-yellow-500 shadow-2xl" style={{ backgroundColor: 'rgba(255, 0, 0, 0.9)' }}>
-              {console.log('🎨 RENDERING MAIN SIDEBAR:', { mainSelectedNode, visible: true })}
-              <div className="p-4 bg-yellow-200 text-red-800 text-lg font-bold border-b-4 border-red-500">
-                🚨 MAIN SIDEBAR IS VISIBLE! 🚨
-              </div>
-              <div className="p-2 bg-blue-100 text-blue-800 text-sm font-bold">
-                📄 Article: {mainSelectedNode?.data?.title || 'Unknown'}
-              </div>
+          {mainSelectedNode && (() => {
+            console.log('🎨 RENDERING MAIN SIDEBAR:', { mainSelectedNode, visible: true });
+            return (
+              <div className="absolute top-0 right-0 w-80 h-full z-50 bg-red-500 border-l-8 border-yellow-500 shadow-2xl" style={{ backgroundColor: 'rgba(255, 0, 0, 0.9)' }}>
+                <div className="p-4 bg-yellow-200 text-red-800 text-lg font-bold border-b-4 border-red-500">
+                  🚨 MAIN SIDEBAR IS VISIBLE! 🚨
+                </div>
+                <div className="p-2 bg-blue-100 text-blue-800 text-sm font-bold">
+                  📄 Article: {mainSelectedNode?.data?.title || 'Unknown'}
+                </div>
               <NetworkSidebar
                 selectedNode={mainSelectedNode}
                 onClose={handleCloseMainSidebar}
@@ -272,8 +273,9 @@ export default function MultiColumnNetworkView({
                 onCreatePaperColumn={handleCreatePaperColumn}
                 showCreateColumnButton={true}
               />
-            </div>
-          )}
+              </div>
+            );
+          })()}
         </div>
       </div>
 
