@@ -251,7 +251,20 @@ export default function NetworkSidebar({
       }
 
       if (endpoint) {
-        const fetchUrl = usePubMed ? endpoint : `${endpoint}?${params.toString()}`;
+        let fetchUrl;
+        if (usePubMed) {
+          // PubMed endpoints already have their parameters
+          fetchUrl = endpoint;
+        } else {
+          // For non-PubMed endpoints, check if URL already has parameters
+          const hasParams = endpoint.includes('?');
+          const paramString = params.toString();
+          if (paramString) {
+            fetchUrl = hasParams ? `${endpoint}&${paramString}` : `${endpoint}?${paramString}`;
+          } else {
+            fetchUrl = endpoint;
+          }
+        }
         console.log(`🌐 Fetching exploration data from: ${fetchUrl} (PubMed: ${usePubMed})`);
 
         const response = await fetch(fetchUrl, {
