@@ -247,7 +247,13 @@ export default function MultiColumnNetworkView({
           {columns.length} column{columns.length > 1 ? 's' : ''} • Scroll →
         </div>
       )}
-      <div className="h-full overflow-x-auto overflow-y-hidden" style={{ scrollbarWidth: 'thin' }}>
+      <div
+        className="h-full overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100"
+        style={{
+          scrollbarWidth: 'thin',
+          scrollBehavior: 'smooth'
+        }}
+      >
         <div className="flex h-full" style={{ minWidth: `${MAIN_VIEW_MIN_WIDTH + (columns.length * COLUMN_MIN_WIDTH)}px` }}>
         {/* Main Network View */}
         <div
