@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface Collection {
   collection_id: string;
@@ -193,6 +194,7 @@ function getSyncManager(): CollectionSyncManager {
 
 // React hook for using the global collection sync
 export function useGlobalCollectionSync(projectId: string) {
+  const { user } = useAuth();
   const [state, setState] = useState<CollectionSyncState>(() => getSyncManager().getState());
   const syncManager = useRef(getSyncManager());
   
@@ -205,22 +207,32 @@ export function useGlobalCollectionSync(projectId: string) {
     if (!projectId) return;
 
     syncManager.current.setLoading(true);
-    
+
     try {
-      const response = await fetch(`/api/proxy/projects/${projectId}/collections`);
+      console.log('🔄 Refreshing collections for project:', projectId, 'user:', user?.email);
+      const response = await fetch(`/api/proxy/projects/${projectId}/collections`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user?.email || 'default_user',
+        },
+      });
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Collections fetch failed:', response.status, errorText);
         throw new Error(`Failed to fetch collections: ${response.statusText}`);
       }
-      
+
       const data = await response.json();
-      const collections = data.collections || [];
-      
+      const collections = Array.isArray(data) ? data : (data.collections || []);
+      console.log('✅ Collections fetched successfully:', collections.length, 'collections');
+
       syncManager.current.updateCollections(collections, projectId);
     } catch (error) {
       console.error('Failed to refresh collections:', error);
       syncManager.current.setError(error instanceof Error ? error.message : 'Unknown error');
     }
-  }, [projectId]);
+  }, [projectId, user?.email]);
 
   const broadcastCollectionAdded = useCallback((collection: Collection) => {
     syncManager.current.broadcastUpdate({
