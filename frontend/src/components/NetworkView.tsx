@@ -594,6 +594,14 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
               endpoint = `/api/proxy/pubmed/network?pmid=${sourceId}&type=mixed&limit=20`;
               usePubMed = true;
             }
+          } else if (sourceType === 'collection') {
+            // Use hybrid PubMed-backend endpoint for collections
+            const projectId = new URLSearchParams(window.location.search).get('projectId') ||
+                             (window.location.pathname.includes('/project/') ?
+                              window.location.pathname.split('/project/')[1].split('/')[0] : '');
+            endpoint = `/api/proxy/collections/${sourceId}/pubmed-network?projectId=${projectId}&limit=20`;
+            usePubMed = true; // Enable PubMed integration for collections
+            console.log(`🔍 Using hybrid collection network endpoint: ${endpoint}`);
           } else {
             endpoint = `/api/proxy/${sourceType}s/${sourceId}/network`;
           }
@@ -645,6 +653,23 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         data = await response.json();
       }
 
+      // Handle hybrid collection network response
+      if (sourceType === 'collection' && (data as any).metadata?.source === 'hybrid_collection_pubmed') {
+        console.log(`✅ Received hybrid collection network:`, {
+          totalNodes: data.nodes?.length || 0,
+          totalEdges: data.edges?.length || 0,
+          collectionArticles: (data as any).metadata.collection_articles,
+          pubmedExpansions: (data as any).metadata.pubmed_expansions
+        });
+
+        // Mark as having real data to skip demo fallbacks
+        data.metadata = {
+          ...data.metadata,
+          network_type: 'hybrid_collection',
+          has_real_data: true
+        } as any;
+      }
+
       console.log('🔍 NetworkView API Response:', {
         endpoint,
         sourceType,
@@ -657,7 +682,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       });
 
       // DEMO FALLBACK: Only if project/collection network is completely empty (0 nodes)
-      if (sourceType !== 'article' && (!data.nodes || data.nodes.length === 0)) {
+      // Skip fallback for hybrid collection networks that have real data
+      if (sourceType !== 'article' && (!data.nodes || data.nodes.length === 0) && !(data.metadata as any)?.has_real_data) {
         console.log('Project/collection network completely empty, loading demo article network...');
         const demoResponse = await fetch('/api/proxy/articles/33462507/citations-network?limit=5', {
           headers: {
