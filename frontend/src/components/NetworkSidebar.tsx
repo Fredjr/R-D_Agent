@@ -415,30 +415,32 @@ export default function NetworkSidebar({
         </button>
       </div>
 
-      {/* Paper Details */}
-      <div className="p-4 border-b border-gray-200">
-        <div className="space-y-2 text-xs">
+      {/* Paper Details - Compact & Scrollable */}
+      <div className="p-3 border-b border-gray-200 flex-shrink-0">
+        <div className="space-y-1.5 text-xs">
           <div>
             <span className="font-medium text-gray-700">Authors:</span>
-            <div className="text-gray-600 mt-1">
-              {data.authors?.slice(0, 3).join(', ')}
-              {data.authors?.length > 3 && ` +${data.authors.length - 3} more`}
+            <div className="text-gray-600 mt-0.5 leading-tight">
+              {data.authors?.slice(0, 2).join(', ')}
+              {data.authors?.length > 2 && ` +${data.authors.length - 2} more`}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <span className="font-medium text-gray-700">Year:</span>
+              <span className="text-gray-600 ml-1">{data.year || 'N/A'}</span>
+            </div>
+            <div>
+              <span className="font-medium text-gray-700">Citations:</span>
+              <span className="text-gray-600 ml-1">{data.citation_count || 0}</span>
             </div>
           </div>
 
           <div>
             <span className="font-medium text-gray-700">Journal:</span>
-            <div className="text-gray-600">{data.journal || 'Unknown'}</div>
-          </div>
-
-          <div className="flex justify-between">
-            <div>
-              <span className="font-medium text-gray-700">Year:</span>
-              <span className="text-gray-600 ml-1">{data.year || 'Unknown'}</span>
-            </div>
-            <div>
-              <span className="font-medium text-gray-700">Citations:</span>
-              <span className="text-gray-600 ml-1">{data.citation_count || 0}</span>
+            <div className="text-gray-600 truncate" title={data.journal || 'Unknown'}>
+              {data.journal || 'Unknown'}
             </div>
           </div>
 
@@ -448,30 +450,35 @@ export default function NetworkSidebar({
           </div>
         </div>
 
-        {/* Paper Abstract/Summary - ResearchRabbit Style */}
+        {/* Paper Abstract - Collapsible to save space */}
         {data.abstract && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <div className="text-xs font-medium text-gray-700 mb-2">Abstract</div>
-            <div className="text-xs text-gray-600 leading-relaxed">
-              {data.abstract}
-            </div>
+          <div className="mt-2">
+            <details className="group">
+              <summary className="cursor-pointer text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors select-none">
+                📄 Abstract ▼
+              </summary>
+              <div className="mt-1 p-2 bg-gray-50 rounded text-xs text-gray-600 leading-relaxed max-h-24 overflow-y-auto">
+                {data.abstract}
+              </div>
+            </details>
           </div>
         )}
 
-        {/* Action Buttons */}
-        <div className="mt-4 space-y-2">
+        {/* Quick Action Buttons - Compact */}
+        <div className="mt-2 flex gap-1">
           {data.url && (
             <a
               href={data.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="block w-full px-3 py-2 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 text-center"
+              className="flex-1 px-2 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 text-center transition-colors"
+              title="View Full Paper"
             >
-              View Full Paper
+              📄 View
             </a>
           )}
 
-          {/* Create Paper Column Button - ResearchRabbit Style */}
+          {/* Create Paper Column Button - Compact */}
           {showCreateColumnButton && onCreatePaperColumn && (
             <button
               onClick={() => {
@@ -482,27 +489,17 @@ export default function NetworkSidebar({
                   console.error('❌ No selected node for column creation');
                 }
               }}
-              className="w-full px-3 py-2 text-xs bg-green-600 text-white rounded hover:bg-green-700 font-medium transition-colors"
+              className="flex-1 px-2 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+              title="Create Paper Column"
             >
-              📄 Create Paper Column
+              ➕ Column
             </button>
           )}
-
-          <button
-            onClick={() => onNavigationChange('similar')}
-            className={`w-full px-3 py-2 text-xs rounded transition-colors ${
-              currentMode === 'similar'
-                ? 'bg-blue-100 text-blue-800 border border-blue-300'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            🔍 Find Similar Work
-          </button>
         </div>
       </div>
 
-      {/* ResearchRabbit-style Exploration Sections */}
-      <div className="flex-1 overflow-y-auto">
+      {/* ResearchRabbit-style Exploration Sections - Scrollable */}
+      <div className="flex-1 overflow-y-auto min-h-0" style={{ maxHeight: 'calc(100vh - 300px)' }}>
         {/* Explore Papers Section */}
         <div className="border-b border-gray-200">
           <div className="p-3 bg-gray-50">
