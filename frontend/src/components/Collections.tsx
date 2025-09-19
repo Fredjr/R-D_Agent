@@ -45,9 +45,21 @@ export default function Collections({ projectId, onRefresh }: CollectionsProps) 
   // Initial load and refresh on projectId change
   useEffect(() => {
     if (projectId) {
+      console.log('🔄 Collections component refreshing for projectId:', projectId);
       refreshCollections();
     }
   }, [projectId, refreshCollections]);
+
+  // Debug logging for collections state
+  useEffect(() => {
+    console.log('🔍 Collections component state:', {
+      projectId,
+      collectionsCount: collections.length,
+      collections: collections,
+      loading,
+      error
+    });
+  }, [collections, loading, error, projectId]);
 
   const handleCreateCollection = async (e: React.FormEvent) => {
     e.preventDefault();
