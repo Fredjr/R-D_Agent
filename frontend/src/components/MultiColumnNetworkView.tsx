@@ -4,6 +4,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import NetworkView from './NetworkView';
 import NetworkSidebar from './NetworkSidebar';
+import { ErrorBoundary } from './ErrorBoundary';
 
 interface NetworkNode {
   id: string;
@@ -276,15 +277,35 @@ export default function MultiColumnNetworkView({
           </div>
 
           <div className="flex-1 relative">
-            <NetworkView
-              ref={mainNetworkViewRef}
-              sourceType={sourceType}
-              sourceId={sourceId}
-              onNodeSelect={handleMainNodeSelect}
-              className="h-full"
-              disableInternalSidebar={true}
-              projectId={projectId}
-            />
+            <ErrorBoundary
+              fallback={
+                <div className="flex items-center justify-center h-full p-4 bg-red-50 border border-red-200 rounded">
+                  <div className="text-center">
+                    <p className="text-red-700 mb-2">Network view failed to load</p>
+                    <button
+                      onClick={() => window.location.reload()}
+                      className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                </div>
+              }
+              onError={(error, errorInfo) => {
+                console.error('❌ Main NetworkView Error:', error);
+                console.error('Error Info:', errorInfo);
+              }}
+            >
+              <NetworkView
+                ref={mainNetworkViewRef}
+                sourceType={sourceType}
+                sourceId={sourceId}
+                onNodeSelect={handleMainNodeSelect}
+                className="h-full"
+                disableInternalSidebar={true}
+                projectId={projectId}
+              />
+            </ErrorBoundary>
           </div>
           
           {/* Main Sidebar */}
@@ -294,22 +315,42 @@ export default function MultiColumnNetworkView({
                   <h3 className="text-sm font-semibold text-blue-800 mb-1">📄 Article Details</h3>
                   <p className="text-xs text-blue-600">Click options below to explore related research</p>
                 </div>
-              <NetworkSidebar
-                selectedNode={mainSelectedNode}
-                onClose={handleCloseMainSidebar}
-                onNavigationChange={(mode) => {
-                  console.log('Main navigation mode changed:', mode);
+              <ErrorBoundary
+                fallback={
+                  <div className="flex items-center justify-center h-full p-4 bg-red-50 border border-red-200 rounded">
+                    <div className="text-center">
+                      <p className="text-red-700 mb-2">Main sidebar failed to load</p>
+                      <button
+                        onClick={handleCloseMainSidebar}
+                        className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+                      >
+                        Close Sidebar
+                      </button>
+                    </div>
+                  </div>
+                }
+                onError={(error, errorInfo) => {
+                  console.error('❌ Main NetworkSidebar Error:', error);
+                  console.error('Error Info:', errorInfo);
                 }}
-                onAddToCollection={(pmid) => {
-                  console.log('Add to collection:', pmid);
-                }}
-                currentMode="default"
-                projectId={projectId || ''}
-                collections={[]}
-                onAddExplorationNodes={handleMainAddExplorationNodes}
-                onCreatePaperColumn={handleCreatePaperColumn}
-                showCreateColumnButton={true}
-              />
+              >
+                <NetworkSidebar
+                  selectedNode={mainSelectedNode}
+                  onClose={handleCloseMainSidebar}
+                  onNavigationChange={(mode) => {
+                    console.log('Main navigation mode changed:', mode);
+                  }}
+                  onAddToCollection={(pmid) => {
+                    console.log('Add to collection:', pmid);
+                  }}
+                  currentMode="default"
+                  projectId={projectId || ''}
+                  collections={[]}
+                  onAddExplorationNodes={handleMainAddExplorationNodes}
+                  onCreatePaperColumn={handleCreatePaperColumn}
+                  showCreateColumnButton={true}
+                />
+              </ErrorBoundary>
               </div>
             )}
         </div>
@@ -375,45 +416,85 @@ export default function MultiColumnNetworkView({
 
             {/* Column Network View */}
             <div className="flex-1 relative">
-              <NetworkView
-                ref={column.networkViewRef}
-                sourceType={column.sourceType}
-                sourceId={column.sourceId}
-                onNodeSelect={(node) => handleColumnNodeSelect(column.id, node)}
-                className="h-full"
-                forceNetworkType={column.networkType}
-                projectId={projectId}
-                articleMetadata={column.paper?.metadata ? {
-                  pmid: column.paper.metadata.pmid,
-                  title: column.paper.metadata.title,
-                  authors: column.paper.metadata.authors || [],
-                  journal: column.paper.metadata.journal || '',
-                  year: column.paper.metadata.year || new Date().getFullYear(),
-                  citation_count: column.paper.metadata.citation_count || 0
-                } : undefined}
-              />
+              <ErrorBoundary
+                fallback={
+                  <div className="flex items-center justify-center h-full p-4 bg-red-50 border border-red-200 rounded">
+                    <div className="text-center">
+                      <p className="text-red-700 mb-2">Column network failed to load</p>
+                      <button
+                        onClick={() => handleCloseColumn(column.id)}
+                        className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+                      >
+                        Remove Column
+                      </button>
+                    </div>
+                  </div>
+                }
+                onError={(error, errorInfo) => {
+                  console.error(`❌ Column ${column.id} NetworkView Error:`, error);
+                  console.error('Error Info:', errorInfo);
+                }}
+              >
+                <NetworkView
+                  ref={column.networkViewRef}
+                  sourceType={column.sourceType}
+                  sourceId={column.sourceId}
+                  onNodeSelect={(node) => handleColumnNodeSelect(column.id, node)}
+                  className="h-full"
+                  forceNetworkType={column.networkType}
+                  projectId={projectId}
+                  articleMetadata={column.paper?.metadata ? {
+                    pmid: column.paper.metadata.pmid,
+                    title: column.paper.metadata.title,
+                    authors: column.paper.metadata.authors || [],
+                    journal: column.paper.metadata.journal || '',
+                    year: column.paper.metadata.year || new Date().getFullYear(),
+                    citation_count: column.paper.metadata.citation_count || 0
+                  } : undefined}
+                />
+              </ErrorBoundary>
 
               {/* Column Sidebar */}
               {column.selectedNode && (
                 <div className="absolute top-0 right-0 w-64 h-full z-10 bg-white border-l border-gray-200">
-                  <NetworkSidebar
-                    selectedNode={column.selectedNode}
-                    onClose={() => handleColumnNodeSelect(column.id, null)}
-                    onNavigationChange={(mode) => {
-                      console.log(`Column ${column.id} navigation mode changed:`, mode);
-                    }}
-                    onAddToCollection={(pmid) => {
-                      console.log('Add to collection:', pmid);
-                    }}
-                    currentMode="default"
-                    projectId={projectId || ''}
-                    collections={[]}
-                    onAddExplorationNodes={(sourceNodeId, explorationResults, relationType) =>
-                      handleColumnAddExplorationNodes(column.id, sourceNodeId, explorationResults, relationType)
+                  <ErrorBoundary
+                    fallback={
+                      <div className="flex items-center justify-center h-full p-4 bg-red-50 border border-red-200 rounded">
+                        <div className="text-center">
+                          <p className="text-red-700 mb-2">Sidebar failed to load</p>
+                          <button
+                            onClick={() => handleColumnNodeSelect(column.id, null)}
+                            className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+                          >
+                            Close Sidebar
+                          </button>
+                        </div>
+                      </div>
                     }
-                    onCreatePaperColumn={handleCreatePaperColumn}
-                    showCreateColumnButton={true}
-                  />
+                    onError={(error, errorInfo) => {
+                      console.error(`❌ Column ${column.id} NetworkSidebar Error:`, error);
+                      console.error('Error Info:', errorInfo);
+                    }}
+                  >
+                    <NetworkSidebar
+                      selectedNode={column.selectedNode}
+                      onClose={() => handleColumnNodeSelect(column.id, null)}
+                      onNavigationChange={(mode) => {
+                        console.log(`Column ${column.id} navigation mode changed:`, mode);
+                      }}
+                      onAddToCollection={(pmid) => {
+                        console.log('Add to collection:', pmid);
+                      }}
+                      currentMode="default"
+                      projectId={projectId || ''}
+                      collections={[]}
+                      onAddExplorationNodes={(sourceNodeId, explorationResults, relationType) =>
+                        handleColumnAddExplorationNodes(column.id, sourceNodeId, explorationResults, relationType)
+                      }
+                      onCreatePaperColumn={handleCreatePaperColumn}
+                      showCreateColumnButton={true}
+                    />
+                  </ErrorBoundary>
                 </div>
               )}
             </div>

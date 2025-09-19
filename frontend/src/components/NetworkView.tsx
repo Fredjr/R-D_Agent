@@ -344,10 +344,10 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       // Fetch citations and references using PubMed APIs
       const [citationsResponse, referencesResponse] = await Promise.all([
         fetch(`/api/proxy/pubmed/citations?pmid=${pmid}&type=citations&limit=10`, {
-          headers: { 'User-ID': user?.email || 'default_user' }
+          headers: { 'User-ID': user?.user_id || 'default_user' }
         }),
         fetch(`/api/proxy/pubmed/references?pmid=${pmid}&limit=10`, {
-          headers: { 'User-ID': user?.email || 'default_user' }
+          headers: { 'User-ID': user?.user_id || 'default_user' }
         })
       ]);
 
@@ -621,7 +621,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
       const response = await fetch(endpoint, {
         headers: {
-          'User-ID': user?.email || 'default_user',
+          'User-ID': user?.user_id || 'default_user',
         },
       });
 
@@ -646,7 +646,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             : `/api/proxy/articles/${sourceId}/similar-network`;
 
           const fallbackResponse = await fetch(fallbackEndpoint, {
-            headers: { 'User-ID': user?.email || 'default_user' }
+            headers: { 'User-ID': user?.user_id || 'default_user' }
           });
 
           if (fallbackResponse.ok) {
@@ -698,7 +698,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         // Use PubMed API directly for demo data with a real, well-cited paper
         const demoResponse = await fetch('/api/proxy/pubmed/network?pmid=33462507&type=citations&limit=8', {
           headers: {
-            'User-ID': user?.email || 'default_user',
+            'User-ID': user?.user_id || 'default_user',
           },
         });
         if (demoResponse.ok) {
@@ -728,7 +728,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         console.log('Article similar-network empty/single node, trying PubMed citations...');
         const fallbackResponse = await fetch(`/api/proxy/pubmed/network?pmid=${sourceId}&type=citations&limit=12`, {
           headers: {
-            'User-ID': user?.email || 'default_user',
+            'User-ID': user?.user_id || 'default_user',
           },
         });
         if (fallbackResponse.ok) {
@@ -799,7 +799,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         console.log('Creating final demo fallback network with real PubMed data...');
         const demoResponse = await fetch('/api/proxy/pubmed/network?pmid=33462507&type=citations&limit=10', {
           headers: {
-            'User-ID': user?.email || 'default_user',
+            'User-ID': user?.user_id || 'default_user',
           },
         });
         if (demoResponse.ok) {
@@ -927,18 +927,13 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
     }
   }, [sourceType, sourceId, navigationMode, user]);
 
-  useEffect(() => {
-    fetchNetworkData();
-    fetchCollections();
-  }, [fetchNetworkData]);
-
   // Fetch collections for sidebar
   const fetchCollections = useCallback(async () => {
     if (sourceType === 'project') {
       try {
         const response = await fetch(`/api/proxy/projects/${sourceId}/collections`, {
           headers: {
-            'User-ID': user?.email || 'default_user',
+            'User-ID': user?.user_id || 'default_user',
           },
         });
         if (response.ok) {
@@ -950,6 +945,11 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       }
     }
   }, [sourceType, sourceId, user]);
+
+  useEffect(() => {
+    fetchNetworkData();
+    fetchCollections();
+  }, [fetchNetworkData, fetchCollections]);
 
   // Handle navigation mode changes
   const handleNavigationChange = useCallback((newMode: string, newSourceId?: string) => {
