@@ -690,8 +690,9 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       // DEMO FALLBACK: Only if project/collection network is completely empty (0 nodes)
       // Skip fallback for hybrid collection networks that have real data
       if (sourceType !== 'article' && (!data.nodes || data.nodes.length === 0) && !(data.metadata as any)?.has_real_data) {
-        console.log('Project/collection network completely empty, loading demo article network...');
-        const demoResponse = await fetch('/api/proxy/articles/33462507/citations-network?limit=5', {
+        console.log('Project/collection network completely empty, loading demo PubMed network...');
+        // Use PubMed API directly for demo data with a real, well-cited paper
+        const demoResponse = await fetch('/api/proxy/pubmed/network?pmid=33462507&type=citations&limit=8', {
           headers: {
             'User-ID': user?.email || 'default_user',
           },
@@ -703,9 +704,9 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             demoData.metadata = {
               ...demoData.metadata,
               demo_mode: true,
-              demo_message: `Demo: Sample citation network (add articles to your ${sourceType} to see real data)`
+              demo_message: `Demo: Real citation network from PubMed (add articles to your ${sourceType} to see your data)`
             };
-            console.log('🔧 Using demo data, will convert to React Flow format');
+            console.log('🔧 Using real PubMed demo data, will convert to React Flow format');
             data = demoData;
           }
         }
@@ -718,17 +719,17 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         // Let it fall through to the React Flow conversion below
       }
 
-      // ARTICLE NETWORK FALLBACK: If article network is empty or has only 1 node, try citations-network
+      // ARTICLE NETWORK FALLBACK: If article network is empty or has only 1 node, try PubMed citations
       if (sourceType === 'article' && (!data.nodes || data.nodes.length <= 1)) {
-        console.log('Article similar-network empty/single node, trying citations-network...');
-        const fallbackResponse = await fetch(`/api/proxy/articles/${sourceId}/citations-network?limit=10`, {
+        console.log('Article similar-network empty/single node, trying PubMed citations...');
+        const fallbackResponse = await fetch(`/api/proxy/pubmed/network?pmid=${sourceId}&type=citations&limit=12`, {
           headers: {
             'User-ID': user?.email || 'default_user',
           },
         });
         if (fallbackResponse.ok) {
           const fallbackData = await fallbackResponse.json();
-          console.log('🔄 Article citations-network fallback:', {
+          console.log('🔄 Article PubMed citations fallback:', {
             nodesCount: fallbackData.nodes?.length || 0,
             edgesCount: fallbackData.edges?.length || 0
           });
@@ -737,9 +738,9 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             fallbackData.metadata = {
               ...fallbackData.metadata,
               fallback_mode: true,
-              fallback_message: `Showing citation network (similar articles not found)`
+              fallback_message: `Showing real citation network from PubMed (similar articles not found)`
             };
-            console.log('🔧 Using fallback data, will convert to React Flow format');
+            console.log('🔧 Using PubMed fallback data, will convert to React Flow format');
             data = fallbackData;
           }
         }
@@ -791,8 +792,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         data = syntheticNetwork;
 
         // FINAL DEMO FALLBACK: If we can't create article-specific network, show demo
-        console.log('Creating final demo fallback network...');
-        const demoResponse = await fetch('/api/proxy/articles/33462507/citations-network?limit=8', {
+        console.log('Creating final demo fallback network with real PubMed data...');
+        const demoResponse = await fetch('/api/proxy/pubmed/network?pmid=33462507&type=citations&limit=10', {
           headers: {
             'User-ID': user?.email || 'default_user',
           },
@@ -808,9 +809,9 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             demoData.metadata = {
               ...demoData.metadata,
               demo_mode: true,
-              demo_message: `Demo: Multi-column citation network (original article data not available)`
+              demo_message: `Demo: Real PubMed citation network (original article data not available)`
             };
-            console.log('🔧 Using final demo fallback, will convert to React Flow format');
+            console.log('🔧 Using final PubMed demo fallback, will convert to React Flow format');
             data = demoData;
           }
         }
