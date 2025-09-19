@@ -36,17 +36,21 @@ function parseArticleXML(xmlText: string): PubMedArticle[] {
   const articles: PubMedArticle[] = [];
 
   try {
-    // Simple regex-based XML parsing for PubMed data
+    // Enhanced regex-based XML parsing for PubMed data
     const articleMatches = xmlText.match(/<PubmedArticle>[\s\S]*?<\/PubmedArticle>/g) || [];
 
+    console.log(`🔍 Found ${articleMatches.length} PubmedArticle elements in XML`);
+
     for (const articleXML of articleMatches) {
-      // Extract PMID
+      // Extract PMID - handle both Version="1" and without version
       const pmidMatch = articleXML.match(/<PMID[^>]*>(\d+)<\/PMID>/);
       const pmid = pmidMatch ? pmidMatch[1] : '';
 
-      // Extract title
+      console.log(`📄 Processing article with PMID: ${pmid}`);
+
+      // Extract title - handle HTML entities and nested tags
       const titleMatch = articleXML.match(/<ArticleTitle>([\s\S]*?)<\/ArticleTitle>/);
-      const title = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, '').trim() : '';
+      const title = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, '').replace(/&[^;]+;/g, '').trim() : '';
 
       // Extract authors
       const authors: string[] = [];
@@ -78,6 +82,7 @@ function parseArticleXML(xmlText: string): PubMedArticle[] {
       const doi = doiMatch ? doiMatch[1] : '';
 
       if (pmid && title) {
+        console.log(`✅ Successfully parsed article: ${pmid} - ${title.substring(0, 50)}...`);
         articles.push({
           pmid,
           title,
@@ -88,6 +93,8 @@ function parseArticleXML(xmlText: string): PubMedArticle[] {
           abstract,
           doi
         });
+      } else {
+        console.log(`❌ Failed to parse article - PMID: ${pmid}, Title: ${title ? title.substring(0, 50) + '...' : 'MISSING'}`);
       }
     }
   } catch (error) {
