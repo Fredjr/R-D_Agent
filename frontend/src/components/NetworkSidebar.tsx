@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useGlobalCollectionSync } from '../hooks/useGlobalCollectionSync';
 
 interface NetworkNode {
   id: string;
@@ -64,6 +65,10 @@ export default function NetworkSidebar({
     collectionsCount: collections?.length || 0
   });
   const { user } = useAuth();
+
+  // Global collection sync for broadcasting article saves
+  const { broadcastArticleAdded } = useGlobalCollectionSync(projectId || '');
+
   const [isLoading, setIsLoading] = useState(false);
   const [references, setReferences] = useState<any[]>([]);
   const [citations, setCitations] = useState<any[]>([]);
@@ -356,6 +361,9 @@ export default function NetworkSidebar({
       const result = await response.json();
 
       if (result.success) {
+        // Broadcast the article addition to sync across tabs
+        broadcastArticleAdded(collectionId);
+
         alert('✅ Article saved to collection successfully!');
         setShowSaveToCollectionModal(false);
         setSelectedArticleToSave(null);
