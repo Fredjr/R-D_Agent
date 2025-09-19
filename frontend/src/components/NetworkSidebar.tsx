@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGlobalCollectionSync } from '../hooks/useGlobalCollectionSync';
 
@@ -103,14 +103,7 @@ export default function NetworkSidebar({
     };
   }, []);
 
-  // Fetch references and citations when node is selected
-  useEffect(() => {
-    if (selectedNode?.metadata.pmid) {
-      fetchPaperDetails(selectedNode.metadata.pmid);
-    }
-  }, [selectedNode]);
-
-  const fetchPaperDetails = async (pmid: string) => {
+  const fetchPaperDetails = useCallback(async (pmid: string) => {
     setIsLoading(true);
     try {
       console.log(`🔍 NetworkSidebar fetching paper details for PMID: ${pmid}`);
@@ -151,7 +144,14 @@ export default function NetworkSidebar({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
+
+  // Fetch references and citations when node is selected
+  useEffect(() => {
+    if (selectedNode?.metadata.pmid) {
+      fetchPaperDetails(selectedNode.metadata.pmid);
+    }
+  }, [selectedNode, fetchPaperDetails]);
 
   const handleAddToCollection = async () => {
     if (!selectedNode || !selectedCollection) return;
