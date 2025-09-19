@@ -88,6 +88,16 @@ export default function NetworkSidebar({
   const [explorationLoading, setExplorationLoading] = useState(false);
   const [explorationMode, setExplorationMode] = useState<string>('');
 
+  // Audit trail state to track exploration path
+  const [explorationPath, setExplorationPath] = useState<Array<{
+    pmid: string;
+    title: string;
+    explorationType: string;
+    timestamp: Date;
+    resultCount: number;
+    sourceNode: string;
+  }>>([]);
+
   // Collection save functionality
   const [showSaveToCollectionModal, setShowSaveToCollectionModal] = useState(false);
   const [selectedArticleToSave, setSelectedArticleToSave] = useState<any>(null);
@@ -212,15 +222,17 @@ export default function NetworkSidebar({
         case 'papers':
           switch (mode) {
             case 'similar':
-              // Use the robust similar articles endpoint with fallback mock data
-              endpoint = `/api/proxy/articles/${pmid}/similar?limit=20`;
-              usePubMed = false;
+              // Use PubMed eLink API for real similar articles
+              endpoint = `/api/proxy/pubmed/citations?pmid=${pmid}&type=similar&limit=20`;
+              usePubMed = true;
               break;
             case 'earlier':
+              // Use PubMed eLink API for real reference articles
               endpoint = `/api/proxy/pubmed/references?pmid=${pmid}&limit=20`;
               usePubMed = true;
               break;
             case 'later':
+              // Use PubMed eLink API for real citing articles
               endpoint = `/api/proxy/pubmed/citations?pmid=${pmid}&type=citations&limit=20`;
               usePubMed = true;
               break;
@@ -228,24 +240,23 @@ export default function NetworkSidebar({
           break;
         case 'people':
           if (mode === 'authors') {
-            endpoint = `/api/proxy/authors/search`;
-            // Use authors from metadata, with fallback to sample authors
-            const authors = selectedNode?.metadata?.authors || ['Sample Author'];
-            params.append('authors', authors.join(','));
-            params.append('limit', '10');
-            console.log('🔍 Authors search with:', { authors, endpoint });
+            // Get real author information from the selected article
+            endpoint = `/api/proxy/articles/${pmid}/authors?include_profiles=true`;
+            usePubMed = false; // This uses our backend which fetches real PubMed data
+            console.log('🔍 Real authors data for PMID:', { pmid, endpoint });
           } else if (mode === 'suggested') {
-            endpoint = `/api/proxy/authors/suggested`;
-            // Use paper metadata for suggested authors
-            params.append('pmid', pmid || 'unknown');
-            params.append('limit', '10');
-            console.log('🔍 Suggested authors search with:', { pmid, endpoint });
+            // Use PubMed eLink to find related authors through similar articles
+            endpoint = `/api/proxy/pubmed/citations?pmid=${pmid}&type=similar&limit=10`;
+            usePubMed = true;
+            console.log('🔍 Suggested authors via similar articles for PMID:', { pmid, endpoint });
           }
           break;
         case 'content':
           if (mode === 'linked') {
-            endpoint = `/api/proxy/articles/${selectedNode?.metadata.pmid}/related`;
-            params.append('limit', '10');
+            // Use PubMed eLink to find related articles (comprehensive linkage)
+            endpoint = `/api/proxy/pubmed/network?pmid=${pmid}&type=mixed&limit=15`;
+            usePubMed = true;
+            console.log('🔍 Real linked content via PubMed network for PMID:', { pmid, endpoint });
           }
           break;
       }
@@ -290,6 +301,20 @@ export default function NetworkSidebar({
 
           // Set results with context for better user feedback
           setExplorationResults(results);
+
+          // 📋 AUDIT TRAIL: Track exploration path for research transparency
+          const explorationType = `${section}-${mode}`;
+          const auditEntry = {
+            pmid: pmid || 'unknown',
+            title: selectedNode?.label || 'Unknown Article',
+            explorationType,
+            timestamp: new Date(),
+            resultCount: results.length,
+            sourceNode: selectedNode?.id || 'unknown'
+          };
+
+          setExplorationPath(prev => [...prev, auditEntry]);
+          console.log('📋 Audit trail updated:', auditEntry);
 
           // Store additional context for user feedback
           if (results.length === 0) {
@@ -561,6 +586,41 @@ export default function NetworkSidebar({
           )}
         </div>
       </div>
+
+      {/* 📋 AUDIT TRAIL: Research Path Tracking */}
+      {explorationPath.length > 0 && (
+        <div className="p-3 border-b border-gray-200 bg-blue-50">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+              <span className="text-white text-xs">📋</span>
+            </div>
+            <h4 className="text-sm font-medium text-blue-800">Research Path</h4>
+          </div>
+          <div className="space-y-1 max-h-32 overflow-y-auto">
+            {explorationPath.slice(-5).map((entry, index) => (
+              <div key={index} className="text-xs bg-white rounded p-2 border border-blue-200">
+                <div className="font-medium text-blue-900 truncate" title={entry.title}>
+                  {entry.title}
+                </div>
+                <div className="text-blue-600 mt-1">
+                  <span className="font-mono bg-blue-100 px-1 rounded">{entry.pmid}</span>
+                  <span className="mx-1">→</span>
+                  <span className="capitalize">{entry.explorationType.replace('-', ' ')}</span>
+                  <span className="mx-1">({entry.resultCount} results)</span>
+                </div>
+                <div className="text-blue-500 text-xs mt-1">
+                  {entry.timestamp.toLocaleTimeString()}
+                </div>
+              </div>
+            ))}
+          </div>
+          {explorationPath.length > 5 && (
+            <div className="text-xs text-blue-600 mt-1 text-center">
+              Showing last 5 of {explorationPath.length} explorations
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ResearchRabbit-style Exploration Sections - Scrollable */}
       <div className="flex-1 overflow-y-auto min-h-0" style={{ maxHeight: 'calc(100vh - 300px)' }}>
