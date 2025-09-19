@@ -28,7 +28,7 @@ import { useResponsive, MobileSidebar } from './MobileOptimizations';
 import { useNetworkShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { SourceBadge, NodeSourceOverlay } from './DataSourceIndicators';
 
-interface NetworkNode {
+export interface NetworkNode {
   id: string;
   label: string;
   size: number;
@@ -42,6 +42,10 @@ interface NetworkNode {
     citation_count: number;
     url: string;
     abstract?: string;
+    // Optional exploration properties for ResearchRabbit-style columns
+    explorationType?: string;
+    explorationResults?: any[];
+    explorationTimestamp?: string;
   };
 }
 
@@ -1416,8 +1420,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
                 year: selectedNode.metadata.year,
                 citation_count: selectedNode.metadata.citation_count,
                 url: selectedNode.metadata.url,
-                abstract: selectedNode.metadata.abstract,
-                node_type: 'article'
+                abstract: selectedNode.metadata.abstract
               }
             }}
             onNavigationChange={handleSidebarNavigationChange}
