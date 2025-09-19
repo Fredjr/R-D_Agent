@@ -27,6 +27,10 @@ interface PaperColumn {
   sourceId: string;
   selectedNode: NetworkNode | null;
   networkViewRef?: React.RefObject<any>;
+  // New fields for flexible network types
+  networkType: 'citations' | 'similar' | 'references';
+  explorationMode: 'focused' | 'broad' | 'timeline';
+  title?: string; // Custom column title
 }
 
 interface MultiColumnNetworkViewProps {
@@ -50,6 +54,11 @@ export default function MultiColumnNetworkView({
   const [columns, setColumns] = useState<PaperColumn[]>([]);
   const [mainSelectedNode, setMainSelectedNode] = useState<NetworkNode | null>(null);
   const mainNetworkViewRef = useRef<any>(null);
+
+  // Network type selection state
+  const [defaultNetworkType, setDefaultNetworkType] = useState<'citations' | 'similar' | 'references'>('citations');
+  const [defaultExplorationMode, setDefaultExplorationMode] = useState<'focused' | 'broad' | 'timeline'>('focused');
+  const [showNetworkTypeSelector, setShowNetworkTypeSelector] = useState(false);
 
   console.log('🔍 MultiColumnNetworkView rendered with:', { sourceType, sourceId, projectId, columnsCount: columns.length });
 
@@ -106,14 +115,17 @@ export default function MultiColumnNetworkView({
     }
 
     try {
-      // Use article sourceType - NetworkView will try similar-network then fallback to citations-network
+      // Use article sourceType with flexible network type
       const newColumn: PaperColumn = {
         id: `column-${paper.data.pmid}-${Date.now()}`,
         paper,
         sourceType: 'article',
         sourceId: paper.data.pmid,
         selectedNode: null,
-        networkViewRef: React.createRef()
+        networkViewRef: React.createRef(),
+        networkType: defaultNetworkType,
+        explorationMode: defaultExplorationMode,
+        title: `${defaultNetworkType.charAt(0).toUpperCase() + defaultNetworkType.slice(1)} of ${paper.data.title.substring(0, 30)}...`
       };
 
       console.log('🔍 Column will use NetworkView with:', {
@@ -223,15 +235,47 @@ export default function MultiColumnNetworkView({
         className="flex-shrink-0 border-r border-gray-200 relative"
         style={{ width: mainViewWidth }}
       >
-        <div className="h-full relative">
-          <NetworkView
-            ref={mainNetworkViewRef}
-            sourceType={sourceType}
-            sourceId={sourceId}
-            onNodeSelect={handleMainNodeSelect}
-            className="h-full"
-            disableInternalSidebar={true}
-          />
+        <div className="h-full relative flex flex-col">
+          {/* Network Type Selector */}
+          <div className="flex-shrink-0 bg-gray-50 border-b border-gray-200 p-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-gray-700">New Columns:</span>
+                <select
+                  value={defaultNetworkType}
+                  onChange={(e) => setDefaultNetworkType(e.target.value as any)}
+                  className="text-xs border border-gray-300 rounded px-2 py-1 bg-white"
+                >
+                  <option value="citations">Citations</option>
+                  <option value="similar">Similar Papers</option>
+                  <option value="references">References</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-gray-700">Mode:</span>
+                <select
+                  value={defaultExplorationMode}
+                  onChange={(e) => setDefaultExplorationMode(e.target.value as any)}
+                  className="text-xs border border-gray-300 rounded px-2 py-1 bg-white"
+                >
+                  <option value="focused">Focused</option>
+                  <option value="broad">Broad</option>
+                  <option value="timeline">Timeline</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 relative">
+            <NetworkView
+              ref={mainNetworkViewRef}
+              sourceType={sourceType}
+              sourceId={sourceId}
+              onNodeSelect={handleMainNodeSelect}
+              className="h-full"
+              disableInternalSidebar={true}
+            />
+          </div>
           
           {/* Main Sidebar */}
           {mainSelectedNode && (
@@ -272,12 +316,36 @@ export default function MultiColumnNetworkView({
             {/* Column Header - ResearchRabbit Style */}
             <div className="bg-gray-50 border-b border-gray-200 p-3 flex justify-between items-start">
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-gray-900 mb-1">Similar Work</div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-sm font-semibold text-gray-900">
+                    {column.title || `${column.networkType.charAt(0).toUpperCase() + column.networkType.slice(1)} Network`}
+                  </div>
+                  <select
+                    value={column.networkType}
+                    onChange={(e) => {
+                      const newNetworkType = e.target.value as 'citations' | 'similar' | 'references';
+                      setColumns(prev => prev.map(col =>
+                        col.id === column.id
+                          ? {
+                              ...col,
+                              networkType: newNetworkType,
+                              title: `${newNetworkType.charAt(0).toUpperCase() + newNetworkType.slice(1)} of ${col.paper.data.title.substring(0, 30)}...`
+                            }
+                          : col
+                      ));
+                    }}
+                    className="text-xs border border-gray-300 rounded px-1 py-0.5 bg-white"
+                  >
+                    <option value="citations">Citations</option>
+                    <option value="similar">Similar</option>
+                    <option value="references">References</option>
+                  </select>
+                </div>
                 <div className="text-xs text-gray-600 mb-2">
-                  Connections between your collection and 20 papers
+                  Exploring {column.networkType} for selected paper
                 </div>
                 <div className="bg-white border border-gray-200 rounded p-2">
-                  <div className="text-xs font-medium text-gray-900 mb-1">1 selected paper</div>
+                  <div className="text-xs font-medium text-gray-900 mb-1">Source Paper</div>
                   <h3 className="text-xs text-gray-700 leading-tight truncate">
                     {column.paper.data.title}
                   </h3>
@@ -303,7 +371,7 @@ export default function MultiColumnNetworkView({
                 sourceId={column.sourceId}
                 onNodeSelect={(node) => handleColumnNodeSelect(column.id, node)}
                 className="h-full"
-                forceNetworkType="citations"
+                forceNetworkType={column.networkType}
                 articleMetadata={column.paper?.data ? {
                   pmid: column.paper.data.pmid,
                   title: column.paper.data.title,
