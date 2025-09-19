@@ -21,6 +21,12 @@ import {
 import '@xyflow/react/dist/style.css';
 import NetworkSidebar from './NetworkSidebar';
 import TimelineView from './TimelineView';
+import { useLazyNetworkLoading } from '@/hooks/useLazyNetworkLoading';
+import { pubmedCache } from '@/utils/pubmedCache';
+import { NetworkLoadingProgress, LoadingOverlay, useLoadingState } from './LoadingStates';
+import { useResponsive, MobileSidebar } from './MobileOptimizations';
+import { useNetworkShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { SourceBadge, NodeSourceOverlay } from './DataSourceIndicators';
 
 interface NetworkNode {
   id: string;

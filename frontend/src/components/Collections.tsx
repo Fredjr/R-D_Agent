@@ -7,6 +7,9 @@ import { useGlobalCollectionSync, type Collection } from '@/hooks/useGlobalColle
 import NetworkViewWithSidebar from './NetworkViewWithSidebar';
 import MultiColumnNetworkView from './MultiColumnNetworkView';
 import CollectionArticles from './CollectionArticles';
+import { useResponsive, MobileCollectionGrid, MobileTabs, MobileFAB } from './MobileOptimizations';
+import { CollectionLoadingSkeleton, InlineLoading } from './LoadingStates';
+import { SourceBadge } from './DataSourceIndicators';
 
 interface CollectionsProps {
   projectId: string;
