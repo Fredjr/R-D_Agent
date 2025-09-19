@@ -14,9 +14,16 @@ interface Article {
   article_year: number;
   notes?: string;
   added_at: string;
-  source_type: string;
+  source_type: 'report' | 'deep_dive' | 'pubmed_exploration';
   source_report_id?: string;
   source_analysis_id?: string;
+  // New fields for PubMed exploration sources
+  pubmed_source_data?: {
+    discovery_context: 'similar' | 'citations' | 'references' | 'authors';
+    source_article_pmid?: string;
+    source_article_title?: string;
+    exploration_session_id?: string;
+  };
   added_by: string;
 }
 
@@ -160,6 +167,23 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
                       )}
                     </div>
                     
+                    {/* PubMed Discovery Context */}
+                    {article.source_type === 'pubmed_exploration' && article.pubmed_source_data && (
+                      <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-green-600 font-medium text-sm">🔍 PubMed Discovery</span>
+                          <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                            {article.pubmed_source_data.discovery_context}
+                          </span>
+                        </div>
+                        {article.pubmed_source_data.source_article_title && (
+                          <div className="text-xs text-green-600">
+                            <span className="font-medium">Discovered from:</span> {article.pubmed_source_data.source_article_title.substring(0, 80)}...
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {article.notes && (
                       <div className="mt-3 p-3 bg-gray-50 rounded-lg">
                         <span className="font-medium text-gray-700">Notes:</span>
@@ -173,10 +197,23 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
                   <div className="text-xs text-gray-500">
                     Added {new Date(article.added_at).toLocaleDateString()}
                   </div>
-                  <div className="mt-2">
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  <div className="mt-2 space-y-1">
+                    <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                      article.source_type === 'pubmed_exploration'
+                        ? 'bg-green-100 text-green-800'
+                        : article.source_type === 'report'
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-purple-100 text-purple-800'
+                    }`}>
+                      {article.source_type === 'pubmed_exploration'
+                        ? '🧬 PubMed'
+                        : article.source_type === 'report'
+                        ? '📄 Report'
+                        : '🔬 Analysis'}
+                    </div>
+                    <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                       🔍 Click to Explore
-                    </span>
+                    </div>
                   </div>
                 </div>
               </div>

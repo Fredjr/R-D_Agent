@@ -77,6 +77,11 @@ export default function NetworkSidebar({
   const [explorationLoading, setExplorationLoading] = useState(false);
   const [explorationMode, setExplorationMode] = useState<string>('');
 
+  // Collection save functionality
+  const [showSaveToCollectionModal, setShowSaveToCollectionModal] = useState(false);
+  const [selectedArticleToSave, setSelectedArticleToSave] = useState<any>(null);
+  const [savingToCollection, setSavingToCollection] = useState(false);
+
   // Fetch references and citations when node is selected
   useEffect(() => {
     if (selectedNode?.data.pmid) {
@@ -319,6 +324,54 @@ export default function NetworkSidebar({
     }
   };
 
+  // Handle save to collection for PubMed articles
+  const handleSaveToCollection = (article: any) => {
+    setSelectedArticleToSave({
+      ...article,
+      discovery_context: explorationMode,
+      source_article_pmid: selectedNode?.data.pmid,
+      source_article_title: selectedNode?.data.title,
+      exploration_session_id: `session_${Date.now()}`
+    });
+    setShowSaveToCollectionModal(true);
+  };
+
+  const handleConfirmSaveToCollection = async (collectionId: string) => {
+    if (!selectedArticleToSave || !projectId) return;
+
+    setSavingToCollection(true);
+    try {
+      const response = await fetch(`/api/proxy/collections/${collectionId}/pubmed-articles`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user?.user_id || 'default_user'
+        },
+        body: JSON.stringify({
+          article: selectedArticleToSave,
+          projectId: projectId
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert('✅ Article saved to collection successfully!');
+        setShowSaveToCollectionModal(false);
+        setSelectedArticleToSave(null);
+      } else if (result.duplicate) {
+        alert('⚠️ This article is already in the collection.');
+      } else {
+        alert(`❌ Failed to save article: ${result.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error saving article to collection:', error);
+      alert('❌ Failed to save article to collection. Please try again.');
+    } finally {
+      setSavingToCollection(false);
+    }
+  };
+
   if (!selectedNode) {
     return (
       <div className="w-80 bg-white border-l border-gray-200 p-4">
@@ -551,18 +604,46 @@ export default function NetworkSidebar({
                   {explorationResults.map((paper, index) => (
                     <div
                       key={index}
-                      onClick={() => handleExplorationPaperClick(paper)}
-                      className="p-2 bg-white rounded border border-gray-200 hover:border-blue-300 hover:bg-blue-50 cursor-pointer transition-colors"
+                      className="p-2 bg-white rounded border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors"
                     >
-                      <div className="font-medium text-xs text-gray-900 truncate">
-                        {paper.title}
+                      <div
+                        onClick={() => handleExplorationPaperClick(paper)}
+                        className="cursor-pointer"
+                      >
+                        <div className="font-medium text-xs text-gray-900 truncate">
+                          {paper.title}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {paper.authors?.slice(0, 2).join(', ')}
+                          {paper.authors?.length > 2 && ` +${paper.authors.length - 2} more`}
+                        </div>
+                        <div className="text-xs text-gray-400 mt-1">
+                          {paper.year} • {paper.citation_count || 0} citations
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {paper.authors?.slice(0, 2).join(', ')}
-                        {paper.authors?.length > 2 && ` +${paper.authors.length - 2} more`}
-                      </div>
-                      <div className="text-xs text-gray-400 mt-1">
-                        {paper.year} • {paper.citation_count || 0} citations
+
+                      {/* Action buttons */}
+                      <div className="flex gap-1 mt-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleExplorationPaperClick(paper);
+                          }}
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs font-medium transition-colors"
+                        >
+                          Explore
+                        </button>
+                        {projectId && collections.length > 0 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSaveToCollection(paper);
+                            }}
+                            className="flex-1 bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs font-medium transition-colors"
+                          >
+                            Save
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -609,6 +690,67 @@ export default function NetworkSidebar({
       {isLoading && (
         <div className="p-4 text-center">
           <div className="text-xs text-gray-500">Loading paper details...</div>
+        </div>
+      )}
+
+      {/* Save to Collection Modal */}
+      {showSaveToCollectionModal && selectedArticleToSave && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 max-w-90vw">
+            <h3 className="text-lg font-semibold mb-4">Save Article to Collection</h3>
+
+            <div className="mb-4 p-3 bg-gray-50 rounded">
+              <div className="font-medium text-sm text-gray-900 mb-1">
+                {selectedArticleToSave.title}
+              </div>
+              <div className="text-xs text-gray-500">
+                {selectedArticleToSave.authors?.slice(0, 2).join(', ')}
+                {selectedArticleToSave.authors?.length > 2 && ` +${selectedArticleToSave.authors.length - 2} more`}
+              </div>
+              <div className="text-xs text-gray-400 mt-1">
+                PMID: {selectedArticleToSave.pmid} • {selectedArticleToSave.year}
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select Collection:
+              </label>
+              <select
+                value={selectedCollection}
+                onChange={(e) => setSelectedCollection(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Choose a collection...</option>
+                {collections.map((collection) => (
+                  <option key={collection.collection_id} value={collection.collection_id}>
+                    {collection.collection_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowSaveToCollectionModal(false);
+                  setSelectedArticleToSave(null);
+                  setSelectedCollection('');
+                }}
+                className="flex-1 px-4 py-2 text-gray-700 bg-gray-200 rounded hover:bg-gray-300 transition-colors"
+                disabled={savingToCollection}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleConfirmSaveToCollection(selectedCollection)}
+                disabled={!selectedCollection || savingToCollection}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+              >
+                {savingToCollection ? 'Saving...' : 'Save Article'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
