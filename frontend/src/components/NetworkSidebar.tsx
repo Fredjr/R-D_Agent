@@ -1,21 +1,24 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGlobalCollectionSync } from '../hooks/useGlobalCollectionSync';
 
 interface NetworkNode {
   id: string;
-  data: {
+  label: string;
+  size: number;
+  color: string;
+  metadata: {
     pmid: string;
     title: string;
     authors: string[];
     journal: string;
     year: number;
     citation_count: number;
-    node_type: string;
+    url: string;
     abstract?: string;
-    url?: string;
+    node_type: string;
   };
 }
 
@@ -69,6 +72,9 @@ export default function NetworkSidebar({
   // Global collection sync for broadcasting article saves
   const { broadcastArticleAdded } = useGlobalCollectionSync(projectId || '');
 
+  // Timeout management for cleanup
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const [isLoading, setIsLoading] = useState(false);
   const [references, setReferences] = useState<any[]>([]);
   const [citations, setCitations] = useState<any[]>([]);
@@ -87,10 +93,20 @@ export default function NetworkSidebar({
   const [selectedArticleToSave, setSelectedArticleToSave] = useState<any>(null);
   const [savingToCollection, setSavingToCollection] = useState(false);
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, []);
+
   // Fetch references and citations when node is selected
   useEffect(() => {
-    if (selectedNode?.data.pmid) {
-      fetchPaperDetails(selectedNode.data.pmid);
+    if (selectedNode?.metadata.pmid) {
+      fetchPaperDetails(selectedNode.metadata.pmid);
     }
   }, [selectedNode]);
 
@@ -148,17 +164,17 @@ export default function NetworkSidebar({
           'User-ID': user?.user_id || 'default_user'
         },
         body: JSON.stringify({
-          pmid: selectedNode.data.pmid,
-          title: selectedNode.data.title,
-          authors: selectedNode.data.authors,
-          journal: selectedNode.data.journal,
-          year: selectedNode.data.year,
+          pmid: selectedNode.metadata.pmid,
+          title: selectedNode.metadata.title,
+          authors: selectedNode.metadata.authors,
+          journal: selectedNode.metadata.journal,
+          year: selectedNode.metadata.year,
           projectId: projectId
         })
       });
 
       if (response.ok) {
-        onAddToCollection(selectedNode.data.pmid);
+        onAddToCollection(selectedNode.metadata.pmid);
         // Show success message
         alert('Paper added to collection successfully!');
       }
@@ -189,7 +205,7 @@ export default function NetworkSidebar({
     try {
       let endpoint = '';
       let usePubMed = false;
-      const pmid = selectedNode?.data?.pmid || selectedNode?.id;
+      const pmid = selectedNode?.metadata?.pmid || selectedNode?.id;
       const params = new URLSearchParams();
 
       switch (section) {
@@ -212,8 +228,8 @@ export default function NetworkSidebar({
         case 'people':
           if (mode === 'authors') {
             endpoint = `/api/proxy/authors/search`;
-            // Use authors from data, with fallback to sample authors
-            const authors = selectedNode?.data?.authors || ['Sample Author'];
+            // Use authors from metadata, with fallback to sample authors
+            const authors = selectedNode?.metadata?.authors || ['Sample Author'];
             params.append('authors', authors.join(','));
             params.append('limit', '10');
             console.log('🔍 Authors search with:', { authors, endpoint });
@@ -221,7 +237,7 @@ export default function NetworkSidebar({
           break;
         case 'content':
           if (mode === 'linked') {
-            endpoint = `/api/proxy/articles/${selectedNode?.data.pmid}/related`;
+            endpoint = `/api/proxy/articles/${selectedNode?.metadata.pmid}/related`;
             params.append('limit', '10');
           }
           break;
@@ -293,8 +309,13 @@ export default function NetworkSidebar({
             });
 
             // Add a small delay to ensure the callback is properly executed
-            setTimeout(() => {
+            // Clear any existing timeout first
+            if (timeoutRef.current) {
+              clearTimeout(timeoutRef.current);
+            }
+            timeoutRef.current = setTimeout(() => {
               onAddExplorationNodes(selectedNode.id, results, relationType);
+              timeoutRef.current = null;
             }, 100);
           } else {
             console.log('❌ NetworkSidebar NOT calling onAddExplorationNodes:', {
@@ -330,22 +351,25 @@ export default function NetworkSidebar({
     // Create a new node from the exploration result
     const newNode: NetworkNode = {
       id: paper.pmid || paper.id,
-      data: {
+      label: paper.title,
+      size: Math.max(40, Math.min((paper.citation_count || 0) * 2, 100)),
+      color: '#2196F3',
+      metadata: {
         pmid: paper.pmid || paper.id,
         title: paper.title,
         authors: paper.authors || [],
         journal: paper.journal || '',
         year: paper.year || 0,
         citation_count: paper.citation_count || 0,
-        node_type: 'paper',
+        url: paper.url || `https://pubmed.ncbi.nlm.nih.gov/${paper.pmid || paper.id}/`,
         abstract: paper.abstract,
-        url: paper.url
+        node_type: 'paper'
       }
     };
 
     // Trigger navigation to this new paper
     if (onExpandNode) {
-      onExpandNode(newNode.id, newNode.data);
+      onExpandNode(newNode.id, newNode.metadata);
     }
   };
 
@@ -354,8 +378,8 @@ export default function NetworkSidebar({
     setSelectedArticleToSave({
       ...article,
       discovery_context: explorationMode,
-      source_article_pmid: selectedNode?.data.pmid,
-      source_article_title: selectedNode?.data.title,
+      source_article_pmid: selectedNode?.metadata.pmid,
+      source_article_title: selectedNode?.metadata.title,
       exploration_session_id: `session_${Date.now()}`
     });
     setShowSaveToCollectionModal(true);
@@ -411,7 +435,7 @@ export default function NetworkSidebar({
     );
   }
 
-  const { data } = selectedNode;
+  const { metadata } = selectedNode;
 
   return (
     <div className="w-80 bg-white border-l border-gray-200 flex flex-col h-full">
@@ -419,12 +443,12 @@ export default function NetworkSidebar({
       <div className="p-4 border-b border-gray-200 flex justify-between items-start">
         <div className="flex-1">
           <div className="text-xs text-gray-500 mb-1">
-            {data.node_type === 'base_article' ? 'Base Article' :
-             data.node_type === 'reference_article' ? 'Reference' :
-             data.node_type === 'citing_article' ? 'Citing Paper' : 'Similar Work'}
+            {metadata.node_type === 'base_article' ? 'Base Article' :
+             metadata.node_type === 'reference_article' ? 'Reference' :
+             metadata.node_type === 'citing_article' ? 'Citing Paper' : 'Similar Work'}
           </div>
           <h3 className="font-semibold text-sm text-gray-900 leading-tight">
-            {data.title}
+            {metadata.title}
           </h3>
         </div>
         <button
@@ -441,44 +465,44 @@ export default function NetworkSidebar({
           <div>
             <span className="font-medium text-gray-700">Authors:</span>
             <div className="text-gray-600 mt-0.5 leading-tight">
-              {data.authors?.slice(0, 2).join(', ')}
-              {data.authors?.length > 2 && ` +${data.authors.length - 2} more`}
+              {metadata.authors?.slice(0, 2).join(', ')}
+              {metadata.authors?.length > 2 && ` +${metadata.authors.length - 2} more`}
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div>
               <span className="font-medium text-gray-700">Year:</span>
-              <span className="text-gray-600 ml-1">{data.year || 'N/A'}</span>
+              <span className="text-gray-600 ml-1">{metadata.year || 'N/A'}</span>
             </div>
             <div>
               <span className="font-medium text-gray-700">Citations:</span>
-              <span className="text-gray-600 ml-1">{data.citation_count || 0}</span>
+              <span className="text-gray-600 ml-1">{metadata.citation_count || 0}</span>
             </div>
           </div>
 
           <div>
             <span className="font-medium text-gray-700">Journal:</span>
-            <div className="text-gray-600 truncate" title={data.journal || 'Unknown'}>
-              {data.journal || 'Unknown'}
+            <div className="text-gray-600 truncate" title={metadata.journal || 'Unknown'}>
+              {metadata.journal || 'Unknown'}
             </div>
           </div>
 
           <div>
             <span className="font-medium text-gray-700">PMID:</span>
-            <span className="text-gray-600 ml-1 font-mono">{data.pmid}</span>
+            <span className="text-gray-600 ml-1 font-mono">{metadata.pmid}</span>
           </div>
         </div>
 
         {/* Paper Abstract - Collapsible to save space */}
-        {data.abstract && (
+        {metadata.abstract && (
           <div className="mt-2">
             <details className="group">
               <summary className="cursor-pointer text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors select-none">
                 📄 Abstract ▼
               </summary>
               <div className="mt-1 p-2 bg-gray-50 rounded text-xs text-gray-600 leading-relaxed max-h-24 overflow-y-auto">
-                {data.abstract}
+                {metadata.abstract}
               </div>
             </details>
           </div>
@@ -486,9 +510,9 @@ export default function NetworkSidebar({
 
         {/* Quick Action Buttons - Compact */}
         <div className="mt-2 flex gap-1">
-          {data.url && (
+          {metadata.url && (
             <a
-              href={data.url}
+              href={metadata.url}
               target="_blank"
               rel="noopener noreferrer"
               className="flex-1 px-2 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 text-center transition-colors"
@@ -677,7 +701,7 @@ export default function NetworkSidebar({
                 <div className="text-center py-4">
                   <div className="text-xs text-gray-500 mb-2">No {explorationMode} found</div>
                   <div className="text-xs text-gray-400">
-                    {explorationMode === 'later' && selectedNode?.data?.year >= 2024
+                    {explorationMode === 'later' && selectedNode?.metadata?.year >= 2024
                       ? 'Recent papers may not have citations yet'
                       : explorationMode === 'similar'
                       ? 'Try exploring references or citations instead'
