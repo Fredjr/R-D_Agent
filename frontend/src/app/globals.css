@@ -24,3 +24,23 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Custom scrollbar for network view columns */
+.custom-scrollbar::-webkit-scrollbar {
+  height: 14px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #e2e8f0;
+  border-radius: 7px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #3b82f6;
+  border-radius: 7px;
+  border: 2px solid #e2e8f0;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #2563eb;
+}

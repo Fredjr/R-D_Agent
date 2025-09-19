@@ -209,8 +209,9 @@ export default function MultiColumnNetworkView({
 
   // Calculate column widths with fixed minimum widths for horizontal scrolling
   const hasColumns = columns.length > 0;
-  const MAIN_VIEW_MIN_WIDTH = 600; // Minimum width for main view
-  const COLUMN_MIN_WIDTH = 500; // Minimum width for each column
+  const MAIN_VIEW_MIN_WIDTH = 800; // Increased minimum width for main view
+  const COLUMN_MIN_WIDTH = 700; // Increased minimum width for each column to prevent cramping
+  const SIDEBAR_WIDTH = 320; // Standard sidebar width
   const mainViewWidth = `${MAIN_VIEW_MIN_WIDTH}px`;
   const columnWidth = `${COLUMN_MIN_WIDTH}px`;
 
@@ -240,24 +241,33 @@ export default function MultiColumnNetworkView({
   }, [columns]);
 
   return (
-    <div className={`h-full relative ${className}`}>
-      {/* Horizontal scroll indicator */}
+    <div className={`h-full relative ${className}`} style={{ backgroundColor: '#f8fafc' }}>
+      {/* Enhanced horizontal scroll indicator */}
       {columns.length > 0 && (
-        <div className="absolute top-4 right-4 z-20 bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium shadow-sm">
-          {columns.length} column{columns.length > 1 ? 's' : ''} • Scroll →
+        <div className="absolute top-4 right-4 z-20 bg-blue-500 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-lg border border-blue-600">
+          <div className="flex items-center gap-2">
+            <span>{columns.length} column{columns.length > 1 ? 's' : ''}</span>
+            <span className="text-blue-200">•</span>
+            <span className="flex items-center gap-1">
+              <span>Scroll</span>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </span>
+          </div>
         </div>
       )}
       <div
-        className="h-full overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100"
+        className="h-full overflow-x-auto overflow-y-hidden custom-scrollbar"
         style={{
           scrollbarWidth: 'thin',
           scrollBehavior: 'smooth'
         }}
       >
-        <div className="flex h-full" style={{ minWidth: `${MAIN_VIEW_MIN_WIDTH + (columns.length * COLUMN_MIN_WIDTH)}px` }}>
+        <div className="flex h-full gap-1" style={{ minWidth: `${MAIN_VIEW_MIN_WIDTH + (columns.length * COLUMN_MIN_WIDTH) + (columns.length * 4)}px` }}>
         {/* Main Network View */}
         <div
-          className="flex-shrink-0 border-r border-gray-200 relative shadow-sm"
+          className="flex-shrink-0 border-r-2 border-gray-300 relative shadow-md bg-white"
           style={{ width: mainViewWidth }}
         >
         <div className="h-full relative flex flex-col">
@@ -325,7 +335,7 @@ export default function MultiColumnNetworkView({
           
           {/* Main Sidebar */}
           {mainSelectedNode && (
-              <div className="absolute top-0 right-0 w-80 h-full z-10 bg-white border-l border-gray-200 shadow-lg">
+              <div className="absolute top-0 right-0 h-full z-10 bg-white border-l-2 border-gray-300 shadow-xl" style={{ width: `${SIDEBAR_WIDTH}px` }}>
                 <div className="p-3 bg-blue-50 border-b border-blue-200">
                   <h3 className="text-sm font-semibold text-blue-800 mb-1">📄 Article Details</h3>
                   <p className="text-xs text-blue-600">Click options below to explore related research</p>
@@ -375,7 +385,7 @@ export default function MultiColumnNetworkView({
       {columns.map((column) => (
         <div
           key={column.id}
-          className="flex-shrink-0 border-r border-gray-200 relative shadow-sm"
+          className="flex-shrink-0 border-r-2 border-gray-300 relative shadow-md bg-white"
           style={{ width: columnWidth }}
         >
           <div className="h-full flex flex-col">
@@ -471,7 +481,7 @@ export default function MultiColumnNetworkView({
 
               {/* Column Sidebar */}
               {column.selectedNode && (
-                <div className="absolute top-0 right-0 w-64 h-full z-10 bg-white border-l border-gray-200">
+                <div className="absolute top-0 right-0 h-full z-10 bg-white border-l-2 border-gray-300 shadow-xl" style={{ width: `${Math.min(SIDEBAR_WIDTH - 40, 280)}px` }}>
                   <ErrorBoundary
                     fallback={
                       <div className="flex items-center justify-center h-full p-4 bg-red-50 border border-red-200 rounded">
