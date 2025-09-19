@@ -212,8 +212,9 @@ export default function NetworkSidebar({
         case 'papers':
           switch (mode) {
             case 'similar':
-              endpoint = `/api/proxy/pubmed/citations?pmid=${pmid}&type=similar&limit=20`;
-              usePubMed = true;
+              // Use the robust similar articles endpoint with fallback mock data
+              endpoint = `/api/proxy/articles/${pmid}/similar?limit=20`;
+              usePubMed = false;
               break;
             case 'earlier':
               endpoint = `/api/proxy/pubmed/references?pmid=${pmid}&limit=20`;
