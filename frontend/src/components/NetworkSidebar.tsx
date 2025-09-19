@@ -250,8 +250,15 @@ export default function NetworkSidebar({
                       data.authors || data.related_papers || data.results || [];
           }
 
-          console.log(`✅ Found ${results.length} exploration results`);
+          console.log(`✅ Found ${results.length} exploration results for ${mode}`);
+
+          // Set results with context for better user feedback
           setExplorationResults(results);
+
+          // Store additional context for user feedback
+          if (results.length === 0) {
+            console.log(`ℹ️ No ${mode} found - this is normal for recent papers or specific search types`);
+          }
 
           // 🚀 NEW: Automatically add exploration results to the network graph!
           console.log('🔍 Checking conditions for network expansion:', {
@@ -297,6 +304,19 @@ export default function NetworkSidebar({
               selectedNodeId: selectedNode?.id
             });
           }
+        } else {
+          // Handle API errors with user-friendly feedback
+          console.error(`❌ Exploration API failed: ${response.status} ${response.statusText}`);
+
+          try {
+            const errorData = await response.json();
+            console.log('🔍 API Error Details:', errorData);
+          } catch (e) {
+            console.log('🔍 Could not parse error response');
+          }
+
+          // Set empty results for failed requests
+          setExplorationResults([]);
         }
       }
     } catch (error) {
@@ -655,7 +675,14 @@ export default function NetworkSidebar({
                 </div>
               ) : (
                 <div className="text-center py-4">
-                  <div className="text-xs text-gray-500">No results found</div>
+                  <div className="text-xs text-gray-500 mb-2">No {explorationMode} found</div>
+                  <div className="text-xs text-gray-400">
+                    {explorationMode === 'later' && selectedNode?.data?.year >= 2024
+                      ? 'Recent papers may not have citations yet'
+                      : explorationMode === 'similar'
+                      ? 'Try exploring references or citations instead'
+                      : 'This is normal for some papers'}
+                  </div>
                 </div>
               )}
             </div>
