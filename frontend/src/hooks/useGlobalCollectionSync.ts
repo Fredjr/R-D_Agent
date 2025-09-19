@@ -294,6 +294,16 @@ export function useGlobalCollectionSync(projectId: string) {
   // Get collections for current project
   const collections = syncManager.current.getCollectionsForProject(projectId);
 
+  // Debug logging
+  console.log('🔍 useGlobalCollectionSync returning:', {
+    projectId,
+    allCollections: syncManager.current.getState().collections,
+    filteredCollections: collections,
+    collectionsCount: collections.length,
+    isLoading: state.isLoading,
+    error: state.error
+  });
+
   return {
     collections,
     isLoading: state.isLoading,
