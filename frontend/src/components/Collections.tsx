@@ -241,9 +241,9 @@ export default function Collections({ projectId, onRefresh }: CollectionsProps) 
                   </h3>
                 </div>
                 
-                {collection.collection_description && (
+                {collection.description && (
                   <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                    {collection.collection_description}
+                    {collection.description}
                   </p>
                 )}
                 

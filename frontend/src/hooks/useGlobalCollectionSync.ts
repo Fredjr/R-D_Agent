@@ -4,11 +4,15 @@ import { useAuth } from '@/contexts/AuthContext';
 export interface Collection {
   collection_id: string;
   collection_name: string;
-  collection_description: string;
+  description: string;  // Match API response field name
   created_at: string;
   updated_at: string;
   article_count: number;
-  project_id: string;
+  project_id?: string;  // Optional since API doesn't always include it
+  created_by?: string;  // Additional fields from API
+  color?: string;
+  icon?: string;
+  sort_order?: number;
 }
 
 interface CollectionSyncState {
@@ -169,7 +173,10 @@ class CollectionSyncManager {
   }
 
   getCollectionsForProject(projectId: string): Collection[] {
-    return this.state.collections.filter(col => col.project_id === projectId);
+    // Filter collections by project_id, or return all if project_id is not set
+    return this.state.collections.filter(col =>
+      col.project_id === projectId || !col.project_id
+    );
   }
 
   getState(): CollectionSyncState {
@@ -224,8 +231,16 @@ export function useGlobalCollectionSync(projectId: string) {
       }
 
       const data = await response.json();
-      const collections = Array.isArray(data) ? data : (data.collections || []);
+      const rawCollections = Array.isArray(data) ? data : (data.collections || []);
+
+      // Add project_id to each collection since API doesn't include it
+      const collections = rawCollections.map((collection: any) => ({
+        ...collection,
+        project_id: projectId
+      }));
+
       console.log('✅ Collections fetched successfully:', collections.length, 'collections');
+      console.log('🔍 Collections data:', collections);
 
       syncManager.current.updateCollections(collections, projectId);
     } catch (error) {
@@ -238,19 +253,19 @@ export function useGlobalCollectionSync(projectId: string) {
     syncManager.current.broadcastUpdate({
       type: 'collection_added',
       collectionId: collection.collection_id,
-      projectId: collection.project_id,
+      projectId: collection.project_id || projectId,
       data: collection
     });
-  }, []);
+  }, [projectId]);
 
   const broadcastCollectionUpdated = useCallback((collection: Collection) => {
     syncManager.current.broadcastUpdate({
       type: 'collection_updated',
       collectionId: collection.collection_id,
-      projectId: collection.project_id,
+      projectId: collection.project_id || projectId,
       data: collection
     });
-  }, []);
+  }, [projectId]);
 
   const broadcastCollectionDeleted = useCallback((collectionId: string) => {
     syncManager.current.broadcastUpdate({
