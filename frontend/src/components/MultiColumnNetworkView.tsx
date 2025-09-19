@@ -207,11 +207,12 @@ export default function MultiColumnNetworkView({
     setMainSelectedNode(null);
   }, []);
 
-  // Calculate column widths dynamically
-  const totalColumns = columns.length + 1; // +1 for main view
+  // Calculate column widths with fixed minimum widths for horizontal scrolling
   const hasColumns = columns.length > 0;
-  const mainViewWidth = hasColumns ? '40%' : '100%';
-  const columnWidth = hasColumns ? `${60 / columns.length}%` : '0%';
+  const MAIN_VIEW_MIN_WIDTH = 600; // Minimum width for main view
+  const COLUMN_MIN_WIDTH = 500; // Minimum width for each column
+  const mainViewWidth = `${MAIN_VIEW_MIN_WIDTH}px`;
+  const columnWidth = `${COLUMN_MIN_WIDTH}px`;
 
   // Handle dynamic expansion for main view
   const handleMainAddExplorationNodes = useCallback((sourceNodeId: string, explorationResults: any[], relationType: 'similar' | 'citations' | 'references' | 'authors') => {
@@ -239,12 +240,20 @@ export default function MultiColumnNetworkView({
   }, [columns]);
 
   return (
-    <div className={`flex h-full overflow-hidden ${className}`}>
-      {/* Main Network View */}
-      <div 
-        className="flex-shrink-0 border-r border-gray-200 relative"
-        style={{ width: mainViewWidth }}
-      >
+    <div className={`h-full relative ${className}`}>
+      {/* Horizontal scroll indicator */}
+      {columns.length > 0 && (
+        <div className="absolute top-4 right-4 z-20 bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium shadow-sm">
+          {columns.length} column{columns.length > 1 ? 's' : ''} • Scroll →
+        </div>
+      )}
+      <div className="h-full overflow-x-auto overflow-y-hidden" style={{ scrollbarWidth: 'thin' }}>
+        <div className="flex h-full" style={{ minWidth: `${MAIN_VIEW_MIN_WIDTH + (columns.length * COLUMN_MIN_WIDTH)}px` }}>
+        {/* Main Network View */}
+        <div
+          className="flex-shrink-0 border-r border-gray-200 relative shadow-sm"
+          style={{ width: mainViewWidth }}
+        >
         <div className="h-full relative flex flex-col">
           {/* Network Type Selector */}
           <div className="flex-shrink-0 bg-gray-50 border-b border-gray-200 p-2">
@@ -358,9 +367,9 @@ export default function MultiColumnNetworkView({
 
       {/* Paper Columns */}
       {columns.map((column) => (
-        <div 
+        <div
           key={column.id}
-          className="flex-shrink-0 border-r border-gray-200 relative"
+          className="flex-shrink-0 border-r border-gray-200 relative shadow-sm"
           style={{ width: columnWidth }}
         >
           <div className="h-full flex flex-col">
@@ -501,6 +510,8 @@ export default function MultiColumnNetworkView({
           </div>
         </div>
       ))}
+        </div>
+      </div>
     </div>
   );
 }
