@@ -2,27 +2,10 @@
 
 import React, { useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import NetworkView from './NetworkView';
+import NetworkView, { NetworkNode } from './NetworkView';
 import NetworkSidebar from './NetworkSidebar';
 import { ErrorBoundary } from './ErrorBoundary';
-
-interface NetworkNode {
-  id: string;
-  label: string;
-  size: number;
-  color: string;
-  metadata: {
-    pmid: string;
-    title: string;
-    authors: string[];
-    journal: string;
-    year: number;
-    citation_count: number;
-    url: string;
-    abstract?: string;
-    node_type: string;
-  };
-}
+import ExplorationNetworkView from './ExplorationNetworkView';
 
 interface PaperColumn {
   id: string;
@@ -35,6 +18,12 @@ interface PaperColumn {
   networkType: 'citations' | 'similar' | 'references';
   explorationMode: 'focused' | 'broad' | 'timeline';
   title?: string; // Custom column title
+  // Exploration data for ResearchRabbit-style columns
+  explorationData?: {
+    type: string; // e.g., 'papers-similar', 'papers-earlier'
+    results: any[]; // The exploration results to display
+    timestamp: string; // When the exploration was performed
+  };
 }
 
 interface MultiColumnNetworkViewProps {
@@ -93,8 +82,7 @@ export default function MultiColumnNetworkView({
           year: metadata.year || new Date().getFullYear(),
           citation_count: metadata.citation_count || 0,
           url: metadata.url || `https://pubmed.ncbi.nlm.nih.gov/${metadata.pmid || node.id}/`,
-          abstract: metadata.abstract || '',
-          node_type: 'selected_article'
+          abstract: metadata.abstract || ''
         }
       };
 
@@ -112,19 +100,43 @@ export default function MultiColumnNetworkView({
     console.log('🎯 Creating new paper column for:', paper.metadata.title);
     console.log('📊 Paper data structure:', paper);
 
-    // Check if column already exists for this paper
-    const existingColumn = columns.find(col => col.sourceId === paper.metadata.pmid);
-    if (existingColumn) {
-      console.log('⚠️ Column already exists for this paper:', paper.metadata.pmid);
-      // Focus on existing column instead of creating duplicate
-      setMainSelectedNode(null); // Close main sidebar
-      return;
+    // Check if this is an exploration column (has exploration results)
+    const isExplorationColumn = paper.metadata.explorationType && paper.metadata.explorationResults;
+    const columnId = isExplorationColumn
+      ? `exploration-${paper.metadata.pmid}-${paper.metadata.explorationType}-${Date.now()}`
+      : `column-${paper.metadata.pmid}-${Date.now()}`;
+
+    // For exploration columns, allow multiple columns for the same paper with different exploration types
+    if (!isExplorationColumn) {
+      const existingColumn = columns.find(col => col.sourceId === paper.metadata.pmid && col.title && !col.title.includes('Similar') && !col.title.includes('Earlier') && !col.title.includes('Later'));
+      if (existingColumn) {
+        console.log('⚠️ Column already exists for this paper:', paper.metadata.pmid);
+        // Focus on existing column instead of creating duplicate
+        setMainSelectedNode(null); // Close main sidebar
+        return;
+      }
     }
 
     try {
+      // Determine column title based on exploration type
+      let columnTitle = `${defaultNetworkType.charAt(0).toUpperCase() + defaultNetworkType.slice(1)} of ${paper.metadata.title.substring(0, 30)}...`;
+
+      if (isExplorationColumn) {
+        const explorationTypeMap = {
+          'papers-similar': 'Similar Work',
+          'papers-earlier': 'Earlier Work',
+          'papers-later': 'Later Work',
+          'people-authors': 'These Authors',
+          'people-suggested': 'Suggested Authors',
+          'content-linked': 'Linked Content'
+        };
+        const explorationLabel = explorationTypeMap[paper.metadata.explorationType as keyof typeof explorationTypeMap] || 'Related';
+        columnTitle = `${explorationLabel}: ${paper.metadata.title.substring(0, 25)}...`;
+      }
+
       // Use article sourceType with flexible network type
       const newColumn: PaperColumn = {
-        id: `column-${paper.metadata.pmid}-${Date.now()}`,
+        id: columnId,
         paper,
         sourceType: 'article',
         sourceId: paper.metadata.pmid,
@@ -132,7 +144,13 @@ export default function MultiColumnNetworkView({
         networkViewRef: React.createRef(),
         networkType: defaultNetworkType,
         explorationMode: defaultExplorationMode,
-        title: `${defaultNetworkType.charAt(0).toUpperCase() + defaultNetworkType.slice(1)} of ${paper.metadata.title.substring(0, 30)}...`
+        title: columnTitle,
+        // Store exploration data for the column
+        explorationData: isExplorationColumn ? {
+          type: paper.metadata.explorationType!,
+          results: paper.metadata.explorationResults!,
+          timestamp: paper.metadata.explorationTimestamp!
+        } : undefined
       };
 
       console.log('🔍 Column will use NetworkView with:', {
@@ -174,8 +192,7 @@ export default function MultiColumnNetworkView({
           year: metadata.year || new Date().getFullYear(),
           citation_count: metadata.citation_count || 0,
           url: metadata.url || `https://pubmed.ncbi.nlm.nih.gov/${metadata.pmid || node.id}/`,
-          abstract: metadata.abstract || '',
-          node_type: 'selected_article'
+          abstract: metadata.abstract || ''
         }
       };
 
@@ -460,23 +477,35 @@ export default function MultiColumnNetworkView({
                   console.error('Error Info:', errorInfo);
                 }}
               >
-                <NetworkView
-                  ref={column.networkViewRef}
-                  sourceType={column.sourceType}
-                  sourceId={column.sourceId}
-                  onNodeSelect={(node) => handleColumnNodeSelect(column.id, node)}
-                  className="h-full"
-                  forceNetworkType={column.networkType}
-                  projectId={projectId}
-                  articleMetadata={column.paper?.metadata ? {
-                    pmid: column.paper.metadata.pmid,
-                    title: column.paper.metadata.title,
-                    authors: column.paper.metadata.authors || [],
-                    journal: column.paper.metadata.journal || '',
-                    year: column.paper.metadata.year || new Date().getFullYear(),
-                    citation_count: column.paper.metadata.citation_count || 0
-                  } : undefined}
-                />
+                {column.explorationData ? (
+                  // Render exploration results in a specialized view
+                  <ExplorationNetworkView
+                    explorationResults={column.explorationData.results}
+                    explorationType={column.explorationData.type}
+                    sourceNode={column.paper}
+                    onNodeSelect={(node) => handleColumnNodeSelect(column.id, node)}
+                    className="h-full"
+                  />
+                ) : (
+                  // Render standard network view
+                  <NetworkView
+                    ref={column.networkViewRef}
+                    sourceType={column.sourceType}
+                    sourceId={column.sourceId}
+                    onNodeSelect={(node) => handleColumnNodeSelect(column.id, node)}
+                    className="h-full"
+                    forceNetworkType={column.networkType}
+                    projectId={projectId}
+                    articleMetadata={column.paper?.metadata ? {
+                      pmid: column.paper.metadata.pmid,
+                      title: column.paper.metadata.title,
+                      authors: column.paper.metadata.authors || [],
+                      journal: column.paper.metadata.journal || '',
+                      year: column.paper.metadata.year || new Date().getFullYear(),
+                      citation_count: column.paper.metadata.citation_count || 0
+                    } : undefined}
+                  />
+                )}
               </ErrorBoundary>
 
               {/* Column Sidebar */}

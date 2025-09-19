@@ -3,24 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGlobalCollectionSync } from '../hooks/useGlobalCollectionSync';
-
-interface NetworkNode {
-  id: string;
-  label: string;
-  size: number;
-  color: string;
-  metadata: {
-    pmid: string;
-    title: string;
-    authors: string[];
-    journal: string;
-    year: number;
-    citation_count: number;
-    url: string;
-    abstract?: string;
-    node_type: string;
-  };
-}
+import { NetworkNode } from './NetworkView';
 
 interface NetworkSidebarProps {
   selectedNode: NetworkNode | null;
@@ -321,37 +304,37 @@ export default function NetworkSidebar({
             console.log(`ℹ️ No ${mode} found - this is normal for recent papers or specific search types`);
           }
 
-          // 🚀 NEW: Automatically add exploration results to the network graph!
-          console.log('🔍 Checking conditions for network expansion:', {
+          // 🚀 NEW: Create new column for exploration results (ResearchRabbit-style)!
+          console.log('🔍 Checking conditions for new column creation:', {
             resultsLength: results.length,
-            hasCallback: !!onAddExplorationNodes,
+            hasCreateColumnCallback: !!onCreatePaperColumn,
             hasSelectedNode: !!selectedNode,
             selectedNodeId: selectedNode?.id,
             section,
             mode
           });
 
-          if (results.length > 0 && onAddExplorationNodes && selectedNode) {
-            // Determine relation type based on section and mode
-            let relationType: 'similar' | 'citations' | 'references' | 'authors' = 'similar';
-            if (section === 'papers') {
-              if (mode === 'similar') relationType = 'similar';
-              else if (mode === 'earlier') relationType = 'references';
-              else if (mode === 'later') relationType = 'citations';
-            } else if (section === 'people') {
-              relationType = 'authors';
-            } else if (section === 'content') {
-              relationType = 'similar'; // Treat linked content as similar
-            }
-
-            console.log('🎯 NetworkSidebar calling onAddExplorationNodes:', {
+          if (results.length > 0 && onCreatePaperColumn && selectedNode) {
+            console.log('🎯 NetworkSidebar creating new column for exploration results:', {
               selectedNodeId: selectedNode.id,
               resultsCount: results.length,
-              relationType,
               section,
               mode,
+              explorationType: `${section}-${mode}`,
               sampleResult: results[0]
             });
+
+            // Create a new column with the exploration results
+            // The column will be created based on the selected node and will show the exploration results
+            const columnData = {
+              ...selectedNode,
+              metadata: {
+                ...selectedNode.metadata,
+                explorationType: `${section}-${mode}`,
+                explorationResults: results,
+                explorationTimestamp: new Date().toISOString()
+              }
+            };
 
             // Add a small delay to ensure the callback is properly executed
             // Clear any existing timeout first
@@ -359,13 +342,13 @@ export default function NetworkSidebar({
               clearTimeout(timeoutRef.current);
             }
             timeoutRef.current = setTimeout(() => {
-              onAddExplorationNodes(selectedNode.id, results, relationType);
+              onCreatePaperColumn(columnData);
               timeoutRef.current = null;
             }, 100);
           } else {
-            console.log('❌ NetworkSidebar NOT calling onAddExplorationNodes:', {
+            console.log('❌ NetworkSidebar NOT creating new column:', {
               hasResults: results.length > 0,
-              hasCallback: !!onAddExplorationNodes,
+              hasCreateColumnCallback: !!onCreatePaperColumn,
               hasSelectedNode: !!selectedNode,
               selectedNodeId: selectedNode?.id
             });
@@ -407,8 +390,7 @@ export default function NetworkSidebar({
         year: paper.year || 0,
         citation_count: paper.citation_count || 0,
         url: paper.url || `https://pubmed.ncbi.nlm.nih.gov/${paper.pmid || paper.id}/`,
-        abstract: paper.abstract,
-        node_type: 'paper'
+        abstract: paper.abstract
       }
     };
 
@@ -488,9 +470,7 @@ export default function NetworkSidebar({
       <div className="p-4 border-b border-gray-200 flex justify-between items-start">
         <div className="flex-1">
           <div className="text-xs text-gray-500 mb-1">
-            {metadata.node_type === 'base_article' ? 'Base Article' :
-             metadata.node_type === 'reference_article' ? 'Reference' :
-             metadata.node_type === 'citing_article' ? 'Citing Paper' : 'Similar Work'}
+            Article
           </div>
           <h3 className="font-semibold text-sm text-gray-900 leading-tight">
             {metadata.title}
