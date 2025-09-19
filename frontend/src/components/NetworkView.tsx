@@ -103,6 +103,8 @@ interface NetworkViewProps {
   };
   // Disable internal sidebar when used in MultiColumnNetworkView
   disableInternalSidebar?: boolean;
+  // Project ID for collection network endpoints (replaces URL parsing)
+  projectId?: string;
 }
 
 // Function to create article-specific network when backend data is unavailable
@@ -309,7 +311,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   className = '',
   forceNetworkType,
   articleMetadata,
-  disableInternalSidebar = false
+  disableInternalSidebar = false,
+  projectId
 }, ref) => {
   const { user } = useAuth();
   const [networkData, setNetworkData] = useState<NetworkData | null>(null);
@@ -602,9 +605,10 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             }
           } else if (sourceType === 'collection') {
             // Use hybrid PubMed-backend endpoint for collections
-            const projectId = new URLSearchParams(window.location.search).get('projectId') ||
-                             (window.location.pathname.includes('/project/') ?
-                              window.location.pathname.split('/project/')[1].split('/')[0] : '');
+            if (!projectId) {
+              console.error('❌ ProjectId is required for collection network but not provided');
+              throw new Error('Project ID is required for collection network views');
+            }
             endpoint = `/api/proxy/collections/${sourceId}/pubmed-network?projectId=${projectId}&limit=20`;
             usePubMed = true; // Enable PubMed integration for collections
             console.log(`🔍 Using hybrid collection network endpoint: ${endpoint}`);
@@ -1401,16 +1405,19 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           <NetworkSidebar
             selectedNode={{
               id: selectedNode.id,
-              data: {
+              label: selectedNode.label,
+              size: selectedNode.size,
+              color: selectedNode.color,
+              metadata: {
                 pmid: selectedNode.metadata.pmid,
                 title: selectedNode.metadata.title,
                 authors: selectedNode.metadata.authors,
                 journal: selectedNode.metadata.journal,
                 year: selectedNode.metadata.year,
                 citation_count: selectedNode.metadata.citation_count,
-                node_type: 'article',
                 url: selectedNode.metadata.url,
-                abstract: selectedNode.metadata.abstract
+                abstract: selectedNode.metadata.abstract,
+                node_type: 'article'
               }
             }}
             onNavigationChange={handleSidebarNavigationChange}

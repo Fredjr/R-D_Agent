@@ -7,16 +7,19 @@ import NetworkSidebar from './NetworkSidebar';
 
 interface NetworkNode {
   id: string;
-  data: {
+  label: string;
+  size: number;
+  color: string;
+  metadata: {
     pmid: string;
     title: string;
     authors: string[];
     journal: string;
     year: number;
     citation_count: number;
-    node_type: string;
+    url: string;
     abstract?: string;
-    url?: string;
+    node_type: string;
   };
 }
 
@@ -78,16 +81,19 @@ export default function MultiColumnNetworkView({
 
       const convertedNode: NetworkNode = {
         id: node.id,
-        data: {
+        label: metadata.title || `Article ${node.id}`,
+        size: Math.max(40, Math.min((metadata.citation_count || 0) * 2, 100)),
+        color: '#2196F3',
+        metadata: {
           pmid: metadata.pmid || node.id,
           title: metadata.title || `Article ${node.id}`,
           authors: metadata.authors || [],
           journal: metadata.journal || '',
           year: metadata.year || new Date().getFullYear(),
           citation_count: metadata.citation_count || 0,
-          node_type: 'selected_article',
           url: metadata.url || `https://pubmed.ncbi.nlm.nih.gov/${metadata.pmid || node.id}/`,
-          abstract: metadata.abstract || ''
+          abstract: metadata.abstract || '',
+          node_type: 'selected_article'
         }
       };
 
@@ -102,13 +108,13 @@ export default function MultiColumnNetworkView({
 
   // Handle creating a new column for a selected paper
   const handleCreatePaperColumn = useCallback((paper: NetworkNode) => {
-    console.log('🎯 Creating new paper column for:', paper.data.title);
+    console.log('🎯 Creating new paper column for:', paper.metadata.title);
     console.log('📊 Paper data structure:', paper);
 
     // Check if column already exists for this paper
-    const existingColumn = columns.find(col => col.sourceId === paper.data.pmid);
+    const existingColumn = columns.find(col => col.sourceId === paper.metadata.pmid);
     if (existingColumn) {
-      console.log('⚠️ Column already exists for this paper:', paper.data.pmid);
+      console.log('⚠️ Column already exists for this paper:', paper.metadata.pmid);
       // Focus on existing column instead of creating duplicate
       setMainSelectedNode(null); // Close main sidebar
       return;
@@ -117,21 +123,21 @@ export default function MultiColumnNetworkView({
     try {
       // Use article sourceType with flexible network type
       const newColumn: PaperColumn = {
-        id: `column-${paper.data.pmid}-${Date.now()}`,
+        id: `column-${paper.metadata.pmid}-${Date.now()}`,
         paper,
         sourceType: 'article',
-        sourceId: paper.data.pmid,
+        sourceId: paper.metadata.pmid,
         selectedNode: null,
         networkViewRef: React.createRef(),
         networkType: defaultNetworkType,
         explorationMode: defaultExplorationMode,
-        title: `${defaultNetworkType.charAt(0).toUpperCase() + defaultNetworkType.slice(1)} of ${paper.data.title.substring(0, 30)}...`
+        title: `${defaultNetworkType.charAt(0).toUpperCase() + defaultNetworkType.slice(1)} of ${paper.metadata.title.substring(0, 30)}...`
       };
 
       console.log('🔍 Column will use NetworkView with:', {
         sourceType: 'article',
-        sourceId: paper.data.pmid,
-        expectedEndpoint: `/api/proxy/articles/${paper.data.pmid}/similar-network (with citations fallback)`
+        sourceId: paper.metadata.pmid,
+        expectedEndpoint: `/api/proxy/articles/${paper.metadata.pmid}/similar-network (with citations fallback)`
       });
 
       console.log('✅ New column created:', newColumn);
@@ -156,16 +162,19 @@ export default function MultiColumnNetworkView({
 
       const convertedNode: NetworkNode = {
         id: node.id,
-        data: {
+        label: metadata.title || `Article ${node.id}`,
+        size: Math.max(40, Math.min((metadata.citation_count || 0) * 2, 100)),
+        color: '#2196F3',
+        metadata: {
           pmid: metadata.pmid || node.id,
           title: metadata.title || `Article ${node.id}`,
           authors: metadata.authors || [],
           journal: metadata.journal || '',
           year: metadata.year || new Date().getFullYear(),
           citation_count: metadata.citation_count || 0,
-          node_type: 'selected_article',
           url: metadata.url || `https://pubmed.ncbi.nlm.nih.gov/${metadata.pmid || node.id}/`,
-          abstract: metadata.abstract || ''
+          abstract: metadata.abstract || '',
+          node_type: 'selected_article'
         }
       };
 
@@ -274,6 +283,7 @@ export default function MultiColumnNetworkView({
               onNodeSelect={handleMainNodeSelect}
               className="h-full"
               disableInternalSidebar={true}
+              projectId={projectId}
             />
           </div>
           
@@ -329,7 +339,7 @@ export default function MultiColumnNetworkView({
                           ? {
                               ...col,
                               networkType: newNetworkType,
-                              title: `${newNetworkType.charAt(0).toUpperCase() + newNetworkType.slice(1)} of ${col.paper.data.title.substring(0, 30)}...`
+                              title: `${newNetworkType.charAt(0).toUpperCase() + newNetworkType.slice(1)} of ${col.paper.metadata.title.substring(0, 30)}...`
                             }
                           : col
                       ));
@@ -347,11 +357,11 @@ export default function MultiColumnNetworkView({
                 <div className="bg-white border border-gray-200 rounded p-2">
                   <div className="text-xs font-medium text-gray-900 mb-1">Source Paper</div>
                   <h3 className="text-xs text-gray-700 leading-tight truncate">
-                    {column.paper.data.title}
+                    {column.paper.metadata.title}
                   </h3>
                   <div className="text-xs text-gray-500 mt-1">
-                    {column.paper.data.authors.slice(0, 2).join(', ')}
-                    {column.paper.data.authors.length > 2 && ` +${column.paper.data.authors.length - 2} more`}
+                    {column.paper.metadata.authors.slice(0, 2).join(', ')}
+                    {column.paper.metadata.authors.length > 2 && ` +${column.paper.metadata.authors.length - 2} more`}
                   </div>
                 </div>
               </div>
@@ -372,13 +382,14 @@ export default function MultiColumnNetworkView({
                 onNodeSelect={(node) => handleColumnNodeSelect(column.id, node)}
                 className="h-full"
                 forceNetworkType={column.networkType}
-                articleMetadata={column.paper?.data ? {
-                  pmid: column.paper.data.pmid,
-                  title: column.paper.data.title,
-                  authors: column.paper.data.authors || [],
-                  journal: column.paper.data.journal || '',
-                  year: column.paper.data.year || new Date().getFullYear(),
-                  citation_count: column.paper.data.citation_count || 0
+                projectId={projectId}
+                articleMetadata={column.paper?.metadata ? {
+                  pmid: column.paper.metadata.pmid,
+                  title: column.paper.metadata.title,
+                  authors: column.paper.metadata.authors || [],
+                  journal: column.paper.metadata.journal || '',
+                  year: column.paper.metadata.year || new Date().getFullYear(),
+                  citation_count: column.paper.metadata.citation_count || 0
                 } : undefined}
               />
 

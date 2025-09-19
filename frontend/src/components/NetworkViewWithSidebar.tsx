@@ -7,16 +7,19 @@ import NetworkSidebar from './NetworkSidebar';
 
 interface NetworkNode {
   id: string;
-  data: {
+  label: string;
+  size: number;
+  color: string;
+  metadata: {
     pmid: string;
     title: string;
     authors: string[];
     journal: string;
     year: number;
     citation_count: number;
-    node_type: string;
+    url: string;
     abstract?: string;
-    url?: string;
+    node_type: string;
   };
 }
 
@@ -49,15 +52,19 @@ export default function NetworkViewWithSidebar({
       // Convert NetworkView format to NetworkSidebar format
       const convertedNode: NetworkNode = {
         id: node.id,
-        data: {
+        label: node.metadata.title || `Article ${node.id}`,
+        size: Math.max(40, Math.min((node.metadata.citation_count || 0) * 2, 100)),
+        color: '#2196F3',
+        metadata: {
           pmid: node.metadata.pmid,
           title: node.metadata.title,
           authors: node.metadata.authors,
           journal: node.metadata.journal,
           year: node.metadata.year,
           citation_count: node.metadata.citation_count,
-          node_type: 'selected_article',
-          url: node.metadata.url
+          url: node.metadata.url,
+          abstract: node.metadata.abstract,
+          node_type: 'selected_article'
         }
       };
       setSelectedNode(convertedNode);
