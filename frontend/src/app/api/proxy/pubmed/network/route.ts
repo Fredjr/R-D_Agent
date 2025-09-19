@@ -241,13 +241,20 @@ export async function GET(request: NextRequest) {
 
     // Fetch source article details
     const sourceArticles = await fetchArticleDetails([pmid]);
-    const sourceArticle = sourceArticles[0];
+    let sourceArticle = sourceArticles[0];
 
+    // If source article not found, create a minimal placeholder to avoid 404
     if (!sourceArticle) {
-      return NextResponse.json(
-        { error: `Article with PMID ${pmid} not found in PubMed` },
-        { status: 404 }
-      );
+      console.log(`⚠️ Article PMID ${pmid} not found in PubMed, creating placeholder`);
+      sourceArticle = {
+        pmid,
+        title: `Article ${pmid}`,
+        authors: ['Unknown Author'],
+        journal: 'Unknown Journal',
+        year: new Date().getFullYear(),
+        citation_count: 0,
+        abstract: 'Abstract not available'
+      };
     }
 
     // Initialize network data
