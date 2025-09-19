@@ -234,6 +234,12 @@ export default function NetworkSidebar({
             params.append('authors', authors.join(','));
             params.append('limit', '10');
             console.log('🔍 Authors search with:', { authors, endpoint });
+          } else if (mode === 'suggested') {
+            endpoint = `/api/proxy/authors/suggested`;
+            // Use paper metadata for suggested authors
+            params.append('pmid', pmid || 'unknown');
+            params.append('limit', '10');
+            console.log('🔍 Suggested authors search with:', { pmid, endpoint });
           }
           break;
         case 'content':
