@@ -3,20 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { PlusIcon, FolderIcon, DocumentTextIcon, EyeIcon, ListBulletIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
+import { useGlobalCollectionSync, type Collection } from '@/hooks/useGlobalCollectionSync';
 import NetworkViewWithSidebar from './NetworkViewWithSidebar';
 import MultiColumnNetworkView from './MultiColumnNetworkView';
 import CollectionArticles from './CollectionArticles';
-
-interface Collection {
-  collection_id: string;
-  collection_name: string;
-  description?: string;
-  color: string;
-  icon: string;
-  article_count: number;
-  created_at: string;
-  updated_at: string;
-}
 
 interface CollectionsProps {
   projectId: string;
@@ -25,9 +15,18 @@ interface CollectionsProps {
 
 export default function Collections({ projectId, onRefresh }: CollectionsProps) {
   const { user } = useAuth();
-  const [collections, setCollections] = useState<Collection[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  // Use global collection sync instead of local state
+  const {
+    collections,
+    isLoading: loading,
+    error,
+    refreshCollections,
+    broadcastCollectionAdded,
+    broadcastCollectionUpdated,
+    broadcastCollectionDeleted
+  } = useGlobalCollectionSync(projectId);
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null);
   const [showNetworkView, setShowNetworkView] = useState(false);
@@ -40,40 +39,12 @@ export default function Collections({ projectId, onRefresh }: CollectionsProps) 
     icon: 'folder'
   });
 
-  const fetchCollections = async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const response = await fetch(`/api/proxy/projects/${projectId}/collections`, {
-        headers: {
-          'User-ID': user?.email || 'default_user',
-        },
-      });
-
-      if (response.status === 403) {
-        throw new Error('Access denied. You do not have permission to view collections for this project.');
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || errorData.detail || `HTTP ${response.status}: ${response.statusText}`;
-        throw new Error(`Failed to fetch collections: ${errorMessage}`);
-      }
-
-      const data = await response.json();
-      setCollections(data);
-    } catch (err) {
-      console.error('Error fetching collections:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load collections');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Initial load and refresh on projectId change
   useEffect(() => {
-    fetchCollections();
-  }, [projectId]);
+    if (projectId) {
+      refreshCollections();
+    }
+  }, [projectId, refreshCollections]);
 
   const handleCreateCollection = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,10 +77,14 @@ export default function Collections({ projectId, onRefresh }: CollectionsProps) 
       });
       setShowCreateModal(false);
       
-      // Refresh collections
-      fetchCollections();
+      // Get the created collection data and broadcast the update
+      const createdCollection = await response.json();
+      broadcastCollectionAdded({
+        ...createdCollection,
+        project_id: projectId
+      });
       onRefresh?.();
-      
+
       alert('✅ Collection created successfully!');
     } catch (error) {
       console.error('Error creating collection:', error);
@@ -149,7 +124,7 @@ export default function Collections({ projectId, onRefresh }: CollectionsProps) 
         <div className="text-center">
           <p className="text-red-600 mb-4">{error}</p>
           <button
-            onClick={fetchCollections}
+            onClick={refreshCollections}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
           >
             Retry
@@ -171,9 +146,9 @@ export default function Collections({ projectId, onRefresh }: CollectionsProps) 
               ← Back to Collections
             </button>
             <div className="flex items-center gap-2">
-              <div 
-                className="w-4 h-4 rounded-full" 
-                style={{ backgroundColor: selectedCollection.color }}
+              <div
+                className="w-4 h-4 rounded-full"
+                style={{ backgroundColor: '#3B82F6' }}
               ></div>
               <h2 className="text-xl font-semibold text-gray-900">
                 {selectedCollection.collection_name} - Network View
@@ -245,7 +220,7 @@ export default function Collections({ projectId, onRefresh }: CollectionsProps) 
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {collections.map((collection) => (
+          {collections.map((collection, index) => (
             <div
               key={collection.collection_id}
               className="bg-white rounded-lg shadow border hover:shadow-md transition-shadow"
@@ -254,7 +229,7 @@ export default function Collections({ projectId, onRefresh }: CollectionsProps) 
                 <div className="flex items-center gap-3 mb-3">
                   <div
                     className="w-8 h-8 rounded-lg flex items-center justify-center"
-                    style={{ backgroundColor: collection.color }}
+                    style={{ backgroundColor: colors[index % colors.length] }}
                   >
                     <FolderIcon className="w-5 h-5 text-white" />
                   </div>
@@ -263,9 +238,9 @@ export default function Collections({ projectId, onRefresh }: CollectionsProps) 
                   </h3>
                 </div>
                 
-                {collection.description && (
+                {collection.collection_description && (
                   <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                    {collection.description}
+                    {collection.collection_description}
                   </p>
                 )}
                 

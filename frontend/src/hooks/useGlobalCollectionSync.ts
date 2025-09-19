@@ -1,0 +1,290 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+
+export interface Collection {
+  collection_id: string;
+  collection_name: string;
+  collection_description: string;
+  created_at: string;
+  updated_at: string;
+  article_count: number;
+  project_id: string;
+}
+
+interface CollectionSyncState {
+  collections: Collection[];
+  lastUpdated: number;
+  isLoading: boolean;
+  error: string | null;
+}
+
+interface CollectionUpdateEvent {
+  type: 'collection_added' | 'collection_updated' | 'collection_deleted' | 'article_added' | 'article_removed';
+  collectionId: string;
+  projectId: string;
+  data?: any;
+  timestamp: number;
+}
+
+// Global state storage using localStorage for persistence
+const STORAGE_KEY = 'rd_agent_collection_sync';
+const SYNC_CHANNEL = 'rd_agent_collection_updates';
+
+class CollectionSyncManager {
+  private listeners: Set<(state: CollectionSyncState) => void> = new Set();
+  private broadcastChannel: BroadcastChannel;
+  private state: CollectionSyncState = {
+    collections: [],
+    lastUpdated: 0,
+    isLoading: false,
+    error: null
+  };
+
+  constructor() {
+    this.broadcastChannel = new BroadcastChannel(SYNC_CHANNEL);
+    this.broadcastChannel.addEventListener('message', this.handleBroadcastMessage.bind(this));
+    this.loadStateFromStorage();
+  }
+
+  private loadStateFromStorage() {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsedState = JSON.parse(stored);
+        // Only load if data is less than 5 minutes old
+        if (Date.now() - parsedState.lastUpdated < 5 * 60 * 1000) {
+          this.state = { ...this.state, ...parsedState };
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load collection sync state from storage:', error);
+    }
+  }
+
+  private saveStateToStorage() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+    } catch (error) {
+      console.warn('Failed to save collection sync state to storage:', error);
+    }
+  }
+
+  private notifyListeners() {
+    this.listeners.forEach(listener => listener(this.state));
+  }
+
+  private handleBroadcastMessage(event: MessageEvent<CollectionUpdateEvent>) {
+    const { type, collectionId, projectId, data, timestamp } = event.data;
+    
+    console.log('🔄 Received collection sync event:', { type, collectionId, projectId, timestamp });
+
+    // Ignore old events
+    if (timestamp <= this.state.lastUpdated) {
+      return;
+    }
+
+    switch (type) {
+      case 'collection_added':
+        if (data) {
+          this.state.collections = [...this.state.collections, data];
+        }
+        break;
+      
+      case 'collection_updated':
+        if (data) {
+          this.state.collections = this.state.collections.map(col => 
+            col.collection_id === collectionId ? { ...col, ...data } : col
+          );
+        }
+        break;
+      
+      case 'collection_deleted':
+        this.state.collections = this.state.collections.filter(col => col.collection_id !== collectionId);
+        break;
+      
+      case 'article_added':
+      case 'article_removed':
+        // Update article count for the collection
+        this.state.collections = this.state.collections.map(col => 
+          col.collection_id === collectionId 
+            ? { 
+                ...col, 
+                article_count: type === 'article_added' 
+                  ? col.article_count + 1 
+                  : Math.max(0, col.article_count - 1),
+                updated_at: new Date().toISOString()
+              }
+            : col
+        );
+        break;
+    }
+
+    this.state.lastUpdated = timestamp;
+    this.saveStateToStorage();
+    this.notifyListeners();
+  }
+
+  subscribe(listener: (state: CollectionSyncState) => void): () => void {
+    this.listeners.add(listener);
+    // Immediately notify with current state
+    listener(this.state);
+    
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  updateCollections(collections: Collection[], projectId: string) {
+    this.state.collections = collections;
+    this.state.lastUpdated = Date.now();
+    this.state.isLoading = false;
+    this.state.error = null;
+    
+    this.saveStateToStorage();
+    this.notifyListeners();
+  }
+
+  setLoading(isLoading: boolean) {
+    this.state.isLoading = isLoading;
+    this.notifyListeners();
+  }
+
+  setError(error: string | null) {
+    this.state.error = error;
+    this.state.isLoading = false;
+    this.notifyListeners();
+  }
+
+  broadcastUpdate(event: Omit<CollectionUpdateEvent, 'timestamp'>) {
+    const fullEvent: CollectionUpdateEvent = {
+      ...event,
+      timestamp: Date.now()
+    };
+    
+    console.log('📡 Broadcasting collection sync event:', fullEvent);
+    this.broadcastChannel.postMessage(fullEvent);
+    
+    // Also handle locally
+    this.handleBroadcastMessage({ data: fullEvent } as MessageEvent<CollectionUpdateEvent>);
+  }
+
+  getCollectionsForProject(projectId: string): Collection[] {
+    return this.state.collections.filter(col => col.project_id === projectId);
+  }
+
+  getState(): CollectionSyncState {
+    return this.state;
+  }
+
+  destroy() {
+    this.broadcastChannel.close();
+    this.listeners.clear();
+  }
+}
+
+// Global singleton instance
+let globalSyncManager: CollectionSyncManager | null = null;
+
+function getSyncManager(): CollectionSyncManager {
+  if (!globalSyncManager) {
+    globalSyncManager = new CollectionSyncManager();
+  }
+  return globalSyncManager;
+}
+
+// React hook for using the global collection sync
+export function useGlobalCollectionSync(projectId: string) {
+  const [state, setState] = useState<CollectionSyncState>(() => getSyncManager().getState());
+  const syncManager = useRef(getSyncManager());
+  
+  useEffect(() => {
+    const unsubscribe = syncManager.current.subscribe(setState);
+    return unsubscribe;
+  }, []);
+
+  const refreshCollections = useCallback(async () => {
+    if (!projectId) return;
+
+    syncManager.current.setLoading(true);
+    
+    try {
+      const response = await fetch(`/api/proxy/projects/${projectId}/collections`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch collections: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      const collections = data.collections || [];
+      
+      syncManager.current.updateCollections(collections, projectId);
+    } catch (error) {
+      console.error('Failed to refresh collections:', error);
+      syncManager.current.setError(error instanceof Error ? error.message : 'Unknown error');
+    }
+  }, [projectId]);
+
+  const broadcastCollectionAdded = useCallback((collection: Collection) => {
+    syncManager.current.broadcastUpdate({
+      type: 'collection_added',
+      collectionId: collection.collection_id,
+      projectId: collection.project_id,
+      data: collection
+    });
+  }, []);
+
+  const broadcastCollectionUpdated = useCallback((collection: Collection) => {
+    syncManager.current.broadcastUpdate({
+      type: 'collection_updated',
+      collectionId: collection.collection_id,
+      projectId: collection.project_id,
+      data: collection
+    });
+  }, []);
+
+  const broadcastCollectionDeleted = useCallback((collectionId: string) => {
+    syncManager.current.broadcastUpdate({
+      type: 'collection_deleted',
+      collectionId,
+      projectId
+    });
+  }, [projectId]);
+
+  const broadcastArticleAdded = useCallback((collectionId: string) => {
+    syncManager.current.broadcastUpdate({
+      type: 'article_added',
+      collectionId,
+      projectId
+    });
+  }, [projectId]);
+
+  const broadcastArticleRemoved = useCallback((collectionId: string) => {
+    syncManager.current.broadcastUpdate({
+      type: 'article_removed',
+      collectionId,
+      projectId
+    });
+  }, [projectId]);
+
+  // Get collections for current project
+  const collections = syncManager.current.getCollectionsForProject(projectId);
+
+  return {
+    collections,
+    isLoading: state.isLoading,
+    error: state.error,
+    lastUpdated: state.lastUpdated,
+    refreshCollections,
+    broadcastCollectionAdded,
+    broadcastCollectionUpdated,
+    broadcastCollectionDeleted,
+    broadcastArticleAdded,
+    broadcastArticleRemoved
+  };
+}
+
+// Cleanup function for when the app unmounts
+export function cleanupGlobalCollectionSync() {
+  if (globalSyncManager) {
+    globalSyncManager.destroy();
+    globalSyncManager = null;
+  }
+}

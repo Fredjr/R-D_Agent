@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { ArrowLeftIcon, BeakerIcon } from '@heroicons/react/24/outline';
+import { type Collection } from '@/hooks/useGlobalCollectionSync';
 import NetworkViewWithSidebar from './NetworkViewWithSidebar';
 
 interface Article {
@@ -27,13 +28,7 @@ interface Article {
   added_by: string;
 }
 
-interface Collection {
-  collection_id: string;
-  collection_name: string;
-  description?: string;
-  color: string;
-  article_count: number;
-}
+
 
 interface CollectionArticlesProps {
   collection: Collection;
@@ -114,7 +109,7 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
         <div className="flex items-center gap-3">
           <div
             className="w-8 h-8 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: collection.color }}
+            style={{ backgroundColor: '#3B82F6' }}
           >
             <BeakerIcon className="w-5 h-5 text-white" />
           </div>
