@@ -705,6 +705,210 @@ a:hover {
 }
 
 /* ========================================
+   PROJECT LIST AND DASHBOARD FIXES
+   ======================================== */
+
+/* Fix for project cards on dashboard/projects page */
+.project-card .bg-white,
+.project-card.bg-white,
+[class*="project"] .bg-white {
+  color: #1a1a1a !important;
+}
+
+.project-card .bg-white h1,
+.project-card .bg-white h2,
+.project-card .bg-white h3,
+.project-card .bg-white h4,
+.project-card .bg-white h5,
+.project-card .bg-white h6 {
+  color: #1a1a1a !important;
+  font-weight: 600 !important;
+}
+
+.project-card .bg-white p,
+.project-card .bg-white span,
+.project-card .bg-white div {
+  color: #4a4a4a !important;
+}
+
+/* Fix for reports section in project dashboard */
+.reports-section .bg-white,
+.reports-section.bg-white,
+[class*="report"] .bg-white {
+  color: #1a1a1a !important;
+}
+
+.reports-section .bg-white .report-title,
+.reports-section .bg-white .report-name,
+.reports-section .bg-white h3,
+.reports-section .bg-white h4 {
+  color: #1a1a1a !important;
+  font-weight: 600 !important;
+}
+
+.reports-section .bg-white .report-description,
+.reports-section .bg-white .report-meta,
+.reports-section .bg-white p,
+.reports-section .bg-white span {
+  color: #4a4a4a !important;
+}
+
+/* Fix for network view buttons */
+.network-view .share-button,
+.network-view .settings-button,
+.network-view button {
+  color: #1a1a1a !important;
+  background: white !important;
+  border: 1px solid #d1d5db !important;
+}
+
+.network-view .share-button:hover,
+.network-view .settings-button:hover,
+.network-view button:hover {
+  background: #f3f4f6 !important;
+  color: #1a1a1a !important;
+}
+
+/* Fix for any remaining white background elements */
+.bg-white .card-content,
+.bg-white .card-body,
+.bg-white .content,
+.bg-white .body {
+  color: #1a1a1a !important;
+}
+
+.bg-white .card-content h1,
+.bg-white .card-content h2,
+.bg-white .card-content h3,
+.bg-white .card-content h4,
+.bg-white .card-content h5,
+.bg-white .card-content h6,
+.bg-white .card-body h1,
+.bg-white .card-body h2,
+.bg-white .card-body h3,
+.bg-white .card-body h4,
+.bg-white .card-body h5,
+.bg-white .card-body h6 {
+  color: #1a1a1a !important;
+  font-weight: 600 !important;
+}
+
+/* Fix for dashboard grid items */
+.dashboard-grid .bg-white,
+.grid .bg-white,
+.grid-item .bg-white {
+  color: #1a1a1a !important;
+}
+
+.dashboard-grid .bg-white *,
+.grid .bg-white *,
+.grid-item .bg-white * {
+  color: #1a1a1a !important;
+}
+
+/* Override any remaining light text on white backgrounds */
+.bg-white .text-gray-400,
+.bg-white .text-gray-500,
+.bg-white .text-gray-600,
+.bg-white .text-slate-400,
+.bg-white .text-slate-500,
+.bg-white .text-slate-600 {
+  color: #4a4a4a !important;
+}
+
+/* Ensure buttons on white backgrounds are readable */
+.bg-white button:not(.text-white):not([class*="bg-"]) {
+  color: #1a1a1a !important;
+  background: #f3f4f6 !important;
+  border: 1px solid #d1d5db !important;
+}
+
+.bg-white button:not(.text-white):not([class*="bg-"]):hover {
+  background: #e5e7eb !important;
+  color: #1a1a1a !important;
+}
+
+/* ========================================
+   MULTI-COLUMN NETWORK VIEW FIXES
+   ======================================== */
+
+/* Fix for "New Columns" and "Mode" text in network view */
+.bg-gray-50 .text-gray-700,
+.bg-gray-50 span.text-gray-700,
+.bg-gray-50 .font-medium {
+  color: #1a1a1a !important;
+}
+
+/* Fix for network view control panels */
+.bg-gray-50 select,
+.bg-gray-50 input {
+  color: #1a1a1a !important;
+  background: white !important;
+}
+
+/* Fix for any dark text on light backgrounds in network components */
+[class*="bg-gray-"] .text-gray-700,
+[class*="bg-gray-"] .text-gray-600,
+[class*="bg-gray-"] .text-gray-500 {
+  color: #1a1a1a !important;
+}
+
+/* Ensure Share Project button has proper contrast */
+button[class*="share"],
+.share-project-button,
+button:contains("Share Project") {
+  color: #1a1a1a !important;
+  background: white !important;
+  border: 1px solid #d1d5db !important;
+}
+
+button[class*="share"]:hover,
+.share-project-button:hover {
+  background: #f3f4f6 !important;
+  color: #1a1a1a !important;
+}
+
+/* Fix for project list cards */
+.project-list .bg-white,
+.projects-grid .bg-white,
+[class*="project-card"] .bg-white {
+  color: #1a1a1a !important;
+}
+
+.project-list .bg-white *,
+.projects-grid .bg-white *,
+[class*="project-card"] .bg-white * {
+  color: #1a1a1a !important;
+}
+
+/* Fix for project titles and descriptions */
+.project-list .bg-white h1,
+.project-list .bg-white h2,
+.project-list .bg-white h3,
+.project-list .bg-white h4,
+.projects-grid .bg-white h1,
+.projects-grid .bg-white h2,
+.projects-grid .bg-white h3,
+.projects-grid .bg-white h4 {
+  color: #1a1a1a !important;
+  font-weight: 600 !important;
+}
+
+.project-list .bg-white p,
+.project-list .bg-white span,
+.projects-grid .bg-white p,
+.projects-grid .bg-white span {
+  color: #4a4a4a !important;
+}
+
+/* Nuclear option for any remaining light text on white/light backgrounds */
+.bg-white *:not([class*="text-green"]):not([class*="text-blue"]):not([class*="text-red"]):not([class*="text-yellow"]):not([class*="text-purple"]):not(.text-white),
+.bg-gray-50 *:not([class*="text-green"]):not([class*="text-blue"]):not([class*="text-red"]):not([class*="text-yellow"]):not([class*="text-purple"]):not(.text-white),
+.bg-gray-100 *:not([class*="text-green"]):not([class*="text-blue"]):not([class*="text-red"]):not([class*="text-yellow"]):not([class*="text-purple"]):not(.text-white) {
+  color: #1a1a1a !important;
+}
+
+/* ========================================
    SPOTIFY-INSPIRED ANIMATIONS & INTERACTIONS
    ======================================== */
 
