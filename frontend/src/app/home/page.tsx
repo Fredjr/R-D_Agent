@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ErrorAlert } from '@/components/ui/Alert';
 import { SpotifyRecommendations } from '@/components/ui/SpotifyRecommendations';
+import { SpotifyTopBar } from '@/components/ui/SpotifyNavigation';
 import { Button } from '@/components/ui/Button';
 import { 
   PlusIcon, 
@@ -145,6 +146,16 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-[var(--spotify-black)]">
+      {/* Top Navigation */}
+      <SpotifyTopBar
+        title="Home"
+        showSearch={true}
+        onSearch={(query) => {
+          // Navigate to search page with query
+          router.push(`/search?q=${encodeURIComponent(query)}`);
+        }}
+      />
+
       {/* Header */}
       <div className="bg-gradient-to-b from-[var(--spotify-dark-gray)] to-[var(--spotify-black)] px-6 py-8">
         <div className="max-w-7xl mx-auto">
