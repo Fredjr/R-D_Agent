@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { BeakerIcon, PlusIcon, FolderIcon, EyeIcon, ShareIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { PageHeader } from '@/components/ui/Navigation';
 import { Button } from '@/components/ui/Button';
+import { SpotifyCollectionCard } from '@/components/ui/SpotifyCard';
+import { SpotifyTopBar, SpotifyTabs } from '@/components/ui/SpotifyNavigation';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface Collection {
