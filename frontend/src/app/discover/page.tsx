@@ -3,12 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { 
-  SpotifyRecommendationSection, 
+import {
+  SpotifyRecommendationSection,
   WeeklyMixHeader,
-  SpotifyRecommendationCard 
+  SpotifyRecommendationCard
 } from '@/components/ui/SpotifyRecommendations';
 import { SpotifyTopBar } from '@/components/ui/SpotifyNavigation';
+import { EnhancedDiscoverPage } from '@/components/ui/EnhancedDiscoverPage';
 import { LoadingSpinner, ErrorAlert } from '@/components/ui';
 import { 
   MusicalNoteIcon, 
@@ -286,17 +287,21 @@ export default function DiscoverPage() {
 
   return (
     <div className="min-h-screen bg-[var(--spotify-black)]">
-      {/* Top Navigation */}
-      <SpotifyTopBar 
-        title="Discover"
-        showSearch={true}
+      {/* Enhanced Discover Page */}
+      <EnhancedDiscoverPage
+        recommendations={recommendations.recommendations}
+        onPlay={handlePlayPaper}
+        onSave={handleSavePaper}
+        onShare={handleSharePaper}
+        onSeeAll={handleSeeAll}
         onSearch={(query) => {
-          // TODO: Implement search functionality
           console.log('Search:', query);
+          // TODO: Implement search functionality
         }}
       />
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      {/* Legacy content for fallback - can be removed after testing */}
+      <div className="max-w-7xl mx-auto px-6 py-8 hidden">
         {/* Weekly Mix Header */}
         <WeeklyMixHeader 
           weekOf={recommendations.week_of}

@@ -7,6 +7,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ErrorAlert } from '@/components/ui/Alert';
 import { SpotifyRecommendations } from '@/components/ui/SpotifyRecommendations';
 import { SpotifyTopBar } from '@/components/ui/SpotifyNavigation';
+import { EnhancedHomePage } from '@/components/ui/EnhancedHomePage';
 import { Button } from '@/components/ui/Button';
 import { 
   PlusIcon, 
@@ -321,11 +322,14 @@ export default function HomePage() {
           </div>
         ) : recommendations ? (
           (() => {
-            console.log('🎨 HOME PAGE: Rendering SpotifyRecommendations with data:', JSON.stringify(recommendations, null, 2));
+            console.log('🎨 HOME PAGE: Rendering Enhanced Home Page with data:', JSON.stringify(recommendations, null, 2));
             return (
-              <SpotifyRecommendations
+              <EnhancedHomePage
                 recommendations={recommendations}
-                onRefresh={handleRefresh}
+                onPlay={(paper) => console.log('Playing paper:', paper)}
+                onSave={(paper) => console.log('Saving paper:', paper)}
+                onShare={(paper) => console.log('Sharing paper:', paper)}
+                onSeeAll={(category) => console.log('See all for category:', category)}
               />
             );
           })()
