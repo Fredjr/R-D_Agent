@@ -19,6 +19,7 @@ import {
   SpotifyProjectCard,
   PageHeader
 } from '@/components/ui';
+import { SpotifyTopBar } from '@/components/ui/SpotifyNavigation';
 
 interface Project {
   project_id: string;
@@ -197,6 +198,16 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[var(--spotify-black)]">
+      {/* Top Navigation */}
+      <SpotifyTopBar
+        title="Projects"
+        showSearch={true}
+        onSearch={(query) => {
+          // Navigate to search page with query
+          router.push(`/search?q=${encodeURIComponent(query)}`);
+        }}
+      />
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <PageHeader
           title="Research Projects"
