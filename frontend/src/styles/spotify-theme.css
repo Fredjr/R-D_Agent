@@ -488,6 +488,63 @@ a:hover {
 }
 
 /* ========================================
+   WHITE BACKGROUND CARD TEXT FIXES
+   ======================================== */
+
+/* Fix text visibility on white/light backgrounds */
+.bg-white h1, .bg-white h2, .bg-white h3, .bg-white h4, .bg-white h5, .bg-white h6,
+.bg-white .text-primary,
+.bg-white .heading,
+.bg-white p,
+.bg-white span,
+.bg-white div {
+  color: #1a1a1a !important; /* Dark text for white backgrounds */
+}
+
+.bg-white .text-secondary,
+.bg-white .text-muted {
+  color: #4a4a4a !important; /* Medium gray for secondary text */
+}
+
+/* Specific fixes for collection cards and project cards */
+.bg-white .collection-title,
+.bg-white .project-title {
+  color: #1a1a1a !important;
+}
+
+.bg-white .collection-description,
+.bg-white .project-description {
+  color: #4a4a4a !important;
+}
+
+/* Fix for any light gray backgrounds */
+.bg-gray-50 h1, .bg-gray-50 h2, .bg-gray-50 h3, .bg-gray-50 h4, .bg-gray-50 h5, .bg-gray-50 h6,
+.bg-gray-50 p, .bg-gray-50 span, .bg-gray-50 div {
+  color: #1a1a1a !important;
+}
+
+.bg-gray-100 h1, .bg-gray-100 h2, .bg-gray-100 h3, .bg-gray-100 h4, .bg-gray-100 h5, .bg-gray-100 h6,
+.bg-gray-100 p, .bg-gray-100 span, .bg-gray-100 div {
+  color: #1a1a1a !important;
+}
+
+/* Override any light text on light backgrounds */
+[class*="bg-white"] *,
+[class*="bg-gray-"] * {
+  color: #1a1a1a !important;
+}
+
+[class*="bg-white"] .text-secondary,
+[class*="bg-gray-"] .text-secondary {
+  color: #4a4a4a !important;
+}
+
+[class*="bg-white"] .text-muted,
+[class*="bg-gray-"] .text-muted {
+  color: #6a6a6a !important;
+}
+
+/* ========================================
    SPOTIFY-INSPIRED ANIMATIONS & INTERACTIONS
    ======================================== */
 
@@ -677,4 +734,327 @@ a:hover {
   width: 300px;
   height: 300px;
   animation: spotify-ripple 0.6s ease-out;
+}
+
+/* ========================================
+   ADVANCED SPOTIFY-INSPIRED ENHANCEMENTS
+   ======================================== */
+
+/* Spotify-style context menu */
+.spotify-context-menu {
+  position: absolute;
+  background: var(--spotify-dark-gray);
+  border: 1px solid var(--spotify-border-gray);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  padding: 8px 0;
+  min-width: 200px;
+  z-index: 1000;
+  opacity: 0;
+  transform: scale(0.95);
+  transition: all 0.15s ease-out;
+}
+
+.spotify-context-menu.show {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.spotify-context-menu-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  color: var(--spotify-white);
+  text-decoration: none;
+  font-size: 14px;
+  transition: background-color 0.1s ease;
+  cursor: pointer;
+}
+
+.spotify-context-menu-item:hover {
+  background-color: var(--spotify-medium-gray);
+}
+
+.spotify-context-menu-item svg {
+  width: 16px;
+  height: 16px;
+  margin-right: 12px;
+  color: var(--spotify-light-text);
+}
+
+.spotify-context-menu-separator {
+  height: 1px;
+  background-color: var(--spotify-border-gray);
+  margin: 8px 0;
+}
+
+/* Spotify-style tooltip */
+.spotify-tooltip {
+  position: absolute;
+  background: var(--spotify-black);
+  color: var(--spotify-white);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  z-index: 1001;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: all 0.2s ease;
+  pointer-events: none;
+}
+
+.spotify-tooltip.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.spotify-tooltip::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 4px solid var(--spotify-black);
+}
+
+/* Enhanced card hover effects */
+.spotify-card-enhanced {
+  position: relative;
+  background: var(--spotify-card-bg);
+  border-radius: 8px;
+  padding: 16px;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.spotify-card-enhanced::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(29, 185, 84, 0.1) 0%, transparent 50%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.spotify-card-enhanced:hover::before {
+  opacity: 1;
+}
+
+.spotify-card-enhanced:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+  background: var(--spotify-card-hover-bg);
+}
+
+/* Play button overlay for cards */
+.spotify-play-overlay {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  width: 48px;
+  height: 48px;
+  background: var(--spotify-green);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.spotify-card-enhanced:hover .spotify-play-overlay {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.spotify-play-overlay:hover {
+  transform: scale(1.05);
+  background: var(--spotify-green-hover);
+}
+
+.spotify-play-overlay svg {
+  width: 20px;
+  height: 20px;
+  color: var(--spotify-black);
+  margin-left: 2px;
+}
+
+/* Spotify-style progress bars */
+.spotify-progress-container {
+  position: relative;
+  height: 4px;
+  background: var(--spotify-medium-gray);
+  border-radius: 2px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.spotify-progress-bar {
+  height: 100%;
+  background: var(--spotify-green);
+  border-radius: 2px;
+  transition: width 0.1s linear;
+  position: relative;
+}
+
+.spotify-progress-bar::after {
+  content: '';
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  background: var(--spotify-white);
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.spotify-progress-container:hover .spotify-progress-bar::after {
+  opacity: 1;
+}
+
+/* Enhanced search bar */
+.spotify-search-enhanced {
+  position: relative;
+  max-width: 364px;
+}
+
+.spotify-search-enhanced input {
+  width: 100%;
+  height: 40px;
+  background: var(--spotify-white);
+  border: none;
+  border-radius: 20px;
+  padding: 0 48px 0 16px;
+  font-size: 14px;
+  color: var(--spotify-black);
+  transition: all 0.3s ease;
+}
+
+.spotify-search-enhanced input:focus {
+  outline: 2px solid var(--spotify-white);
+  background: var(--spotify-white);
+}
+
+.spotify-search-enhanced .search-icon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  color: var(--spotify-black);
+}
+
+/* Spotify-style tabs */
+.spotify-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--spotify-border-gray);
+  margin-bottom: 24px;
+}
+
+.spotify-tab {
+  padding: 12px 0;
+  margin-right: 32px;
+  color: var(--spotify-light-text);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.spotify-tab:hover {
+  color: var(--spotify-white);
+}
+
+.spotify-tab.active {
+  color: var(--spotify-white);
+  border-bottom-color: var(--spotify-green);
+}
+
+/* Enhanced scrollbar */
+.spotify-scrollbar::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.spotify-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.spotify-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--spotify-medium-gray);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.spotify-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--spotify-light-text);
+  background-clip: content-box;
+}
+
+/* Spotify-style modal */
+.spotify-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.spotify-modal-overlay.show {
+  opacity: 1;
+}
+
+.spotify-modal {
+  background: var(--spotify-dark-gray);
+  border-radius: 8px;
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow: hidden;
+  transform: scale(0.95);
+  transition: transform 0.3s ease;
+  box-shadow: 0 16px 64px rgba(0, 0, 0, 0.5);
+}
+
+.spotify-modal-overlay.show .spotify-modal {
+  transform: scale(1);
+}
+
+.spotify-modal-header {
+  padding: 24px 24px 0;
+  border-bottom: 1px solid var(--spotify-border-gray);
+}
+
+.spotify-modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  max-height: 60vh;
+}
+
+.spotify-modal-footer {
+  padding: 0 24px 24px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
 }

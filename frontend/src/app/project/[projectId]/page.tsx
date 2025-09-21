@@ -12,6 +12,8 @@ import Collections from '@/components/Collections';
 import { useAsyncJob } from '@/hooks/useAsyncJob';
 import { startReviewJob, startDeepDiveJob } from '@/lib/api';
 import AsyncJobProgress from '@/components/AsyncJobProgress';
+import { SpotifyTopBar, SpotifyBreadcrumb, SpotifyTabs } from '@/components/ui/SpotifyNavigation';
+import { SpotifyCollectionCard } from '@/components/ui/SpotifyCard';
 import {
   Button,
   Card,
