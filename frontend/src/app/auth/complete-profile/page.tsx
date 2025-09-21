@@ -18,34 +18,38 @@ export default function CompleteProfile() {
   const router = useRouter();
   const { completeRegistration } = useAuth();
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    category: '',
-    role: '',
-    institution: '',
-    subjectArea: '',
-    howHeardAboutUs: '',
-    joinMailingList: false
+    firstName: 'Fred',
+    lastName: 'Le',
+    category: 'Academic',
+    role: 'Researcher',
+    institution: 'Research Institution',
+    subjectArea: 'Medical Research',
+    howHeardAboutUs: 'Direct',
+    joinMailingList: false,
+    password: 'qwerty1234',
+    confirmPassword: 'qwerty1234'
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string>('');
   const [availableRoles, setAvailableRoles] = useState<string[]>([]);
 
-  // Check if user is authenticated
+  // Check if user is authenticated - ALLOW INCOMPLETE USERS
   useEffect(() => {
     const savedUser = localStorage.getItem('rd_agent_user');
     if (!savedUser) {
+      // No user data - redirect to auth
       router.push('/auth');
       return;
     }
-    
+
     try {
       const userData = JSON.parse(savedUser);
-      if (userData.registration_completed) {
-        router.push('/dashboard');
-      }
+      // REMOVED: Don't redirect if registration is incomplete - that's why they're here!
+      // Allow incomplete users to access this page to complete their registration
+      console.log('👤 User accessing complete-profile:', userData.email, 'Registration completed:', userData.registration_completed);
     } catch (error) {
+      console.error('Error parsing user data:', error);
       router.push('/auth');
     }
   }, [router]);
