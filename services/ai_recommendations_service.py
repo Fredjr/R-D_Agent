@@ -231,16 +231,27 @@ class SpotifyInspiredRecommendationsService:
 
             profile = {}
 
+            # Resolve user - handle both email and UUID formats
+            resolved_user_id = await self._resolve_user_id(user_id, db)
+            logger.info(f"🔍 Resolving user_id '{user_id}' to '{resolved_user_id}'")
+
             # Get user's saved articles across all projects or specific project
             if project_id:
                 saved_articles = db.query(ArticleCollection).join(Collection).filter(
                     Collection.project_id == project_id,
-                    Collection.created_by == user_id
+                    or_(Collection.created_by == user_id, Collection.created_by == resolved_user_id)
                 ).order_by(desc(ArticleCollection.added_at)).limit(200).all()
             else:
                 saved_articles = db.query(ArticleCollection).join(Collection).filter(
-                    Collection.created_by == user_id
+                    or_(Collection.created_by == user_id, Collection.created_by == resolved_user_id)
                 ).order_by(desc(ArticleCollection.added_at)).limit(200).all()
+
+            logger.info(f"📊 Found {len(saved_articles)} saved articles for user {user_id}")
+
+            # If no saved articles, provide fallback recommendations
+            if len(saved_articles) == 0:
+                logger.info(f"🎯 No saved articles found, providing fallback recommendations for user {user_id}")
+                return await self._generate_fallback_profile(user_id, db)
 
             # Extract research domains and topics
             profile["primary_domains"] = await self._extract_research_domains(saved_articles, db)
@@ -270,6 +281,118 @@ class SpotifyInspiredRecommendationsService:
         except Exception as e:
             logger.error(f"Error building user research profile: {e}")
             return {}
+
+    async def _resolve_user_id(self, user_id: str, db: Session) -> str:
+        """Resolve user_id to handle both email and UUID formats"""
+        try:
+            from database import User
+
+            # Try to find user by email first
+            user = db.query(User).filter(User.email == user_id).first()
+            if user:
+                logger.info(f"✅ Found user by email: {user_id} -> {user.user_id}")
+                return user.user_id
+
+            # Try to find user by user_id (UUID)
+            user = db.query(User).filter(User.user_id == user_id).first()
+            if user:
+                logger.info(f"✅ Found user by UUID: {user_id}")
+                return user.user_id
+
+            logger.warning(f"⚠️ User not found: {user_id}")
+            return user_id
+
+        except Exception as e:
+            logger.error(f"❌ Error resolving user_id {user_id}: {e}")
+            return user_id
+
+    async def _generate_fallback_profile(self, user_id: str, db: Session) -> Dict[str, Any]:
+        """Generate fallback profile for users with no saved articles"""
+        try:
+            from database import User
+
+            # Get user info for basic profile
+            user = db.query(User).filter(
+                or_(User.email == user_id, User.user_id == user_id)
+            ).first()
+
+            fallback_profile = {
+                "primary_domains": ["general research", "interdisciplinary studies"],
+                "topic_preferences": {},
+                "activity_level": "new_user",
+                "discovery_preference": "exploratory",
+                "collaboration_score": 0.5,
+                "research_velocity": "getting_started",
+                "recency_bias": 0.7,
+                "collection_themes": [],
+                "organization_style": "exploratory",
+                "total_saved_papers": 0,
+                "is_fallback": True
+            }
+
+            # Add user-specific info if available
+            if user:
+                if user.subject_area:
+                    fallback_profile["primary_domains"] = [user.subject_area.lower()]
+                if user.category:
+                    fallback_profile["user_category"] = user.category
+                if user.role:
+                    fallback_profile["user_role"] = user.role
+
+            logger.info(f"🎯 Generated fallback profile for user {user_id}")
+            return fallback_profile
+
+        except Exception as e:
+            logger.error(f"❌ Error generating fallback profile: {e}")
+            return {
+                "primary_domains": ["general research"],
+                "activity_level": "new_user",
+                "is_fallback": True
+            }
+
+    async def _generate_fallback_recommendations(self, db: Session, category: str) -> Dict[str, Any]:
+        """Generate sample recommendations for new users"""
+        try:
+            # Get popular recent papers as fallback
+            recent_papers = db.query(Article).filter(
+                Article.publication_year >= datetime.now().year - 2,
+                Article.citation_count.isnot(None),
+                Article.citation_count > 10
+            ).order_by(desc(Article.citation_count)).limit(12).all()
+
+            recommendations = []
+            for paper in recent_papers:
+                recommendations.append({
+                    "pmid": paper.pmid,
+                    "title": paper.title or "Research Paper",
+                    "authors": paper.authors[:3] if paper.authors else ["Unknown"],
+                    "journal": paper.journal or "Academic Journal",
+                    "year": paper.publication_year or datetime.now().year,
+                    "citation_count": paper.citation_count or 0,
+                    "relevance_score": 0.7,
+                    "reason": "Popular recent research to get you started",
+                    "category": category,
+                    "is_fallback": True
+                })
+
+            logger.info(f"🎯 Generated {len(recommendations)} fallback recommendations for category {category}")
+
+            return {
+                "recommendations": recommendations,
+                "total": len(recommendations),
+                "category": category,
+                "updated": datetime.now().isoformat(),
+                "refresh_reason": "Welcome! Here are some popular papers to get you started"
+            }
+
+        except Exception as e:
+            logger.error(f"❌ Error generating fallback recommendations: {e}")
+            return {
+                "recommendations": [],
+                "total": 0,
+                "category": category,
+                "error": str(e)
+            }
     
     async def _generate_papers_for_you(self, user_profile: Dict, db: Session) -> Dict[str, Any]:
         """Generate personalized 'Papers for You' recommendations"""
@@ -277,6 +400,10 @@ class SpotifyInspiredRecommendationsService:
             recommendations = []
             primary_domains = user_profile.get("primary_domains", [])
             topic_preferences = user_profile.get("topic_preferences", {})
+
+            # Handle fallback for new users
+            if user_profile.get("is_fallback", False):
+                return await self._generate_fallback_recommendations(db, "papers_for_you")
 
             # Get papers based on user's research domains with personalization
             for domain in primary_domains[:3]:  # Top 3 domains
