@@ -5,7 +5,20 @@ import Link from 'next/link';
 import { PlusIcon, FolderIcon, UsersIcon, CalendarIcon, BeakerIcon, UserIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Button, FullPageLoading, LoadingSpinner, ErrorAlert } from '@/components/ui';
+import {
+  Button,
+  FullPageLoading,
+  LoadingSpinner,
+  ErrorAlert,
+  Card,
+  CardHeader,
+  CardContent,
+  CardTitle,
+  CardDescription,
+  ProjectCard,
+  SpotifyProjectCard,
+  PageHeader
+} from '@/components/ui';
 
 interface Project {
   project_id: string;
@@ -183,25 +196,16 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[var(--spotify-black)]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex justify-between items-start">
-            <div>
-              <div className="flex items-center gap-4 mb-4">
-                <Link
-                  href="/"
-                  className="inline-flex items-center text-gray-600 hover:text-gray-900 text-sm"
-                >
-                  ← Back to Research Hub
-                </Link>
-              </div>
-              <h1 className="text-3xl font-bold text-gray-900">Research Projects</h1>
-              <p className="mt-2 text-gray-600">
-                Manage your research projects and collaborate with your team
-              </p>
-            </div>
+        <PageHeader
+          title="Research Projects"
+          description="Manage your research projects and collaborate with your team"
+          breadcrumb={[
+            { label: 'Research Hub', href: '/' },
+            { label: 'Projects', current: true }
+          ]}
+          actions={
             <div className="flex flex-col sm:flex-row gap-3">
               <Link href="/">
                 <Button variant="outline" className="inline-flex items-center">
@@ -211,14 +215,16 @@ export default function Dashboard() {
               </Link>
               <Button
                 onClick={() => setShowCreateModal(true)}
+                variant="spotifyPrimary"
+                size="spotifyDefault"
                 className="inline-flex items-center"
               >
                 <PlusIcon className="h-5 w-5 mr-2" />
                 New Project
               </Button>
             </div>
-          </div>
-        </div>
+          }
+        />
 
         {/* Error Display */}
         {error && (
@@ -247,69 +253,49 @@ export default function Dashboard() {
         {/* Projects Grid */}
         {projects.length === 0 ? (
           <div className="text-center py-12">
-            <FolderIcon className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No projects yet</h3>
-            <p className="text-gray-600 mb-6">
+            <FolderIcon className="h-16 w-16 text-[var(--spotify-muted-text)] mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-[var(--spotify-white)] mb-2">No projects yet</h3>
+            <p className="text-[var(--spotify-light-text)] mb-6">
               Create your first research project to get started
             </p>
-            <button
+            <Button
               onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              variant="spotifyPrimary"
+              size="spotifyLg"
+              className="inline-flex items-center"
             >
               <PlusIcon className="h-5 w-5 mr-2" />
               Create First Project
-            </button>
+            </Button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map((project) => (
-              <div
+              <SpotifyProjectCard
                 key={project.project_id}
+                title={project.project_name}
+                description={project.description || 'No description provided'}
+                status="active"
+                lastUpdated={formatDate(project.updated_at)}
+                reportCount={0} // TODO: Add report count from API
                 onClick={() => {
                   setSelectedProject(project);
                   fetchProjectDetails(project.project_id);
                 }}
-                className="block cursor-pointer"
-              >
-                <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow p-6 border border-gray-200">
-                  <div className="flex items-start justify-between mb-4">
-                    <FolderIcon className="h-8 w-8 text-blue-600 flex-shrink-0" />
-                    <span className="text-xs text-gray-500 flex items-center">
-                      <CalendarIcon className="h-4 w-4 mr-1" />
-                      {formatDate(project.created_at)}
-                    </span>
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
-                    {project.project_name}
-                  </h3>
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-                    {project.description || 'No description provided'}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-500">
-                      Updated {formatDate(project.updated_at)}
-                    </span>
-                    <div className="flex space-x-2">
-                      <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                        Active
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              />
             ))}
           </div>
         )}
 
         {/* Project Detail Modal */}
         {selectedProject && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
+            <div className="bg-[var(--spotify-dark-gray)] rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-[var(--spotify-border-gray)]">
               <div className="p-6">
                 <div className="flex items-start justify-between mb-6">
                   <div className="flex-1">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">{selectedProject.project_name}</h2>
-                    <p className="text-gray-600 mb-4">{selectedProject.description || 'No description provided'}</p>
+                    <h2 className="text-2xl font-bold text-[var(--spotify-white)] mb-2">{selectedProject.project_name}</h2>
+                    <p className="text-[var(--spotify-light-text)] mb-4">{selectedProject.description || 'No description provided'}</p>
                     
                     <div className="flex items-center gap-6 text-sm text-gray-500">
                       <div className="flex items-center">
@@ -341,23 +327,23 @@ export default function Dashboard() {
                   {/* Left Column - Main Content */}
                   <div className="lg:col-span-2 space-y-6">
                     {/* Reports & Dossiers */}
-                    <div className="bg-gray-50 rounded-lg p-6">
+                    <div className="bg-[var(--spotify-medium-gray)] rounded-lg p-6 border border-[var(--spotify-border-gray)]">
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                        <h3 className="text-lg font-semibold text-[var(--spotify-white)] flex items-center">
                           <BeakerIcon className="h-5 w-5 mr-2" />
                           Reports & Dossiers
                         </h3>
-                        <button 
+                        <button
                           onClick={() => window.location.href = `/project/${selectedProject.project_id}`}
-                          className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                          className="px-3 py-1 text-sm bg-[var(--spotify-green)] text-[var(--spotify-black)] rounded hover:bg-[var(--spotify-green-hover)] font-medium transition-colors"
                         >
                           New Report
                         </button>
                       </div>
                       {loadingDetails ? (
                         <div className="text-center py-8">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                          <p className="text-gray-500 mt-2">Loading reports...</p>
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--spotify-green)] mx-auto"></div>
+                          <p className="text-[var(--spotify-light-text)] mt-2">Loading reports...</p>
                         </div>
                       ) : projectDetails?.reports?.length > 0 ? (
                         <div className="space-y-3">
@@ -423,45 +409,45 @@ export default function Dashboard() {
                   {/* Right Column - Sidebar */}
                   <div className="space-y-6">
                     {/* Project Info */}
-                    <div className="bg-gray-50 rounded-lg p-6">
-                      <h4 className="text-lg font-semibold text-gray-900 mb-4">Project Details</h4>
+                    <div className="bg-[var(--spotify-medium-gray)] rounded-lg p-6 border border-[var(--spotify-border-gray)]">
+                      <h4 className="text-lg font-semibold text-[var(--spotify-white)] mb-4">Project Details</h4>
                       <div className="space-y-3 text-sm">
                         <div>
-                          <span className="font-medium text-gray-700">Status:</span>
-                          <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
+                          <span className="font-medium text-[var(--spotify-light-text)]">Status:</span>
+                          <span className="ml-2 px-2 py-1 bg-[var(--spotify-green)] text-[var(--spotify-black)] rounded-full text-xs font-medium">
                             Active
                           </span>
                         </div>
                         <div>
-                          <span className="font-medium text-gray-700">Created:</span>
-                          <span className="ml-2 text-gray-600">{formatDate(selectedProject.created_at)}</span>
+                          <span className="font-medium text-[var(--spotify-light-text)]">Created:</span>
+                          <span className="ml-2 text-[var(--spotify-white)]">{formatDate(selectedProject.created_at)}</span>
                         </div>
                         <div>
-                          <span className="font-medium text-gray-700">Last Updated:</span>
-                          <span className="ml-2 text-gray-600">{formatDate(selectedProject.updated_at)}</span>
+                          <span className="font-medium text-[var(--spotify-light-text)]">Last Updated:</span>
+                          <span className="ml-2 text-[var(--spotify-white)]">{formatDate(selectedProject.updated_at)}</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Quick Actions */}
-                    <div className="bg-gray-50 rounded-lg p-6">
-                      <h4 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h4>
+                    <div className="bg-[var(--spotify-medium-gray)] rounded-lg p-6 border border-[var(--spotify-border-gray)]">
+                      <h4 className="text-lg font-semibold text-[var(--spotify-white)] mb-4">Quick Actions</h4>
                       <div className="space-y-2">
                         <Link
                           href={`/project/${selectedProject.project_id}`}
-                          className="block w-full text-left px-3 py-2 text-sm bg-blue-50 text-blue-700 rounded hover:bg-blue-100"
+                          className="block w-full text-left px-3 py-2 text-sm bg-[var(--spotify-blue)]/10 text-[var(--spotify-blue)] rounded hover:bg-[var(--spotify-blue)]/20 transition-colors"
                         >
                           Open Project Workspace
                         </Link>
-                        <button 
+                        <button
                           onClick={() => window.location.href = `/project/${selectedProject.project_id}`}
-                          className="w-full text-left px-3 py-2 text-sm bg-green-50 text-green-700 rounded hover:bg-green-100"
+                          className="w-full text-left px-3 py-2 text-sm bg-[var(--spotify-green)]/10 text-[var(--spotify-green)] rounded hover:bg-[var(--spotify-green)]/20 transition-colors"
                         >
                           Generate Summary Report
                         </button>
-                        <button 
+                        <button
                           onClick={() => window.location.href = `/project/${selectedProject.project_id}`}
-                          className="w-full text-left px-3 py-2 text-sm bg-purple-50 text-purple-700 rounded hover:bg-purple-100"
+                          className="w-full text-left px-3 py-2 text-sm bg-[var(--spotify-purple)]/10 text-[var(--spotify-purple)] rounded hover:bg-[var(--spotify-purple)]/20 transition-colors"
                         >
                           Invite Collaborators
                         </button>
@@ -522,13 +508,15 @@ export default function Dashboard() {
                   >
                     Cancel
                   </button>
-                  <button
+                  <Button
                     type="submit"
                     disabled={creating || !newProjectName.trim()}
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    variant="spotifyPrimary"
+                    size="spotifyDefault"
+                    className="flex-1"
                   >
                     {creating ? 'Creating...' : 'Create Project'}
-                  </button>
+                  </Button>
                 </div>
               </form>
             </div>

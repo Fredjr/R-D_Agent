@@ -1,0 +1,255 @@
+/* Palantir-Inspired Design System for R&D Agent */
+
+:root {
+  /* === PALANTIR COLOR PALETTE === */
+  
+  /* Primary Colors - Deep Blues */
+  --palantir-primary-900: #0A1628;  /* Darkest blue - headers, primary text */
+  --palantir-primary-800: #1C2B3A;  /* Dark blue - navigation, cards */
+  --palantir-primary-700: #2D3E50;  /* Medium blue - borders, dividers */
+  --palantir-primary-600: #3E5266;  /* Light blue - secondary elements */
+  --palantir-primary-500: #4F667C;  /* Lighter blue - hover states */
+  --palantir-primary-400: #607892;  /* Muted blue - disabled states */
+  --palantir-primary-300: #7189A8;  /* Light muted - subtle backgrounds */
+  --palantir-primary-200: #829ABE;  /* Very light - borders */
+  --palantir-primary-100: #93ABD4;  /* Lightest - backgrounds */
+  --palantir-primary-50: #E8EDF5;   /* Almost white - page backgrounds */
+
+  /* Accent Colors */
+  --palantir-accent-blue: #2196F3;    /* Bright blue - CTAs, links */
+  --palantir-accent-cyan: #00BCD4;    /* Cyan - data visualization */
+  --palantir-accent-teal: #009688;    /* Teal - success states */
+  --palantir-accent-orange: #FF9800;  /* Orange - warnings */
+  --palantir-accent-red: #F44336;     /* Red - errors, destructive */
+  --palantir-accent-purple: #9C27B0;  /* Purple - special features */
+  --palantir-accent-green: #4CAF50;   /* Green - success, completed */
+
+  /* Neutral Grays */
+  --palantir-gray-900: #0F1419;  /* Almost black */
+  --palantir-gray-800: #1A1F24;  /* Very dark gray */
+  --palantir-gray-700: #2A3038;  /* Dark gray */
+  --palantir-gray-600: #3A424C;  /* Medium gray */
+  --palantir-gray-500: #4A5560;  /* Mid gray */
+  --palantir-gray-400: #5A6674;  /* Light gray */
+  --palantir-gray-300: #6A7788;  /* Lighter gray */
+  --palantir-gray-200: #8A95A6;  /* Very light gray */
+  --palantir-gray-100: #AAB5C4;  /* Almost white gray */
+  --palantir-gray-50: #F5F7FA;   /* Background gray */
+
+  /* Semantic Colors */
+  --palantir-success: var(--palantir-accent-green);
+  --palantir-warning: var(--palantir-accent-orange);
+  --palantir-error: var(--palantir-accent-red);
+  --palantir-info: var(--palantir-accent-blue);
+
+  /* === TYPOGRAPHY === */
+  --palantir-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --palantir-font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+
+  /* Font Sizes */
+  --palantir-text-xs: 0.75rem;    /* 12px */
+  --palantir-text-sm: 0.875rem;   /* 14px */
+  --palantir-text-base: 1rem;     /* 16px */
+  --palantir-text-lg: 1.125rem;   /* 18px */
+  --palantir-text-xl: 1.25rem;    /* 20px */
+  --palantir-text-2xl: 1.5rem;    /* 24px */
+  --palantir-text-3xl: 1.875rem;  /* 30px */
+  --palantir-text-4xl: 2.25rem;   /* 36px */
+
+  /* Font Weights */
+  --palantir-font-light: 300;
+  --palantir-font-normal: 400;
+  --palantir-font-medium: 500;
+  --palantir-font-semibold: 600;
+  --palantir-font-bold: 700;
+
+  /* Line Heights */
+  --palantir-leading-tight: 1.25;
+  --palantir-leading-normal: 1.5;
+  --palantir-leading-relaxed: 1.75;
+
+  /* === SPACING === */
+  --palantir-space-1: 0.25rem;   /* 4px */
+  --palantir-space-2: 0.5rem;    /* 8px */
+  --palantir-space-3: 0.75rem;   /* 12px */
+  --palantir-space-4: 1rem;      /* 16px */
+  --palantir-space-5: 1.25rem;   /* 20px */
+  --palantir-space-6: 1.5rem;    /* 24px */
+  --palantir-space-8: 2rem;      /* 32px */
+  --palantir-space-10: 2.5rem;   /* 40px */
+  --palantir-space-12: 3rem;     /* 48px */
+  --palantir-space-16: 4rem;     /* 64px */
+
+  /* === BORDER RADIUS === */
+  --palantir-radius-sm: 0.25rem;   /* 4px */
+  --palantir-radius-md: 0.375rem;  /* 6px */
+  --palantir-radius-lg: 0.5rem;    /* 8px */
+  --palantir-radius-xl: 0.75rem;   /* 12px */
+  --palantir-radius-2xl: 1rem;     /* 16px */
+
+  /* === SHADOWS === */
+  --palantir-shadow-sm: 0 1px 2px 0 rgba(10, 22, 40, 0.05);
+  --palantir-shadow-md: 0 4px 6px -1px rgba(10, 22, 40, 0.1), 0 2px 4px -1px rgba(10, 22, 40, 0.06);
+  --palantir-shadow-lg: 0 10px 15px -3px rgba(10, 22, 40, 0.1), 0 4px 6px -2px rgba(10, 22, 40, 0.05);
+  --palantir-shadow-xl: 0 20px 25px -5px rgba(10, 22, 40, 0.1), 0 10px 10px -5px rgba(10, 22, 40, 0.04);
+
+  /* === TRANSITIONS === */
+  --palantir-transition-fast: 150ms ease-in-out;
+  --palantir-transition-normal: 250ms ease-in-out;
+  --palantir-transition-slow: 350ms ease-in-out;
+
+  /* === Z-INDEX === */
+  --palantir-z-dropdown: 1000;
+  --palantir-z-sticky: 1020;
+  --palantir-z-fixed: 1030;
+  --palantir-z-modal-backdrop: 1040;
+  --palantir-z-modal: 1050;
+  --palantir-z-popover: 1060;
+  --palantir-z-tooltip: 1070;
+  --palantir-z-toast: 1080;
+
+  /* === COMPONENT SPECIFIC === */
+  
+  /* Buttons */
+  --palantir-button-height-sm: 2rem;     /* 32px */
+  --palantir-button-height-md: 2.5rem;   /* 40px */
+  --palantir-button-height-lg: 3rem;     /* 48px */
+
+  /* Cards */
+  --palantir-card-bg: #FFFFFF;
+  --palantir-card-border: var(--palantir-gray-200);
+  --palantir-card-shadow: var(--palantir-shadow-md);
+
+  /* Navigation */
+  --palantir-nav-bg: var(--palantir-primary-800);
+  --palantir-nav-text: #FFFFFF;
+  --palantir-nav-text-muted: var(--palantir-gray-300);
+  --palantir-nav-border: var(--palantir-primary-700);
+
+  /* Sidebar */
+  --palantir-sidebar-bg: var(--palantir-primary-50);
+  --palantir-sidebar-border: var(--palantir-primary-200);
+  --palantir-sidebar-width: 20rem; /* 320px */
+
+  /* Network View */
+  --palantir-network-bg: #FAFBFC;
+  --palantir-network-node-primary: var(--palantir-accent-blue);
+  --palantir-network-node-secondary: var(--palantir-accent-cyan);
+  --palantir-network-edge: var(--palantir-gray-400);
+  --palantir-network-selected: var(--palantir-accent-orange);
+}
+
+/* === DARK MODE OVERRIDES === */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --palantir-card-bg: var(--palantir-primary-800);
+    --palantir-card-border: var(--palantir-primary-600);
+    --palantir-sidebar-bg: var(--palantir-primary-900);
+    --palantir-network-bg: var(--palantir-primary-900);
+  }
+}
+
+/* === UTILITY CLASSES === */
+
+/* Background Colors */
+.bg-palantir-primary { background-color: var(--palantir-primary-800); }
+.bg-palantir-surface { background-color: var(--palantir-card-bg); }
+.bg-palantir-muted { background-color: var(--palantir-gray-50); }
+
+/* Text Colors */
+.text-palantir-primary { color: var(--palantir-primary-900); }
+.text-palantir-secondary { color: var(--palantir-gray-600); }
+.text-palantir-muted { color: var(--palantir-gray-400); }
+.text-palantir-accent { color: var(--palantir-accent-blue); }
+
+/* Border Colors */
+.border-palantir-primary { border-color: var(--palantir-primary-200); }
+.border-palantir-muted { border-color: var(--palantir-gray-200); }
+
+/* Shadows */
+.shadow-palantir-sm { box-shadow: var(--palantir-shadow-sm); }
+.shadow-palantir-md { box-shadow: var(--palantir-shadow-md); }
+.shadow-palantir-lg { box-shadow: var(--palantir-shadow-lg); }
+
+/* Transitions */
+.transition-palantir { transition: all var(--palantir-transition-normal); }
+
+/* Typography */
+.font-palantir { font-family: var(--palantir-font-family); }
+.font-palantir-mono { font-family: var(--palantir-font-mono); }
+
+/* Custom Scrollbars - Palantir Style */
+.scrollbar-palantir::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollbar-palantir::-webkit-scrollbar-track {
+  background: var(--palantir-gray-100);
+  border-radius: var(--palantir-radius-sm);
+}
+
+.scrollbar-palantir::-webkit-scrollbar-thumb {
+  background: var(--palantir-gray-400);
+  border-radius: var(--palantir-radius-sm);
+  border: 1px solid var(--palantir-gray-200);
+}
+
+.scrollbar-palantir::-webkit-scrollbar-thumb:hover {
+  background: var(--palantir-gray-500);
+}
+
+/* Network View Specific */
+.network-node-primary {
+  background: var(--palantir-network-node-primary);
+  border: 2px solid var(--palantir-primary-200);
+}
+
+.network-node-secondary {
+  background: var(--palantir-network-node-secondary);
+  border: 2px solid var(--palantir-primary-200);
+}
+
+.network-node-selected {
+  background: var(--palantir-network-selected);
+  border: 2px solid var(--palantir-primary-600);
+  box-shadow: var(--palantir-shadow-lg);
+}
+
+/* Card Styles */
+.card-palantir {
+  background: var(--palantir-card-bg);
+  border: 1px solid var(--palantir-card-border);
+  border-radius: var(--palantir-radius-lg);
+  box-shadow: var(--palantir-card-shadow);
+  transition: all var(--palantir-transition-normal);
+}
+
+.card-palantir:hover {
+  box-shadow: var(--palantir-shadow-lg);
+  border-color: var(--palantir-primary-300);
+}
+
+/* Navigation Styles */
+.nav-palantir {
+  background: var(--palantir-nav-bg);
+  color: var(--palantir-nav-text);
+  border-bottom: 1px solid var(--palantir-nav-border);
+}
+
+.nav-item-palantir {
+  color: var(--palantir-nav-text-muted);
+  transition: color var(--palantir-transition-fast);
+}
+
+.nav-item-palantir:hover,
+.nav-item-palantir.active {
+  color: var(--palantir-nav-text);
+}
+
+/* Sidebar Styles */
+.sidebar-palantir {
+  background: var(--palantir-sidebar-bg);
+  border-right: 1px solid var(--palantir-sidebar-border);
+  width: var(--palantir-sidebar-width);
+}

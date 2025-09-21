@@ -40,6 +40,34 @@ export default function SignUp() {
       await signup(email.trim(), password);
       router.push('/auth/complete-profile');
     } catch (error: any) {
+      if (error.message === 'User already exists') {
+        // Check if this is an incomplete registration
+        try {
+          const checkResponse = await fetch('/api/proxy/auth/check-incomplete-registration', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email: email.trim(), password }),
+          });
+
+          if (checkResponse.ok) {
+            const checkData = await checkResponse.json();
+            if (checkData.status === 'incomplete') {
+              setError('Account exists but registration is incomplete. Redirecting to complete your profile...');
+              setTimeout(() => {
+                router.push('/auth/complete-profile');
+              }, 2000);
+              return;
+            } else if (checkData.status === 'complete') {
+              setError('Account already exists and is complete. Please use the Sign In page instead.');
+              return;
+            }
+          }
+        } catch (checkError) {
+          console.error('Error checking registration status:', checkError);
+        }
+      }
       setError(error.message || 'Sign up failed. Please try again.');
     } finally {
       setIsLoading(false);
