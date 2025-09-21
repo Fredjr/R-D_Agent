@@ -3829,6 +3829,66 @@ async def debug_user_status(email: str, db: Session = Depends(get_db)):
             "can_signin": False
         }
 
+@app.get("/debug/user/{email}/collections")
+async def debug_user_collections(email: str, db: Session = Depends(get_db)):
+    """Debug endpoint to check user's collections and articles"""
+    try:
+        user = db.query(User).filter(User.email == email).first()
+        if not user:
+            return {"email": email, "status": "user_not_found"}
+
+        # Get collections by email
+        collections_by_email = db.query(Collection).filter(Collection.created_by == email).all()
+
+        # Get collections by UUID
+        collections_by_uuid = db.query(Collection).filter(Collection.created_by == user.user_id).all()
+
+        # Get article collections
+        article_collections_by_email = db.query(ArticleCollection).join(Collection).filter(
+            Collection.created_by == email
+        ).all()
+
+        article_collections_by_uuid = db.query(ArticleCollection).join(Collection).filter(
+            Collection.created_by == user.user_id
+        ).all()
+
+        return {
+            "user": {
+                "email": user.email,
+                "user_id": user.user_id,
+                "registration_completed": user.registration_completed
+            },
+            "collections_by_email": len(collections_by_email),
+            "collections_by_uuid": len(collections_by_uuid),
+            "article_collections_by_email": len(article_collections_by_email),
+            "article_collections_by_uuid": len(article_collections_by_uuid),
+            "collections_details": [
+                {
+                    "id": c.collection_id,
+                    "name": c.name,
+                    "created_by": c.created_by,
+                    "project_id": c.project_id
+                } for c in collections_by_email + collections_by_uuid
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Error in debug collections endpoint: {e}")
+        return {"error": str(e), "email": email}
+
+@app.post("/debug/clear-cache")
+async def clear_recommendation_cache():
+    """Clear recommendation cache"""
+    try:
+        if hasattr(ai_recommendations_service, 'user_behavior_cache'):
+            ai_recommendations_service.user_behavior_cache.clear()
+        if hasattr(ai_recommendations_service, 'recommendation_cache'):
+            ai_recommendations_service.recommendation_cache.clear()
+
+        return {"status": "success", "message": "Recommendation cache cleared"}
+    except Exception as e:
+        logger.error(f"Error clearing cache: {e}")
+        return {"error": str(e)}
+
 # Authentication Models
 class AuthRequest(BaseModel):
     email: str = Field(..., description="User email address")
