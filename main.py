@@ -3889,6 +3889,48 @@ async def clear_recommendation_cache():
         logger.error(f"Error clearing cache: {e}")
         return {"error": str(e)}
 
+@app.post("/debug/repair-user/{email}")
+async def repair_user_account(email: str, password: str, db: Session = Depends(get_db)):
+    """Repair user account - complete registration and set password"""
+    try:
+        user = db.query(User).filter(User.email == email).first()
+        if not user:
+            return {"error": "User not found", "email": email}
+
+        # Set password hash
+        from passlib.context import CryptContext
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        user.password_hash = pwd_context.hash(password)
+
+        # Complete registration
+        user.registration_completed = True
+        user.is_active = True
+        user.can_signin = True
+
+        # Set basic profile info if missing
+        if not user.first_name:
+            user.first_name = "Fred"
+        if not user.last_name:
+            user.last_name = "Le"
+        if not user.subject_area:
+            user.subject_area = "Medical Research"
+
+        db.commit()
+
+        return {
+            "status": "success",
+            "message": "User account repaired",
+            "user_id": user.user_id,
+            "email": user.email,
+            "registration_completed": user.registration_completed,
+            "can_signin": user.can_signin
+        }
+
+    except Exception as e:
+        logger.error(f"Error repairing user account: {e}")
+        db.rollback()
+        return {"error": str(e)}
+
 # Authentication Models
 class AuthRequest(BaseModel):
     email: str = Field(..., description="User email address")
