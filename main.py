@@ -3783,6 +3783,87 @@ async def debug_get_background_task_status(task_id: str):
     result = _background_test_results.get(task_id, {"status": "processing", "message": "Task still running or not found"})
     return {"task_id": task_id, **result}
 
+@app.get("/debug/user/{email}")
+async def debug_user_status(email: str, db: Session = Depends(get_db)):
+    """Debug endpoint to check user account status"""
+    try:
+        user = db.query(User).filter(User.email == email).first()
+
+        if not user:
+            return {
+                "email": email,
+                "status": "not_found",
+                "message": "No user account found with this email",
+                "can_signup": True,
+                "can_signin": False
+            }
+
+        return {
+            "email": email,
+            "status": "found",
+            "user_id": user.user_id,
+            "username": user.username,
+            "registration_completed": user.registration_completed,
+            "is_active": user.is_active,
+            "has_password": bool(user.password_hash),
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "category": user.category,
+            "role": user.role,
+            "institution": user.institution,
+            "can_signup": False,
+            "can_signin": user.registration_completed and bool(user.password_hash),
+            "message": "User found" if user.registration_completed else "User exists but registration incomplete"
+        }
+
+    except Exception as e:
+        return {
+            "email": email,
+            "status": "error",
+            "message": f"Error checking user: {str(e)}",
+            "can_signup": False,
+            "can_signin": False
+        }
+
+@app.post("/auth/check-incomplete-registration")
+async def check_incomplete_registration(auth_data: AuthRequest, db: Session = Depends(get_db)):
+    """Check if user has incomplete registration and can proceed to complete it"""
+    try:
+        user = db.query(User).filter(User.email == auth_data.email).first()
+
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Verify password first
+        if not verify_password(auth_data.password, user.password_hash):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+
+        if user.registration_completed:
+            # User can sign in normally
+            return {
+                "status": "complete",
+                "message": "Registration is complete, use signin endpoint",
+                "user_id": user.user_id,
+                "email": user.email,
+                "username": user.username
+            }
+        else:
+            # User needs to complete registration
+            return {
+                "status": "incomplete",
+                "message": "Registration incomplete, proceed to complete profile",
+                "user_id": user.user_id,
+                "email": user.email,
+                "username": user.username,
+                "needs_completion": True
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error checking registration: {str(e)}")
+
 @app.get("/debug/email")
 async def debug_email_config():
     """Debug endpoint to check email configuration"""
@@ -7881,6 +7962,60 @@ async def _run_deepdive_chain(prompt: PromptTemplate, objective: str, full_text:
     return data
 
 
+@app.post("/deep-dive-async")
+async def deep_dive_async(request: DeepDiveRequest, http_request: Request, db: Session = Depends(get_db)):
+    """Start async deep-dive job and return job ID for polling"""
+    current_user = http_request.headers.get("User-ID", "default_user")
+
+    # Create analysis record with "processing" status
+    analysis_id = str(uuid.uuid4())
+    analysis = DeepDiveAnalysis(
+        analysis_id=analysis_id,
+        project_id=request.project_id or "standalone",  # Use standalone if no project
+        article_pmid=request.pmid,
+        article_url=request.url,
+        article_title=request.title or "Unknown Article",
+        created_by=current_user,
+        processing_status="processing"
+    )
+
+    db.add(analysis)
+    db.commit()
+
+    # Launch background task
+    async def process_deep_dive_background():
+        try:
+            print(f"🚀 Starting async deep-dive processing for: {analysis_id}")
+
+            # Process the deep-dive using existing logic
+            await process_deep_dive_analysis(analysis, request, db, current_user)
+
+            print(f"✅ Async deep-dive completed for: {analysis_id}")
+
+        except Exception as e:
+            print(f"💥 Async deep-dive failed for {analysis_id}: {e}")
+            # Update status to failed
+            try:
+                db_error = SessionLocal()
+                analysis_error = db_error.query(DeepDiveAnalysis).filter(DeepDiveAnalysis.analysis_id == analysis_id).first()
+                if analysis_error:
+                    analysis_error.processing_status = "failed"
+                    db_error.commit()
+                db_error.close()
+            except Exception as db_error:
+                print(f"💥 Failed to update analysis error status: {db_error}")
+
+    # Launch background task
+    asyncio.create_task(process_deep_dive_background())
+
+    # Return job info immediately
+    return {
+        "job_id": analysis_id,
+        "status": "processing",
+        "message": "Deep-dive analysis started. Use the job_id to check status.",
+        "poll_url": f"/jobs/{analysis_id}/status"
+    }
+
 @app.post("/deep-dive")
 async def deep_dive(request: DeepDiveRequest, db: Session = Depends(get_db)):
     t0 = _now_ms()
@@ -8435,6 +8570,153 @@ async def generate_review(request: ReviewRequest, http_request: Request, db: Ses
     """Generate a summary report (legacy endpoint)"""
     current_user = http_request.headers.get("User-ID", "default_user")
     return await generate_review_internal(request, db, current_user)
+
+@app.post("/generate-review-async")
+async def generate_review_async(request: ReviewRequest, http_request: Request, db: Session = Depends(get_db)):
+    """Start async generate-review job and return job ID for polling"""
+    current_user = http_request.headers.get("User-ID", "default_user")
+
+    # Create report record with "processing" status
+    report_id = str(uuid.uuid4())
+    report = Report(
+        report_id=report_id,
+        project_id=request.project_id,
+        title=f"Research Report: {request.molecule}" if request.molecule else "Research Report",
+        objective=request.objective,
+        molecule=request.molecule,
+        clinical_mode=request.clinical_mode,
+        dag_mode=request.dag_mode,
+        full_text_only=request.full_text_only,
+        preference=request.preference,
+        created_by=current_user,
+        content={},  # Empty content initially
+        status="processing",  # Set to processing
+        article_count=0
+    )
+
+    db.add(report)
+    db.commit()
+
+    # Launch background task
+    async def process_review_background():
+        try:
+            print(f"🚀 Starting async review processing for: {report_id}")
+
+            # Process the review
+            report_content = await generate_review_internal(request, db, current_user)
+
+            # Update report with results
+            db_update = SessionLocal()
+            report_update = db_update.query(Report).filter(Report.report_id == report_id).first()
+            if report_update:
+                report_update.content = report_content
+                report_update.status = "completed"
+                report_update.article_count = len(report_content.get("results", []))
+                db_update.commit()
+                print(f"✅ Async review completed for: {report_id}")
+            db_update.close()
+
+        except Exception as e:
+            print(f"💥 Async review failed for {report_id}: {e}")
+            # Update status to failed
+            try:
+                db_error = SessionLocal()
+                report_error = db_error.query(Report).filter(Report.report_id == report_id).first()
+                if report_error:
+                    report_error.status = "failed"
+                    db_error.commit()
+                db_error.close()
+            except Exception as db_error:
+                print(f"💥 Failed to update report error status: {db_error}")
+
+    # Launch background task
+    asyncio.create_task(process_review_background())
+
+    # Return job info immediately
+    return {
+        "job_id": report_id,
+        "status": "processing",
+        "message": "Review generation started. Use the job_id to check status.",
+        "poll_url": f"/jobs/{report_id}/status"
+    }
+
+@app.get("/jobs/{job_id}/status")
+async def get_job_status(job_id: str, request: Request, db: Session = Depends(get_db)):
+    """Get status of async job (works for both reports and deep-dive analyses)"""
+    current_user = request.headers.get("User-ID", "default_user")
+
+    # Check if it's a report
+    report = db.query(Report).filter(Report.report_id == job_id).first()
+    if report:
+        # Verify user has access
+        if report.created_by != current_user:
+            # Check if user has project access
+            project = db.query(Project).filter(
+                Project.project_id == report.project_id,
+                or_(
+                    Project.owner_user_id == current_user,
+                    Project.project_id.in_(
+                        db.query(ProjectCollaborator.project_id).filter(
+                            ProjectCollaborator.user_id == current_user,
+                            ProjectCollaborator.is_active == True
+                        )
+                    )
+                )
+            ).first()
+            if not project:
+                raise HTTPException(status_code=403, detail="Access denied")
+
+        return {
+            "job_id": job_id,
+            "job_type": "generate-review",
+            "status": report.status,
+            "created_at": report.created_at,
+            "result": report.content if report.status == "completed" else None,
+            "article_count": report.article_count if report.status == "completed" else 0
+        }
+
+    # Check if it's a deep-dive analysis
+    analysis = db.query(DeepDiveAnalysis).filter(DeepDiveAnalysis.analysis_id == job_id).first()
+    if analysis:
+        # Verify user has access
+        if analysis.created_by != current_user:
+            # Check if user has project access
+            project = db.query(Project).filter(
+                Project.project_id == analysis.project_id,
+                or_(
+                    Project.owner_user_id == current_user,
+                    Project.project_id.in_(
+                        db.query(ProjectCollaborator.project_id).filter(
+                            ProjectCollaborator.user_id == current_user,
+                            ProjectCollaborator.is_active == True
+                        )
+                    )
+                )
+            ).first()
+            if not project:
+                raise HTTPException(status_code=403, detail="Access denied")
+
+        result = None
+        if analysis.processing_status == "completed":
+            result = {
+                "scientific_model_analysis": analysis.scientific_model_analysis,
+                "experimental_methods_analysis": analysis.experimental_methods_analysis,
+                "results_interpretation_analysis": analysis.results_interpretation_analysis,
+                "article_title": analysis.article_title,
+                "article_pmid": analysis.article_pmid,
+                "article_url": analysis.article_url
+            }
+
+        return {
+            "job_id": job_id,
+            "job_type": "deep-dive",
+            "status": analysis.processing_status,
+            "created_at": analysis.created_at,
+            "result": result
+        }
+
+    # Job not found
+    raise HTTPException(status_code=404, detail="Job not found")
 
 async def generate_review_internal(request: ReviewRequest, db: Session, current_user: str = None):
     req_start = _now_ms()

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui';
 import { useGlobalCollectionSync } from '../hooks/useGlobalCollectionSync';
 import { NetworkNode } from './NetworkView';
 
@@ -321,7 +322,8 @@ export default function NetworkSidebar({
               section,
               mode,
               explorationType: `${section}-${mode}`,
-              sampleResult: results[0]
+              sampleResult: results[0],
+              allResults: results
             });
 
             // Create a new column with the exploration results
@@ -336,12 +338,20 @@ export default function NetworkSidebar({
               }
             };
 
+            console.log('🔍 Column data being passed:', {
+              hasExplorationType: !!columnData.metadata.explorationType,
+              hasExplorationResults: !!columnData.metadata.explorationResults,
+              explorationResultsLength: columnData.metadata.explorationResults?.length,
+              columnData
+            });
+
             // Add a small delay to ensure the callback is properly executed
             // Clear any existing timeout first
             if (timeoutRef.current) {
               clearTimeout(timeoutRef.current);
             }
             timeoutRef.current = setTimeout(() => {
+              console.log('🚀 Calling onCreatePaperColumn with:', columnData);
               onCreatePaperColumn(columnData);
               timeoutRef.current = null;
             }, 100);
@@ -350,7 +360,8 @@ export default function NetworkSidebar({
               hasResults: results.length > 0,
               hasCreateColumnCallback: !!onCreatePaperColumn,
               hasSelectedNode: !!selectedNode,
-              selectedNodeId: selectedNode?.id
+              selectedNodeId: selectedNode?.id,
+              resultsData: results
             });
           }
         } else {
@@ -465,9 +476,9 @@ export default function NetworkSidebar({
   const { metadata } = selectedNode;
 
   return (
-    <div className="w-80 bg-white border-l border-gray-200 flex flex-col h-full">
+    <div className="w-full h-full bg-white border-l border-gray-200 flex flex-col overflow-y-auto">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 flex justify-between items-start">
+      <div className="p-4 border-b border-gray-200 flex justify-between items-start flex-shrink-0">
         <div className="flex-1">
           <div className="text-xs text-gray-500 mb-1">
             Article
@@ -536,20 +547,23 @@ export default function NetworkSidebar({
         {/* Quick Action Buttons - Compact */}
         <div className="mt-2 flex gap-1">
           {metadata.url && (
-            <a
-              href={metadata.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 px-2 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 text-center transition-colors"
+            <Button
+              variant="default"
+              size="sm"
+              className="flex-1 text-xs"
+              onClick={() => window.open(metadata.url, '_blank', 'noopener,noreferrer')}
               title="View Full Paper"
             >
               📄 View
-            </a>
+            </Button>
           )}
 
           {/* Create Paper Column Button - Compact */}
           {showCreateColumnButton && onCreatePaperColumn && (
-            <button
+            <Button
+              variant="success"
+              size="sm"
+              className="flex-1 text-xs"
               onClick={() => {
                 console.log('🎯 Create Paper Column button clicked!', selectedNode);
                 if (selectedNode) {
@@ -558,25 +572,24 @@ export default function NetworkSidebar({
                   console.error('❌ No selected node for column creation');
                 }
               }}
-              className="flex-1 px-2 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
               title="Create Paper Column"
             >
               ➕ Column
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
-      {/* 📋 AUDIT TRAIL: Research Path Tracking */}
+      {/* 📋 AUDIT TRAIL: Research Path Tracking - Compact */}
       {explorationPath.length > 0 && (
-        <div className="p-3 border-b border-gray-200 bg-blue-50">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+        <div className="p-2 border-b border-gray-200 bg-blue-50 flex-shrink-0">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
               <span className="text-white text-xs">📋</span>
             </div>
-            <h4 className="text-sm font-medium text-blue-800">Research Path</h4>
+            <h4 className="text-xs font-medium text-blue-800">Research Path</h4>
           </div>
-          <div className="space-y-1 max-h-32 overflow-y-auto">
+          <div className="space-y-1 max-h-20 overflow-y-auto">
             {explorationPath.slice(-5).map((entry, index) => (
               <div key={index} className="text-xs bg-white rounded p-2 border border-blue-200">
                 <div className="font-medium text-blue-900 truncate" title={entry.title}>
@@ -602,44 +615,51 @@ export default function NetworkSidebar({
         </div>
       )}
 
-      {/* ResearchRabbit-style Exploration Sections - Scrollable */}
-      <div className="flex-1 overflow-y-auto min-h-0" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+      {/* Navigation Instructions - Compact */}
+      <div className="p-2 border-b border-gray-200 bg-yellow-50 flex-shrink-0">
+        <div className="text-xs text-yellow-800">
+          <div className="font-medium mb-1">🧭 Navigation:</div>
+          <div className="space-y-0.5">
+            <div>• <strong>Cards</strong> → Explore article</div>
+            <div>• <strong>Nodes</strong> → See connections</div>
+            <div>• Buttons create new columns →</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ResearchRabbit-style Exploration Sections */}
+      <div className="flex-shrink-0">
         {/* Explore Papers Section */}
         <div className="border-b border-gray-200">
           <div className="p-3 bg-gray-50">
             <h4 className="font-medium text-sm text-gray-900">📄 Explore Papers</h4>
+            <p className="text-xs text-gray-600 mt-1">Creates columns with article cards</p>
           </div>
           <div className="p-2 space-y-1">
-            <button
+            <Button
+              variant={expandedSection === 'papers' && explorationMode === 'similar' ? 'default' : 'outline'}
+              size="sm"
+              className="w-full text-xs justify-start"
               onClick={() => handleExploreSection('papers', 'similar')}
-              className={`w-full px-3 py-2 text-xs rounded transition-colors text-left ${
-                expandedSection === 'papers' && explorationMode === 'similar'
-                  ? 'bg-blue-100 text-blue-800 border border-blue-300'
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-              }`}
             >
               Similar Work
-            </button>
-            <button
+            </Button>
+            <Button
+              variant={expandedSection === 'papers' && explorationMode === 'earlier' ? 'default' : 'outline'}
+              size="sm"
+              className="w-full text-xs justify-start"
               onClick={() => handleExploreSection('papers', 'earlier')}
-              className={`w-full px-3 py-2 text-xs rounded transition-colors text-left ${
-                expandedSection === 'papers' && explorationMode === 'earlier'
-                  ? 'bg-blue-100 text-blue-800 border border-blue-300'
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-              }`}
             >
               Earlier Work
-            </button>
-            <button
+            </Button>
+            <Button
+              variant={expandedSection === 'papers' && explorationMode === 'later' ? 'default' : 'outline'}
+              size="sm"
+              className="w-full text-xs justify-start"
               onClick={() => handleExploreSection('papers', 'later')}
-              className={`w-full px-3 py-2 text-xs rounded transition-colors text-left ${
-                expandedSection === 'papers' && explorationMode === 'later'
-                  ? 'bg-blue-100 text-blue-800 border border-blue-300'
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-              }`}
             >
               Later Work
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -647,28 +667,59 @@ export default function NetworkSidebar({
         <div className="border-b border-gray-200">
           <div className="p-3 bg-gray-50">
             <h4 className="font-medium text-sm text-gray-900">👥 Explore People</h4>
+            <p className="text-xs text-gray-600 mt-1">Creates columns with article cards</p>
           </div>
           <div className="p-2 space-y-1">
-            <button
+            <Button
+              variant={expandedSection === 'people' && explorationMode === 'authors' ? 'secondary' : 'outline'}
+              size="sm"
+              className="w-full text-xs justify-start"
               onClick={() => handleExploreSection('people', 'authors')}
-              className={`w-full px-3 py-2 text-xs rounded transition-colors text-left ${
-                expandedSection === 'people' && explorationMode === 'authors'
-                  ? 'bg-purple-100 text-purple-800 border border-purple-300'
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-              }`}
             >
               These Authors
-            </button>
-            <button
+            </Button>
+            <Button
+              variant={expandedSection === 'people' && explorationMode === 'suggested' ? 'secondary' : 'outline'}
+              size="sm"
+              className="w-full text-xs justify-start"
               onClick={() => handleExploreSection('people', 'suggested')}
-              className={`w-full px-3 py-2 text-xs rounded transition-colors text-left ${
-                expandedSection === 'people' && explorationMode === 'suggested'
-                  ? 'bg-purple-100 text-purple-800 border border-purple-300'
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-              }`}
             >
               Suggested Authors
-            </button>
+            </Button>
+          </div>
+        </div>
+
+        {/* Network Views Section */}
+        <div className="border-b border-gray-200">
+          <div className="p-3 bg-gray-50">
+            <h4 className="font-medium text-sm text-gray-900">🕸️ Network Views</h4>
+            <p className="text-xs text-gray-600 mt-1">Creates columns with connected nodes</p>
+          </div>
+          <div className="p-2 space-y-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full text-xs justify-start"
+              onClick={() => {
+                if (onShowCitations && selectedNode?.metadata?.pmid) {
+                  onShowCitations(selectedNode.metadata.pmid);
+                }
+              }}
+            >
+              Citations Network
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full text-xs justify-start"
+              onClick={() => {
+                if (onShowReferences && selectedNode?.metadata?.pmid) {
+                  onShowReferences(selectedNode.metadata.pmid);
+                }
+              }}
+            >
+              References Network
+            </Button>
           </div>
         </div>
 
@@ -676,6 +727,7 @@ export default function NetworkSidebar({
         <div className="border-b border-gray-200">
           <div className="p-3 bg-gray-50">
             <h4 className="font-medium text-sm text-gray-900">🔗 Explore Other Content</h4>
+            <p className="text-xs text-gray-600 mt-1">Creates columns with article cards</p>
           </div>
           <div className="p-2 space-y-1">
             <button
@@ -718,6 +770,7 @@ export default function NetworkSidebar({
                       <div
                         onClick={() => handleExplorationPaperClick(paper)}
                         className="cursor-pointer"
+                        title="Click to view details and explore this article"
                       >
                         <div className="font-medium text-xs text-gray-900 truncate">
                           {paper.title}
@@ -774,11 +827,11 @@ export default function NetworkSidebar({
         )}
       </div>
 
-      {/* Collection Management */}
-      <div className="p-4 border-b border-gray-200">
-        <h4 className="font-medium text-sm text-gray-900 mb-3">Add to Collection</h4>
+      {/* Collection Management - Compact */}
+      <div className="p-3 border-b border-gray-200 flex-shrink-0">
+        <h4 className="font-medium text-xs text-gray-900 mb-2">Add to Collection</h4>
 
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <select
             value={selectedCollection}
             onChange={(e) => setSelectedCollection(e.target.value)}
@@ -792,13 +845,17 @@ export default function NetworkSidebar({
             ))}
           </select>
 
-          <button
+          <Button
+            variant="success"
+            size="sm"
+            className="w-full text-xs"
             onClick={handleAddToCollection}
             disabled={!selectedCollection || isLoading}
-            className="w-full px-3 py-2 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+            loading={isLoading}
+            loadingText="Adding..."
           >
-            {isLoading ? 'Adding...' : '+ Add Paper'}
-          </button>
+            + Add Paper
+          </Button>
         </div>
       </div>
 
@@ -847,24 +904,30 @@ export default function NetworkSidebar({
             </div>
 
             <div className="flex gap-3">
-              <button
+              <Button
+                variant="secondary"
+                size="sm"
+                className="flex-1"
                 onClick={() => {
                   setShowSaveToCollectionModal(false);
                   setSelectedArticleToSave(null);
                   setSelectedCollection('');
                 }}
-                className="flex-1 px-4 py-2 text-gray-700 bg-gray-200 rounded hover:bg-gray-300 transition-colors"
                 disabled={savingToCollection}
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="success"
+                size="sm"
+                className="flex-1"
                 onClick={() => handleConfirmSaveToCollection(selectedCollection)}
                 disabled={!selectedCollection || savingToCollection}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                loading={savingToCollection}
+                loadingText="Saving..."
               >
-                {savingToCollection ? 'Saving...' : 'Save Article'}
-              </button>
+                Save Article
+              </Button>
             </div>
           </div>
         </div>

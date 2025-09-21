@@ -30,8 +30,12 @@ export default function SignIn() {
       await signin(email, password);
       router.push('/dashboard');
     } catch (error: any) {
+      if (error.message === 'INCOMPLETE_REGISTRATION') {
+        // Redirect to complete profile page
+        router.push('/auth/complete-profile');
+        return;
+      }
       setError(error.message || 'Sign in failed. Please try again.');
-      setError('Network error. Please try again.');
     } finally {
       setIsLoading(false);
     }

@@ -9,6 +9,20 @@ import ResultsList from '@/components/ResultsList';
 import NetworkViewWithSidebar from '@/components/NetworkViewWithSidebar';
 import MultiColumnNetworkView from '@/components/MultiColumnNetworkView';
 import Collections from '@/components/Collections';
+import { useAsyncJob } from '@/hooks/useAsyncJob';
+import { startReviewJob, startDeepDiveJob } from '@/lib/api';
+import AsyncJobProgress from '@/components/AsyncJobProgress';
+import {
+  Button,
+  Card,
+  CardHeader,
+  CardContent,
+  CardTitle,
+  CardDescription,
+  ProjectNavigation,
+  PageHeader,
+  ReportCard
+} from '@/components/ui';
 
 interface Project {
   project_id: string;
@@ -111,6 +125,27 @@ export default function ProjectPage() {
   const [reportTitle, setReportTitle] = useState<string>('');
   const [reportObjective, setReportObjective] = useState<string>('');
   const [generatingReport, setGeneratingReport] = useState(false);
+
+  // Async job management for generate-review
+  const reviewJob = useAsyncJob({
+    pollInterval: 5000, // 5 seconds
+    storageKey: `reviewJob_${projectId}`,
+    onComplete: (result) => {
+      // Handle completed review
+      const arr = Array.isArray(result?.results) ? result.results : [];
+      const enriched = arr.map((it: any) => ({ ...it, _objective: reportObjective, query: reportObjective }));
+
+      setReportResults(enriched);
+      setReportDiagnostics(result?.diagnostics ?? null);
+      setReportQueries(Array.isArray(result?.queries) ? result.queries : null);
+
+      alert(`✅ Report generated successfully!\n\nResults are displayed below and saved to the project.`);
+      fetchProjectData(); // Refresh project data
+    },
+    onError: (error) => {
+      alert(`❌ Failed to generate report: ${error}. Please try again.`);
+    }
+  });
 
   // Comprehensive project summary state
   const [comprehensiveSummary, setComprehensiveSummary] = useState<any>(null);
@@ -244,56 +279,30 @@ export default function ProjectPage() {
       setShowReportModal(false);
       setCreatingReport(false);
 
-      // Show user-friendly message
-      // Use the same endpoint and approach as Welcome Page
-      setGeneratingReport(true);
+      // Store report info for completion handler
+      setReportTitle(reportToGenerate.title);
+      setReportObjective(reportToGenerate.objective);
 
       try {
-        const response = await fetch('/api/proxy/generate-review', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'User-ID': user?.email || 'default_user',
-          },
-          body: JSON.stringify({
-            molecule: reportToGenerate.molecule,
-            objective: reportToGenerate.objective,
-            projectId: projectId, // Include projectId to save to database
-            clinicalMode: reportToGenerate.clinicalMode,
-            dagMode: reportToGenerate.dagMode,
-            fullTextOnly: reportToGenerate.fullTextOnly,
-            preference: reportToGenerate.preference
-          }),
+        // Start async job
+        const jobResponse = await startReviewJob({
+          molecule: reportToGenerate.molecule,
+          objective: reportToGenerate.objective,
+          projectId: projectId,
+          clinicalMode: reportToGenerate.clinicalMode,
+          dagMode: reportToGenerate.dagMode,
+          fullTextOnly: reportToGenerate.fullTextOnly,
+          preference: reportToGenerate.preference as 'precision' | 'recall'
         });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to generate report: ${errorText}`);
-        }
+        // Start polling for job completion
+        reviewJob.startJob(jobResponse.job_id);
 
-        const data = await response.json();
-
-        // Set the results to display them immediately (same as Welcome Page)
-        const arr = Array.isArray(data?.results) ? data.results : [];
-        const enriched = arr.map((it: any) => ({ ...it, _objective: reportToGenerate.objective, query: reportToGenerate.objective }));
-
-        setReportResults(enriched);
-        setReportDiagnostics(data?.diagnostics ?? null);
-        setReportQueries(Array.isArray(data?.queries) ? data.queries : null);
-        setReportTitle(reportToGenerate.title);
-        setReportObjective(reportToGenerate.objective);
-
-        // Show success message
-        alert(`✅ Report "${reportToGenerate.title}" generated successfully!\n\nResults are displayed below and saved to the project.`);
-
-        // Refresh project data to show the new report in the list
-        fetchProjectData();
+        alert(`🚀 Report generation started!\n\nThis process will continue in the background. You can close your browser and return later to check the results.`);
 
       } catch (error: any) {
-        console.error('Error generating report:', error);
-        alert(`❌ Failed to generate report: ${error.message || 'Unknown error'}. Please try again.`);
-      } finally {
-        setGeneratingReport(false);
+        console.error('Error starting report generation:', error);
+        alert(`❌ Failed to start report generation: ${error.message || 'Unknown error'}. Please try again.`);
       }
 
     } catch (err) {
@@ -539,22 +548,26 @@ export default function ProjectPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[var(--spotify-black)]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <div className="flex items-center gap-4 mb-4">
-            <a
-              href="/dashboard"
-              className="inline-flex items-center text-gray-600 hover:text-gray-900 text-sm"
-            >
-              ← Back to Projects
-            </a>
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900">{project.project_name}</h1>
-          {project.description && (
-            <p className="mt-2 text-gray-600">{project.description}</p>
-          )}
-        </div>
+        <PageHeader
+          title={project.project_name}
+          description={project.description}
+          breadcrumb={[
+            { label: 'Projects', href: '/dashboard' },
+            { label: project.project_name, current: true }
+          ]}
+          actions={
+            <div className="flex items-center space-x-3">
+              <Button variant="outline" size="sm">
+                Share Project
+              </Button>
+              <Button variant="spotifyPrimary" size="spotifySm">
+                Settings
+              </Button>
+            </div>
+          }
+        />
 
         {/* Action Buttons */}
         <div className="mb-8 flex flex-wrap gap-4">
@@ -606,50 +619,35 @@ export default function ProjectPage() {
 
         {/* Tab Navigation */}
         <div className="mb-8">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
-              <button
-                onClick={() => setActiveTab('overview')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'overview'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Overview
-              </button>
-              <button
-                onClick={() => setActiveTab('collections')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'collections'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Collections
-              </button>
-              <button
-                onClick={() => setActiveTab('network')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'network'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Network View
-              </button>
-              <button
-                onClick={() => setActiveTab('activity')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'activity'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Activity & Notes
-              </button>
-            </nav>
-          </div>
+          <ProjectNavigation
+            activeTab={activeTab}
+            onTabChange={(tab) => setActiveTab(tab as 'overview' | 'collections' | 'network' | 'activity')}
+            tabs={[
+              {
+                id: 'overview',
+                label: 'Overview',
+                icon: <span>📊</span>,
+                count: (project.reports?.length || 0) + ((project as any).deep_dives?.length || 0)
+              },
+              {
+                id: 'collections',
+                label: 'Collections',
+                icon: <span>📁</span>,
+                count: (project as any).collections?.length || 0
+              },
+              {
+                id: 'network',
+                label: 'Network View',
+                icon: <span>🕸️</span>
+              },
+              {
+                id: 'activity',
+                label: 'Activity & Notes',
+                icon: <span>📝</span>,
+                count: (project as any).annotations?.length || 0
+              }
+            ]}
+          />
         </div>
 
         {/* Add Note Modal */}
@@ -799,10 +797,10 @@ export default function ProjectPage() {
                   </button>
                   <button
                     type="submit"
-                    disabled={!reportData.title.trim() || !reportData.objective.trim() || !reportData.molecule.trim() || generatingReport}
+                    disabled={!reportData.title.trim() || !reportData.objective.trim() || !reportData.molecule.trim() || reviewJob.isProcessing}
                     className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-colors"
                   >
-                    {generatingReport ? 'Generating...' : 'Generate Report'}
+                    {reviewJob.isProcessing ? 'Starting Job...' : 'Generate Report'}
                   </button>
                 </div>
               </form>
@@ -1092,60 +1090,62 @@ export default function ProjectPage() {
             {/* Project Data Sections */}
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-8 mb-8">
           {/* Reports Section */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Reports ({project.reports?.length || 0})</h3>
-            {project.reports && project.reports.length > 0 ? (
-              <div className="space-y-3">
-                {project.reports.map((report) => (
-                  <div
-                    key={report.report_id}
-                    className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-md transition-all"
-                  >
-                    <div
-                      className="cursor-pointer"
+          <Card variant="default" padding="lg">
+            <CardHeader>
+              <CardTitle>Reports ({project.reports?.length || 0})</CardTitle>
+              <CardDescription>Generated research reports and analyses</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {project.reports && project.reports.length > 0 ? (
+                <div className="space-y-3">
+                  {project.reports.map((report) => (
+                    <ReportCard
+                      key={report.report_id}
+                      title={report.title}
+                      objective={report.objective}
+                      status="completed"
+                      createdAt={new Date(report.created_at).toLocaleDateString()}
                       onClick={() => window.open(`/report/${report.report_id}`, '_blank')}
+                      className="relative"
                     >
-                      <h4 className="font-medium text-gray-900 mb-1">{report.title}</h4>
-                      <p className="text-sm text-gray-600 mb-2">{report.objective}</p>
-                      <div className="flex justify-between items-center text-xs text-gray-500 mb-3">
-                        <span>By {report.created_by}</span>
-                        <span>{new Date(report.created_at).toLocaleDateString()}</span>
+                      <div className="absolute top-3 right-3 flex gap-2">
+                        <Button
+                          variant="success"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddToCollection({
+                              title: report.title,
+                              source: 'report',
+                              source_id: report.report_id,
+                              pmid: report.objective.match(/PMID[:\s]*(\d+)/i)?.[1]
+                            });
+                          }}
+                          title="Add articles from this report to a collection"
+                        >
+                          📚
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(`/report/${report.report_id}`, '_blank');
+                          }}
+                        >
+                          View
+                        </Button>
                       </div>
-                    </div>
-                    <div className="flex gap-2 pt-2 border-t border-gray-100">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAddToCollection({
-                            title: report.title,
-                            source: 'report',
-                            source_id: report.report_id,
-                            // Extract PMID from report if available
-                            pmid: report.objective.match(/PMID[:\s]*(\d+)/i)?.[1]
-                          });
-                        }}
-                        className="flex-1 px-3 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-                        title="Add articles from this report to a collection"
-                      >
-                        📚 Add to Collection
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          window.open(`/report/${report.report_id}`, '_blank');
-                        }}
-                        className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                      >
-                        View Report
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-500 text-sm">No reports yet. Create your first report to get started.</p>
-            )}
-          </div>
+                    </ReportCard>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[var(--palantir-gray-500)] text-sm">
+                  No reports yet. Create your first report to get started.
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Report Iterations Section */}
           <div className="bg-white rounded-lg shadow p-6">
@@ -1364,6 +1364,22 @@ export default function ProjectPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Async Job Progress */}
+        {reviewJob.jobId && (
+          <AsyncJobProgress
+            jobId={reviewJob.jobId}
+            status={reviewJob.status}
+            progress={reviewJob.progress}
+            error={reviewJob.error}
+            startedAt={reviewJob.startedAt}
+            completedAt={reviewJob.completedAt}
+            onCancel={reviewJob.cancelJob}
+            onReset={reviewJob.resetJob}
+            jobType="Generate Review"
+            className="mb-6"
+          />
         )}
 
         {/* Report Results Section (same as Welcome Page) */}

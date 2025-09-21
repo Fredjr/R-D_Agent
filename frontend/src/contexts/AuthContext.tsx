@@ -91,6 +91,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!response.ok) {
         const errorData = await response.json();
         const errorMessage = errorData.detail || 'Sign in failed';
+
+        // Check if this is a "Registration not completed" error
+        if (errorMessage === 'Registration not completed') {
+          console.log('⚠️ Registration incomplete, checking status...');
+
+          // Try the incomplete registration check
+          const checkResponse = await fetch('/api/proxy/auth/check-incomplete-registration', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email, password }),
+          });
+
+          if (checkResponse.ok) {
+            const checkData = await checkResponse.json();
+            if (checkData.status === 'incomplete') {
+              // Store partial user data and redirect to complete profile
+              const partialUser: User = {
+                user_id: checkData.user_id,
+                username: checkData.username,
+                email: checkData.email,
+                created_at: new Date().toISOString(),
+                registration_completed: false
+              };
+
+              setUser(partialUser);
+              localStorage.setItem('rd_agent_user', JSON.stringify(partialUser));
+
+              // Throw a specific error that the UI can handle
+              throw new Error('INCOMPLETE_REGISTRATION');
+            }
+          }
+        }
+
         console.error('❌ Sign in failed:', errorMessage);
         throw new Error(errorMessage);
       }

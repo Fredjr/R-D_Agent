@@ -102,6 +102,13 @@ export default function MultiColumnNetworkView({
 
     // Check if this is an exploration column (has exploration results)
     const isExplorationColumn = paper.metadata.explorationType && paper.metadata.explorationResults;
+    console.log('🔍 Exploration column check:', {
+      hasExplorationType: !!paper.metadata.explorationType,
+      hasExplorationResults: !!paper.metadata.explorationResults,
+      explorationResultsLength: paper.metadata.explorationResults?.length,
+      isExplorationColumn,
+      explorationType: paper.metadata.explorationType
+    });
     const columnId = isExplorationColumn
       ? `exploration-${paper.metadata.pmid}-${paper.metadata.explorationType}-${Date.now()}`
       : `column-${paper.metadata.pmid}-${Date.now()}`;
@@ -160,6 +167,11 @@ export default function MultiColumnNetworkView({
       });
 
       console.log('✅ New column created:', newColumn);
+      console.log('🔍 Column exploration data check:', {
+        isExplorationColumn,
+        hasExplorationData: !!newColumn.explorationData,
+        explorationData: newColumn.explorationData
+      });
       setColumns(prev => {
         const newColumns = [...prev, newColumn];
         console.log('📊 Updated columns:', newColumns);
@@ -477,11 +489,19 @@ export default function MultiColumnNetworkView({
                   console.error('Error Info:', errorInfo);
                 }}
               >
-                {column.explorationData ? (
+                {(() => {
+                  console.log(`🔍 Column ${column.id} rendering decision:`, {
+                    hasExplorationData: !!column.explorationData,
+                    explorationData: column.explorationData,
+                    columnTitle: column.title,
+                    paperMetadata: column.paper?.metadata
+                  });
+                  return column.explorationData;
+                })() ? (
                   // Render exploration results in a specialized view
                   <ExplorationNetworkView
-                    explorationResults={column.explorationData.results}
-                    explorationType={column.explorationData.type}
+                    explorationResults={column.explorationData!.results}
+                    explorationType={column.explorationData!.type}
                     sourceNode={column.paper}
                     onNodeSelect={(node) => handleColumnNodeSelect(column.id, node)}
                     className="h-full"
