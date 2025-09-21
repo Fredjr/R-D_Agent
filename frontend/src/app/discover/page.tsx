@@ -64,16 +64,31 @@ export default function DiscoverPage() {
       setLoading(true);
       setError(null);
 
-      const url = selectedProject 
-        ? `/api/proxy/recommendations/weekly/${user.email}?project_id=${selectedProject}`
-        : `/api/proxy/recommendations/weekly/${user.email}`;
+      // Try enhanced recommendations first, fallback to regular if needed
+      let url = selectedProject
+        ? `/api/proxy/recommendations/enhanced/${user.email}?project_id=${selectedProject}`
+        : `/api/proxy/recommendations/enhanced/${user.email}`;
 
-      const response = await fetch(url, {
+      let response = await fetch(url, {
         headers: {
           'User-ID': user.email,
           'Content-Type': 'application/json'
         }
       });
+
+      if (!response.ok) {
+        console.warn('⚠️ Enhanced recommendations failed, falling back to regular recommendations');
+        url = selectedProject
+          ? `/api/proxy/recommendations/weekly/${user.email}?project_id=${selectedProject}`
+          : `/api/proxy/recommendations/weekly/${user.email}`;
+
+        response = await fetch(url, {
+          headers: {
+            'User-ID': user.email,
+            'Content-Type': 'application/json'
+          }
+        });
+      }
 
       if (!response.ok) {
         throw new Error(`Failed to fetch recommendations: ${response.status}`);
