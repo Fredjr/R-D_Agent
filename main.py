@@ -3898,9 +3898,7 @@ async def repair_user_account(email: str, password: str, db: Session = Depends(g
             return {"error": "User not found", "email": email}
 
         # Set password hash
-        from passlib.context import CryptContext
-        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-        user.password_hash = pwd_context.hash(password)
+        user.password_hash = hash_password(password)
 
         # Complete registration
         user.registration_completed = True
@@ -3940,9 +3938,7 @@ async def quick_complete_registration(email: str, db: Session = Depends(get_db))
             return {"error": "User not found", "email": email}
 
         # Set password hash for qwerty1234
-        from passlib.context import CryptContext
-        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-        user.password_hash = pwd_context.hash("qwerty1234")
+        user.password_hash = hash_password("qwerty1234")
 
         # Complete registration
         user.registration_completed = True
@@ -3994,12 +3990,8 @@ async def fix_user_password(email: str, db: Session = Depends(get_db)):
         if not user:
             return {"error": "User not found", "email": email}
 
-        # Import password hashing
-        from passlib.context import CryptContext
-        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
         # Set password hash for qwerty1234
-        password_hash = pwd_context.hash("qwerty1234")
+        password_hash = hash_password("qwerty1234")
 
         # Update user directly in database
         user.password_hash = password_hash
@@ -4010,7 +4002,7 @@ async def fix_user_password(email: str, db: Session = Depends(get_db)):
         db.refresh(user)
 
         # Test the password hash
-        test_verify = pwd_context.verify("qwerty1234", user.password_hash)
+        test_verify = verify_password("qwerty1234", user.password_hash)
 
         return {
             "status": "success",
@@ -4287,9 +4279,7 @@ async def complete_registration(request: CompleteRegistrationRequest, db: Sessio
 
         # CRITICAL FIX: Set password hash if provided
         if hasattr(request, 'password') and request.password:
-            from passlib.context import CryptContext
-            pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-            user.password_hash = pwd_context.hash(request.password)
+            user.password_hash = hash_password(request.password)
             user.can_signin = True
             user.is_active = True
         # Generate unique username - use email prefix with timestamp to ensure uniqueness
