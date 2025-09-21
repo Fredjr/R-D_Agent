@@ -1,0 +1,287 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
+import { 
+  SpotifyRecommendationSection, 
+  WeeklyMixHeader,
+  SpotifyRecommendationCard 
+} from '@/components/ui/SpotifyRecommendations';
+import { SpotifyTopBar } from '@/components/ui/SpotifyNavigation';
+import { LoadingSpinner, ErrorAlert } from '@/components/ui';
+import { 
+  MusicalNoteIcon, 
+  FireIcon, 
+  BeakerIcon, 
+  LightBulbIcon,
+  ArrowPathIcon
+} from '@heroicons/react/24/outline';
+
+interface WeeklyRecommendations {
+  status: string;
+  week_of: string;
+  user_id: string;
+  project_id?: string;
+  recommendations: {
+    papers_for_you: any;
+    trending_in_field: any;
+    cross_pollination: any;
+    citation_opportunities: any;
+  };
+  user_insights: {
+    research_domains: string[];
+    activity_level: string;
+    discovery_preference: string;
+    collaboration_tendency: number;
+  };
+  generated_at: string;
+  next_update: string;
+}
+
+export default function DiscoverPage() {
+  const { user } = useAuth();
+  const router = useRouter();
+  const [recommendations, setRecommendations] = useState<WeeklyRecommendations | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) {
+      router.push('/auth/signin');
+      return;
+    }
+    
+    fetchWeeklyRecommendations();
+  }, [user, selectedProject]);
+
+  const fetchWeeklyRecommendations = async () => {
+    if (!user) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+
+      const url = selectedProject 
+        ? `/api/proxy/recommendations/weekly/${user.email}?project_id=${selectedProject}`
+        : `/api/proxy/recommendations/weekly/${user.email}`;
+
+      const response = await fetch(url, {
+        headers: {
+          'User-ID': user.email,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch recommendations: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.status === 'error') {
+        throw new Error(data.error || 'Failed to generate recommendations');
+      }
+
+      setRecommendations(data);
+    } catch (err: any) {
+      console.error('Error fetching recommendations:', err);
+      setError(err.message || 'Failed to load recommendations');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchWeeklyRecommendations();
+    setRefreshing(false);
+  };
+
+  const handlePlayPaper = (paper: any) => {
+    // Navigate to paper details or open in new tab
+    if (paper.pmid) {
+      window.open(`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`, '_blank');
+    }
+  };
+
+  const handleSavePaper = async (paper: any) => {
+    // TODO: Implement save to collection functionality
+    console.log('Save paper:', paper);
+  };
+
+  const handleSharePaper = (paper: any) => {
+    // Copy paper URL to clipboard
+    const url = paper.pmid 
+      ? `https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`
+      : '#';
+    
+    navigator.clipboard.writeText(url).then(() => {
+      // TODO: Show toast notification
+      console.log('Paper URL copied to clipboard');
+    });
+  };
+
+  const handleSeeAll = (category: string) => {
+    // Navigate to category-specific page
+    const categoryMap: { [key: string]: string } = {
+      'Papers for You': 'papers-for-you',
+      'Trending in Your Field': 'trending',
+      'Cross-pollination': 'cross-pollination',
+      'Citation Opportunities': 'citation-opportunities'
+    };
+    
+    const route = categoryMap[category];
+    if (route) {
+      router.push(`/discover/${route}`);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[var(--spotify-black)] flex items-center justify-center">
+        <div className="text-center">
+          <LoadingSpinner size="xl" />
+          <p className="text-[var(--spotify-light-text)] mt-4">
+            Generating your personalized recommendations...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[var(--spotify-black)] p-8">
+        <div className="max-w-4xl mx-auto">
+          <ErrorAlert title="Failed to load recommendations">
+            <p className="mb-4">{error}</p>
+            <button
+              onClick={handleRefresh}
+              className="px-4 py-2 bg-[var(--spotify-green)] text-black rounded-lg hover:bg-[var(--spotify-green-hover)] transition-colors"
+            >
+              Try Again
+            </button>
+          </ErrorAlert>
+        </div>
+      </div>
+    );
+  }
+
+  if (!recommendations) {
+    return (
+      <div className="min-h-screen bg-[var(--spotify-black)] flex items-center justify-center">
+        <div className="text-center text-[var(--spotify-light-text)]">
+          <BeakerIcon className="w-16 h-16 mx-auto mb-4 opacity-50" />
+          <p>No recommendations available</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[var(--spotify-black)]">
+      {/* Top Navigation */}
+      <SpotifyTopBar 
+        title="Discover"
+        showSearch={true}
+        onSearch={(query) => {
+          // TODO: Implement search functionality
+          console.log('Search:', query);
+        }}
+      />
+
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Weekly Mix Header */}
+        <WeeklyMixHeader 
+          weekOf={recommendations.week_of}
+          userInsights={recommendations.user_insights}
+        />
+
+        {/* Refresh Button */}
+        <div className="flex justify-between items-center mb-8">
+          <div className="flex items-center gap-4">
+            <h2 className="text-xl font-semibold text-white">
+              Your Research Discovery
+            </h2>
+            {selectedProject && (
+              <span className="px-3 py-1 bg-[var(--spotify-dark-gray)] text-[var(--spotify-light-text)] rounded-full text-sm">
+                Project Context
+              </span>
+            )}
+          </div>
+          
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex items-center gap-2 px-4 py-2 bg-[var(--spotify-dark-gray)] text-white rounded-lg hover:bg-[var(--spotify-medium-gray)] transition-colors disabled:opacity-50"
+          >
+            <ArrowPathIcon className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
+
+        {/* Recommendation Sections */}
+        <div className="space-y-12">
+          {/* Papers for You */}
+          {recommendations.recommendations.papers_for_you?.papers?.length > 0 && (
+            <SpotifyRecommendationSection
+              section={recommendations.recommendations.papers_for_you}
+              onPlay={handlePlayPaper}
+              onSave={handleSavePaper}
+              onShare={handleSharePaper}
+              onSeeAll={handleSeeAll}
+            />
+          )}
+
+          {/* Trending in Your Field */}
+          {recommendations.recommendations.trending_in_field?.papers?.length > 0 && (
+            <SpotifyRecommendationSection
+              section={recommendations.recommendations.trending_in_field}
+              onPlay={handlePlayPaper}
+              onSave={handleSavePaper}
+              onShare={handleSharePaper}
+              onSeeAll={handleSeeAll}
+            />
+          )}
+
+          {/* Cross-pollination */}
+          {recommendations.recommendations.cross_pollination?.papers?.length > 0 && (
+            <SpotifyRecommendationSection
+              section={recommendations.recommendations.cross_pollination}
+              onPlay={handlePlayPaper}
+              onSave={handleSavePaper}
+              onShare={handleSharePaper}
+              onSeeAll={handleSeeAll}
+            />
+          )}
+
+          {/* Citation Opportunities */}
+          {recommendations.recommendations.citation_opportunities?.papers?.length > 0 && (
+            <SpotifyRecommendationSection
+              section={recommendations.recommendations.citation_opportunities}
+              onPlay={handlePlayPaper}
+              onSave={handleSavePaper}
+              onShare={handleSharePaper}
+              onSeeAll={handleSeeAll}
+            />
+          )}
+        </div>
+
+        {/* Next Update Info */}
+        <div className="mt-16 p-6 bg-[var(--spotify-dark-gray)] rounded-lg border border-[var(--spotify-border-gray)]">
+          <div className="flex items-center gap-3 mb-2">
+            <MusicalNoteIcon className="w-5 h-5 text-[var(--spotify-green)]" />
+            <h3 className="text-white font-medium">Weekly Updates</h3>
+          </div>
+          <p className="text-[var(--spotify-light-text)] text-sm">
+            Your recommendations refresh every Monday based on your latest research activity.
+            Next update: {new Date(recommendations.next_update).toLocaleDateString()}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}

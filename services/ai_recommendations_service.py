@@ -1,329 +1,702 @@
 """
-AI Recommendations Service
-Phase 8 of ResearchRabbit Feature Parity Implementation
+Spotify-Inspired AI Recommendations Service
+Advanced personalized paper discovery system
 
-This service provides AI-enhanced features including:
-1. Smart research recommendations based on user behavior
-2. Auto-organization of research collections
-3. AI-powered research insights and trend analysis
-4. Intelligent paper clustering and categorization
+This service provides Spotify-like AI-enhanced features including:
+1. "Papers for You" - Personalized daily feed based on user behavior
+2. "Trending in Your Field" - Hot topics and emerging research
+3. "Cross-pollination" - Interdisciplinary discovery opportunities
+4. "Citation Opportunities" - Papers that could cite your work
+5. Weekly recommendation mixes generated every Monday
+6. User-specific learning and preference modeling
+7. Collection-specific recommendations
 """
 
 import asyncio
 import logging
-from typing import List, Dict, Any, Optional, Tuple
-from datetime import datetime, timedelta
+import hashlib
+import random
+import os
+from typing import List, Dict, Any, Optional, Tuple, Set
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict, Counter
 import json
+import re
 
-from database import get_db, Article, Collection, Project, User
+from database import get_db, Article, Collection, Project, User, ArticleCollection
 from sqlalchemy.orm import Session
-from sqlalchemy import func, desc, and_, or_
+from sqlalchemy import func, desc, and_, or_, text
+
+# Import AI agents for enhanced recommendations
+try:
+    from recommendation_agents import RecommendationOrchestrator
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    AI_AGENTS_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"AI agents not available: {e}")
+    AI_AGENTS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
-class AIRecommendationsService:
-    """AI-powered recommendations and insights service"""
-    
+class SpotifyInspiredRecommendationsService:
+    """Spotify-inspired AI-powered paper recommendations and discovery service"""
+
     def __init__(self):
         self.recommendation_cache = {}
+
+        # Initialize AI agents if available
+        self.ai_orchestrator = None
+        if AI_AGENTS_AVAILABLE:
+            try:
+                # Initialize LLM for AI agents
+                api_key = os.getenv("GOOGLE_API_KEY")
+                if api_key:
+                    llm = ChatGoogleGenerativeAI(
+                        model="gemini-1.5-flash",
+                        google_api_key=api_key,
+                        temperature=0.3
+                    )
+                    self.ai_orchestrator = RecommendationOrchestrator(llm)
+                    logger.info("✅ AI recommendation agents initialized successfully")
+                else:
+                    logger.warning("⚠️ GOOGLE_API_KEY not found, AI agents disabled")
+            except Exception as e:
+                logger.error(f"❌ Failed to initialize AI agents: {e}")
+                self.ai_orchestrator = None
+        self.user_behavior_cache = {}
         self.cache_ttl = timedelta(hours=6)  # Cache recommendations for 6 hours
+        self.behavior_cache_ttl = timedelta(hours=1)  # Cache user behavior for 1 hour
+
+        # Spotify-like recommendation categories
+        self.recommendation_categories = {
+            "papers_for_you": "Personalized daily feed",
+            "trending_in_field": "Hot topics in your research area",
+            "cross_pollination": "Interdisciplinary discoveries",
+            "citation_opportunities": "Papers that could cite your work"
+        }
+
+        # User interaction weights for learning
+        self.interaction_weights = {
+            "saved_to_collection": 1.0,
+            "network_exploration": 0.7,
+            "time_spent_reading": 0.5,
+            "citation_added": 0.9,
+            "shared_paper": 0.8,
+            "deep_dive_analysis": 1.2
+        }
     
-    async def get_smart_recommendations(self, user_id: str, project_id: str, limit: int = 10) -> Dict[str, Any]:
+    async def get_weekly_recommendations(self, user_id: str, project_id: Optional[str] = None) -> Dict[str, Any]:
         """
-        Generate smart recommendations based on user's research patterns
-        
+        Generate Spotify-style weekly recommendations with 4 main categories
+
         Args:
             user_id: User identifier
-            project_id: Current project context
-            limit: Maximum number of recommendations
-            
+            project_id: Optional project context (if None, generates user-level recommendations)
+
         Returns:
-            Dictionary with recommendations and insights
+            Dictionary with weekly recommendations in Spotify format
         """
         try:
             db_gen = get_db()
             db = next(db_gen)
-            
-            # Get user's research history and patterns
-            user_patterns = await self._analyze_user_patterns(user_id, project_id, db)
-            
-            # Generate different types of recommendations
-            recommendations = {
-                "trending_papers": await self._get_trending_papers(user_patterns, db, limit//3),
-                "related_work": await self._get_related_work_recommendations(user_patterns, db, limit//3),
-                "author_suggestions": await self._get_author_suggestions(user_patterns, db, limit//3),
-                "research_insights": await self._generate_research_insights(user_patterns, db),
-                "collection_suggestions": await self._suggest_collection_organization(user_id, project_id, db)
-            }
-            
-            return {
+
+            # Check cache first
+            cache_key = f"weekly_{user_id}_{project_id or 'global'}"
+            if cache_key in self.recommendation_cache:
+                cached_data = self.recommendation_cache[cache_key]
+                if datetime.now() - cached_data["timestamp"] < self.cache_ttl:
+                    return cached_data["data"]
+
+            # Get comprehensive user behavior analysis
+            user_profile = await self._build_user_research_profile(user_id, project_id, db)
+
+            # Try AI-enhanced recommendations first
+            if self.ai_orchestrator:
+                try:
+                    # Get available papers pool for AI agents
+                    available_papers = await self._get_available_papers_pool(user_id, project_id, db)
+
+                    # Use AI agents for enhanced recommendations
+                    ai_result = await self.ai_orchestrator.generate_all_recommendations(
+                        user_profile, available_papers
+                    )
+
+                    # Use AI recommendations if successful
+                    recommendations = {
+                        "papers_for_you": ai_result.get("papers_for_you", []),
+                        "trending_in_field": ai_result.get("trending", []),
+                        "cross_pollination": ai_result.get("cross_pollination", []),
+                        "citation_opportunities": ai_result.get("citation_opportunities", [])
+                    }
+
+                    logger.info(f"✅ AI-enhanced recommendations generated for user {user_id}")
+
+                except Exception as e:
+                    logger.warning(f"⚠️ AI agents failed, falling back to traditional method: {e}")
+                    # Fallback to traditional methods
+                    recommendations = {
+                        "papers_for_you": await self._generate_papers_for_you(user_profile, db),
+                        "trending_in_field": await self._generate_trending_in_field(user_profile, db),
+                        "cross_pollination": await self._generate_cross_pollination(user_profile, db),
+                        "citation_opportunities": await self._generate_citation_opportunities(user_profile, db)
+                    }
+            else:
+                # Traditional recommendation methods
+                recommendations = {
+                    "papers_for_you": await self._generate_papers_for_you(user_profile, db),
+                    "trending_in_field": await self._generate_trending_in_field(user_profile, db),
+                    "cross_pollination": await self._generate_cross_pollination(user_profile, db),
+                    "citation_opportunities": await self._generate_citation_opportunities(user_profile, db)
+                }
+
+            # Add weekly mix metadata
+            week_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            week_start -= timedelta(days=week_start.weekday())  # Get Monday
+
+            result = {
                 "status": "success",
+                "week_of": week_start.isoformat(),
+                "user_id": user_id,
+                "project_id": project_id,
                 "recommendations": recommendations,
-                "user_patterns": {
-                    "primary_topics": user_patterns.get("topics", [])[:5],
-                    "research_velocity": user_patterns.get("velocity", 0),
-                    "collaboration_score": user_patterns.get("collaboration_score", 0)
+                "user_insights": {
+                    "research_domains": user_profile.get("primary_domains", [])[:5],
+                    "activity_level": user_profile.get("activity_level", "moderate"),
+                    "discovery_preference": user_profile.get("discovery_preference", "balanced"),
+                    "collaboration_tendency": user_profile.get("collaboration_score", 0.5)
                 },
-                "generated_at": datetime.now().isoformat()
+                "generated_at": datetime.now().isoformat(),
+                "next_update": (week_start + timedelta(days=7)).isoformat()
             }
-            
+
+            # Cache the result
+            self.recommendation_cache[cache_key] = {
+                "data": result,
+                "timestamp": datetime.now()
+            }
+
+            return result
+
         except Exception as e:
-            logger.error(f"Error generating smart recommendations: {e}")
+            logger.error(f"Error generating weekly recommendations: {e}")
             return {"status": "error", "error": str(e)}
         finally:
             db.close()
-    
-    async def _analyze_user_patterns(self, user_id: str, project_id: str, db: Session) -> Dict[str, Any]:
-        """Analyze user's research patterns and preferences"""
+
+    async def _get_available_papers_pool(self, user_id: str, project_id: Optional[str], db: Session) -> List[Dict[str, Any]]:
+        """Get a pool of available papers for AI agents to analyze"""
         try:
-            # Get user's recent articles and collections
-            recent_articles = db.query(Article).join(
-                Collection.articles
-            ).join(Collection).filter(
-                Collection.project_id == project_id
-            ).order_by(desc(Article.created_at)).limit(50).all()
-            
-            if not recent_articles:
-                return {"topics": [], "velocity": 0, "collaboration_score": 0}
-            
-            # Extract research topics from titles and abstracts
-            topics = self._extract_research_topics(recent_articles)
-            
-            # Calculate research velocity (articles per week)
-            if recent_articles:
-                time_span = (datetime.now() - recent_articles[-1].created_at).days
-                velocity = len(recent_articles) / max(time_span / 7, 1)  # articles per week
+            # Get recent papers from the database (last 2 years)
+            cutoff_date = datetime.now().year - 2
+
+            query = db.query(Article).filter(
+                Article.pub_year >= cutoff_date,
+                Article.citation_count.isnot(None)
+            ).order_by(desc(Article.citation_count)).limit(200)
+
+            papers = query.all()
+
+            # Convert to format expected by AI agents
+            paper_pool = []
+            for paper in papers:
+                paper_dict = {
+                    "pmid": paper.pmid,
+                    "title": paper.title or "",
+                    "abstract": paper.abstract or "",
+                    "pub_year": paper.pub_year or datetime.now().year,
+                    "citation_count": paper.citation_count or 0,
+                    "authors": paper.authors or [],
+                    "journal": paper.journal or "",
+                    "keywords": paper.keywords or [],
+                    "mesh_terms": paper.mesh_terms or []
+                }
+                paper_pool.append(paper_dict)
+
+            logger.info(f"Retrieved {len(paper_pool)} papers for AI agent analysis")
+            return paper_pool
+
+        except Exception as e:
+            logger.error(f"Error getting papers pool: {e}")
+            return []
+
+    async def _build_user_research_profile(self, user_id: str, project_id: Optional[str], db: Session) -> Dict[str, Any]:
+        """Build comprehensive user research profile for personalized recommendations"""
+        try:
+            # Check behavior cache first
+            cache_key = f"profile_{user_id}_{project_id or 'global'}"
+            if cache_key in self.user_behavior_cache:
+                cached_data = self.user_behavior_cache[cache_key]
+                if datetime.now() - cached_data["timestamp"] < self.behavior_cache_ttl:
+                    return cached_data["data"]
+
+            profile = {}
+
+            # Get user's saved articles across all projects or specific project
+            if project_id:
+                saved_articles = db.query(ArticleCollection).join(Collection).filter(
+                    Collection.project_id == project_id,
+                    Collection.created_by == user_id
+                ).order_by(desc(ArticleCollection.added_at)).limit(200).all()
             else:
-                velocity = 0
-            
-            # Calculate collaboration score based on author diversity
-            all_authors = []
-            for article in recent_articles:
-                if article.authors:
-                    all_authors.extend(article.authors)
-            
-            unique_authors = len(set(all_authors))
-            collaboration_score = min(unique_authors / 20, 1.0)  # Normalized to 0-1
-            
-            return {
-                "topics": topics,
-                "velocity": velocity,
-                "collaboration_score": collaboration_score,
-                "recent_articles": len(recent_articles),
-                "time_span_days": time_span if recent_articles else 0
+                saved_articles = db.query(ArticleCollection).join(Collection).filter(
+                    Collection.created_by == user_id
+                ).order_by(desc(ArticleCollection.added_at)).limit(200).all()
+
+            # Extract research domains and topics
+            profile["primary_domains"] = await self._extract_research_domains(saved_articles, db)
+            profile["topic_preferences"] = await self._analyze_topic_preferences(saved_articles, db)
+
+            # Calculate user activity patterns
+            profile["activity_level"] = self._calculate_activity_level(saved_articles)
+            profile["discovery_preference"] = self._analyze_discovery_preference(saved_articles, db)
+            profile["collaboration_score"] = self._calculate_collaboration_score(saved_articles, db)
+
+            # Analyze temporal patterns
+            profile["research_velocity"] = self._calculate_research_velocity(saved_articles)
+            profile["recency_bias"] = self._calculate_recency_bias(saved_articles)
+
+            # Collection analysis
+            profile["collection_themes"] = await self._analyze_collection_themes(user_id, project_id, db)
+            profile["organization_style"] = self._analyze_organization_style(user_id, project_id, db)
+
+            # Cache the profile
+            self.user_behavior_cache[cache_key] = {
+                "data": profile,
+                "timestamp": datetime.now()
             }
-            
+
+            return profile
+
         except Exception as e:
-            logger.error(f"Error analyzing user patterns: {e}")
-            return {"topics": [], "velocity": 0, "collaboration_score": 0}
-    
-    def _extract_research_topics(self, articles: List[Article]) -> List[str]:
-        """Extract key research topics from articles using simple keyword analysis"""
-        try:
-            # Combine all titles and abstracts
-            text_corpus = []
-            for article in articles:
-                if article.title:
-                    text_corpus.append(article.title.lower())
-                if article.abstract:
-                    text_corpus.append(article.abstract.lower())
-            
-            if not text_corpus:
-                return []
-            
-            # Simple keyword extraction (in production, use NLP libraries)
-            common_research_terms = [
-                'machine learning', 'deep learning', 'neural network', 'artificial intelligence',
-                'cancer', 'treatment', 'therapy', 'diagnosis', 'clinical', 'patient',
-                'covid', 'pandemic', 'vaccine', 'virus', 'infection',
-                'climate', 'environment', 'sustainability', 'renewable',
-                'quantum', 'physics', 'chemistry', 'biology', 'genetics',
-                'algorithm', 'optimization', 'analysis', 'model', 'prediction'
-            ]
-            
-            topic_counts = Counter()
-            full_text = ' '.join(text_corpus)
-            
-            for term in common_research_terms:
-                if term in full_text:
-                    topic_counts[term] = full_text.count(term)
-            
-            # Return top topics
-            return [topic for topic, count in topic_counts.most_common(10)]
-            
-        except Exception as e:
-            logger.error(f"Error extracting topics: {e}")
-            return []
-    
-    async def _get_trending_papers(self, user_patterns: Dict, db: Session, limit: int) -> List[Dict]:
-        """Get trending papers based on recent citation activity"""
-        try:
-            # Get papers with high recent citation activity
-            trending = db.query(Article).filter(
-                Article.citation_count > 10,
-                Article.publication_year >= datetime.now().year - 2
-            ).order_by(desc(Article.citation_count)).limit(limit).all()
-            
-            return [{
-                "pmid": article.pmid,
-                "title": article.title,
-                "authors": article.authors[:3] if article.authors else [],
-                "citation_count": article.citation_count,
-                "year": article.publication_year,
-                "relevance_score": min(article.citation_count / 100, 1.0),
-                "reason": "High citation activity"
-            } for article in trending]
-            
-        except Exception as e:
-            logger.error(f"Error getting trending papers: {e}")
-            return []
-    
-    async def _get_related_work_recommendations(self, user_patterns: Dict, db: Session, limit: int) -> List[Dict]:
-        """Get related work based on user's research topics"""
-        try:
-            topics = user_patterns.get("topics", [])
-            if not topics:
-                return []
-            
-            # Simple topic-based search (in production, use vector similarity)
-            related_articles = []
-            for topic in topics[:3]:  # Use top 3 topics
-                articles = db.query(Article).filter(
-                    or_(
-                        Article.title.ilike(f'%{topic}%'),
-                        Article.abstract.ilike(f'%{topic}%')
-                    )
-                ).order_by(desc(Article.citation_count)).limit(limit//3).all()
-                
-                for article in articles:
-                    related_articles.append({
-                        "pmid": article.pmid,
-                        "title": article.title,
-                        "authors": article.authors[:3] if article.authors else [],
-                        "citation_count": article.citation_count,
-                        "year": article.publication_year,
-                        "relevance_score": 0.8,
-                        "reason": f"Related to '{topic}'"
-                    })
-            
-            return related_articles[:limit]
-            
-        except Exception as e:
-            logger.error(f"Error getting related work: {e}")
-            return []
-    
-    async def _get_author_suggestions(self, user_patterns: Dict, db: Session, limit: int) -> List[Dict]:
-        """Suggest authors to follow based on research patterns"""
-        try:
-            # Get authors from user's recent articles
-            recent_authors = []
-            topics = user_patterns.get("topics", [])
-            
-            if topics:
-                # Find prolific authors in user's research areas
-                for topic in topics[:2]:
-                    articles = db.query(Article).filter(
-                        or_(
-                            Article.title.ilike(f'%{topic}%'),
-                            Article.abstract.ilike(f'%{topic}%')
-                        )
-                    ).order_by(desc(Article.citation_count)).limit(20).all()
-                    
-                    author_counts = Counter()
-                    for article in articles:
-                        if article.authors:
-                            for author in article.authors[:2]:  # First 2 authors
-                                author_counts[author] += 1
-                    
-                    for author, count in author_counts.most_common(limit//2):
-                        recent_authors.append({
-                            "name": author,
-                            "paper_count": count,
-                            "research_area": topic,
-                            "relevance_score": min(count / 5, 1.0),
-                            "reason": f"Prolific in '{topic}'"
-                        })
-            
-            return recent_authors[:limit]
-            
-        except Exception as e:
-            logger.error(f"Error getting author suggestions: {e}")
-            return []
-    
-    async def _generate_research_insights(self, user_patterns: Dict, db: Session) -> Dict[str, Any]:
-        """Generate AI-powered research insights"""
-        try:
-            insights = {
-                "research_velocity": {
-                    "current": user_patterns.get("velocity", 0),
-                    "trend": "increasing" if user_patterns.get("velocity", 0) > 2 else "stable",
-                    "recommendation": "Consider organizing papers into themed collections"
-                },
-                "collaboration_opportunities": {
-                    "score": user_patterns.get("collaboration_score", 0),
-                    "suggestion": "Explore author networks to find potential collaborators"
-                },
-                "research_gaps": [
-                    "Consider exploring interdisciplinary connections",
-                    "Look for recent review papers in your field",
-                    "Investigate emerging methodologies"
-                ]
-            }
-            
-            return insights
-            
-        except Exception as e:
-            logger.error(f"Error generating insights: {e}")
+            logger.error(f"Error building user research profile: {e}")
             return {}
     
-    async def _suggest_collection_organization(self, user_id: str, project_id: str, db: Session) -> List[Dict]:
-        """Suggest how to organize papers into collections"""
+    async def _generate_papers_for_you(self, user_profile: Dict, db: Session) -> Dict[str, Any]:
+        """Generate personalized 'Papers for You' recommendations"""
         try:
-            # Get all articles in the project
-            articles = db.query(Article).join(
-                Collection.articles
-            ).join(Collection).filter(
-                Collection.project_id == project_id
-            ).all()
-            
-            if len(articles) < 5:
-                return []
-            
-            # Simple clustering by year and topic
-            suggestions = [
-                {
-                    "type": "chronological",
-                    "name": "Recent Papers (2023-2024)",
-                    "description": "Organize recent publications",
-                    "estimated_papers": len([a for a in articles if a.publication_year >= 2023])
-                },
-                {
-                    "type": "citation_based",
-                    "name": "Highly Cited Works",
-                    "description": "Papers with >50 citations",
-                    "estimated_papers": len([a for a in articles if (a.citation_count or 0) > 50])
-                },
-                {
-                    "type": "methodological",
-                    "name": "Review Papers",
-                    "description": "Comprehensive reviews and surveys",
-                    "estimated_papers": len([a for a in articles if 'review' in (a.title or '').lower()])
-                }
-            ]
-            
-            return [s for s in suggestions if s["estimated_papers"] > 0]
-            
+            recommendations = []
+            primary_domains = user_profile.get("primary_domains", [])
+            topic_preferences = user_profile.get("topic_preferences", {})
+
+            # Get papers based on user's research domains with personalization
+            for domain in primary_domains[:3]:  # Top 3 domains
+                domain_papers = db.query(Article).filter(
+                    or_(
+                        Article.title.ilike(f'%{domain}%'),
+                        Article.abstract.ilike(f'%{domain}%')
+                    ),
+                    Article.publication_year >= datetime.now().year - 3  # Recent papers
+                ).order_by(desc(Article.citation_count)).limit(5).all()
+
+                for paper in domain_papers:
+                    relevance_score = self._calculate_personalized_relevance(paper, user_profile)
+                    recommendations.append({
+                        "pmid": paper.pmid,
+                        "title": paper.title,
+                        "authors": paper.authors[:3] if paper.authors else [],
+                        "journal": paper.journal,
+                        "year": paper.publication_year,
+                        "citation_count": paper.citation_count or 0,
+                        "relevance_score": relevance_score,
+                        "reason": f"Matches your interest in {domain}",
+                        "category": "papers_for_you",
+                        "spotify_style": {
+                            "cover_color": self._generate_cover_color(domain),
+                            "subtitle": f"Because you research {domain}",
+                            "play_count": paper.citation_count or 0
+                        }
+                    })
+
+            # Sort by relevance and return top recommendations
+            recommendations.sort(key=lambda x: x["relevance_score"], reverse=True)
+
+            return {
+                "title": "Papers for You",
+                "description": "Your personalized research feed",
+                "papers": recommendations[:12],  # Spotify-like grid of 12
+                "updated": datetime.now().isoformat(),
+                "refresh_reason": "Based on your recent research activity"
+            }
+
         except Exception as e:
-            logger.error(f"Error suggesting collection organization: {e}")
+            logger.error(f"Error generating Papers for You: {e}")
+            return {"title": "Papers for You", "papers": [], "error": str(e)}
+    
+    async def _generate_trending_in_field(self, user_profile: Dict, db: Session) -> Dict[str, Any]:
+        """Generate 'Trending in Your Field' recommendations"""
+        try:
+            recommendations = []
+            primary_domains = user_profile.get("primary_domains", [])
+
+            # Get trending papers in user's research fields
+            for domain in primary_domains[:2]:  # Top 2 domains
+                # Find papers with high recent citation velocity in this domain
+                trending_papers = db.query(Article).filter(
+                    or_(
+                        Article.title.ilike(f'%{domain}%'),
+                        Article.abstract.ilike(f'%{domain}%')
+                    ),
+                    Article.publication_year >= datetime.now().year - 1,  # Very recent
+                    Article.citation_count > 5  # Some traction
+                ).order_by(desc(Article.citation_count)).limit(8).all()
+
+                for paper in trending_papers:
+                    # Calculate trending score based on citations per month since publication
+                    months_since_pub = max(1, (datetime.now().year - (paper.publication_year or datetime.now().year)) * 12)
+                    trending_score = (paper.citation_count or 0) / months_since_pub
+
+                    recommendations.append({
+                        "pmid": paper.pmid,
+                        "title": paper.title,
+                        "authors": paper.authors[:3] if paper.authors else [],
+                        "journal": paper.journal,
+                        "year": paper.publication_year,
+                        "citation_count": paper.citation_count or 0,
+                        "trending_score": trending_score,
+                        "reason": f"Trending in {domain}",
+                        "category": "trending_in_field",
+                        "spotify_style": {
+                            "cover_color": "#ff6b35",  # Orange for trending
+                            "subtitle": f"Hot in {domain}",
+                            "trend_indicator": "🔥"
+                        }
+                    })
+
+            # Sort by trending score
+            recommendations.sort(key=lambda x: x["trending_score"], reverse=True)
+
+            return {
+                "title": "Trending in Your Field",
+                "description": "Hot topics and emerging research in your areas",
+                "papers": recommendations[:10],
+                "updated": datetime.now().isoformat(),
+                "refresh_reason": "Based on recent citation activity in your research domains"
+            }
+
+        except Exception as e:
+            logger.error(f"Error generating Trending in Field: {e}")
+            return {"title": "Trending in Your Field", "papers": [], "error": str(e)}
+    
+    async def _generate_cross_pollination(self, user_profile: Dict, db: Session) -> Dict[str, Any]:
+        """Generate 'Cross-pollination' interdisciplinary discovery recommendations"""
+        try:
+            recommendations = []
+            primary_domains = user_profile.get("primary_domains", [])
+
+            # Define interdisciplinary connection mappings
+            cross_domain_map = {
+                "machine learning": ["biology", "medicine", "physics", "chemistry", "psychology"],
+                "biology": ["computer science", "engineering", "mathematics", "physics"],
+                "medicine": ["engineering", "data science", "psychology", "biology"],
+                "physics": ["computer science", "engineering", "mathematics", "chemistry"],
+                "chemistry": ["biology", "physics", "materials science", "engineering"],
+                "psychology": ["neuroscience", "computer science", "medicine", "sociology"],
+                "engineering": ["biology", "medicine", "computer science", "physics"],
+                "neuroscience": ["psychology", "computer science", "medicine", "biology"]
+            }
+
+            # Find papers at the intersection of user's domains and adjacent fields
+            for primary_domain in primary_domains[:2]:
+                adjacent_fields = cross_domain_map.get(primary_domain.lower(), [])
+
+                for adjacent_field in adjacent_fields[:3]:
+                    # Find papers that mention both domains
+                    cross_papers = db.query(Article).filter(
+                        and_(
+                            or_(
+                                Article.title.ilike(f'%{primary_domain}%'),
+                                Article.abstract.ilike(f'%{primary_domain}%')
+                            ),
+                            or_(
+                                Article.title.ilike(f'%{adjacent_field}%'),
+                                Article.abstract.ilike(f'%{adjacent_field}%')
+                            )
+                        ),
+                        Article.publication_year >= datetime.now().year - 5
+                    ).order_by(desc(Article.citation_count)).limit(3).all()
+
+                    for paper in cross_papers:
+                        cross_pollination_score = self._calculate_interdisciplinary_score(
+                            paper, primary_domain, adjacent_field
+                        )
+
+                        recommendations.append({
+                            "pmid": paper.pmid,
+                            "title": paper.title,
+                            "authors": paper.authors[:3] if paper.authors else [],
+                            "journal": paper.journal,
+                            "year": paper.publication_year,
+                            "citation_count": paper.citation_count or 0,
+                            "cross_pollination_score": cross_pollination_score,
+                            "reason": f"Bridges {primary_domain} and {adjacent_field}",
+                            "category": "cross_pollination",
+                            "spotify_style": {
+                                "cover_color": "#9b59b6",  # Purple for interdisciplinary
+                                "subtitle": f"{primary_domain} × {adjacent_field}",
+                                "discovery_badge": "🔬"
+                            }
+                        })
+
+            # Sort by cross-pollination score
+            recommendations.sort(key=lambda x: x["cross_pollination_score"], reverse=True)
+
+            return {
+                "title": "Cross-pollination",
+                "description": "Interdisciplinary discoveries at the intersection of your research",
+                "papers": recommendations[:8],
+                "updated": datetime.now().isoformat(),
+                "refresh_reason": "Exploring connections between your research domains and adjacent fields"
+            }
+
+        except Exception as e:
+            logger.error(f"Error generating Cross-pollination: {e}")
+            return {"title": "Cross-pollination", "papers": [], "error": str(e)}
+    
+    async def _generate_citation_opportunities(self, user_profile: Dict, db: Session) -> Dict[str, Any]:
+        """Generate 'Citation Opportunities' - papers that could cite user's work"""
+        try:
+            recommendations = []
+            primary_domains = user_profile.get("primary_domains", [])
+            topic_preferences = user_profile.get("topic_preferences", {})
+
+            # Find recent papers in user's field that might benefit from citing their work
+            for domain in primary_domains[:3]:
+                # Get very recent papers (last 6 months) in the domain
+                recent_papers = db.query(Article).filter(
+                    or_(
+                        Article.title.ilike(f'%{domain}%'),
+                        Article.abstract.ilike(f'%{domain}%')
+                    ),
+                    Article.publication_year >= datetime.now().year,  # Current year only
+                    Article.citation_count < 20  # Papers that could use more citations
+                ).order_by(desc(Article.created_at)).limit(5).all()
+
+                for paper in recent_papers:
+                    citation_opportunity_score = self._calculate_citation_opportunity_score(
+                        paper, user_profile
+                    )
+
+                    recommendations.append({
+                        "pmid": paper.pmid,
+                        "title": paper.title,
+                        "authors": paper.authors[:3] if paper.authors else [],
+                        "journal": paper.journal,
+                        "year": paper.publication_year,
+                        "citation_count": paper.citation_count or 0,
+                        "opportunity_score": citation_opportunity_score,
+                        "reason": f"Recent work in {domain} that could benefit from your research",
+                        "category": "citation_opportunities",
+                        "spotify_style": {
+                            "cover_color": "#27ae60",  # Green for opportunities
+                            "subtitle": f"Opportunity in {domain}",
+                            "opportunity_badge": "💡"
+                        }
+                    })
+
+            # Sort by opportunity score
+            recommendations.sort(key=lambda x: x["opportunity_score"], reverse=True)
+
+            return {
+                "title": "Citation Opportunities",
+                "description": "Recent papers that could cite your work",
+                "papers": recommendations[:8],
+                "updated": datetime.now().isoformat(),
+                "refresh_reason": "Based on recent publications in your research areas"
+            }
+
+        except Exception as e:
+            logger.error(f"Error generating Citation Opportunities: {e}")
+            return {"title": "Citation Opportunities", "papers": [], "error": str(e)}
+    
+    # Helper methods for user behavior analysis
+    async def _extract_research_domains(self, saved_articles: List, db: Session) -> List[str]:
+        """Extract primary research domains from user's saved articles"""
+        try:
+            domain_keywords = {
+                "machine learning": ["machine learning", "deep learning", "neural network", "ai", "artificial intelligence"],
+                "biology": ["biology", "biological", "organism", "cell", "gene", "protein", "dna"],
+                "medicine": ["medical", "clinical", "patient", "treatment", "therapy", "disease", "diagnosis"],
+                "physics": ["physics", "quantum", "particle", "energy", "matter", "force"],
+                "chemistry": ["chemistry", "chemical", "molecule", "compound", "reaction", "synthesis"],
+                "neuroscience": ["neuroscience", "brain", "neural", "cognitive", "neurological"],
+                "engineering": ["engineering", "design", "system", "optimization", "control"],
+                "psychology": ["psychology", "behavior", "cognitive", "mental", "psychological"]
+            }
+
+            domain_scores = defaultdict(int)
+
+            for article_collection in saved_articles:
+                title = (article_collection.article_title or "").lower()
+
+                for domain, keywords in domain_keywords.items():
+                    for keyword in keywords:
+                        if keyword in title:
+                            domain_scores[domain] += 1
+
+            # Return top domains
+            return [domain for domain, score in sorted(domain_scores.items(), key=lambda x: x[1], reverse=True)][:5]
+
+        except Exception as e:
+            logger.error(f"Error extracting research domains: {e}")
             return []
+    
+    def _calculate_personalized_relevance(self, paper: Article, user_profile: Dict) -> float:
+        """Calculate personalized relevance score for a paper"""
+        try:
+            score = 0.0
+
+            # Base score from citation count
+            score += min((paper.citation_count or 0) / 100, 0.3)
+
+            # Recency bonus
+            years_old = datetime.now().year - (paper.publication_year or datetime.now().year)
+            recency_score = max(0, (5 - years_old) / 5) * 0.2
+            score += recency_score
+
+            # Domain relevance
+            primary_domains = user_profile.get("primary_domains", [])
+            title_lower = (paper.title or "").lower()
+
+            for domain in primary_domains[:3]:
+                if domain.lower() in title_lower:
+                    score += 0.3
+                    break
+
+            # Activity level adjustment
+            activity_level = user_profile.get("activity_level", "moderate")
+            if activity_level == "high":
+                score += 0.1
+            elif activity_level == "low":
+                score -= 0.1
+
+            return min(score, 1.0)
+
+        except Exception as e:
+            logger.error(f"Error calculating personalized relevance: {e}")
+            return 0.5
+
+    # Additional helper methods
+    def _calculate_interdisciplinary_score(self, paper: Article, domain1: str, domain2: str) -> float:
+        """Calculate interdisciplinary relevance score"""
+        try:
+            title_lower = (paper.title or "").lower()
+            abstract_lower = (paper.abstract or "").lower()
+
+            # Check presence of both domains
+            domain1_present = domain1.lower() in title_lower or domain1.lower() in abstract_lower
+            domain2_present = domain2.lower() in title_lower or domain2.lower() in abstract_lower
+
+            if domain1_present and domain2_present:
+                base_score = 0.8
+            elif domain1_present or domain2_present:
+                base_score = 0.4
+            else:
+                base_score = 0.1
+
+            # Citation bonus
+            citation_bonus = min((paper.citation_count or 0) / 50, 0.2)
+
+            return min(base_score + citation_bonus, 1.0)
+
+        except Exception as e:
+            logger.error(f"Error calculating interdisciplinary score: {e}")
+            return 0.3
+
+    def _calculate_citation_opportunity_score(self, paper: Article, user_profile: Dict) -> float:
+        """Calculate citation opportunity score"""
+        try:
+            score = 0.0
+
+            # Recency is key for citation opportunities
+            years_old = datetime.now().year - (paper.publication_year or datetime.now().year)
+            if years_old == 0:  # Current year
+                score += 0.5
+            elif years_old == 1:  # Last year
+                score += 0.3
+
+            # Low citation count means opportunity
+            citation_count = paper.citation_count or 0
+            if citation_count < 5:
+                score += 0.3
+            elif citation_count < 15:
+                score += 0.2
+
+            # Domain relevance
+            primary_domains = user_profile.get("primary_domains", [])
+            title_lower = (paper.title or "").lower()
+
+            for domain in primary_domains:
+                if domain.lower() in title_lower:
+                    score += 0.2
+                    break
+
+            return min(score, 1.0)
+
+        except Exception as e:
+            logger.error(f"Error calculating citation opportunity score: {e}")
+            return 0.3
+
+    def _generate_cover_color(self, domain: str) -> str:
+        """Generate Spotify-style cover colors for domains"""
+        color_map = {
+            "machine learning": "#1db954",
+            "biology": "#1ed760",
+            "medicine": "#ff6b6b",
+            "physics": "#4ecdc4",
+            "chemistry": "#45b7d1",
+            "neuroscience": "#96ceb4",
+            "engineering": "#feca57",
+            "psychology": "#ff9ff3"
+        }
+        return color_map.get(domain.lower(), "#1db954")
+
+    # Simplified implementations for missing methods
+    async def _analyze_topic_preferences(self, saved_articles: List, db: Session) -> Dict:
+        return {}
+
+    def _calculate_activity_level(self, saved_articles: List) -> str:
+        if len(saved_articles) > 50:
+            return "high"
+        elif len(saved_articles) > 20:
+            return "moderate"
+        else:
+            return "low"
+
+    def _analyze_discovery_preference(self, saved_articles: List, db: Session) -> str:
+        return "balanced"
+
+    def _calculate_collaboration_score(self, saved_articles: List, db: Session) -> float:
+        return 0.5
+
+    def _calculate_research_velocity(self, saved_articles: List) -> float:
+        if not saved_articles:
+            return 0.0
+
+        # Calculate papers per week over last 3 months
+        recent_articles = [a for a in saved_articles if
+                          (datetime.now() - a.added_at).days <= 90]
+        return len(recent_articles) / 12  # 12 weeks in 3 months
+
+    def _calculate_recency_bias(self, saved_articles: List) -> float:
+        return 0.7  # Default moderate recency bias
+
+    async def _analyze_collection_themes(self, user_id: str, project_id: Optional[str], db: Session) -> List[str]:
+        return []
+
+    def _analyze_organization_style(self, user_id: str, project_id: Optional[str], db: Session) -> str:
+        return "thematic"
 
 # Global service instance
-_ai_recommendations_service = None
+_spotify_recommendations_service = None
 
-def get_ai_recommendations_service() -> AIRecommendationsService:
-    """Get the global AI recommendations service instance"""
-    global _ai_recommendations_service
-    if _ai_recommendations_service is None:
-        _ai_recommendations_service = AIRecommendationsService()
-    return _ai_recommendations_service
+def get_spotify_recommendations_service() -> SpotifyInspiredRecommendationsService:
+    """Get the global Spotify-inspired recommendations service instance"""
+    global _spotify_recommendations_service
+    if _spotify_recommendations_service is None:
+        _spotify_recommendations_service = SpotifyInspiredRecommendationsService()
+    return _spotify_recommendations_service
+
+# Backward compatibility
+def get_ai_recommendations_service() -> SpotifyInspiredRecommendationsService:
+    """Backward compatibility alias"""
+    return get_spotify_recommendations_service()

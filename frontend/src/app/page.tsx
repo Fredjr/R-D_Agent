@@ -8,6 +8,7 @@ import { fetchReview } from "@/lib/api";
 import { useState, useEffect } from "react";
 import { FolderIcon, UserIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
 
 interface Article { title: string; pub_year: number; citation_count: number; pmid?: string }
 interface AgentResult { summary: string; confidence_score: number; methodologies: string[]; publication_score: number; overall_relevance_score: number }
@@ -15,6 +16,7 @@ export interface ResultData { query?: string; result: AgentResult; articles: Art
 
 export default function Home() {
   const { user, logout, isLoading: authLoading } = useAuth();
+  const router = useRouter();
   const [results, setResults] = useState<ResultData[]>([]);
   const [diagnostics, setDiagnostics] = useState<any | null>(null);
   const [queries, setQueries] = useState<string[] | null>(null);
@@ -22,6 +24,13 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
+
+  // Redirect authenticated users to home page
+  useEffect(() => {
+    if (user && !authLoading) {
+      router.push('/home');
+    }
+  }, [user, authLoading, router]);
 
   // Get project ID from URL params if provided
   useEffect(() => {
