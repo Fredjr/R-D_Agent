@@ -2,21 +2,25 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { 
-  ChevronLeftIcon, 
-  ChevronRightIcon, 
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
   MagnifyingGlassIcon,
   HomeIcon,
   RectangleStackIcon,
   UserGroupIcon,
   Cog6ToothIcon,
-  BellIcon
+  BellIcon,
+  MusicalNoteIcon,
+  FolderIcon
 } from '@heroicons/react/24/outline';
-import { 
+import {
   HomeIcon as HomeSolidIcon,
   RectangleStackIcon as RectangleStackSolidIcon,
   UserGroupIcon as UserGroupSolidIcon,
-  Cog6ToothIcon as Cog6ToothSolidIcon
+  Cog6ToothIcon as Cog6ToothSolidIcon,
+  MusicalNoteIcon as MusicalNoteSolidIcon,
+  FolderIcon as FolderSolidIcon
 } from '@heroicons/react/24/solid';
 
 interface SpotifyTopBarProps {
@@ -131,10 +135,22 @@ export const SpotifyQuickNav: React.FC<SpotifyQuickNavProps> = ({ currentPath })
 
   const navItems = [
     {
-      path: '/dashboard',
+      path: '/home',
       label: 'Home',
       icon: HomeIcon,
       activeIcon: HomeSolidIcon
+    },
+    {
+      path: '/dashboard',
+      label: 'Projects',
+      icon: FolderIcon,
+      activeIcon: FolderSolidIcon
+    },
+    {
+      path: '/discover',
+      label: 'Discover',
+      icon: MusicalNoteIcon,
+      activeIcon: MusicalNoteSolidIcon
     },
     {
       path: '/search',

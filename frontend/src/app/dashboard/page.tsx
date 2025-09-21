@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { PlusIcon, FolderIcon, UsersIcon, CalendarIcon, BeakerIcon, UserIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, FolderIcon, UsersIcon, CalendarIcon, BeakerIcon, UserIcon, MusicalNoteIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import {
@@ -207,6 +207,12 @@ export default function Dashboard() {
           ]}
           actions={
             <div className="flex flex-col sm:flex-row gap-3">
+              <Link href="/discover">
+                <Button variant="outline" className="inline-flex items-center">
+                  <MusicalNoteIcon className="h-5 w-5 mr-2" />
+                  Discover Papers
+                </Button>
+              </Link>
               <Link href="/">
                 <Button variant="outline" className="inline-flex items-center">
                   <BeakerIcon className="h-5 w-5 mr-2" />

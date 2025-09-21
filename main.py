@@ -65,6 +65,9 @@ from database import (
     Article, NetworkGraph, AuthorCollaboration, create_tables
 )
 
+# AI Recommendations Service
+from services.ai_recommendations_service import get_spotify_recommendations_service
+
 # Embeddings and Pinecone
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from pinecone import Pinecone
@@ -11623,3 +11626,156 @@ async def migrate_railway_database_endpoint():
             "message": f"Migration endpoint error: {str(e)}",
             "timestamp": datetime.now().isoformat()
         }
+
+# =============================================================================
+# SPOTIFY-INSPIRED AI RECOMMENDATIONS ENDPOINTS
+# =============================================================================
+
+@app.get("/recommendations/weekly/{user_id}")
+async def get_weekly_recommendations(
+    user_id: str,
+    project_id: Optional[str] = Query(None, description="Optional project context"),
+    request: Request = None
+):
+    """
+    Get Spotify-style weekly recommendations for a user
+
+    Returns 4 categories:
+    - Papers for You: Personalized daily feed
+    - Trending in Your Field: Hot topics
+    - Cross-pollination: Interdisciplinary discoveries
+    - Citation Opportunities: Papers that could cite your work
+    """
+    try:
+        # Get current user from headers (for auth)
+        current_user = request.headers.get("User-ID", user_id) if request else user_id
+
+        # Get recommendations service
+        recommendations_service = get_spotify_recommendations_service()
+
+        # Generate weekly recommendations
+        result = await recommendations_service.get_weekly_recommendations(
+            user_id=current_user,
+            project_id=project_id
+        )
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error getting weekly recommendations: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "user_id": user_id,
+            "project_id": project_id
+        }
+
+@app.get("/recommendations/papers-for-you/{user_id}")
+async def get_papers_for_you(
+    user_id: str,
+    project_id: Optional[str] = Query(None),
+    limit: int = Query(12, ge=1, le=50),
+    request: Request = None
+):
+    """Get personalized 'Papers for You' recommendations"""
+    try:
+        current_user = request.headers.get("User-ID", user_id) if request else user_id
+        recommendations_service = get_spotify_recommendations_service()
+
+        # Get user profile and generate personalized recommendations
+        db_gen = get_db()
+        db = next(db_gen)
+
+        try:
+            user_profile = await recommendations_service._build_user_research_profile(
+                current_user, project_id, db
+            )
+            result = await recommendations_service._generate_papers_for_you(user_profile, db)
+            return result
+        finally:
+            db.close()
+
+    except Exception as e:
+        logger.error(f"Error getting Papers for You: {e}")
+        return {"status": "error", "error": str(e)}
+
+@app.get("/recommendations/trending/{user_id}")
+async def get_trending_in_field(
+    user_id: str,
+    project_id: Optional[str] = Query(None),
+    request: Request = None
+):
+    """Get 'Trending in Your Field' recommendations"""
+    try:
+        current_user = request.headers.get("User-ID", user_id) if request else user_id
+        recommendations_service = get_spotify_recommendations_service()
+
+        db_gen = get_db()
+        db = next(db_gen)
+
+        try:
+            user_profile = await recommendations_service._build_user_research_profile(
+                current_user, project_id, db
+            )
+            result = await recommendations_service._generate_trending_in_field(user_profile, db)
+            return result
+        finally:
+            db.close()
+
+    except Exception as e:
+        logger.error(f"Error getting Trending in Field: {e}")
+        return {"status": "error", "error": str(e)}
+
+@app.get("/recommendations/cross-pollination/{user_id}")
+async def get_cross_pollination(
+    user_id: str,
+    project_id: Optional[str] = Query(None),
+    request: Request = None
+):
+    """Get 'Cross-pollination' interdisciplinary recommendations"""
+    try:
+        current_user = request.headers.get("User-ID", user_id) if request else user_id
+        recommendations_service = get_spotify_recommendations_service()
+
+        db_gen = get_db()
+        db = next(db_gen)
+
+        try:
+            user_profile = await recommendations_service._build_user_research_profile(
+                current_user, project_id, db
+            )
+            result = await recommendations_service._generate_cross_pollination(user_profile, db)
+            return result
+        finally:
+            db.close()
+
+    except Exception as e:
+        logger.error(f"Error getting Cross-pollination: {e}")
+        return {"status": "error", "error": str(e)}
+
+@app.get("/recommendations/citation-opportunities/{user_id}")
+async def get_citation_opportunities(
+    user_id: str,
+    project_id: Optional[str] = Query(None),
+    request: Request = None
+):
+    """Get 'Citation Opportunities' recommendations"""
+    try:
+        current_user = request.headers.get("User-ID", user_id) if request else user_id
+        recommendations_service = get_spotify_recommendations_service()
+
+        db_gen = get_db()
+        db = next(db_gen)
+
+        try:
+            user_profile = await recommendations_service._build_user_research_profile(
+                current_user, project_id, db
+            )
+            result = await recommendations_service._generate_citation_opportunities(user_profile, db)
+            return result
+        finally:
+            db.close()
+
+    except Exception as e:
+        logger.error(f"Error getting Citation Opportunities: {e}")
+        return {"status": "error", "error": str(e)}
