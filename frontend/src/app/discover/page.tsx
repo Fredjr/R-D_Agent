@@ -330,20 +330,27 @@ export default function DiscoverPage() {
         <div className="space-y-12">
           {/* Papers for You */}
           {(() => {
-            console.log('🔍 DISCOVER PAGE: Papers for You check - has papers:', recommendations.recommendations.papers_for_you?.papers?.length > 0, 'length:', recommendations.recommendations.papers_for_you?.papers?.length);
+            // Handle both enhanced API format (direct array) and backend service format (nested under 'papers')
+            const papersForYou = recommendations.recommendations.papers_for_you;
+            const papers = Array.isArray(papersForYou) ? papersForYou : papersForYou?.papers || [];
 
-            if (recommendations.recommendations.papers_for_you?.papers?.length > 0) {
-              console.log('🎨 DISCOVER PAGE: Rendering Papers for You section with:', JSON.stringify({
-                ...recommendations.recommendations.papers_for_you,
-                papers: recommendations.recommendations.papers_for_you.papers
-              }, null, 2));
+            console.log('🔍 DISCOVER PAGE: Papers for You check - isArray:', Array.isArray(papersForYou), 'papers length:', papers.length);
+            console.log('🔍 DISCOVER PAGE: Papers for You data structure:', papersForYou);
+
+            if (papers.length > 0) {
+              const sectionData = {
+                title: "Papers for You",
+                description: "Personalized recommendations based on your research",
+                updated: "21/09/2025 • Based on your recent activity and saved papers",
+                refresh_reason: "Updated based on your research activity and saved papers",
+                papers: papers
+              };
+
+              console.log('🎨 DISCOVER PAGE: Rendering Papers for You section with:', JSON.stringify(sectionData, null, 2));
 
               return (
                 <SpotifyRecommendationSection
-                  section={{
-                    ...recommendations.recommendations.papers_for_you,
-                    papers: recommendations.recommendations.papers_for_you.papers
-                  }}
+                  section={sectionData}
                   onPlay={handlePlayPaper}
                   onSave={handleSavePaper}
                   onShare={handleSharePaper}
@@ -358,20 +365,27 @@ export default function DiscoverPage() {
 
           {/* Trending in Your Field */}
           {(() => {
-            console.log('🔍 DISCOVER PAGE: Trending check - has papers:', recommendations.recommendations.trending_in_field?.papers?.length > 0, 'length:', recommendations.recommendations.trending_in_field?.papers?.length);
+            // Handle both enhanced API format (direct array) and backend service format (nested under 'papers')
+            const trendingInField = recommendations.recommendations.trending_in_field;
+            const papers = Array.isArray(trendingInField) ? trendingInField : trendingInField?.papers || [];
 
-            if (recommendations.recommendations.trending_in_field?.papers?.length > 0) {
-              console.log('🎨 DISCOVER PAGE: Rendering Trending section with:', JSON.stringify({
-                ...recommendations.recommendations.trending_in_field,
-                papers: recommendations.recommendations.trending_in_field.papers
-              }, null, 2));
+            console.log('🔍 DISCOVER PAGE: Trending check - isArray:', Array.isArray(trendingInField), 'papers length:', papers.length);
+            console.log('🔍 DISCOVER PAGE: Trending data structure:', trendingInField);
+
+            if (papers.length > 0) {
+              const sectionData = {
+                title: "Trending in Your Field",
+                description: "Hot topics gaining attention in your research area",
+                updated: "21/09/2025 • Latest trends and breakthrough discoveries",
+                refresh_reason: "Updated with latest trending research in your field",
+                papers: papers
+              };
+
+              console.log('🎨 DISCOVER PAGE: Rendering Trending section with:', JSON.stringify(sectionData, null, 2));
 
               return (
                 <SpotifyRecommendationSection
-                  section={{
-                    ...recommendations.recommendations.trending_in_field,
-                    papers: recommendations.recommendations.trending_in_field.papers
-                  }}
+                  section={sectionData}
                   onPlay={handlePlayPaper}
                   onSave={handleSavePaper}
                   onShare={handleSharePaper}
@@ -385,32 +399,72 @@ export default function DiscoverPage() {
           })()}
 
           {/* Cross-pollination */}
-          {recommendations.recommendations.cross_pollination?.papers?.length > 0 && (
-            <SpotifyRecommendationSection
-              section={{
-                ...recommendations.recommendations.cross_pollination,
-                papers: recommendations.recommendations.cross_pollination.papers
-              }}
-              onPlay={handlePlayPaper}
-              onSave={handleSavePaper}
-              onShare={handleSharePaper}
-              onSeeAll={handleSeeAll}
-            />
-          )}
+          {(() => {
+            // Handle both enhanced API format (direct array) and backend service format (nested under 'papers')
+            const crossPollination = recommendations.recommendations.cross_pollination;
+            const papers = Array.isArray(crossPollination) ? crossPollination : crossPollination?.papers || [];
+
+            console.log('🔍 DISCOVER PAGE: Cross-pollination check - isArray:', Array.isArray(crossPollination), 'papers length:', papers.length);
+
+            if (papers.length > 0) {
+              const sectionData = {
+                title: "Cross-pollination",
+                description: "Interdisciplinary discoveries and new perspectives",
+                updated: "21/09/2025 • Exploring connections across research domains",
+                refresh_reason: "Updated with interdisciplinary research opportunities",
+                papers: papers
+              };
+
+              console.log('🎨 DISCOVER PAGE: Rendering Cross-pollination section with:', JSON.stringify(sectionData, null, 2));
+
+              return (
+                <SpotifyRecommendationSection
+                  section={sectionData}
+                  onPlay={handlePlayPaper}
+                  onSave={handleSavePaper}
+                  onShare={handleSharePaper}
+                  onSeeAll={handleSeeAll}
+                />
+              );
+            } else {
+              console.log('⚠️ DISCOVER PAGE: Cross-pollination section not rendered - no papers or empty array');
+              return null;
+            }
+          })()}
 
           {/* Citation Opportunities */}
-          {recommendations.recommendations.citation_opportunities?.papers?.length > 0 && (
-            <SpotifyRecommendationSection
-              section={{
-                ...recommendations.recommendations.citation_opportunities,
-                papers: recommendations.recommendations.citation_opportunities.papers
-              }}
-              onPlay={handlePlayPaper}
-              onSave={handleSavePaper}
-              onShare={handleSharePaper}
-              onSeeAll={handleSeeAll}
-            />
-          )}
+          {(() => {
+            // Handle both enhanced API format (direct array) and backend service format (nested under 'papers')
+            const citationOpportunities = recommendations.recommendations.citation_opportunities;
+            const papers = Array.isArray(citationOpportunities) ? citationOpportunities : citationOpportunities?.papers || [];
+
+            console.log('🔍 DISCOVER PAGE: Citation Opportunities check - isArray:', Array.isArray(citationOpportunities), 'papers length:', papers.length);
+
+            if (papers.length > 0) {
+              const sectionData = {
+                title: "Citation Opportunities",
+                description: "Papers that could benefit from your expertise",
+                updated: "21/09/2025 • Recent papers in your field with citation gaps",
+                refresh_reason: "Updated with papers that could benefit from your research",
+                papers: papers
+              };
+
+              console.log('🎨 DISCOVER PAGE: Rendering Citation Opportunities section with:', JSON.stringify(sectionData, null, 2));
+
+              return (
+                <SpotifyRecommendationSection
+                  section={sectionData}
+                  onPlay={handlePlayPaper}
+                  onSave={handleSavePaper}
+                  onShare={handleSharePaper}
+                  onSeeAll={handleSeeAll}
+                />
+              );
+            } else {
+              console.log('⚠️ DISCOVER PAGE: Citation Opportunities section not rendered - no papers or empty array');
+              return null;
+            }
+          })()}
         </div>
 
         {/* Next Update Info */}
