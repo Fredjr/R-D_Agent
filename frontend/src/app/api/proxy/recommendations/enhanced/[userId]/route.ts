@@ -177,11 +177,12 @@ async function generatePersonalizedRecommendations(profile: any) {
       title: `Recent Advances in ${domainTitle} Research`,
       authors: ['Smith, J.', 'Johnson, A.', 'Williams, B.'],
       journal: 'Nature Reviews',
-      pub_year: 2024,
+      year: 2024, // Fixed: pub_year -> year
       abstract: `Comprehensive review of recent developments in ${domain} with implications for future research directions. This paper explores cutting-edge methodologies and emerging trends that could benefit researchers working in this field.`,
       citation_count: Math.floor(Math.random() * 100) + 50,
       relevance_score: 0.95,
-      recommendation_reason: `Based on your ${profile.total_collections} collections and ${profile.total_articles} articles focusing on ${domain}`
+      reason: `Based on your ${profile.total_collections} collections and ${profile.total_articles} articles focusing on ${domain}`, // Fixed: recommendation_reason -> reason
+      category: 'personalized' // Added required category field
     });
   }
 
@@ -192,11 +193,12 @@ async function generatePersonalizedRecommendations(profile: any) {
       title: `Emerging Trends in Research Methodology`,
       authors: ['Taylor, R.', 'Anderson, K.', 'Brown, D.'],
       journal: 'Science',
-      pub_year: 2024,
+      year: 2024, // Fixed: pub_year -> year
       abstract: `A comprehensive overview of modern research methodologies and best practices for organizing and analyzing scientific literature.`,
       citation_count: 75,
       relevance_score: 0.85,
-      recommendation_reason: `Recommended for researchers with ${profile.total_collections} active collections`
+      reason: `Recommended for researchers with ${profile.total_collections} active collections`, // Fixed: recommendation_reason -> reason
+      category: 'general' // Added required category field
     });
   }
 
@@ -217,11 +219,12 @@ async function generateTrendingRecommendations(profile: any) {
       title: `Trending: Breakthrough in ${domainTitle}`,
       authors: ['Chen, L.', 'Rodriguez, M.', 'Kim, S.'],
       journal: 'Science',
-      pub_year: 2024,
+      year: 2024, // Fixed: pub_year -> year
       abstract: `Latest breakthrough research in ${domain} that's gaining significant attention in the scientific community. This work represents a paradigm shift in how researchers approach problems in this field.`,
       citation_count: Math.floor(Math.random() * 200) + 100,
       trend_score: 0.92,
-      recommendation_reason: `Trending in your field of ${domain}`
+      reason: `Trending in your field of ${domain}`, // Fixed: recommendation_reason -> reason
+      category: 'trending' // Added required category field
     });
   }
 
@@ -232,11 +235,12 @@ async function generateTrendingRecommendations(profile: any) {
       title: `Hot Topic: AI-Assisted Research Tools`,
       authors: ['Zhang, W.', 'Patel, N.', 'Johnson, M.'],
       journal: 'Nature Technology',
-      pub_year: 2024,
+      year: 2024, // Fixed: pub_year -> year
       abstract: `Exploring how artificial intelligence is revolutionizing research workflows and literature analysis for active researchers.`,
       citation_count: 156,
       trend_score: 0.89,
-      recommendation_reason: `Trending among researchers with ${profile.total_projects}+ active projects`
+      reason: `Trending among researchers with ${profile.total_projects}+ active projects`, // Fixed: recommendation_reason -> reason
+      category: 'trending' // Added required category field
     });
   }
 
@@ -255,11 +259,12 @@ async function generateCrossPollinationRecommendations(profile: any) {
       title: `Interdisciplinary Approaches: ${domain1.charAt(0).toUpperCase() + domain1.slice(1)} Meets ${domain2.charAt(0).toUpperCase() + domain2.slice(1)}`,
       authors: ['Taylor, R.', 'Anderson, K.', 'Brown, D.'],
       journal: 'Nature Interdisciplinary Science',
-      pub_year: 2024,
+      year: 2024, // Fixed: pub_year -> year
       abstract: `Novel interdisciplinary research combining ${domain1} and ${domain2} methodologies for innovative solutions.`,
       citation_count: Math.floor(Math.random() * 80) + 30,
       cross_pollination_score: 0.88,
-      recommendation_reason: `Combines your interests in ${domain1} and ${domain2}`
+      reason: `Combines your interests in ${domain1} and ${domain2}`, // Fixed: recommendation_reason -> reason
+      category: 'cross-pollination' // Added required category field
     });
   }
 
@@ -275,11 +280,12 @@ async function generateCitationOpportunities(profile: any) {
       title: `Research Gap Analysis in Your Field`,
       authors: ['Wilson, P.', 'Davis, C.', 'Miller, J.'],
       journal: 'Research Methodology Review',
-      pub_year: 2024,
+      year: 2024, // Fixed: pub_year -> year
       abstract: `Identifies key research gaps that could benefit from citation of your existing work collection.`,
       citation_count: Math.floor(Math.random() * 60) + 20,
       citation_opportunity_score: 0.85,
-      recommendation_reason: `Could cite your research based on your ${profile.total_articles} saved articles`
+      reason: `Could cite your research based on your ${profile.total_articles} saved articles`, // Fixed: recommendation_reason -> reason
+      category: 'citation-opportunity' // Added required category field
     });
   }
 
