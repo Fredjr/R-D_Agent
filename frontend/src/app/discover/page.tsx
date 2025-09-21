@@ -64,11 +64,16 @@ export default function DiscoverPage() {
       setLoading(true);
       setError(null);
 
+      console.log('🔄 DISCOVER PAGE: Starting recommendation load for user:', user.email);
+      console.log('🔄 DISCOVER PAGE: Selected project:', selectedProject);
+      console.log('🔄 DISCOVER PAGE: User object:', JSON.stringify(user, null, 2));
+
       // Try enhanced recommendations first, fallback to regular if needed
       let url = selectedProject
         ? `/api/proxy/recommendations/enhanced/${user.email}?project_id=${selectedProject}`
         : `/api/proxy/recommendations/enhanced/${user.email}`;
 
+      console.log('🔄 DISCOVER PAGE: Attempting enhanced recommendations from:', url);
       let response = await fetch(url, {
         headers: {
           'User-ID': user.email,
@@ -77,11 +82,15 @@ export default function DiscoverPage() {
       });
 
       if (!response.ok) {
-        console.warn('⚠️ Enhanced recommendations failed, falling back to regular recommendations');
+        console.warn('⚠️ DISCOVER PAGE: Enhanced recommendations failed with status:', response.status);
+        const enhancedErrorText = await response.text();
+        console.warn('⚠️ DISCOVER PAGE: Enhanced error details:', enhancedErrorText);
+
         url = selectedProject
           ? `/api/proxy/recommendations/weekly/${user.email}?project_id=${selectedProject}`
           : `/api/proxy/recommendations/weekly/${user.email}`;
 
+        console.log('🔄 DISCOVER PAGE: Falling back to regular recommendations from:', url);
         response = await fetch(url, {
           headers: {
             'User-ID': user.email,
@@ -91,20 +100,99 @@ export default function DiscoverPage() {
       }
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch recommendations: ${response.status}`);
+        const errorText = await response.text();
+        console.error('❌ DISCOVER PAGE: All recommendations APIs failed. Status:', response.status);
+        console.error('❌ DISCOVER PAGE: Error details:', errorText);
+        throw new Error(`Failed to fetch recommendations: ${response.status} - ${errorText}`);
       }
 
+      console.log('✅ DISCOVER PAGE: API request successful, status:', response.status);
+
       const data = await response.json();
-      
+      console.log('✅ DISCOVER PAGE: Raw API response:', JSON.stringify(data, null, 2));
+
       if (data.status === 'error') {
+        console.error('❌ DISCOVER PAGE: API returned error status:', data.error);
         throw new Error(data.error || 'Failed to generate recommendations');
       }
 
+      // Debug: Analyze the structure of recommendations
+      console.log('🔍 DISCOVER PAGE: Analyzing recommendation structure...');
+      if (data.recommendations) {
+        console.log('📚 papers_for_you structure:', {
+          type: typeof data.recommendations.papers_for_you,
+          isArray: Array.isArray(data.recommendations.papers_for_you),
+          hasTitle: data.recommendations.papers_for_you?.title,
+          hasDescription: data.recommendations.papers_for_you?.description,
+          hasPapers: data.recommendations.papers_for_you?.papers,
+          papersLength: data.recommendations.papers_for_you?.papers?.length || 0,
+          content: data.recommendations.papers_for_you
+        });
+
+        console.log('🔥 trending_in_field structure:', {
+          type: typeof data.recommendations.trending_in_field,
+          isArray: Array.isArray(data.recommendations.trending_in_field),
+          hasTitle: data.recommendations.trending_in_field?.title,
+          hasDescription: data.recommendations.trending_in_field?.description,
+          hasPapers: data.recommendations.trending_in_field?.papers,
+          papersLength: data.recommendations.trending_in_field?.papers?.length || 0,
+          content: data.recommendations.trending_in_field
+        });
+
+        console.log('🔬 cross_pollination structure:', {
+          type: typeof data.recommendations.cross_pollination,
+          isArray: Array.isArray(data.recommendations.cross_pollination),
+          hasTitle: data.recommendations.cross_pollination?.title,
+          hasDescription: data.recommendations.cross_pollination?.description,
+          hasPapers: data.recommendations.cross_pollination?.papers,
+          papersLength: data.recommendations.cross_pollination?.papers?.length || 0,
+          content: data.recommendations.cross_pollination
+        });
+
+        console.log('💡 citation_opportunities structure:', {
+          type: typeof data.recommendations.citation_opportunities,
+          isArray: Array.isArray(data.recommendations.citation_opportunities),
+          hasTitle: data.recommendations.citation_opportunities?.title,
+          hasDescription: data.recommendations.citation_opportunities?.description,
+          hasPapers: data.recommendations.citation_opportunities?.papers,
+          papersLength: data.recommendations.citation_opportunities?.papers?.length || 0,
+          content: data.recommendations.citation_opportunities
+        });
+      }
+
+      // Debug: Sample items from each section
+      if (data.recommendations?.papers_for_you?.papers?.length > 0) {
+        console.log('🔍 DISCOVER PAGE: Sample Papers for You item:', JSON.stringify(data.recommendations.papers_for_you.papers[0], null, 2));
+      }
+      if (data.recommendations?.trending_in_field?.papers?.length > 0) {
+        console.log('🔍 DISCOVER PAGE: Sample Trending item:', JSON.stringify(data.recommendations.trending_in_field.papers[0], null, 2));
+      }
+      if (data.recommendations?.cross_pollination?.papers?.length > 0) {
+        console.log('🔍 DISCOVER PAGE: Sample Cross-pollination item:', JSON.stringify(data.recommendations.cross_pollination.papers[0], null, 2));
+      }
+      if (data.recommendations?.citation_opportunities?.papers?.length > 0) {
+        console.log('🔍 DISCOVER PAGE: Sample Citation Opportunity item:', JSON.stringify(data.recommendations.citation_opportunities.papers[0], null, 2));
+      }
+
+      console.log('📊 DISCOVER PAGE: Total recommendations count:');
+      console.log('📚 Papers for You:', data.recommendations?.papers_for_you?.papers?.length || 0);
+      console.log('🔥 Trending:', data.recommendations?.trending_in_field?.papers?.length || 0);
+      console.log('🔬 Cross-pollination:', data.recommendations?.cross_pollination?.papers?.length || 0);
+      console.log('💡 Citation Opportunities:', data.recommendations?.citation_opportunities?.papers?.length || 0);
+
+      console.log('🔄 DISCOVER PAGE: Setting recommendations state with data:', JSON.stringify(data, null, 2));
       setRecommendations(data);
     } catch (err: any) {
-      console.error('Error fetching recommendations:', err);
-      setError(err.message || 'Failed to load recommendations');
+      console.error('❌ DISCOVER PAGE: Failed to load recommendations. Error details:', err);
+      console.error('❌ DISCOVER PAGE: Error stack:', err?.stack || 'No stack trace');
+      console.error('❌ DISCOVER PAGE: Error type:', typeof err);
+      console.error('❌ DISCOVER PAGE: Error stringified:', JSON.stringify(err, null, 2));
+
+      const errorMessage = err?.message || 'Failed to load recommendations';
+      console.error('❌ DISCOVER PAGE: Setting error state to:', errorMessage);
+      setError(errorMessage);
     } finally {
+      console.log('🏁 DISCOVER PAGE: Recommendation loading completed, setting loading to false');
       setLoading(false);
     }
   };
@@ -241,31 +329,68 @@ export default function DiscoverPage() {
         {/* Recommendation Sections */}
         <div className="space-y-12">
           {/* Papers for You */}
-          {recommendations.recommendations.papers_for_you?.papers?.length > 0 && (
-            <SpotifyRecommendationSection
-              section={recommendations.recommendations.papers_for_you}
-              onPlay={handlePlayPaper}
-              onSave={handleSavePaper}
-              onShare={handleSharePaper}
-              onSeeAll={handleSeeAll}
-            />
-          )}
+          {(() => {
+            console.log('🔍 DISCOVER PAGE: Papers for You check - has papers:', recommendations.recommendations.papers_for_you?.papers?.length > 0, 'length:', recommendations.recommendations.papers_for_you?.papers?.length);
+
+            if (recommendations.recommendations.papers_for_you?.papers?.length > 0) {
+              console.log('🎨 DISCOVER PAGE: Rendering Papers for You section with:', JSON.stringify({
+                ...recommendations.recommendations.papers_for_you,
+                papers: recommendations.recommendations.papers_for_you.papers
+              }, null, 2));
+
+              return (
+                <SpotifyRecommendationSection
+                  section={{
+                    ...recommendations.recommendations.papers_for_you,
+                    papers: recommendations.recommendations.papers_for_you.papers
+                  }}
+                  onPlay={handlePlayPaper}
+                  onSave={handleSavePaper}
+                  onShare={handleSharePaper}
+                  onSeeAll={handleSeeAll}
+                />
+              );
+            } else {
+              console.log('⚠️ DISCOVER PAGE: Papers for You section not rendered - no papers or empty array');
+              return null;
+            }
+          })()}
 
           {/* Trending in Your Field */}
-          {recommendations.recommendations.trending_in_field?.papers?.length > 0 && (
-            <SpotifyRecommendationSection
-              section={recommendations.recommendations.trending_in_field}
-              onPlay={handlePlayPaper}
-              onSave={handleSavePaper}
-              onShare={handleSharePaper}
-              onSeeAll={handleSeeAll}
-            />
-          )}
+          {(() => {
+            console.log('🔍 DISCOVER PAGE: Trending check - has papers:', recommendations.recommendations.trending_in_field?.papers?.length > 0, 'length:', recommendations.recommendations.trending_in_field?.papers?.length);
+
+            if (recommendations.recommendations.trending_in_field?.papers?.length > 0) {
+              console.log('🎨 DISCOVER PAGE: Rendering Trending section with:', JSON.stringify({
+                ...recommendations.recommendations.trending_in_field,
+                papers: recommendations.recommendations.trending_in_field.papers
+              }, null, 2));
+
+              return (
+                <SpotifyRecommendationSection
+                  section={{
+                    ...recommendations.recommendations.trending_in_field,
+                    papers: recommendations.recommendations.trending_in_field.papers
+                  }}
+                  onPlay={handlePlayPaper}
+                  onSave={handleSavePaper}
+                  onShare={handleSharePaper}
+                  onSeeAll={handleSeeAll}
+                />
+              );
+            } else {
+              console.log('⚠️ DISCOVER PAGE: Trending section not rendered - no papers or empty array');
+              return null;
+            }
+          })()}
 
           {/* Cross-pollination */}
           {recommendations.recommendations.cross_pollination?.papers?.length > 0 && (
             <SpotifyRecommendationSection
-              section={recommendations.recommendations.cross_pollination}
+              section={{
+                ...recommendations.recommendations.cross_pollination,
+                papers: recommendations.recommendations.cross_pollination.papers
+              }}
               onPlay={handlePlayPaper}
               onSave={handleSavePaper}
               onShare={handleSharePaper}
@@ -276,7 +401,10 @@ export default function DiscoverPage() {
           {/* Citation Opportunities */}
           {recommendations.recommendations.citation_opportunities?.papers?.length > 0 && (
             <SpotifyRecommendationSection
-              section={recommendations.recommendations.citation_opportunities}
+              section={{
+                ...recommendations.recommendations.citation_opportunities,
+                papers: recommendations.recommendations.citation_opportunities.papers
+              }}
               onPlay={handlePlayPaper}
               onSave={handleSavePaper}
               onShare={handleSharePaper}

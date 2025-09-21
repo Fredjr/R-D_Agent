@@ -32,6 +32,22 @@ interface RecommendationData {
   };
 }
 
+// API response structure (what we get from the backend)
+interface ApiRecommendationResponse {
+  recommendations: {
+    papers_for_you: any[];
+    trending_in_field: any[];
+    cross_pollination: any[];
+    citation_opportunities: any[];
+  };
+  user_insights: {
+    primary_domains: string[];
+    activity_level: string;
+    research_velocity: string;
+    total_saved_papers: number;
+  };
+}
+
 interface QuickAction {
   title: string;
   description: string;
@@ -101,40 +117,114 @@ export default function HomePage() {
     setError(null);
 
     try {
-      console.log('🔄 Loading enhanced recommendations for user:', user.user_id);
+      console.log('🔄 HOME PAGE: Starting recommendation load for user:', user.user_id);
+      console.log('🔄 HOME PAGE: User object:', JSON.stringify(user, null, 2));
 
       // Try enhanced recommendations first, fallback to regular if needed
-      let response = await fetch(`/api/proxy/recommendations/enhanced/${user.user_id}`);
+      const enhancedUrl = `/api/proxy/recommendations/enhanced/${user.user_id}`;
+      console.log('🔄 HOME PAGE: Attempting enhanced recommendations from:', enhancedUrl);
+      let response = await fetch(enhancedUrl);
 
       if (!response.ok) {
-        console.warn('⚠️ Enhanced recommendations failed, falling back to regular recommendations');
-        response = await fetch(`/api/proxy/recommendations/weekly/${user.user_id}`);
+        console.warn('⚠️ HOME PAGE: Enhanced recommendations failed with status:', response.status);
+        const enhancedErrorText = await response.text();
+        console.warn('⚠️ HOME PAGE: Enhanced error details:', enhancedErrorText);
+
+        const fallbackUrl = `/api/proxy/recommendations/weekly/${user.user_id}`;
+        console.log('🔄 HOME PAGE: Falling back to regular recommendations from:', fallbackUrl);
+        response = await fetch(fallbackUrl);
       }
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ Recommendations API error:', response.status, errorText);
-        throw new Error(`Failed to load recommendations: ${response.status}`);
+        console.error('❌ HOME PAGE: All recommendations APIs failed. Status:', response.status);
+        console.error('❌ HOME PAGE: Error details:', errorText);
+        throw new Error(`Failed to load recommendations: ${response.status} - ${errorText}`);
       }
+
+      console.log('✅ HOME PAGE: API request successful, status:', response.status);
 
       const data = await response.json();
-      console.log('✅ Recommendations loaded:', data);
+      console.log('✅ HOME PAGE: Raw API response:', JSON.stringify(data, null, 2));
+
+      // Debug: Check the structure of each recommendation section
+      console.log('🔍 HOME PAGE: Analyzing recommendation structure...');
+      console.log('📚 papers_for_you type:', typeof data.recommendations?.papers_for_you, 'isArray:', Array.isArray(data.recommendations?.papers_for_you));
+      console.log('📚 papers_for_you content:', data.recommendations?.papers_for_you);
+      console.log('🔥 trending_in_field type:', typeof data.recommendations?.trending_in_field, 'isArray:', Array.isArray(data.recommendations?.trending_in_field));
+      console.log('🔥 trending_in_field content:', data.recommendations?.trending_in_field);
+      console.log('🔬 cross_pollination type:', typeof data.recommendations?.cross_pollination, 'isArray:', Array.isArray(data.recommendations?.cross_pollination));
+      console.log('🔬 cross_pollination content:', data.recommendations?.cross_pollination);
+      console.log('💡 citation_opportunities type:', typeof data.recommendations?.citation_opportunities, 'isArray:', Array.isArray(data.recommendations?.citation_opportunities));
+      console.log('💡 citation_opportunities content:', data.recommendations?.citation_opportunities);
+
+      // Transform the data structure to match what SpotifyRecommendations expects
+      // Handle both enhanced API format (direct arrays) and backend service format (nested under 'papers')
+      const transformedData = {
+        papers_for_you: Array.isArray(data.recommendations?.papers_for_you)
+          ? data.recommendations.papers_for_you
+          : data.recommendations?.papers_for_you?.papers || [],
+        trending: Array.isArray(data.recommendations?.trending_in_field)
+          ? data.recommendations.trending_in_field
+          : data.recommendations?.trending_in_field?.papers || [],
+        cross_pollination: Array.isArray(data.recommendations?.cross_pollination)
+          ? data.recommendations.cross_pollination
+          : data.recommendations?.cross_pollination?.papers || [],
+        citation_opportunities: Array.isArray(data.recommendations?.citation_opportunities)
+          ? data.recommendations.citation_opportunities
+          : data.recommendations?.citation_opportunities?.papers || [],
+        user_insights: data.user_insights || {
+          primary_domains: [],
+          activity_level: 'moderate',
+          research_velocity: 'steady',
+          total_saved_papers: 0
+        }
+      };
 
       // Check if we got empty recommendations
-      const totalRecommendations = (data.recommendations?.papers_for_you?.length || 0) +
-                                  (data.recommendations?.trending_in_field?.length || 0) +
-                                  (data.recommendations?.cross_pollination?.length || 0) +
-                                  (data.recommendations?.citation_opportunities?.length || 0);
+      const totalRecommendations = transformedData.papers_for_you.length +
+                                  transformedData.trending.length +
+                                  transformedData.cross_pollination.length +
+                                  transformedData.citation_opportunities.length;
+
+      console.log('📊 HOME PAGE: Recommendation counts after transformation:');
+      console.log('📚 Papers for You:', transformedData.papers_for_you.length, 'items');
+      console.log('🔥 Trending:', transformedData.trending.length, 'items');
+      console.log('🔬 Cross-pollination:', transformedData.cross_pollination.length, 'items');
+      console.log('💡 Citation Opportunities:', transformedData.citation_opportunities.length, 'items');
+      console.log('📈 Total recommendations:', totalRecommendations);
 
       if (totalRecommendations === 0) {
-        console.warn('⚠️ No recommendations returned. User profile may be incomplete or no saved articles found.');
+        console.warn('⚠️ HOME PAGE: No recommendations returned. User profile may be incomplete or no saved articles found.');
       }
 
-      setRecommendations(data);
+      // Debug: Sample the first item from each section to verify structure
+      if (transformedData.papers_for_you.length > 0) {
+        console.log('🔍 HOME PAGE: Sample Papers for You item:', JSON.stringify(transformedData.papers_for_you[0], null, 2));
+      }
+      if (transformedData.trending.length > 0) {
+        console.log('🔍 HOME PAGE: Sample Trending item:', JSON.stringify(transformedData.trending[0], null, 2));
+      }
+      if (transformedData.cross_pollination.length > 0) {
+        console.log('🔍 HOME PAGE: Sample Cross-pollination item:', JSON.stringify(transformedData.cross_pollination[0], null, 2));
+      }
+      if (transformedData.citation_opportunities.length > 0) {
+        console.log('🔍 HOME PAGE: Sample Citation Opportunity item:', JSON.stringify(transformedData.citation_opportunities[0], null, 2));
+      }
+
+      console.log('🔄 HOME PAGE: Final transformed data for SpotifyRecommendations:', JSON.stringify(transformedData, null, 2));
+      setRecommendations(transformedData);
     } catch (err) {
-      console.error('❌ Failed to load recommendations:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load recommendations');
+      console.error('❌ HOME PAGE: Failed to load recommendations. Error details:', err);
+      console.error('❌ HOME PAGE: Error stack:', err instanceof Error ? err.stack : 'No stack trace');
+      console.error('❌ HOME PAGE: Error type:', typeof err);
+      console.error('❌ HOME PAGE: Error stringified:', JSON.stringify(err, null, 2));
+
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load recommendations';
+      console.error('❌ HOME PAGE: Setting error state to:', errorMessage);
+      setError(errorMessage);
     } finally {
+      console.log('🏁 HOME PAGE: Recommendation loading completed, setting loading to false');
       setLoading(false);
     }
   };
@@ -230,11 +320,27 @@ export default function HomePage() {
             </ErrorAlert>
           </div>
         ) : recommendations ? (
-          <SpotifyRecommendations 
-            recommendations={recommendations}
-            onRefresh={handleRefresh}
-          />
-        ) : null}
+          (() => {
+            console.log('🎨 HOME PAGE: Rendering SpotifyRecommendations with data:', JSON.stringify(recommendations, null, 2));
+            return (
+              <SpotifyRecommendations
+                recommendations={recommendations}
+                onRefresh={handleRefresh}
+              />
+            );
+          })()
+        ) : (
+          (() => {
+            console.log('⚠️ HOME PAGE: No recommendations to render, recommendations state is:', recommendations);
+            return (
+              <div className="py-20 text-center">
+                <p className="text-[var(--spotify-light-text)] text-lg">
+                  No recommendations available at the moment.
+                </p>
+              </div>
+            );
+          })()
+        )}
 
         {/* Recent Activity Preview */}
         <section className="mt-16">
