@@ -545,6 +545,166 @@ a:hover {
 }
 
 /* ========================================
+   ADDITIONAL WHITE BACKGROUND FIXES
+   ======================================== */
+
+/* Fix for specific project page elements */
+.bg-white .text-gray-500,
+.bg-white .text-gray-400,
+.bg-white .text-gray-300,
+.bg-white .text-slate-500,
+.bg-white .text-slate-400,
+.bg-white .text-slate-300 {
+  color: #4a4a4a !important;
+}
+
+/* Fix for report cards and iteration cards */
+.bg-white .report-title,
+.bg-white .iteration-title,
+.bg-white .analysis-title {
+  color: #1a1a1a !important;
+}
+
+.bg-white .report-description,
+.bg-white .iteration-description,
+.bg-white .analysis-description {
+  color: #4a4a4a !important;
+}
+
+/* Fix for any text elements in white containers */
+.bg-white .text-sm,
+.bg-white .text-xs,
+.bg-white .text-base,
+.bg-white .text-lg {
+  color: #1a1a1a !important;
+}
+
+/* Fix for muted text in white containers */
+.bg-white .text-muted,
+.bg-white .opacity-70,
+.bg-white .opacity-60,
+.bg-white .opacity-50 {
+  color: #6a6a6a !important;
+  opacity: 1 !important;
+}
+
+/* Fix for any Tailwind text color classes on white backgrounds */
+.bg-white [class*="text-gray-"],
+.bg-white [class*="text-slate-"],
+.bg-white [class*="text-zinc-"],
+.bg-white [class*="text-neutral-"],
+.bg-white [class*="text-stone-"] {
+  color: #1a1a1a !important;
+}
+
+/* Fix for light backgrounds */
+.bg-gray-50 *,
+.bg-gray-100 *,
+.bg-slate-50 *,
+.bg-slate-100 * {
+  color: #1a1a1a !important;
+}
+
+/* Fix for any light text on light backgrounds - nuclear option */
+[style*="background: white"] *,
+[style*="background-color: white"] *,
+[style*="background: #fff"] *,
+[style*="background-color: #fff"] *,
+[style*="background: #ffffff"] *,
+[style*="background-color: #ffffff"] * {
+  color: #1a1a1a !important;
+}
+
+/* Specific fix for report iteration cards */
+.bg-white .version-number,
+.bg-white .date-text,
+.bg-white .status-text,
+.bg-white .author-text {
+  color: #4a4a4a !important;
+}
+
+/* Fix for buttons on white backgrounds */
+.bg-white button,
+.bg-white .btn {
+  color: #1a1a1a !important;
+}
+
+.bg-white button.text-white,
+.bg-white .btn.text-white {
+  color: white !important;
+}
+
+/* ========================================
+   PROJECT PAGE SPECIFIC FIXES
+   ======================================== */
+
+/* Fix for project page cards - Reports section */
+[class*="bg-white"] h3,
+[class*="bg-white"] h4,
+[class*="bg-white"] h5,
+[class*="bg-white"] .card-title,
+[class*="bg-white"] .report-title {
+  color: #1a1a1a !important;
+  font-weight: 600 !important;
+}
+
+[class*="bg-white"] p,
+[class*="bg-white"] .card-description,
+[class*="bg-white"] .report-description,
+[class*="bg-white"] .text-description {
+  color: #4a4a4a !important;
+}
+
+/* Fix for specific project page elements */
+[class*="bg-white"] .pmid,
+[class*="bg-white"] .version,
+[class*="bg-white"] .date,
+[class*="bg-white"] .author,
+[class*="bg-white"] .status {
+  color: #6a6a6a !important;
+}
+
+/* Fix for any remaining light text */
+[class*="bg-white"] .text-light,
+[class*="bg-white"] .text-secondary,
+[class*="bg-white"] .secondary-text {
+  color: #6a6a6a !important;
+}
+
+/* Fix for Share Project button and similar buttons */
+.bg-white .share-button,
+.bg-white .project-button,
+.bg-white .action-button {
+  color: #1a1a1a !important;
+}
+
+/* Nuclear option for any remaining issues */
+.bg-white *:not(.text-white):not(.text-green-500):not(.text-blue-500):not(.text-red-500):not(.text-yellow-500):not(.text-purple-500):not([class*="text-green"]):not([class*="text-blue"]):not([class*="text-red"]):not([class*="text-yellow"]):not([class*="text-purple"]) {
+  color: #1a1a1a !important;
+}
+
+/* Ensure colored elements stay colored */
+.bg-white .text-green-500,
+.bg-white .text-blue-500,
+.bg-white .text-red-500,
+.bg-white .text-yellow-500,
+.bg-white .text-purple-500,
+.bg-white [class*="text-green"],
+.bg-white [class*="text-blue"],
+.bg-white [class*="text-red"],
+.bg-white [class*="text-yellow"],
+.bg-white [class*="text-purple"] {
+  /* Keep original colors for these elements */
+}
+
+/* Fix for completed status and other status indicators */
+.bg-white .status-completed,
+.bg-white .status-pending,
+.bg-white .status-active {
+  color: inherit !important; /* Keep their original colors */
+}
+
+/* ========================================
    SPOTIFY-INSPIRED ANIMATIONS & INTERACTIONS
    ======================================== */
 
