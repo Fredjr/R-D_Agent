@@ -4256,6 +4256,7 @@ class CompleteRegistrationRequest(BaseModel):
     subject_area: str = Field(..., min_length=1, max_length=255, description="Subject area")
     how_heard_about_us: str = Field(..., min_length=1, max_length=255, description="How heard about us")
     join_mailing_list: bool = False
+    password: Optional[str] = Field(None, min_length=6, description="User password")
 
     @validator('category')
     def validate_category(cls, v):
@@ -4283,6 +4284,14 @@ async def complete_registration(request: CompleteRegistrationRequest, db: Sessio
         user.how_heard_about_us = request.how_heard_about_us
         user.join_mailing_list = request.join_mailing_list
         user.registration_completed = True
+
+        # CRITICAL FIX: Set password hash if provided
+        if hasattr(request, 'password') and request.password:
+            from passlib.context import CryptContext
+            pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+            user.password_hash = pwd_context.hash(request.password)
+            user.can_signin = True
+            user.is_active = True
         # Generate unique username - use email prefix with timestamp to ensure uniqueness
         base_username = user.email.split('@')[0]
         # Check if username already exists, if so, keep the current one or generate unique
