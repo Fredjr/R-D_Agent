@@ -3986,6 +3986,48 @@ async def quick_complete_registration(email: str, db: Session = Depends(get_db))
         db.rollback()
         return {"error": str(e)}
 
+@app.post("/debug/fix-password/{email}")
+async def fix_user_password(email: str, db: Session = Depends(get_db)):
+    """Fix password hash for user - direct database update"""
+    try:
+        user = db.query(User).filter(User.email == email).first()
+        if not user:
+            return {"error": "User not found", "email": email}
+
+        # Import password hashing
+        from passlib.context import CryptContext
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+        # Set password hash for qwerty1234
+        password_hash = pwd_context.hash("qwerty1234")
+
+        # Update user directly in database
+        user.password_hash = password_hash
+        user.can_signin = True
+        user.is_active = True
+
+        db.commit()
+        db.refresh(user)
+
+        # Test the password hash
+        test_verify = pwd_context.verify("qwerty1234", user.password_hash)
+
+        return {
+            "status": "success",
+            "message": "Password hash fixed successfully",
+            "email": user.email,
+            "user_id": user.user_id,
+            "has_password": bool(user.password_hash),
+            "can_signin": user.can_signin,
+            "password_test": test_verify,
+            "next_steps": "You can now login from any device with qwerty1234"
+        }
+
+    except Exception as e:
+        logger.error(f"Error fixing password: {e}")
+        db.rollback()
+        return {"error": str(e), "details": "Failed to fix password hash"}
+
 # Authentication Models
 class AuthRequest(BaseModel):
     email: str = Field(..., description="User email address")
