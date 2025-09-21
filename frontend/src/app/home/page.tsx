@@ -82,26 +82,49 @@ export default function HomePage() {
       router.push('/auth/signin');
       return;
     }
+
+    // Check if user registration is complete
+    if (user.registration_completed === false) {
+      console.log('⚠️ User registration incomplete, redirecting to complete profile');
+      router.push('/auth/complete-profile');
+      return;
+    }
+
     loadRecommendations();
   }, [user, router]);
 
   const loadRecommendations = async () => {
     if (!user) return;
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
+      console.log('🔄 Loading recommendations for user:', user.user_id);
       const response = await fetch(`/api/proxy/recommendations/weekly/${user.user_id}`);
-      
+
       if (!response.ok) {
-        throw new Error('Failed to load recommendations');
+        const errorText = await response.text();
+        console.error('❌ Recommendations API error:', response.status, errorText);
+        throw new Error(`Failed to load recommendations: ${response.status}`);
       }
-      
+
       const data = await response.json();
+      console.log('✅ Recommendations loaded:', data);
+
+      // Check if we got empty recommendations
+      const totalRecommendations = (data.recommendations?.papers_for_you?.length || 0) +
+                                  (data.recommendations?.trending_in_field?.length || 0) +
+                                  (data.recommendations?.cross_pollination?.length || 0) +
+                                  (data.recommendations?.citation_opportunities?.length || 0);
+
+      if (totalRecommendations === 0) {
+        console.warn('⚠️ No recommendations returned. User profile may be incomplete or no saved articles found.');
+      }
+
       setRecommendations(data);
     } catch (err) {
-      console.error('Failed to load recommendations:', err);
+      console.error('❌ Failed to load recommendations:', err);
       setError(err instanceof Error ? err.message : 'Failed to load recommendations');
     } finally {
       setLoading(false);
