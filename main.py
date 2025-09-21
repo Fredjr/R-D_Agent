@@ -3826,6 +3826,28 @@ async def debug_user_status(email: str, db: Session = Depends(get_db)):
             "can_signin": False
         }
 
+# Authentication Models
+class AuthRequest(BaseModel):
+    email: str = Field(..., description="User email address")
+    password: str = Field(..., min_length=8, max_length=128, description="User password")
+
+    @validator('email')
+    def validate_email(cls, v):
+        if not v:
+            raise ValueError('Email is required')
+        email_pattern = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
+        if not re.match(email_pattern, v):
+            raise ValueError('Invalid email format')
+        return v
+
+    @validator('password')
+    def validate_password(cls, v):
+        if not v:
+            raise ValueError('Password is required')
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        return v
+
 @app.post("/auth/check-incomplete-registration")
 async def check_incomplete_registration(auth_data: AuthRequest, db: Session = Depends(get_db)):
     """Check if user has incomplete registration and can proceed to complete it"""
@@ -3913,32 +3935,7 @@ def set_current_user(user_id: str):
 
 # Authentication Endpoints
 
-class AuthRequest(BaseModel):
-    email: str = Field(..., description="User email address")
-    password: str = Field(..., min_length=8, max_length=128, description="User password")
 
-    @validator('email')
-    def validate_email(cls, v):
-        if not v:
-            raise ValueError('Email is required')
-        email_pattern = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
-        if not re.match(email_pattern, v):
-            raise ValueError('Invalid email format')
-        return v
-
-    @validator('password')
-    def validate_password(cls, v):
-        if not v:
-            raise ValueError('Password is required')
-        if len(v) < 8:
-            raise ValueError('Password must be at least 8 characters long')
-        if not any(c.isupper() for c in v):
-            raise ValueError('Password must contain at least one uppercase letter')
-        if not any(c.islower() for c in v):
-            raise ValueError('Password must contain at least one lowercase letter')
-        if not any(c.isdigit() for c in v):
-            raise ValueError('Password must contain at least one number')
-        return v
 
 class SignUpRequest(BaseModel):
     email: str = Field(..., description="User email address")
