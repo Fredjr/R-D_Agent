@@ -101,8 +101,15 @@ export default function HomePage() {
     setError(null);
 
     try {
-      console.log('🔄 Loading recommendations for user:', user.user_id);
-      const response = await fetch(`/api/proxy/recommendations/weekly/${user.user_id}`);
+      console.log('🔄 Loading enhanced recommendations for user:', user.user_id);
+
+      // Try enhanced recommendations first, fallback to regular if needed
+      let response = await fetch(`/api/proxy/recommendations/enhanced/${user.user_id}`);
+
+      if (!response.ok) {
+        console.warn('⚠️ Enhanced recommendations failed, falling back to regular recommendations');
+        response = await fetch(`/api/proxy/recommendations/weekly/${user.user_id}`);
+      }
 
       if (!response.ok) {
         const errorText = await response.text();

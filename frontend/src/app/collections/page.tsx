@@ -36,53 +36,66 @@ export default function CollectionsPage() {
 
   const fetchCollections = async () => {
     try {
-      // TODO: Implement actual API call
-      // For now, return mock data
-      const mockCollections: Collection[] = [
-        {
-          id: '1',
-          name: 'Machine Learning Papers',
-          description: 'Key papers in machine learning and AI research',
-          color: '#1db954',
-          icon: 'beaker',
-          articleCount: 24,
-          projectName: 'AI Research Project',
-          projectId: 'proj-1',
-          createdAt: '2024-01-15',
-          updatedAt: '2024-01-20',
-          isShared: false
+      console.log('🔄 Fetching all collections from all projects...');
+
+      // First, get all user projects
+      const projectsResponse = await fetch(`/api/proxy/projects?user_id=${user?.email}`, {
+        headers: {
+          'User-ID': user?.email || 'default_user',
+          'Content-Type': 'application/json',
         },
-        {
-          id: '2',
-          name: 'COVID-19 Studies',
-          description: 'Comprehensive collection of pandemic research',
-          color: '#1e3a8a',
-          icon: 'folder',
-          articleCount: 18,
-          projectName: 'Pandemic Response',
-          projectId: 'proj-2',
-          createdAt: '2024-01-10',
-          updatedAt: '2024-01-18',
-          isShared: true
-        },
-        {
-          id: '3',
-          name: 'Neural Networks',
-          description: 'Deep learning and neural network architectures',
-          color: '#8b5cf6',
-          icon: 'beaker',
-          articleCount: 31,
-          projectName: 'Deep Learning Research',
-          projectId: 'proj-3',
-          createdAt: '2024-01-08',
-          updatedAt: '2024-01-22',
-          isShared: false
+      });
+
+      if (!projectsResponse.ok) {
+        throw new Error('Failed to fetch projects');
+      }
+
+      const projectsData = await projectsResponse.json();
+      const projects = projectsData.projects || [];
+      console.log('✅ Found projects:', projects.length);
+
+      // Fetch collections from all projects
+      const allCollections: Collection[] = [];
+
+      for (const project of projects) {
+        try {
+          const collectionsResponse = await fetch(`/api/proxy/projects/${project.project_id}/collections`, {
+            headers: {
+              'User-ID': user?.email || 'default_user',
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (collectionsResponse.ok) {
+            const projectCollections = await collectionsResponse.json();
+
+            // Transform backend collections to frontend format
+            const transformedCollections = projectCollections.map((collection: any) => ({
+              id: collection.collection_id,
+              name: collection.collection_name,
+              description: collection.description || '',
+              color: collection.color || '#3B82F6',
+              icon: collection.icon || 'folder',
+              articleCount: collection.article_count || 0,
+              projectName: project.project_name,
+              projectId: project.project_id,
+              createdAt: collection.created_at,
+              updatedAt: collection.updated_at,
+              isShared: false // TODO: Add sharing logic
+            }));
+
+            allCollections.push(...transformedCollections);
+            console.log(`✅ Found ${transformedCollections.length} collections in project: ${project.project_name}`);
+          }
+        } catch (error) {
+          console.warn(`⚠️ Failed to fetch collections for project ${project.project_name}:`, error);
         }
-      ];
-      
-      setCollections(mockCollections);
+      }
+
+      console.log('✅ Total collections loaded:', allCollections.length);
+      setCollections(allCollections);
     } catch (error) {
-      console.error('Failed to fetch collections:', error);
+      console.error('❌ Failed to fetch collections:', error);
     } finally {
       setIsLoading(false);
     }
