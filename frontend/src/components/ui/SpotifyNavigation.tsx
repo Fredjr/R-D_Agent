@@ -35,6 +35,7 @@ export const SpotifyTopBar: React.FC<SpotifyTopBarProps> = ({
   title
 }) => {
   const router = useRouter();
+  const pathname = usePathname();
   const [searchQuery, setSearchQuery] = useState('');
   const [canGoBack, setCanGoBack] = useState(false);
   const [canGoForward, setCanGoForward] = useState(false);
@@ -89,7 +90,55 @@ export const SpotifyTopBar: React.FC<SpotifyTopBarProps> = ({
         >
           <ChevronRightIcon className="w-5 h-5" />
         </button>
-        
+
+        {/* Quick Navigation Pills */}
+        <div className="flex items-center gap-2 ml-4">
+          <button
+            onClick={() => router.push('/home')}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+              pathname === '/home'
+                ? 'bg-white text-black'
+                : 'bg-[var(--spotify-dark-gray)] text-white hover:bg-[var(--spotify-medium-gray)]'
+            }`}
+          >
+            <HomeIcon className="w-4 h-4 inline mr-1" />
+            Home
+          </button>
+          <button
+            onClick={() => router.push('/dashboard')}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+              pathname === '/dashboard'
+                ? 'bg-white text-black'
+                : 'bg-[var(--spotify-dark-gray)] text-white hover:bg-[var(--spotify-medium-gray)]'
+            }`}
+          >
+            <RectangleStackIcon className="w-4 h-4 inline mr-1" />
+            Dashboard
+          </button>
+          <button
+            onClick={() => router.push('/discover')}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+              pathname === '/discover'
+                ? 'bg-white text-black'
+                : 'bg-[var(--spotify-dark-gray)] text-white hover:bg-[var(--spotify-medium-gray)]'
+            }`}
+          >
+            <MusicalNoteIcon className="w-4 h-4 inline mr-1" />
+            Discover
+          </button>
+          <button
+            onClick={() => router.push('/collections')}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+              pathname === '/collections'
+                ? 'bg-white text-black'
+                : 'bg-[var(--spotify-dark-gray)] text-white hover:bg-[var(--spotify-medium-gray)]'
+            }`}
+          >
+            <FolderIcon className="w-4 h-4 inline mr-1" />
+            Collections
+          </button>
+        </div>
+
         {title && (
           <h1 className="ml-4 text-white text-xl font-bold">
             {title}

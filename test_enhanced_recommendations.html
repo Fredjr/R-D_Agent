@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Enhanced Recommendations</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #121212;
+            color: #ffffff;
+        }
+        .container {
+            background-color: #1e1e1e;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .success { background-color: #1db954; }
+        .error { background-color: #e22134; }
+        .warning { background-color: #ff9500; }
+        .recommendation {
+            background-color: #2a2a2a;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 6px;
+            border-left: 4px solid #1db954;
+        }
+        .insights {
+            background-color: #2a2a2a;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #ff9500;
+        }
+        button {
+            background-color: #1db954;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #1ed760;
+        }
+        pre {
+            background-color: #000;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎯 Enhanced Recommendations Test</h1>
+    
+    <div class="container">
+        <h2>Test Enhanced Recommendations API</h2>
+        <button onclick="testEnhancedRecommendations()">Test Enhanced Recommendations</button>
+        <button onclick="testRegularRecommendations()">Test Regular Recommendations</button>
+        <button onclick="testCollections()">Test Collections</button>
+        <div id="status"></div>
+    </div>
+
+    <div class="container">
+        <h2>Results</h2>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://frontend-psi-seven-85.vercel.app/api/proxy';
+        const USER_ID = 'fredericle77@gmail.com';
+
+        function showStatus(message, isError = false) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `<div class="status ${isError ? 'error' : 'success'}">${message}</div>`;
+        }
+
+        function showResults(title, data) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML += `
+                <div class="container">
+                    <h3>${title}</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                </div>
+            `;
+        }
+
+        async function testEnhancedRecommendations() {
+            try {
+                showStatus('🔄 Testing Enhanced Recommendations...');
+                
+                const response = await fetch(`${API_BASE}/recommendations/enhanced/${USER_ID}`, {
+                    headers: {
+                        'User-ID': USER_ID,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+                }
+
+                const data = await response.json();
+                showStatus('✅ Enhanced Recommendations loaded successfully!');
+                
+                // Display insights
+                if (data.user_insights) {
+                    document.getElementById('results').innerHTML += `
+                        <div class="insights">
+                            <h3>🎯 Your Research Insights</h3>
+                            <p><strong>Research Domains:</strong> ${data.user_insights.research_domains.join(', ') || 'None detected'}</p>
+                            <p><strong>Activity Level:</strong> ${data.user_insights.activity_level}</p>
+                            <p><strong>Total Projects:</strong> ${data.user_insights.total_projects}</p>
+                            <p><strong>Total Collections:</strong> ${data.user_insights.total_collections}</p>
+                            <p><strong>Total Articles:</strong> ${data.user_insights.total_articles}</p>
+                        </div>
+                    `;
+                }
+
+                // Display recommendations
+                const recommendations = data.recommendations;
+                Object.keys(recommendations).forEach(category => {
+                    const recs = recommendations[category];
+                    if (recs && recs.length > 0) {
+                        document.getElementById('results').innerHTML += `
+                            <div class="container">
+                                <h3>📚 ${category.replace(/_/g, ' ').toUpperCase()}</h3>
+                                ${recs.map(rec => `
+                                    <div class="recommendation">
+                                        <h4>${rec.title}</h4>
+                                        <p><strong>Authors:</strong> ${rec.authors.join(', ')}</p>
+                                        <p><strong>Journal:</strong> ${rec.journal} (${rec.pub_year})</p>
+                                        <p><strong>Reason:</strong> ${rec.recommendation_reason}</p>
+                                        <p>${rec.abstract}</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        `;
+                    }
+                });
+
+                showResults('Enhanced Recommendations Raw Data', data);
+
+            } catch (error) {
+                showStatus(`❌ Enhanced Recommendations failed: ${error.message}`, true);
+                console.error('Enhanced recommendations error:', error);
+            }
+        }
+
+        async function testRegularRecommendations() {
+            try {
+                showStatus('🔄 Testing Regular Recommendations...');
+                
+                const response = await fetch(`${API_BASE}/recommendations/weekly/${USER_ID}`, {
+                    headers: {
+                        'User-ID': USER_ID,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+                }
+
+                const data = await response.json();
+                showStatus('✅ Regular Recommendations loaded successfully!');
+                showResults('Regular Recommendations', data);
+
+            } catch (error) {
+                showStatus(`❌ Regular Recommendations failed: ${error.message}`, true);
+                console.error('Regular recommendations error:', error);
+            }
+        }
+
+        async function testCollections() {
+            try {
+                showStatus('🔄 Testing Collections API...');
+                
+                // First get projects
+                const projectsResponse = await fetch(`${API_BASE}/projects?user_id=${USER_ID}`, {
+                    headers: {
+                        'User-ID': USER_ID,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!projectsResponse.ok) {
+                    throw new Error(`Projects API failed: ${projectsResponse.status}`);
+                }
+
+                const projectsData = await projectsResponse.json();
+                showResults('User Projects', projectsData);
+
+                // Test collections for first project
+                if (projectsData.projects && projectsData.projects.length > 0) {
+                    const firstProject = projectsData.projects[0];
+                    
+                    const collectionsResponse = await fetch(`${API_BASE}/projects/${firstProject.project_id}/collections`, {
+                        headers: {
+                            'User-ID': USER_ID,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (collectionsResponse.ok) {
+                        const collectionsData = await collectionsResponse.json();
+                        showResults(`Collections for ${firstProject.project_name}`, collectionsData);
+                    }
+                }
+
+                showStatus('✅ Collections test completed!');
+
+            } catch (error) {
+                showStatus(`❌ Collections test failed: ${error.message}`, true);
+                console.error('Collections test error:', error);
+            }
+        }
+
+        // Auto-run tests on page load
+        window.onload = function() {
+            setTimeout(() => {
+                testEnhancedRecommendations();
+            }, 1000);
+        };
+    </script>
+</body>
+</html>
