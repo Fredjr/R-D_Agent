@@ -47,7 +47,56 @@ export async function GET(
     const backendData = await backendResponse.json();
     console.log('✅ Backend recommendations successful for user:', userId);
     console.log('📊 Backend response structure:', JSON.stringify(backendData, null, 2));
-    
+
+    // Check if backend returned empty recommendations and enhance for better UX
+    const recommendations = backendData.recommendations || {};
+    const totalRecommendations =
+      (recommendations.papers_for_you || []).length +
+      (recommendations.trending_in_field || []).length +
+      (recommendations.cross_pollination || []).length +
+      (recommendations.citation_opportunities || []).length;
+
+    if (totalRecommendations === 0) {
+      console.log('📝 Backend returned empty recommendations, enhancing for new user experience...');
+
+      // Enhance empty response with helpful getting started content
+      backendData.recommendations = {
+        papers_for_you: [{
+          pmid: "getting_started_1",
+          title: "Welcome to Your Research Discovery Journey!",
+          authors: ["R&D Agent Team"],
+          journal: "Getting Started Guide",
+          year: 2024,
+          citation_count: 0,
+          relevance_score: 1.0,
+          reason: "Start by creating your first project and adding articles to get personalized recommendations",
+          category: "getting_started",
+          is_getting_started: true
+        }],
+        trending_in_field: [{
+          pmid: "getting_started_2",
+          title: "How to Build Your Research Collection",
+          authors: ["R&D Agent Team"],
+          journal: "User Guide",
+          year: 2024,
+          citation_count: 0,
+          relevance_score: 1.0,
+          reason: "Learn how to organize your research and discover new papers",
+          category: "getting_started",
+          is_getting_started: true
+        }],
+        cross_pollination: [],
+        citation_opportunities: []
+      };
+
+      // Update user insights for new users
+      backendData.user_insights = {
+        ...backendData.user_insights,
+        activity_level: "new_user",
+        discovery_preference: "getting_started"
+      };
+    }
+
     return NextResponse.json(backendData);
 
   } catch (error) {
