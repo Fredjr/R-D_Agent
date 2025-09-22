@@ -124,7 +124,12 @@ export default function HomePage() {
       // Try enhanced recommendations first, fallback to regular if needed
       const enhancedUrl = `/api/proxy/recommendations/enhanced/${user.user_id}`;
       console.log('🔄 HOME PAGE: Attempting enhanced recommendations from:', enhancedUrl);
-      let response = await fetch(enhancedUrl);
+      let response = await fetch(enhancedUrl, {
+        headers: {
+          'User-ID': user.user_id,
+          'Content-Type': 'application/json'
+        }
+      });
 
       if (!response.ok) {
         console.warn('⚠️ HOME PAGE: Enhanced recommendations failed with status:', response.status);
@@ -133,7 +138,12 @@ export default function HomePage() {
 
         const fallbackUrl = `/api/proxy/recommendations/weekly/${user.user_id}`;
         console.log('🔄 HOME PAGE: Falling back to regular recommendations from:', fallbackUrl);
-        response = await fetch(fallbackUrl);
+        response = await fetch(fallbackUrl, {
+          headers: {
+            'User-ID': user.user_id,
+            'Content-Type': 'application/json'
+          }
+        });
       }
 
       if (!response.ok) {
