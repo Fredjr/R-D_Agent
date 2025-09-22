@@ -236,39 +236,165 @@ class SpotifyInspiredRecommendationsService:
             logger.info(f"🔍 Resolving user_id '{user_id}' to '{resolved_user_id}'")
 
             # Get user's saved articles across all projects or specific project
+            # Enhanced query with better debugging
+            logger.info(f"🔍 Querying articles for user_id: {user_id}, resolved_user_id: {resolved_user_id}, project_id: {project_id}")
+
             if project_id:
-                saved_articles = db.query(ArticleCollection).join(Collection).filter(
+                # Query with project filter
+                saved_articles_query = db.query(ArticleCollection).join(Collection).filter(
                     Collection.project_id == project_id,
-                    or_(Collection.created_by == user_id, Collection.created_by == resolved_user_id)
-                ).order_by(desc(ArticleCollection.added_at)).limit(200).all()
+                    or_(
+                        Collection.created_by == user_id,
+                        Collection.created_by == resolved_user_id,
+                        ArticleCollection.added_by == user_id,
+                        ArticleCollection.added_by == resolved_user_id
+                    )
+                ).order_by(desc(ArticleCollection.added_at)).limit(200)
+
+                saved_articles = saved_articles_query.all()
+                logger.info(f"📊 Project-specific query found {len(saved_articles)} articles")
+
+                # If no articles found with project filter, try without project filter
+                if len(saved_articles) == 0:
+                    logger.info(f"🔍 No articles found for project {project_id}, trying all projects...")
+                    saved_articles_query = db.query(ArticleCollection).join(Collection).filter(
+                        or_(
+                            Collection.created_by == user_id,
+                            Collection.created_by == resolved_user_id,
+                            ArticleCollection.added_by == user_id,
+                            ArticleCollection.added_by == resolved_user_id
+                        )
+                    ).order_by(desc(ArticleCollection.added_at)).limit(200)
+                    saved_articles = saved_articles_query.all()
+                    logger.info(f"📊 All-projects query found {len(saved_articles)} articles")
             else:
-                saved_articles = db.query(ArticleCollection).join(Collection).filter(
-                    or_(Collection.created_by == user_id, Collection.created_by == resolved_user_id)
-                ).order_by(desc(ArticleCollection.added_at)).limit(200).all()
+                # Query all projects
+                saved_articles_query = db.query(ArticleCollection).join(Collection).filter(
+                    or_(
+                        Collection.created_by == user_id,
+                        Collection.created_by == resolved_user_id,
+                        ArticleCollection.added_by == user_id,
+                        ArticleCollection.added_by == resolved_user_id
+                    )
+                ).order_by(desc(ArticleCollection.added_at)).limit(200)
+                saved_articles = saved_articles_query.all()
+                logger.info(f"📊 All-projects query found {len(saved_articles)} articles")
 
-            logger.info(f"📊 Found {len(saved_articles)} saved articles for user {user_id}")
+            # Debug: Log some sample articles if found
+            if len(saved_articles) > 0:
+                sample_article = saved_articles[0]
+                logger.info(f"📄 Sample article: PMID={sample_article.article_pmid}, Title={sample_article.article_title[:50]}...")
+                logger.info(f"📄 Sample article added_by: {sample_article.added_by}")
+                logger.info(f"📄 Sample collection created_by: {sample_article.collection.created_by}")
 
-            # If no saved articles, provide fallback recommendations
+            logger.info(f"📊 Final result: Found {len(saved_articles)} saved articles for user {user_id}")
+
+            # If no saved articles, try to generate recommendations based on user activity
             if len(saved_articles) == 0:
-                logger.info(f"🎯 No saved articles found, providing fallback recommendations for user {user_id}")
-                return await self._generate_fallback_profile(user_id, db)
+                logger.info(f"🎯 No saved articles found, trying alternative recommendation approach for user {user_id}")
 
-            # Extract research domains and topics
-            profile["primary_domains"] = await self._extract_research_domains(saved_articles, db)
-            profile["topic_preferences"] = await self._analyze_topic_preferences(saved_articles, db)
+                # Try to get user's collections and projects for context
+                try:
+                    from database import Collection, Project
 
-            # Calculate user activity patterns
-            profile["activity_level"] = self._calculate_activity_level(saved_articles)
-            profile["discovery_preference"] = self._analyze_discovery_preference(saved_articles, db)
-            profile["collaboration_score"] = self._calculate_collaboration_score(saved_articles, db)
+                    # Get user's collections
+                    user_collections = db.query(Collection).filter(
+                        or_(
+                            Collection.created_by == user_id,
+                            Collection.created_by == resolved_user_id
+                        )
+                    ).all()
 
-            # Analyze temporal patterns
-            profile["research_velocity"] = self._calculate_research_velocity(saved_articles)
-            profile["recency_bias"] = self._calculate_recency_bias(saved_articles)
+                    logger.info(f"📚 Found {len(user_collections)} collections for user")
 
-            # Collection analysis
-            profile["collection_themes"] = await self._analyze_collection_themes(user_id, project_id, db)
-            profile["organization_style"] = self._analyze_organization_style(user_id, project_id, db)
+                    # Get user's projects
+                    user_projects = db.query(Project).filter(
+                        or_(
+                            Project.created_by == user_id,
+                            Project.created_by == resolved_user_id
+                        )
+                    ).all()
+
+                    logger.info(f"📁 Found {len(user_projects)} projects for user")
+
+                    # If user has collections or projects, generate domain-based recommendations
+                    if len(user_collections) > 0 or len(user_projects) > 0:
+                        logger.info(f"✅ User has activity, generating domain-based recommendations")
+
+                        # Extract research domains from collection names and descriptions
+                        research_domains = []
+                        for collection in user_collections:
+                            collection_text = f"{collection.collection_name} {collection.description or ''}".lower()
+
+                            # Detect research domains
+                            if any(term in collection_text for term in ['kidney', 'renal', 'nephrology']):
+                                research_domains.append('nephrology')
+                            if any(term in collection_text for term in ['diabetes', 'diabetic', 'glucose']):
+                                research_domains.append('diabetes')
+                            if any(term in collection_text for term in ['cardiovascular', 'heart', 'cardiac']):
+                                research_domains.append('cardiovascular')
+                            if any(term in collection_text for term in ['finerenone', 'mineralocorticoid', 'pharmacology']):
+                                research_domains.append('pharmacology')
+
+                        # Remove duplicates
+                        research_domains = list(set(research_domains))
+
+                        if research_domains:
+                            logger.info(f"🔬 Detected research domains: {research_domains}")
+
+                            # Create enhanced profile with detected domains
+                            profile["primary_domains"] = research_domains
+                            profile["topic_preferences"] = {domain: 0.8 for domain in research_domains}
+                            profile["activity_level"] = "moderate"
+                            profile["discovery_preference"] = "balanced"
+                            profile["collaboration_score"] = 0.7
+                            profile["research_velocity"] = "active"
+                            profile["recency_bias"] = 0.8
+                            profile["total_saved_papers"] = len(user_collections)
+                            profile["is_enhanced_fallback"] = True
+
+                            # Continue with recommendation generation instead of fallback
+                            logger.info(f"✅ Generated enhanced profile with {len(research_domains)} domains")
+                        else:
+                            logger.info(f"📝 No research domains detected, using standard fallback")
+                            return await self._generate_fallback_profile(user_id, db)
+                    else:
+                        logger.info(f"📝 No user activity found, using standard fallback")
+                        return await self._generate_fallback_profile(user_id, db)
+
+                except Exception as e:
+                    logger.error(f"❌ Error in alternative recommendation approach: {e}")
+                    return await self._generate_fallback_profile(user_id, db)
+
+            # Process saved articles if we have them (or if we created an enhanced profile)
+            if len(saved_articles) > 0:
+                # Extract research domains and topics from saved articles
+                profile["primary_domains"] = await self._extract_research_domains(saved_articles, db)
+                profile["topic_preferences"] = await self._analyze_topic_preferences(saved_articles, db)
+
+                # Calculate user activity patterns
+                profile["activity_level"] = self._calculate_activity_level(saved_articles)
+                profile["discovery_preference"] = self._analyze_discovery_preference(saved_articles, db)
+                profile["collaboration_score"] = self._calculate_collaboration_score(saved_articles, db)
+
+                # Analyze temporal patterns
+                profile["research_velocity"] = self._calculate_research_velocity(saved_articles)
+                profile["recency_bias"] = self._calculate_recency_bias(saved_articles)
+
+                # Collection analysis
+                profile["collection_themes"] = await self._analyze_collection_themes(user_id, project_id, db)
+                profile["organization_style"] = self._analyze_organization_style(user_id, project_id, db)
+
+                # Store total saved papers
+                profile["total_saved_papers"] = len(saved_articles)
+
+            # If we have an enhanced fallback profile, we already set the necessary fields above
+            elif profile.get("is_enhanced_fallback"):
+                logger.info(f"✅ Using enhanced fallback profile with domains: {profile.get('primary_domains', [])}")
+
+                # Add collection analysis for enhanced fallback
+                profile["collection_themes"] = await self._analyze_collection_themes(user_id, project_id, db)
+                profile["organization_style"] = self._analyze_organization_style(user_id, project_id, db)
 
             # Cache the profile
             self.user_behavior_cache[cache_key] = {
