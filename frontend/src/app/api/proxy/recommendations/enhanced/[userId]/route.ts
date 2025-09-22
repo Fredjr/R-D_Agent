@@ -60,20 +60,29 @@ export async function GET(
       console.log('📝 Backend returned empty recommendations, analyzing user collections for real recommendations...');
 
       // Try to generate real recommendations based on user's actual research activity
-      const realRecommendations = await generateRealRecommendations(userId, projectId);
+      try {
+        console.log('🔍 Attempting to generate real recommendations for user:', userId);
+        const realRecommendations = await generateRealRecommendations(userId, projectId);
 
-      if (realRecommendations && realRecommendations.total > 0) {
-        console.log('✅ Generated real recommendations based on user research activity');
-        backendData.recommendations = realRecommendations.recommendations;
-        backendData.user_insights = {
-          ...backendData.user_insights,
-          research_domains: realRecommendations.research_domains,
-          activity_level: realRecommendations.activity_level,
-          total_collections: realRecommendations.total_collections,
-          total_articles: realRecommendations.total_articles
-        };
-      } else {
-        console.log('📝 No real research activity found, providing getting started content...');
+        console.log('📊 Real recommendations result:', realRecommendations ? `Found ${realRecommendations.total} recommendations` : 'null');
+
+        if (realRecommendations && realRecommendations.total > 0) {
+          console.log('✅ Generated real recommendations based on user research activity');
+          console.log('🔬 Research domains found:', realRecommendations.research_domains);
+          backendData.recommendations = realRecommendations.recommendations;
+          backendData.user_insights = {
+            ...backendData.user_insights,
+            research_domains: realRecommendations.research_domains,
+            activity_level: realRecommendations.activity_level,
+            total_collections: realRecommendations.total_collections,
+            total_articles: realRecommendations.total_articles
+          };
+        } else {
+          console.log('📝 No real research activity found, providing getting started content...');
+        }
+      } catch (error) {
+        console.error('❌ Error generating real recommendations:', error);
+        console.log('📝 Falling back to getting started content due to error...');
 
         // Enhance empty response with helpful getting started content
         backendData.recommendations = {
@@ -183,12 +192,14 @@ async function generateRealRecommendations(userId: string, projectId?: string | 
     });
 
     if (!projectsResponse.ok) {
-      console.log('❌ Could not fetch user projects');
+      console.log('❌ Could not fetch user projects, status:', projectsResponse.status);
       return null;
     }
 
     const projectsData = await projectsResponse.json();
     const projects = projectsData.projects || [];
+
+    console.log(`📊 Found ${projects.length} projects for user ${userId}`);
 
     if (projects.length === 0) {
       console.log('📝 No projects found for user');
@@ -213,6 +224,7 @@ async function generateRealRecommendations(userId: string, projectId?: string | 
 
         if (collectionsResponse.ok) {
           const collections = await collectionsResponse.json();
+          console.log(`📚 Found ${collections.length} collections in project ${project.project_name}`);
           totalCollections += collections.length;
 
           // For each collection, get articles
