@@ -1,0 +1,105 @@
+Defaulting to user installation because normal site-packages is not writeable
+Requirement already satisfied: transformers in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (4.56.0)
+Requirement already satisfied: sentence-transformers in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (2.2.2)
+Requirement already satisfied: nltk in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (3.9.1)
+Collecting spacy
+  Downloading spacy-3.8.7-cp39-cp39-macosx_11_0_arm64.whl (6.3 MB)
+Requirement already satisfied: huggingface-hub<1.0,>=0.34.0 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from transformers) (0.34.4)
+Requirement already satisfied: requests in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from transformers) (2.32.5)
+Requirement already satisfied: packaging>=20.0 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from transformers) (24.2)
+Requirement already satisfied: safetensors>=0.4.3 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from transformers) (0.6.2)
+Requirement already satisfied: tokenizers<=0.23.0,>=0.22.0 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from transformers) (0.22.0)
+Requirement already satisfied: pyyaml>=5.1 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from transformers) (6.0.2)
+Requirement already satisfied: tqdm>=4.27 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from transformers) (4.67.1)
+Requirement already satisfied: filelock in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from transformers) (3.19.1)
+Requirement already satisfied: numpy>=1.17 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from transformers) (2.0.2)
+Requirement already satisfied: regex!=2019.12.17 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from transformers) (2025.9.1)
+Requirement already satisfied: torch>=1.6.0 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from sentence-transformers) (2.8.0)
+Requirement already satisfied: scikit-learn in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from sentence-transformers) (1.6.1)
+Requirement already satisfied: torchvision in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from sentence-transformers) (0.23.0)
+Requirement already satisfied: sentencepiece in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from sentence-transformers) (0.2.1)
+Requirement already satisfied: scipy in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from sentence-transformers) (1.13.1)
+Requirement already satisfied: click in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from nltk) (8.1.8)
+Requirement already satisfied: joblib in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from nltk) (1.5.2)
+Collecting wasabi<1.2.0,>=0.9.1
+  Downloading wasabi-1.1.3-py3-none-any.whl (27 kB)
+Collecting preshed<3.1.0,>=3.0.2
+  Downloading preshed-3.0.10-cp39-cp39-macosx_11_0_arm64.whl (129 kB)
+Collecting cymem<2.1.0,>=2.0.2
+  Downloading cymem-2.0.11-cp39-cp39-macosx_11_0_arm64.whl (42 kB)
+Collecting langcodes<4.0.0,>=3.2.0
+  Downloading langcodes-3.5.0-py3-none-any.whl (182 kB)
+Collecting srsly<3.0.0,>=2.4.3
+  Downloading srsly-2.5.1-cp39-cp39-macosx_11_0_arm64.whl (635 kB)
+Collecting typer<1.0.0,>=0.3.0
+  Downloading typer-0.19.2-py3-none-any.whl (46 kB)
+Collecting catalogue<2.1.0,>=2.0.6
+  Downloading catalogue-2.0.10-py3-none-any.whl (17 kB)
+Collecting spacy-loggers<2.0.0,>=1.0.0
+  Downloading spacy_loggers-1.0.5-py3-none-any.whl (22 kB)
+Collecting weasel<0.5.0,>=0.1.0
+  Downloading weasel-0.4.1-py3-none-any.whl (50 kB)
+Collecting spacy-legacy<3.1.0,>=3.0.11
+  Downloading spacy_legacy-3.0.12-py2.py3-none-any.whl (29 kB)
+Collecting murmurhash<1.1.0,>=0.28.0
+  Downloading murmurhash-1.0.13-cp39-cp39-macosx_11_0_arm64.whl (26 kB)
+Requirement already satisfied: pydantic!=1.8,!=1.8.1,<3.0.0,>=1.7.4 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from spacy) (2.11.7)
+Requirement already satisfied: jinja2 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from spacy) (3.1.6)
+Requirement already satisfied: setuptools in /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/site-packages (from spacy) (58.0.4)
+Collecting thinc<8.4.0,>=8.3.4
+  Downloading thinc-8.3.6-cp39-cp39-macosx_11_0_arm64.whl (848 kB)
+Requirement already satisfied: typing-extensions>=3.7.4.3 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from huggingface-hub<1.0,>=0.34.0->transformers) (4.15.0)
+Requirement already satisfied: fsspec>=2023.5.0 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from huggingface-hub<1.0,>=0.34.0->transformers) (2025.7.0)
+Requirement already satisfied: hf-xet<2.0.0,>=1.1.3 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from huggingface-hub<1.0,>=0.34.0->transformers) (1.1.9)
+Collecting language-data>=1.2
+  Downloading language_data-1.3.0-py3-none-any.whl (5.4 MB)
+Collecting marisa-trie>=1.1.0
+  Downloading marisa_trie-1.3.1-cp39-cp39-macosx_11_0_arm64.whl (157 kB)
+Requirement already satisfied: typing-inspection>=0.4.0 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from pydantic!=1.8,!=1.8.1,<3.0.0,>=1.7.4->spacy) (0.4.1)
+Requirement already satisfied: annotated-types>=0.6.0 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from pydantic!=1.8,!=1.8.1,<3.0.0,>=1.7.4->spacy) (0.7.0)
+Requirement already satisfied: pydantic-core==2.33.2 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from pydantic!=1.8,!=1.8.1,<3.0.0,>=1.7.4->spacy) (2.33.2)
+Requirement already satisfied: charset_normalizer<4,>=2 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from requests->transformers) (3.4.3)
+Requirement already satisfied: idna<4,>=2.5 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from requests->transformers) (3.10)
+Requirement already satisfied: urllib3<3,>=1.21.1 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from requests->transformers) (2.5.0)
+Requirement already satisfied: certifi>=2017.4.17 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from requests->transformers) (2025.8.3)
+Collecting blis<1.4.0,>=1.3.0
+  Downloading blis-1.3.0.tar.gz (2.5 MB)
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'done'
+  Installing backend dependencies: started
+  Installing backend dependencies: finished with status 'done'
+    Preparing wheel metadata: started
+    Preparing wheel metadata: finished with status 'done'
+Collecting confection<1.0.0,>=0.0.1
+  Downloading confection-0.1.5-py3-none-any.whl (35 kB)
+Requirement already satisfied: networkx in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from torch>=1.6.0->sentence-transformers) (3.2.1)
+Requirement already satisfied: sympy>=1.13.3 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from torch>=1.6.0->sentence-transformers) (1.14.0)
+Requirement already satisfied: mpmath<1.4,>=1.1.0 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from sympy>=1.13.3->torch>=1.6.0->sentence-transformers) (1.3.0)
+Collecting shellingham>=1.3.0
+  Downloading shellingham-1.5.4-py2.py3-none-any.whl (9.8 kB)
+Collecting rich>=10.11.0
+  Downloading rich-14.1.0-py3-none-any.whl (243 kB)
+Requirement already satisfied: pygments<3.0.0,>=2.13.0 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from rich>=10.11.0->typer<1.0.0,>=0.3.0->spacy) (2.19.2)
+Collecting markdown-it-py>=2.2.0
+  Downloading markdown_it_py-3.0.0-py3-none-any.whl (87 kB)
+Collecting mdurl~=0.1
+  Downloading mdurl-0.1.2-py3-none-any.whl (10.0 kB)
+Collecting cloudpathlib<1.0.0,>=0.7.0
+  Downloading cloudpathlib-0.22.0-py3-none-any.whl (61 kB)
+Collecting smart-open<8.0.0,>=5.2.1
+  Downloading smart_open-7.3.1-py3-none-any.whl (61 kB)
+Collecting wrapt
+  Downloading wrapt-1.17.3-cp39-cp39-macosx_11_0_arm64.whl (38 kB)
+Requirement already satisfied: MarkupSafe>=2.0 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from jinja2->spacy) (3.0.2)
+Requirement already satisfied: threadpoolctl>=3.1.0 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from scikit-learn->sentence-transformers) (3.6.0)
+Requirement already satisfied: pillow!=8.3.*,>=5.3.0 in /Users/fredericle/Library/Python/3.9/lib/python/site-packages (from torchvision->sentence-transformers) (11.3.0)
+Building wheels for collected packages: blis
+  Building wheel for blis (PEP 517): started
+  Building wheel for blis (PEP 517): finished with status 'done'
+  Created wheel for blis: filename=blis-1.3.0-cp39-cp39-macosx_10_9_universal2.whl size=1495329 sha256=e9670cbb0afb905d06c24ed1e545bca33b9771406759c899b58d755755e65011
+  Stored in directory: /Users/fredericle/Library/Caches/pip/wheels/2b/75/f4/e540f5b1ef1d2610200886c45092f5be21cfe8309ccc48c577
+Successfully built blis
+Installing collected packages: mdurl, markdown-it-py, catalogue, wrapt, srsly, shellingham, rich, murmurhash, marisa-trie, cymem, wasabi, typer, smart-open, preshed, language-data, confection, cloudpathlib, blis, weasel, thinc, spacy-loggers, spacy-legacy, langcodes, spacy
+Successfully installed blis-1.3.0 catalogue-2.0.10 cloudpathlib-0.22.0 confection-0.1.5 cymem-2.0.11 langcodes-3.5.0 language-data-1.3.0 marisa-trie-1.3.1 markdown-it-py-3.0.0 mdurl-0.1.2 murmurhash-1.0.13 preshed-3.0.10 rich-14.1.0 shellingham-1.5.4 smart-open-7.3.1 spacy-3.8.7 spacy-legacy-3.0.12 spacy-loggers-1.0.5 srsly-2.5.1 thinc-8.3.6 typer-0.19.2 wasabi-1.1.3 weasel-0.4.1 wrapt-1.17.3
