@@ -225,7 +225,8 @@ class SpotifyInspiredRecommendationsService:
             logger.info("✅ Semantic analysis enhancement completed")
 
             # Add weekly mix metadata
-            week_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            now = datetime.now(timezone.utc)
+            week_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
             week_start -= timedelta(days=week_start.weekday())  # Get Monday
 
             result = {
@@ -240,7 +241,7 @@ class SpotifyInspiredRecommendationsService:
                     "discovery_preference": user_profile.get("discovery_preference", "balanced"),
                     "collaboration_tendency": user_profile.get("collaboration_score", 0.5)
                 },
-                "generated_at": datetime.now().isoformat(),
+                "generated_at": now.isoformat(),
                 "next_update": (week_start + timedelta(days=7)).isoformat()
             }
 
@@ -282,8 +283,8 @@ class SpotifyInspiredRecommendationsService:
                     "citation_count": paper.citation_count or 0,
                     "authors": paper.authors or [],
                     "journal": paper.journal or "",
-                    "keywords": paper.keywords or [],
-                    "mesh_terms": paper.mesh_terms or []
+                    "keywords": [],  # Not available in current schema
+                    "mesh_terms": []  # Not available in current schema
                 }
                 paper_pool.append(paper_dict)
 
@@ -383,8 +384,8 @@ class SpotifyInspiredRecommendationsService:
                     # Get user's projects
                     user_projects = db.query(Project).filter(
                         or_(
-                            Project.created_by == user_id,
-                            Project.created_by == resolved_user_id
+                            Project.owner_user_id == user_id,
+                            Project.owner_user_id == resolved_user_id
                         )
                     ).all()
 
