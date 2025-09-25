@@ -8,6 +8,7 @@ import re
 from langchain_google_genai import ChatGoogleGenerativeAI
 import os
 from dotenv import load_dotenv
+import time
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import text, or_, func
 import bcrypt
@@ -68,6 +69,25 @@ from database import (
 # AI Recommendations Service
 from services.ai_recommendations_service import get_spotify_recommendations_service
 
+# Semantic Analysis Service (Phase 2A.1)
+print("🔧 Attempting to import semantic analysis service...")
+try:
+    from services.semantic_analysis_service import (
+        semantic_analysis_service,
+        SemanticFeatures,
+        ResearchMethodology,
+        ComplexityLevel,
+        NoveltyType
+    )
+    SEMANTIC_ANALYSIS_AVAILABLE = True
+    print("✅ Semantic analysis service imported successfully")
+except ImportError as e:
+    print(f"❌ Semantic analysis service import failed: {e}")
+    SEMANTIC_ANALYSIS_AVAILABLE = False
+except Exception as e:
+    print(f"❌ Unexpected error importing semantic analysis service: {e}")
+    SEMANTIC_ANALYSIS_AVAILABLE = False
+
 # Embeddings and Pinecone
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from pinecone import Pinecone
@@ -100,6 +120,242 @@ def verify_password(password: str, hashed: str) -> bool:
 
 # Initialize FastAPI app
 app = FastAPI(title="R&D Agent API", version="1.0.0")
+
+# Test endpoint to verify app is working
+@app.get("/api/test-app")
+async def test_app():
+    """Simple test endpoint to verify FastAPI app is working"""
+    return {"status": "success", "message": "FastAPI app is working"}
+
+# =============================================================================
+# Phase 2A: Semantic Analysis Endpoints (Moved here for proper registration)
+# =============================================================================
+
+# Test endpoint to verify semantic analysis is working
+@app.get("/api/semantic/test")
+async def test_semantic_endpoint():
+    """Simple test endpoint to verify semantic analysis endpoints are registered"""
+    return {
+        "status": "success",
+        "message": "Semantic analysis endpoints are working",
+        "service_available": SEMANTIC_ANALYSIS_AVAILABLE,
+        "timestamp": datetime.now().isoformat()
+    }
+
+class PaperAnalysisRequest(BaseModel):
+    """Request model for paper analysis"""
+    title: str = Field(..., description="Paper title")
+    abstract: str = Field(..., description="Paper abstract")
+    full_text: Optional[str] = Field(None, description="Full paper text (optional)")
+    pmid: Optional[str] = Field(None, description="PubMed ID (optional)")
+
+class SemanticFeaturesResponse(BaseModel):
+    """Response model for semantic features"""
+    methodology: str
+    complexity_score: float
+    novelty_type: str
+    technical_terms: List[str]
+    research_domains: List[str]
+    confidence_scores: Dict[str, float]
+    embedding_dimensions: int
+    analysis_metadata: Dict[str, Any]
+
+@app.post("/api/semantic/analyze-paper")
+async def analyze_paper(request: PaperAnalysisRequest):
+    """
+    Analyze a single research paper for semantic features
+
+    This endpoint performs comprehensive semantic analysis including:
+    - Research methodology detection
+    - Technical complexity scoring
+    - Novelty type identification
+    - Technical term extraction
+    - Research domain identification
+    """
+    request_start_time = time.time()
+    print(f"🚀 [API] Received semantic analysis request for: '{request.title[:50]}...'")
+    print(f"📋 [API] Request details - Title: {len(request.title)} chars, Abstract: {len(request.abstract)} chars, Full text: {'Yes' if request.full_text else 'No'}, PMID: {request.pmid}")
+
+    if not SEMANTIC_ANALYSIS_AVAILABLE:
+        print("❌ [API] Semantic analysis service not available")
+        raise HTTPException(status_code=503, detail="Semantic analysis service not available")
+
+    try:
+        print(f"🔬 [API] Starting semantic analysis for paper: {request.title[:50]}...")
+
+        # Perform semantic analysis
+        analysis_start = time.time()
+        features = await semantic_analysis_service.analyze_paper(
+            title=request.title,
+            abstract=request.abstract,
+            full_text=request.full_text
+        )
+        analysis_time = time.time() - analysis_start
+        print(f"⏱️  [API] Analysis completed in {analysis_time:.3f}s")
+
+        # Create response
+        print("📦 [API] Creating response object...")
+        response_start = time.time()
+        response = SemanticFeaturesResponse(
+            methodology=features.methodology.value,
+            complexity_score=features.complexity_score,
+            novelty_type=features.novelty_type.value,
+            technical_terms=features.technical_terms,
+            research_domains=features.research_domains,
+            confidence_scores=features.confidence_scores,
+            embedding_dimensions=len(features.embeddings),
+            analysis_metadata={
+                "pmid": request.pmid,
+                "title_length": len(request.title),
+                "abstract_length": len(request.abstract),
+                "has_full_text": request.full_text is not None,
+                "service_initialized": semantic_analysis_service.is_initialized,
+                "analysis_time_seconds": analysis_time,
+                "total_request_time_seconds": time.time() - request_start_time
+            }
+        )
+        response_time = time.time() - response_start
+
+        total_request_time = time.time() - request_start_time
+        print(f"✅ [API] Analysis complete: {features.methodology.value}, complexity: {features.complexity_score:.3f}, novelty: {features.novelty_type.value}")
+        print(f"📊 [API] Performance - Analysis: {analysis_time:.3f}s, Response: {response_time:.3f}s, Total: {total_request_time:.3f}s")
+        print(f"📈 [API] Results - Terms: {len(features.technical_terms)}, Domains: {len(features.research_domains)}, Embeddings: {len(features.embeddings)}")
+
+        return response
+
+    except Exception as e:
+        total_request_time = time.time() - request_start_time
+        print(f"❌ [API] Error analyzing paper after {total_request_time:.3f}s: {e}")
+        import traceback
+        print(f"❌ [API] Full traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+@app.get("/api/semantic/service-status")
+async def get_semantic_service_status():
+    """Get semantic analysis service status and capabilities"""
+    if not SEMANTIC_ANALYSIS_AVAILABLE:
+        return {
+            "service_name": "Semantic Analysis Service",
+            "version": "2A.1",
+            "is_available": False,
+            "error": "Service not available - import failed",
+            "capabilities": {},
+            "models": {}
+        }
+
+    try:
+        status = {
+            "service_name": "Semantic Analysis Service",
+            "version": "2A.1",
+            "is_available": True,
+            "is_initialized": semantic_analysis_service.is_initialized,
+            "capabilities": {
+                "methodology_detection": True,
+                "complexity_scoring": True,
+                "novelty_detection": True,
+                "technical_term_extraction": True,
+                "research_domain_identification": True,
+                "semantic_embeddings": True
+            },
+            "supported_methodologies": [m.value for m in ResearchMethodology],
+            "supported_novelty_types": [n.value for n in NoveltyType],
+            "models": {
+                "scibert_available": semantic_analysis_service.scibert_model is not None,
+                "sentence_transformer_available": semantic_analysis_service.sentence_transformer is not None,
+                "spacy_available": semantic_analysis_service.nlp is not None
+            }
+        }
+
+        return status
+
+    except Exception as e:
+        print(f"❌ Error getting service status: {e}")
+        raise HTTPException(status_code=500, detail=f"Status check failed: {str(e)}")
+
+@app.post("/api/semantic/initialize-service")
+async def initialize_semantic_service():
+    """Initialize the semantic analysis service"""
+    if not SEMANTIC_ANALYSIS_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Semantic analysis service not available")
+
+    try:
+        print("🚀 Manually initializing semantic analysis service...")
+
+        success = await semantic_analysis_service.initialize()
+
+        if success:
+            return {
+                "status": "success",
+                "message": "Semantic analysis service initialized successfully",
+                "is_initialized": semantic_analysis_service.is_initialized
+            }
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to initialize semantic analysis service. Check logs for details."
+            )
+
+    except Exception as e:
+        print(f"❌ Error initializing service: {e}")
+        raise HTTPException(status_code=500, detail=f"Initialization failed: {str(e)}")
+
+@app.get("/api/semantic/test-analysis")
+async def test_semantic_analysis():
+    """Test endpoint with sample paper analysis"""
+    if not SEMANTIC_ANALYSIS_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Semantic analysis service not available")
+
+    try:
+        # Sample paper for testing
+        sample_paper = PaperAnalysisRequest(
+            title="Deep Learning for Protein Structure Prediction",
+            abstract="This paper presents novel deep learning methods for predicting protein structures using transformer architectures and attention mechanisms.",
+            full_text=None,
+            pmid="test_paper_001"
+        )
+
+        print("🧪 Running test analysis on sample paper...")
+
+        # Analyze the sample paper
+        features = await semantic_analysis_service.analyze_paper(
+            title=sample_paper.title,
+            abstract=sample_paper.abstract,
+            full_text=sample_paper.full_text
+        )
+
+        # Return test results
+        test_results = {
+            "status": "success",
+            "message": "Test analysis completed successfully",
+            "sample_paper": {
+                "title": sample_paper.title,
+                "abstract": sample_paper.abstract[:100] + "..."
+            },
+            "analysis_results": {
+                "methodology": features.methodology.value,
+                "complexity_score": features.complexity_score,
+                "novelty_type": features.novelty_type.value,
+                "technical_terms_count": len(features.technical_terms),
+                "research_domains_count": len(features.research_domains),
+                "embedding_dimensions": len(features.embeddings),
+                "confidence_scores": features.confidence_scores
+            },
+            "service_info": {
+                "is_initialized": semantic_analysis_service.is_initialized,
+                "models_loaded": {
+                    "scibert": semantic_analysis_service.scibert_model is not None,
+                    "sentence_transformer": semantic_analysis_service.sentence_transformer is not None,
+                    "spacy": semantic_analysis_service.nlp is not None
+                }
+            }
+        }
+
+        print("✅ Test analysis completed successfully")
+        return test_results
+
+    except Exception as e:
+        print(f"❌ Error in test analysis: {e}")
+        raise HTTPException(status_code=500, detail=f"Test analysis failed: {str(e)}")
 
 # =============================================================================
 # AUTHOR NETWORK ENDPOINTS - Phase 4 ResearchRabbit Feature Parity
@@ -11824,6 +12080,182 @@ async def migrate_railway_database_endpoint():
             "message": f"Migration endpoint error: {str(e)}",
             "timestamp": datetime.now().isoformat()
         }
+
+
+
+
+@app.post("/api/semantic/analyze-paper")
+async def analyze_paper(request: PaperAnalysisRequest):
+    """
+    Analyze a single research paper for semantic features
+
+    This endpoint performs comprehensive semantic analysis including:
+    - Research methodology detection
+    - Technical complexity scoring
+    - Novelty type identification
+    - Technical term extraction
+    - Research domain identification
+    """
+    if not SEMANTIC_ANALYSIS_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Semantic analysis service not available")
+
+    try:
+        print(f"🔬 Analyzing paper: {request.title[:50]}...")
+
+        # Perform semantic analysis
+        features = await semantic_analysis_service.analyze_paper(
+            title=request.title,
+            abstract=request.abstract,
+            full_text=request.full_text
+        )
+
+        # Convert to response format
+        response = SemanticFeaturesResponse(
+            methodology=features.methodology.value,
+            complexity_score=features.complexity_score,
+            novelty_type=features.novelty_type.value,
+            technical_terms=features.technical_terms,
+            research_domains=features.research_domains,
+            confidence_scores=features.confidence_scores,
+            embedding_dimensions=len(features.embeddings),
+            analysis_metadata={
+                "pmid": request.pmid,
+                "title_length": len(request.title),
+                "abstract_length": len(request.abstract),
+                "has_full_text": request.full_text is not None,
+                "service_initialized": semantic_analysis_service.is_initialized
+            }
+        )
+
+        print(f"✅ Analysis complete: {features.methodology.value}, complexity: {features.complexity_score:.2f}")
+        return response
+
+    except Exception as e:
+        print(f"❌ Error analyzing paper: {e}")
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+@app.get("/api/semantic/service-status")
+async def get_semantic_service_status():
+    """Get semantic analysis service status and capabilities"""
+    if not SEMANTIC_ANALYSIS_AVAILABLE:
+        return {
+            "service_name": "Semantic Analysis Service",
+            "version": "2A.1",
+            "is_available": False,
+            "error": "Service not available - NLP dependencies not installed"
+        }
+
+    try:
+        status = {
+            "service_name": "Semantic Analysis Service",
+            "version": "2A.1",
+            "is_available": True,
+            "is_initialized": semantic_analysis_service.is_initialized,
+            "capabilities": {
+                "methodology_detection": True,
+                "complexity_scoring": True,
+                "novelty_detection": True,
+                "technical_term_extraction": True,
+                "research_domain_identification": True,
+                "semantic_embeddings": True
+            },
+            "supported_methodologies": [m.value for m in ResearchMethodology],
+            "supported_novelty_types": [n.value for n in NoveltyType],
+            "models": {
+                "scibert_available": semantic_analysis_service.scibert_model is not None,
+                "sentence_transformer_available": semantic_analysis_service.sentence_transformer is not None,
+                "spacy_available": semantic_analysis_service.nlp is not None
+            }
+        }
+
+        return status
+
+    except Exception as e:
+        print(f"❌ Error getting service status: {e}")
+        raise HTTPException(status_code=500, detail=f"Status check failed: {str(e)}")
+
+@app.post("/api/semantic/initialize-service")
+async def initialize_semantic_service():
+    """Initialize the semantic analysis service"""
+    if not SEMANTIC_ANALYSIS_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Semantic analysis service not available")
+
+    try:
+        print("🚀 Manually initializing semantic analysis service...")
+
+        success = await semantic_analysis_service.initialize()
+
+        if success:
+            return {
+                "status": "success",
+                "message": "Semantic analysis service initialized successfully",
+                "is_initialized": semantic_analysis_service.is_initialized
+            }
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to initialize semantic analysis service. Check logs for details."
+            )
+
+    except Exception as e:
+        print(f"❌ Service initialization failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Initialization failed: {str(e)}")
+
+@app.get("/api/semantic/test-analysis")
+async def test_semantic_analysis():
+    """Test endpoint with sample paper analysis"""
+    if not SEMANTIC_ANALYSIS_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Semantic analysis service not available")
+
+    try:
+        # Sample paper for testing
+        sample_paper = PaperAnalysisRequest(
+            title="Deep Learning Approaches for Protein Structure Prediction",
+            abstract="This study presents novel deep learning methods for predicting protein structures from amino acid sequences. We developed a transformer-based architecture that achieves state-of-the-art performance on benchmark datasets. Our experimental results demonstrate significant improvements in prediction accuracy compared to existing methods. The approach combines convolutional neural networks with attention mechanisms to capture both local and global structural patterns. We validated our method on multiple protein families and show its potential for drug discovery applications.",
+            pmid="test_12345"
+        )
+
+        print("🧪 Running test analysis on sample paper...")
+
+        # Analyze the sample paper
+        features = await semantic_analysis_service.analyze_paper(
+            title=sample_paper.title,
+            abstract=sample_paper.abstract,
+            full_text=sample_paper.full_text
+        )
+
+        # Return detailed test results
+        test_results = {
+            "test_status": "success",
+            "sample_paper": {
+                "title": sample_paper.title,
+                "abstract_length": len(sample_paper.abstract)
+            },
+            "analysis_results": {
+                "methodology": features.methodology.value,
+                "complexity_score": features.complexity_score,
+                "novelty_type": features.novelty_type.value,
+                "technical_terms_count": len(features.technical_terms),
+                "research_domains_count": len(features.research_domains),
+                "embedding_dimensions": len(features.embeddings),
+                "confidence_scores": features.confidence_scores
+            },
+            "service_info": {
+                "is_initialized": semantic_analysis_service.is_initialized,
+                "models_loaded": {
+                    "scibert": semantic_analysis_service.scibert_model is not None,
+                    "sentence_transformer": semantic_analysis_service.sentence_transformer is not None,
+                    "spacy": semantic_analysis_service.nlp is not None
+                }
+            }
+        }
+
+        print("✅ Test analysis completed successfully")
+        return test_results
+
+    except Exception as e:
+        print(f"❌ Test analysis failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Test analysis failed: {str(e)}")
 
 # =============================================================================
 # SPOTIFY-INSPIRED AI RECOMMENDATIONS ENDPOINTS
