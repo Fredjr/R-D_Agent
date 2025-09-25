@@ -63,6 +63,7 @@ export const EnhancedHomePage: React.FC<EnhancedHomePageProps> = ({
 
   useEffect(() => {
     // 🧪 TESTING LOGS: HomePage initialization
+    console.log('🚨 TESTING: If you see this, console logging is working!');
     console.log('🏠 [HomePage] Component initialized');
     console.log(`📊 [HomePage] Sections count: ${sections.length}`);
     console.log(`👤 [HomePage] User: ${displayName}`);

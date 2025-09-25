@@ -22,6 +22,13 @@ interface Paper {
     discovery_badge?: string;
     opportunity_badge?: string;
   };
+  // 🎯 Phase 1.1c: Enhanced metadata for visual hierarchy
+  reading_status?: 'unread' | 'reading' | 'completed' | 'saved';
+  is_trending?: boolean;
+  is_new?: boolean;
+  is_highly_cited?: boolean;
+  publication_date?: string;
+  impact_score?: number;
 }
 
 interface RecommendationSection {
@@ -168,12 +175,29 @@ export const EnhancedSpotifyCard: React.FC<EnhancedSpotifyCardProps> = ({
           {paper.category.replace('_', ' ').toUpperCase()}
         </div>
 
-        {/* Impact indicators */}
-        {paper.citation_count > 100 && (
-          <div className="absolute top-3 right-3 w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center">
-            <span className="text-xs font-bold text-black">🏆</span>
-          </div>
-        )}
+        {/* 🎯 Phase 1.1c: Enhanced Visual Indicators */}
+        <div className="absolute top-3 right-3 flex flex-col gap-1">
+          {/* Trending indicator */}
+          {(paper.is_trending || paper.category === 'trending') && (
+            <div className="w-6 h-6 bg-red-500/90 rounded-full flex items-center justify-center backdrop-blur-sm border border-white/20">
+              <span className="text-xs">🔥</span>
+            </div>
+          )}
+
+          {/* New paper indicator */}
+          {paper.is_new && (
+            <div className="w-6 h-6 bg-blue-500/90 rounded-full flex items-center justify-center backdrop-blur-sm border border-white/20">
+              <span className="text-xs">✨</span>
+            </div>
+          )}
+
+          {/* Highly cited indicator */}
+          {(paper.is_highly_cited || paper.citation_count > 100) && (
+            <div className="w-6 h-6 bg-yellow-500/90 rounded-full flex items-center justify-center backdrop-blur-sm border border-white/20">
+              <span className="text-xs font-bold text-black">⭐</span>
+            </div>
+          )}
+        </div>
         
         {/* Enhanced play button with ripple effect and field-specific color */}
         <div className={`absolute inset-0 flex items-center justify-center transition-all duration-500 ${
@@ -226,15 +250,31 @@ export const EnhancedSpotifyCard: React.FC<EnhancedSpotifyCardProps> = ({
 
       {/* Enhanced Paper Info */}
       <div className="space-y-3">
-        {/* Title with better typography and field-specific hover color */}
-        <h3
-          className="text-white font-semibold text-sm leading-tight line-clamp-2 transition-colors duration-300"
-          style={{
-            color: isHovered ? accentColor : 'white'
-          }}
-        >
-          {paper.title}
-        </h3>
+        {/* 🎯 Phase 1.1c: Title with enhanced typography hierarchy */}
+        <div className="flex items-start gap-2">
+          {/* Reading status indicator */}
+          {paper.reading_status && (
+            <div
+              className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
+                paper.reading_status === 'unread' ? 'bg-gray-500' :
+                paper.reading_status === 'reading' ? 'bg-blue-500' :
+                paper.reading_status === 'completed' ? 'bg-green-500' :
+                'bg-purple-500'
+              }`}
+              title={`Status: ${paper.reading_status}`}
+            />
+          )}
+
+          <h3
+            className="text-white font-bold text-sm leading-tight line-clamp-2 transition-colors duration-300"
+            style={{
+              color: isHovered ? accentColor : 'white',
+              fontWeight: paper.is_highly_cited || paper.citation_count > 100 ? '700' : '600'
+            }}
+          >
+            {paper.title}
+          </h3>
+        </div>
         
         {/* Authors with enhanced photos and styling */}
         <div className="flex items-center gap-2">
@@ -255,24 +295,36 @@ export const EnhancedSpotifyCard: React.FC<EnhancedSpotifyCardProps> = ({
           </p>
         </div>
 
-        {/* Journal and year with quality indicators */}
+        {/* 🎯 Phase 1.1c: Enhanced metadata with visual hierarchy */}
         <div className="flex items-center justify-between">
-          <p className="text-gray-500 text-xs group-hover:text-gray-400 transition-colors duration-200">
-            {paper.journal} • {paper.year}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-gray-500 text-xs font-medium group-hover:text-gray-400 transition-colors duration-200">
+              {paper.journal}
+            </p>
+            <span className="text-gray-600 text-xs">•</span>
+            <p className="text-gray-500 text-xs group-hover:text-gray-400 transition-colors duration-200">
+              {paper.year}
+            </p>
+            {/* Publication recency indicator */}
+            {paper.year && paper.year >= new Date().getFullYear() - 1 && (
+              <span className="text-green-400 text-xs font-bold" title="Recent publication">NEW</span>
+            )}
+          </div>
 
-          {/* Quality indicator based on citation count */}
-          {paper.citation_count > 50 && (
-            <div className="flex items-center gap-1">
-              {paper.citation_count > 200 && <span className="text-yellow-400 text-xs">⭐</span>}
-              {paper.citation_count > 100 && <span className="text-blue-400 text-xs">🔥</span>}
-              <span className="text-gray-500 text-xs">{paper.citation_count}</span>
-            </div>
-          )}
+          {/* Enhanced quality indicators */}
+          <div className="flex items-center gap-1">
+            {paper.impact_score && paper.impact_score > 8 && (
+              <span className="text-purple-400 text-xs" title="High impact">💎</span>
+            )}
+            {paper.citation_count > 200 && <span className="text-yellow-400 text-xs" title="Highly cited">⭐</span>}
+            {paper.citation_count > 100 && <span className="text-blue-400 text-xs" title="Well cited">🔥</span>}
+            <span className="text-gray-500 text-xs font-medium">{paper.citation_count}</span>
+          </div>
         </div>
 
-        {/* Reason with enhanced styling */}
-        <p className="text-gray-400 text-xs line-clamp-2 italic group-hover:text-gray-300 transition-colors duration-200">
+        {/* 🎯 Phase 1.1c: Enhanced reason with better typography */}
+        <p className="text-gray-400 text-xs line-clamp-2 leading-relaxed group-hover:text-gray-300 transition-colors duration-200"
+           style={{ fontStyle: 'italic', fontSize: '11px' }}>
           "{paper.reason}"
         </p>
       </div>
@@ -327,6 +379,8 @@ export const EnhancedScrollableSection: React.FC<EnhancedScrollableSectionProps>
   isLoading = false,
   showProgress = false
 }) => {
+  // 🚨 IMMEDIATE TEST LOG
+  console.log('🚨 SCROLLABLE SECTION LOADED! If you see this, the component is working!');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
@@ -420,7 +474,7 @@ export const EnhancedScrollableSection: React.FC<EnhancedScrollableSectionProps>
       setIsScrolling(true);
 
       // Enhanced scroll amount calculation - scroll by 2-3 cards
-      const cardWidth = 208; // w-52 = 208px
+      const cardWidth = 320; // Increased for testing - force scrollable content
       const gap = 24; // gap-6 = 24px
       const scrollAmount = (cardWidth + gap) * 2.5; // Scroll by 2.5 cards for better UX
 
