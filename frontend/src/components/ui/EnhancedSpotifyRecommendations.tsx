@@ -310,26 +310,39 @@ interface EnhancedScrollableSectionProps {
   onShare?: (paper: Paper) => void;
   onSeeAll?: (category: string) => void;
   showPersonalizedGreeting?: boolean;
+  userName?: string;
+  isLoading?: boolean;
+  showProgress?: boolean;
 }
 
-// Enhanced scrollable section with improved navigation
+// Enhanced scrollable section with improved navigation and momentum scrolling
 export const EnhancedScrollableSection: React.FC<EnhancedScrollableSectionProps> = ({
   section,
   onPlay,
   onSave,
   onShare,
   onSeeAll,
-  showPersonalizedGreeting = false
+  showPersonalizedGreeting = false,
+  userName = 'Researcher',
+  isLoading = false,
+  showProgress = false
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
+  const [isScrolling, setIsScrolling] = useState(false);
+  const [scrollProgress, setScrollProgress] = useState(0);
 
   const checkScrollButtons = () => {
     if (scrollContainerRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
       setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
+
+      // Calculate scroll progress for progress indicator
+      const maxScroll = scrollWidth - clientWidth;
+      const progress = maxScroll > 0 ? (scrollLeft / maxScroll) * 100 : 0;
+      setScrollProgress(progress);
     }
   };
 
@@ -344,66 +357,148 @@ export const EnhancedScrollableSection: React.FC<EnhancedScrollableSectionProps>
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
-      const scrollAmount = 320; // Width of card + gap
-      const newScrollLeft = scrollContainerRef.current.scrollLeft + 
+      setIsScrolling(true);
+
+      // Enhanced scroll amount calculation - scroll by 2-3 cards
+      const cardWidth = 208; // w-52 = 208px
+      const gap = 24; // gap-6 = 24px
+      const scrollAmount = (cardWidth + gap) * 2.5; // Scroll by 2.5 cards for better UX
+
+      const newScrollLeft = scrollContainerRef.current.scrollLeft +
         (direction === 'left' ? -scrollAmount : scrollAmount);
-      
+
       scrollContainerRef.current.scrollTo({
         left: newScrollLeft,
         behavior: 'smooth'
       });
+
+      // Reset scrolling state after animation
+      setTimeout(() => setIsScrolling(false), 500);
+    }
+  };
+
+  // Enhanced scroll with momentum (for mouse wheel)
+  const handleWheel = (e: React.WheelEvent) => {
+    if (scrollContainerRef.current && Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+      e.preventDefault();
+      setIsScrolling(true);
+
+      scrollContainerRef.current.scrollLeft += e.deltaX;
+
+      setTimeout(() => setIsScrolling(false), 300);
     }
   };
 
   return (
     <div className="mb-12">
-      {/* Enhanced section header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-white mb-1">
-            {showPersonalizedGreeting ? `Good ${getTimeOfDay()}, Researcher` : section.title}
-          </h2>
-          <p className="text-gray-400 text-sm">{section.description}</p>
-          <p className="text-gray-500 text-xs mt-1">{section.updated}</p>
+      {/* Enhanced section header with personalization */}
+      <div className="flex items-start justify-between mb-6">
+        <div className="flex-1">
+          <div className="flex items-center gap-3 mb-2">
+            <h2 className="text-2xl font-bold text-white">
+              {showPersonalizedGreeting ? `Good ${getTimeOfDay()}, ${userName}` : section.title}
+            </h2>
+
+            {/* Section icon based on category */}
+            {section.title.toLowerCase().includes('trending') && (
+              <FireIcon className="w-6 h-6 text-orange-400" />
+            )}
+            {section.title.toLowerCase().includes('personalized') && (
+              <SparklesIcon className="w-6 h-6 text-green-400" />
+            )}
+            {section.title.toLowerCase().includes('cross') && (
+              <SparklesIcon className="w-6 h-6 text-purple-400" />
+            )}
+          </div>
+
+          <p className="text-gray-400 text-sm mb-1">{section.description}</p>
+
+          {/* Enhanced metadata with loading state */}
+          <div className="flex items-center gap-4 text-xs text-gray-500">
+            <span>Updated {new Date(section.updated).toLocaleDateString()}</span>
+            <span>•</span>
+            <span>{section.papers.length} papers</span>
+            {isLoading && (
+              <>
+                <span>•</span>
+                <span className="flex items-center gap-1">
+                  <div className="w-3 h-3 border border-gray-500 border-t-transparent rounded-full animate-spin" />
+                  Loading...
+                </span>
+              </>
+            )}
+          </div>
         </div>
-        
-        <button
-          onClick={() => onSeeAll?.(section.title)}
-          className="text-gray-400 hover:text-white text-sm font-medium transition-colors"
-        >
-          Show all
-        </button>
+
+        <div className="flex items-center gap-3">
+          {/* Progress indicator */}
+          {showProgress && section.papers.length > 3 && (
+            <div className="flex items-center gap-2">
+              <div className="w-16 h-1 bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-white transition-all duration-300 rounded-full"
+                  style={{ width: `${scrollProgress}%` }}
+                />
+              </div>
+              <span className="text-xs text-gray-500">
+                {Math.round(scrollProgress)}%
+              </span>
+            </div>
+          )}
+
+          <button
+            onClick={() => onSeeAll?.(section.title)}
+            className="text-gray-400 hover:text-white text-sm font-medium transition-colors px-3 py-1 rounded-full hover:bg-white/10"
+          >
+            Show all
+          </button>
+        </div>
       </div>
 
-      {/* Enhanced scrollable container */}
+      {/* Enhanced scrollable container with improved controls */}
       <div className="relative group">
-        {/* Left scroll button */}
+        {/* Enhanced left scroll button */}
         <button
           onClick={() => scroll('left')}
-          className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-black/80 backdrop-blur-sm rounded-full flex items-center justify-center transition-all duration-200 ${
-            canScrollLeft ? 'opacity-100 hover:bg-black/90' : 'opacity-0 pointer-events-none'
-          }`}
+          className={`absolute left-2 top-1/2 -translate-y-1/2 z-20 w-14 h-14 bg-black/90 backdrop-blur-md rounded-full flex items-center justify-center transition-all duration-300 shadow-xl border border-white/10 ${
+            canScrollLeft
+              ? 'opacity-0 group-hover:opacity-100 hover:bg-black hover:scale-110 hover:shadow-2xl'
+              : 'opacity-0 pointer-events-none'
+          } ${isScrolling ? 'animate-pulse' : ''}`}
         >
-          <ChevronLeftIcon className="w-6 h-6 text-white" />
+          <ChevronLeftIcon className="w-7 h-7 text-white" />
         </button>
 
-        {/* Right scroll button */}
+        {/* Enhanced right scroll button */}
         <button
           onClick={() => scroll('right')}
-          className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-black/80 backdrop-blur-sm rounded-full flex items-center justify-center transition-all duration-200 ${
-            canScrollRight ? 'opacity-100 hover:bg-black/90' : 'opacity-0 pointer-events-none'
-          }`}
+          className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 w-14 h-14 bg-black/90 backdrop-blur-md rounded-full flex items-center justify-center transition-all duration-300 shadow-xl border border-white/10 ${
+            canScrollRight
+              ? 'opacity-0 group-hover:opacity-100 hover:bg-black hover:scale-110 hover:shadow-2xl'
+              : 'opacity-0 pointer-events-none'
+          } ${isScrolling ? 'animate-pulse' : ''}`}
         >
-          <ChevronRightIcon className="w-6 h-6 text-white" />
+          <ChevronRightIcon className="w-7 h-7 text-white" />
         </button>
 
-        {/* Cards container with enhanced scrolling */}
+        {/* Cards container with enhanced scrolling and momentum */}
         <div
           ref={scrollContainerRef}
-          className="flex gap-6 overflow-x-auto scrollbar-hide pb-4"
+          onWheel={handleWheel}
+          className={`flex gap-6 overflow-x-auto scrollbar-hide pb-6 px-2 transition-all duration-300 ${
+            isScrolling ? 'scroll-smooth' : ''
+          }`}
+          style={{
+            scrollSnapType: 'x mandatory',
+            scrollBehavior: 'smooth'
+          }}
         >
           {section.papers.map((paper, index) => (
-            <div key={paper.pmid || index} className="flex-shrink-0">
+            <div
+              key={paper.pmid || index}
+              className="flex-shrink-0"
+              style={{ scrollSnapAlign: 'start' }}
+            >
               <EnhancedSpotifyCard
                 paper={paper}
                 onPlay={onPlay}
@@ -415,18 +510,47 @@ export const EnhancedScrollableSection: React.FC<EnhancedScrollableSectionProps>
               />
             </div>
           ))}
+
+          {/* Loading skeleton cards */}
+          {isLoading && Array.from({ length: 3 }).map((_, index) => (
+            <div key={`skeleton-${index}`} className="flex-shrink-0">
+              <div className="w-52 h-72 bg-gray-800 rounded-xl animate-pulse" />
+            </div>
+          ))}
         </div>
+
+        {/* Gradient fade effects on edges */}
+        <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-black to-transparent pointer-events-none z-10" />
+        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-black to-transparent pointer-events-none z-10" />
       </div>
     </div>
   );
 };
 
-// Helper function for personalized greeting
+// Enhanced helper function for personalized greeting
 const getTimeOfDay = (): string => {
   const hour = new Date().getHours();
+  if (hour < 6) return 'night';
   if (hour < 12) return 'morning';
   if (hour < 17) return 'afternoon';
-  return 'evening';
+  if (hour < 22) return 'evening';
+  return 'night';
+};
+
+// Get contextual greeting based on time and day
+const getContextualGreeting = (userName: string): string => {
+  const timeOfDay = getTimeOfDay();
+  const day = new Date().getDay();
+  const isWeekend = day === 0 || day === 6;
+
+  const greetings = {
+    morning: isWeekend ? `Good morning, ${userName}! Ready for some weekend research?` : `Good morning, ${userName}!`,
+    afternoon: isWeekend ? `Good afternoon, ${userName}! Hope you're having a productive weekend.` : `Good afternoon, ${userName}!`,
+    evening: `Good evening, ${userName}! Time for some evening discoveries.`,
+    night: `Working late, ${userName}? Here's what's new.`
+  };
+
+  return greetings[timeOfDay as keyof typeof greetings] || `Hello, ${userName}!`;
 };
 
 export default EnhancedScrollableSection;
