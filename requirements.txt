@@ -38,13 +38,13 @@ sendgrid>=6.11.0
 # Basic scientific computing (no heavy ML dependencies) - Python 3.12 compatible
 numpy>=1.26.0
 
-# Phase 2A: NLP Infrastructure for Semantic Analysis - Python 3.12 compatible
-transformers>=4.35.0
-torch>=2.1.0
-sentence-transformers>=2.2.2
-scibert-scivocab-uncased>=0.1.0
+# Phase 2A: NLP Infrastructure for Semantic Analysis - Basic NLP only for deployment stability
 nltk>=3.8.1
 spacy>=3.7.0
+# Advanced NLP dependencies (commented out for deployment stability)
+# transformers>=4.35.0
+# torch>=2.1.0
+# sentence-transformers>=2.2.2
 
 # Phase 5: Citation Network Foundation dependencies - Python 3.12 compatible
 scikit-learn>=1.3.0
