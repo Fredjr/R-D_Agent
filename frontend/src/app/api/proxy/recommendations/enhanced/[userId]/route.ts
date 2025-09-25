@@ -2,6 +2,178 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const BACKEND_BASE = "https://r-dagent-production.up.railway.app";
 
+// 🧠 Phase 2A.2: Semantic Analysis Integration
+interface SemanticAnalysis {
+  methodology?: 'experimental' | 'theoretical' | 'computational' | 'review' | 'meta_analysis' | 'case_study' | 'survey';
+  complexity_score?: number;
+  novelty_type?: 'breakthrough' | 'incremental' | 'replication' | 'review';
+  research_domains?: string[];
+  technical_terms?: string[];
+  confidence_scores?: {
+    methodology: number;
+    complexity: number;
+    novelty: number;
+  };
+  analysis_metadata?: {
+    analysis_time_seconds?: number;
+    service_initialized?: boolean;
+  };
+}
+
+// 🧠 Enhanced Paper Interface with Semantic Analysis
+interface EnhancedPaper {
+  pmid: string;
+  title: string;
+  authors: string[];
+  journal: string;
+  year: number;
+  citation_count: number;
+  relevance_score: number;
+  reason: string;
+  category: string;
+  semantic_analysis?: SemanticAnalysis;
+  [key: string]: any;
+}
+
+// 🧠 Semantic Analysis Service Integration
+async function addSemanticAnalysis(papers: any[]): Promise<EnhancedPaper[]> {
+  if (!papers || papers.length === 0) {
+    return [];
+  }
+
+  console.log(`🧠 SEMANTIC: Adding semantic analysis to ${papers.length} papers`);
+
+  try {
+    // Call the semantic analysis service for batch processing
+    const analysisPromises = papers.map(async (paper) => {
+      try {
+        // Create a mock abstract if not provided
+        const mockAbstract = `${paper.title}. ${paper.reason || 'Research paper in ' + (paper.category || 'general research')}.`;
+
+        const analysisResponse = await fetch(`${BACKEND_BASE}/semantic/analyze-paper`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            title: paper.title,
+            abstract: mockAbstract,
+            full_text: null
+          })
+        });
+
+        if (analysisResponse.ok) {
+          const semanticData = await analysisResponse.json();
+          console.log(`✅ SEMANTIC: Analysis successful for paper: ${paper.title.substring(0, 50)}...`);
+
+          return {
+            ...paper,
+            semantic_analysis: {
+              methodology: semanticData.methodology,
+              complexity_score: semanticData.complexity_score,
+              novelty_type: semanticData.novelty_type,
+              research_domains: semanticData.research_domains,
+              technical_terms: semanticData.technical_terms,
+              confidence_scores: semanticData.confidence_scores,
+              analysis_metadata: {
+                analysis_time_seconds: semanticData.analysis_metadata?.analysis_time_seconds || 0.001,
+                service_initialized: semanticData.analysis_metadata?.service_initialized || true
+              }
+            }
+          };
+        } else {
+          console.warn(`⚠️ SEMANTIC: Analysis failed for paper: ${paper.title.substring(0, 50)}... (Status: ${analysisResponse.status})`);
+          // Return paper with fallback semantic analysis
+          return {
+            ...paper,
+            semantic_analysis: generateFallbackSemanticAnalysis(paper)
+          };
+        }
+      } catch (error) {
+        console.error(`❌ SEMANTIC: Error analyzing paper "${paper.title.substring(0, 50)}...":`, error);
+        // Return paper with fallback semantic analysis
+        return {
+          ...paper,
+          semantic_analysis: generateFallbackSemanticAnalysis(paper)
+        };
+      }
+    });
+
+    const enhancedPapers = await Promise.all(analysisPromises);
+    console.log(`✅ SEMANTIC: Successfully enhanced ${enhancedPapers.length} papers with semantic analysis`);
+    return enhancedPapers;
+
+  } catch (error) {
+    console.error('❌ SEMANTIC: Batch semantic analysis failed:', error);
+    // Return papers with fallback semantic analysis
+    return papers.map(paper => ({
+      ...paper,
+      semantic_analysis: generateFallbackSemanticAnalysis(paper)
+    }));
+  }
+}
+
+// 🧠 Generate Fallback Semantic Analysis
+function generateFallbackSemanticAnalysis(paper: any): SemanticAnalysis {
+  // Determine methodology based on paper characteristics
+  let methodology: SemanticAnalysis['methodology'] = 'theoretical';
+  if (paper.title?.toLowerCase().includes('experimental') || paper.title?.toLowerCase().includes('trial')) {
+    methodology = 'experimental';
+  } else if (paper.title?.toLowerCase().includes('computational') || paper.title?.toLowerCase().includes('algorithm')) {
+    methodology = 'computational';
+  } else if (paper.title?.toLowerCase().includes('review') || paper.title?.toLowerCase().includes('survey')) {
+    methodology = 'review';
+  }
+
+  // Determine novelty based on citation count and recency
+  let novelty_type: SemanticAnalysis['novelty_type'] = 'incremental';
+  if (paper.citation_count > 100 && paper.year >= 2023) {
+    novelty_type = 'breakthrough';
+  } else if (paper.citation_count < 10) {
+    novelty_type = 'incremental';
+  }
+
+  // Generate complexity score based on title complexity and citation count
+  const titleComplexity = (paper.title?.length || 50) / 100;
+  const citationComplexity = Math.min(paper.citation_count / 200, 1);
+  const complexity_score = Math.min((titleComplexity + citationComplexity) / 2, 1);
+
+  // Extract research domains from category and title
+  const research_domains = [];
+  if (paper.category) {
+    research_domains.push(paper.category.toLowerCase().replace(/\s+/g, '_'));
+  }
+
+  // Add common domains based on title keywords
+  const title_lower = paper.title?.toLowerCase() || '';
+  if (title_lower.includes('machine learning') || title_lower.includes('ai')) {
+    research_domains.push('machine_learning');
+  }
+  if (title_lower.includes('biology') || title_lower.includes('medical')) {
+    research_domains.push('biology');
+  }
+  if (title_lower.includes('chemistry') || title_lower.includes('chemical')) {
+    research_domains.push('chemistry');
+  }
+
+  return {
+    methodology,
+    complexity_score,
+    novelty_type,
+    research_domains: research_domains.slice(0, 3), // Limit to 3 domains
+    technical_terms: [], // Could be enhanced with NLP extraction
+    confidence_scores: {
+      methodology: 0.7,
+      complexity: 0.6,
+      novelty: 0.65
+    },
+    analysis_metadata: {
+      analysis_time_seconds: 0.001,
+      service_initialized: false // Indicates this is fallback data
+    }
+  };
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
@@ -41,7 +213,7 @@ export async function GET(
       console.error('❌ Backend recommendation service failed:', backendResponse.status);
       // Fallback to mock data only if backend is completely unavailable
       console.log('⚠️ Falling back to mock data generation...');
-      return generateFallbackRecommendations(userId, projectId);
+      return await generateFallbackRecommendations(userId, projectId);
     }
 
     const backendData = await backendResponse.json();
@@ -241,6 +413,36 @@ export async function GET(
       }
     }
 
+    // 🧠 Phase 2A.2: Add Semantic Analysis to All Papers
+    console.log('🧠 SEMANTIC: Starting semantic analysis integration...');
+
+    try {
+      const recommendations = backendData.recommendations || {};
+
+      // Process each recommendation category
+      const enhancedRecommendations = {
+        papers_for_you: await addSemanticAnalysis(recommendations.papers_for_you || []),
+        trending_in_field: await addSemanticAnalysis(recommendations.trending_in_field || []),
+        cross_pollination: await addSemanticAnalysis(recommendations.cross_pollination || []),
+        citation_opportunities: await addSemanticAnalysis(recommendations.citation_opportunities || [])
+      };
+
+      // Update the backend data with enhanced recommendations
+      backendData.recommendations = enhancedRecommendations;
+
+      console.log('✅ SEMANTIC: Successfully integrated semantic analysis into all recommendation categories');
+      console.log(`📊 SEMANTIC: Enhanced ${
+        enhancedRecommendations.papers_for_you.length +
+        enhancedRecommendations.trending_in_field.length +
+        enhancedRecommendations.cross_pollination.length +
+        enhancedRecommendations.citation_opportunities.length
+      } total papers with semantic analysis`);
+
+    } catch (error) {
+      console.error('❌ SEMANTIC: Failed to add semantic analysis, proceeding without it:', error);
+      // Continue without semantic analysis if it fails
+    }
+
     return NextResponse.json(backendData, {
       status: 200,
       headers: {
@@ -258,32 +460,38 @@ export async function GET(
     const { userId } = await params;
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('project_id');
-    return generateFallbackRecommendations(userId, projectId);
+    return await generateFallbackRecommendations(userId, projectId);
   }
 }
 
 // Fallback function for when backend is unavailable
-function generateFallbackRecommendations(userId: string, projectId?: string | null) {
+async function generateFallbackRecommendations(userId: string, projectId?: string | null) {
   console.log('🎯 Generating fallback recommendations for user:', userId);
-  
-  // Return minimal fallback data
+
+  // Create fallback papers with semantic analysis
+  const fallbackPapers = [{
+    pmid: `fallback_${Date.now()}`,
+    title: "Backend Service Unavailable",
+    authors: ["System", "Admin"],
+    journal: "System Notice",
+    year: 2024,
+    citation_count: 0,
+    relevance_score: 0.5,
+    reason: "Backend recommendation service is currently unavailable",
+    category: "system"
+  }];
+
+  // Add semantic analysis to fallback papers
+  const enhancedFallbackPapers = await addSemanticAnalysis(fallbackPapers);
+
+  // Return minimal fallback data with semantic analysis
   const response = {
     status: "success",
     week_of: new Date().toISOString(),
     user_id: userId,
     project_id: projectId,
     recommendations: {
-      papers_for_you: [{
-        pmid: `fallback_${Date.now()}`,
-        title: "Backend Service Unavailable",
-        authors: ["System", "Admin"],
-        journal: "System Notice",
-        year: 2024,
-        citation_count: 0,
-        relevance_score: 0.5,
-        reason: "Backend recommendation service is currently unavailable",
-        category: "system"
-      }],
+      papers_for_you: enhancedFallbackPapers,
       trending_in_field: [],
       cross_pollination: [],
       citation_opportunities: []
