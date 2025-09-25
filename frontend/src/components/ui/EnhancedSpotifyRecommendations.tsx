@@ -3,6 +3,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PlayIcon, HeartIcon, ShareIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartSolidIcon, FireIcon, SparklesIcon } from '@heroicons/react/24/solid';
+import {
+  MethodologyBadge,
+  ComplexityIndicator,
+  NoveltyHighlight,
+  DomainTags
+} from '@/components/semantic';
 
 interface Paper {
   pmid: string;
@@ -216,6 +222,13 @@ export const EnhancedSpotifyCard: React.FC<EnhancedSpotifyCardProps> = ({
               <span className="text-xs font-bold text-black">⭐</span>
             </div>
           )}
+
+          {/* 🧠 Phase 2A.2: Semantic Analysis Indicators */}
+          {paper.semantic_analysis?.novelty_type === 'breakthrough' && (
+            <div className="w-6 h-6 bg-red-600/90 rounded-full flex items-center justify-center backdrop-blur-sm border border-white/20 animate-pulse">
+              <span className="text-xs">🚀</span>
+            </div>
+          )}
         </div>
         
         {/* Enhanced play button with ripple effect and field-specific color */}
@@ -346,6 +359,51 @@ export const EnhancedSpotifyCard: React.FC<EnhancedSpotifyCardProps> = ({
            style={{ fontStyle: 'italic', fontSize: '11px' }}>
           "{paper.reason}"
         </p>
+
+        {/* 🧠 Phase 2A.2: Semantic Analysis Features */}
+        {paper.semantic_analysis && (
+          <div className="space-y-2 pt-2 border-t border-gray-700/50">
+            {/* Methodology and Novelty badges */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {paper.semantic_analysis.methodology && (
+                <MethodologyBadge methodology={paper.semantic_analysis.methodology} size="sm" />
+              )}
+              {paper.semantic_analysis.novelty_type && (
+                <NoveltyHighlight
+                  noveltyType={paper.semantic_analysis.novelty_type}
+                  size="sm"
+                  variant={paper.semantic_analysis.novelty_type === 'breakthrough' ? 'glow' : 'badge'}
+                />
+              )}
+            </div>
+
+            {/* Complexity indicator */}
+            {paper.semantic_analysis.complexity_score !== undefined && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500 text-xs">Complexity</span>
+                  <span className="text-gray-400 text-xs">
+                    {(paper.semantic_analysis.complexity_score * 100).toFixed(0)}%
+                  </span>
+                </div>
+                <ComplexityIndicator
+                  score={paper.semantic_analysis.complexity_score}
+                  size="sm"
+                  showLabel={false}
+                  showScore={false}
+                />
+              </div>
+            )}
+
+            {/* Research domains */}
+            {paper.semantic_analysis.research_domains && paper.semantic_analysis.research_domains.length > 0 && (
+              <div className="space-y-1">
+                <span className="text-gray-500 text-xs">Domains</span>
+                <DomainTags domains={paper.semantic_analysis.research_domains} maxDisplay={3} size="sm" />
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Enhanced action buttons */}
