@@ -22,6 +22,25 @@ interface Paper {
     discovery_badge?: string;
     opportunity_badge?: string;
   };
+
+  // 🧠 Phase 2A.2: Semantic Analysis Fields
+  semantic_analysis?: {
+    methodology?: 'experimental' | 'theoretical' | 'computational' | 'review' | 'meta_analysis' | 'case_study' | 'survey';
+    complexity_score?: number; // 0.0-1.0 scale
+    novelty_type?: 'breakthrough' | 'incremental' | 'replication' | 'review';
+    research_domains?: string[]; // ['machine_learning', 'biology', 'chemistry', etc.]
+    technical_terms?: string[];
+    confidence_scores?: {
+      methodology: number;
+      complexity: number;
+      novelty: number;
+    };
+    analysis_metadata?: {
+      analysis_time_seconds?: number;
+      service_initialized?: boolean;
+      embedding_dimensions?: number;
+    };
+  };
 }
 
 interface RecommendationSection {
