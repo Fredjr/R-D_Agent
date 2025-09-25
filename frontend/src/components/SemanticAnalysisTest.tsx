@@ -5,8 +5,17 @@
 
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSemanticAnalysis } from '@/hooks/useSemanticAnalysis';
+import {
+  MethodologyBadge,
+  ComplexityIndicator,
+  NoveltyHighlight,
+  DomainTags,
+  SemanticFiltersPanel,
+  SemanticPaperCard,
+  type SemanticFilters
+} from '@/components/semantic';
 
 export default function SemanticAnalysisTest() {
   const {
@@ -21,6 +30,10 @@ export default function SemanticAnalysisTest() {
     clearError,
     isServiceReady,
   } = useSemanticAnalysis();
+
+  // State for visual components demo
+  const [filters, setFilters] = useState<SemanticFilters>({});
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
 
   // Get service status on component mount
   useEffect(() => {
@@ -45,8 +58,38 @@ export default function SemanticAnalysisTest() {
     await initializeService();
   };
 
+  // Sample paper with semantic analysis data for visual testing
+  const samplePaper = {
+    pmid: "sample_001",
+    title: "Deep Learning Approaches for Protein Structure Prediction: A Comprehensive Review",
+    authors: ["Smith, J.", "Johnson, A.", "Williams, R."],
+    journal: "Nature Machine Intelligence",
+    year: 2024,
+    citation_count: 127,
+    relevance_score: 0.95,
+    reason: "This paper presents novel deep learning architectures for protein folding prediction, achieving state-of-the-art results on benchmark datasets.",
+    category: "Machine Learning",
+    semantic_analysis: {
+      methodology: 'computational' as const,
+      complexity_score: 0.75,
+      novelty_type: 'breakthrough' as const,
+      research_domains: ['machine_learning', 'biology', 'computer_science'],
+      technical_terms: ['deep learning', 'protein folding', 'neural networks', 'AlphaFold', 'transformer architecture'],
+      confidence_scores: {
+        methodology: 0.92,
+        complexity: 0.88,
+        novelty: 0.85,
+      },
+      analysis_metadata: {
+        analysis_time_seconds: 0.003,
+        service_initialized: true,
+        embedding_dimensions: 384,
+      },
+    },
+  };
+
   return (
-    <div className="p-6 max-w-4xl mx-auto bg-white rounded-lg shadow-lg">
+    <div className="p-6 max-w-6xl mx-auto bg-white rounded-lg shadow-lg">
       <h2 className="text-2xl font-bold mb-6 text-gray-800">🧠 Semantic Analysis Test</h2>
       
       {/* Service Status */}
@@ -165,6 +208,83 @@ export default function SemanticAnalysisTest() {
           <p className="mt-2 text-gray-600">Processing semantic analysis...</p>
         </div>
       )}
+
+      {/* Visual Components Demo */}
+      <div className="mt-8 p-6 bg-gray-50 rounded-lg">
+        <h3 className="text-xl font-semibold mb-6 text-gray-800">🎨 Visual Components Demo</h3>
+
+        {/* Badges Demo */}
+        <div className="mb-6">
+          <h4 className="text-lg font-medium mb-3 text-gray-700">Semantic Badges</h4>
+          <div className="space-y-4">
+            <div>
+              <span className="text-sm text-gray-600 block mb-2">Methodology Badges:</span>
+              <div className="flex flex-wrap gap-2">
+                <MethodologyBadge methodology="experimental" />
+                <MethodologyBadge methodology="theoretical" />
+                <MethodologyBadge methodology="computational" />
+                <MethodologyBadge methodology="review" />
+              </div>
+            </div>
+
+            <div>
+              <span className="text-sm text-gray-600 block mb-2">Novelty Highlights:</span>
+              <div className="flex flex-wrap gap-2">
+                <NoveltyHighlight noveltyType="breakthrough" variant="glow" />
+                <NoveltyHighlight noveltyType="incremental" />
+                <NoveltyHighlight noveltyType="replication" />
+                <NoveltyHighlight noveltyType="review" variant="dot" />
+              </div>
+            </div>
+
+            <div>
+              <span className="text-sm text-gray-600 block mb-2">Research Domains:</span>
+              <DomainTags domains={['machine_learning', 'biology', 'chemistry', 'physics', 'medicine']} />
+            </div>
+
+            <div>
+              <span className="text-sm text-gray-600 block mb-2">Complexity Indicators:</span>
+              <div className="space-y-2 max-w-md">
+                <ComplexityIndicator score={0.2} showLabel showScore />
+                <ComplexityIndicator score={0.5} showLabel showScore />
+                <ComplexityIndicator score={0.8} showLabel showScore />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filters Demo */}
+        <div className="mb-6">
+          <h4 className="text-lg font-medium mb-3 text-gray-700">Semantic Filters</h4>
+          <SemanticFiltersPanel
+            filters={filters}
+            onFiltersChange={setFilters}
+            isOpen={isFiltersOpen}
+            onToggle={() => setIsFiltersOpen(!isFiltersOpen)}
+          />
+          {Object.keys(filters).length > 0 && (
+            <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+              <span className="text-sm text-blue-800">Active Filters: </span>
+              <pre className="text-xs text-blue-600 mt-1">{JSON.stringify(filters, null, 2)}</pre>
+            </div>
+          )}
+        </div>
+
+        {/* Enhanced Paper Card Demo */}
+        <div className="mb-6">
+          <h4 className="text-lg font-medium mb-3 text-gray-700">Enhanced Paper Card</h4>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div>
+              <span className="text-sm text-gray-600 block mb-2">Detailed View:</span>
+              <SemanticPaperCard paper={samplePaper} variant="detailed" />
+            </div>
+            <div>
+              <span className="text-sm text-gray-600 block mb-2">Compact View:</span>
+              <SemanticPaperCard paper={samplePaper} variant="compact" />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
