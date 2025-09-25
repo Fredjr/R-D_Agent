@@ -364,32 +364,39 @@ export const EnhancedSpotifyCard: React.FC<EnhancedSpotifyCardProps> = ({
         {/* 🧠 Phase 2A.2: Enhanced Expandable Semantic Analysis Features */}
         {paper.semantic_analysis && (
           <div className="space-y-2 pt-2 border-t border-gray-700/50">
-            {/* Compact View - Always Visible */}
-            <div className="flex items-center gap-2 flex-wrap">
-              {paper.semantic_analysis.methodology && (
-                <MethodologyBadge methodology={paper.semantic_analysis.methodology} size="sm" />
-              )}
-              {paper.semantic_analysis.novelty_type && (
-                <NoveltyHighlight
-                  noveltyType={paper.semantic_analysis.novelty_type}
-                  size="sm"
-                  variant={paper.semantic_analysis.novelty_type === 'breakthrough' ? 'glow' : 'badge'}
-                />
-              )}
-
-              {/* Expand/Collapse Button */}
+            {/* Semantic Analysis Header */}
+            <div className="flex items-center justify-between">
+              <span className="text-gray-400 text-xs font-medium">Semantic Analysis</span>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setIsSemanticExpanded(!isSemanticExpanded);
                 }}
-                className="ml-auto flex items-center gap-1 text-gray-400 hover:text-white text-xs transition-colors duration-200 px-2 py-1 rounded-md hover:bg-gray-700/50"
-                title={isSemanticExpanded ? "Hide details" : "Show full semantic analysis"}
+                className="flex items-center gap-1 text-gray-300 hover:text-white text-xs transition-all duration-200 px-2 py-1 rounded-md hover:bg-gray-700/50 border border-gray-600/50 hover:border-gray-500/70 bg-gray-800/50"
+                title={isSemanticExpanded ? "Hide semantic details" : "Show full semantic analysis"}
               >
-                <InformationCircleIcon className="w-3 h-3" />
+                <InformationCircleIcon className="w-4 h-4" />
+                <span className="text-xs font-medium">
+                  {isSemanticExpanded ? 'Less' : 'More'}
+                </span>
                 {isSemanticExpanded ? <ChevronUpIcon className="w-3 h-3" /> : <ChevronDownIcon className="w-3 h-3" />}
               </button>
             </div>
+            {/* Badges - Always Visible */}
+            {(paper.semantic_analysis.methodology || paper.semantic_analysis.novelty_type) && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {paper.semantic_analysis.methodology && (
+                  <MethodologyBadge methodology={paper.semantic_analysis.methodology} size="sm" />
+                )}
+                {paper.semantic_analysis.novelty_type && (
+                  <NoveltyHighlight
+                    noveltyType={paper.semantic_analysis.novelty_type}
+                    size="sm"
+                    variant={paper.semantic_analysis.novelty_type === 'breakthrough' ? 'glow' : 'badge'}
+                  />
+                )}
+              </div>
+            )}
 
             {/* Quick complexity preview when collapsed */}
             {!isSemanticExpanded && paper.semantic_analysis.complexity_score !== undefined && (
