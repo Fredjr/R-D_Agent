@@ -174,28 +174,45 @@ async def analyze_paper(request: PaperAnalysisRequest):
     - Research domain identification
     """
     request_start_time = time.time()
-    print(f"🚀 [API] Received semantic analysis request for: '{request.title[:50]}...'")
-    print(f"📋 [API] Request details - Title: {len(request.title)} chars, Abstract: {len(request.abstract)} chars, Full text: {'Yes' if request.full_text else 'No'}, PMID: {request.pmid}")
+    request_id = f"req_{int(time.time() * 1000)}"
+
+    print(f"🚀 [API] [{request_id}] SEMANTIC ANALYSIS REQUEST STARTED")
+    print(f"📝 [API] [{request_id}] Title: '{request.title[:100]}...'")
+    print(f"📄 [API] [{request_id}] Abstract length: {len(request.abstract)} chars")
+    print(f"📚 [API] [{request_id}] Full text: {'Available (' + str(len(request.full_text)) + ' chars)' if request.full_text else 'Not provided'}")
+    print(f"🔢 [API] [{request_id}] PMID: {request.pmid or 'None'}")
+    print(f"🌐 [API] [{request_id}] Service status: {'Available' if SEMANTIC_ANALYSIS_AVAILABLE else 'Unavailable'}")
 
     if not SEMANTIC_ANALYSIS_AVAILABLE:
-        print("❌ [API] Semantic analysis service not available")
+        print(f"❌ [API] [{request_id}] Semantic analysis service not available - returning error")
         raise HTTPException(status_code=503, detail="Semantic analysis service not available")
 
     try:
-        print(f"🔬 [API] Starting semantic analysis for paper: {request.title[:50]}...")
+        print(f"🔬 [API] [{request_id}] Starting semantic analysis processing...")
 
         # Perform semantic analysis
         analysis_start = time.time()
+        print(f"⚡ [API] [{request_id}] Calling semantic analysis service...")
         features = await semantic_analysis_service.analyze_paper(
             title=request.title,
             abstract=request.abstract,
             full_text=request.full_text
         )
         analysis_time = time.time() - analysis_start
-        print(f"⏱️  [API] Analysis completed in {analysis_time:.3f}s")
+        print(f"⏱️  [API] [{request_id}] Core analysis completed in {analysis_time:.3f}s")
+
+        # Log detailed analysis results
+        print(f"🧪 [API] [{request_id}] ANALYSIS RESULTS:")
+        print(f"   📊 Methodology: {features.methodology.value}")
+        print(f"   🎯 Complexity Score: {features.complexity_score:.3f}")
+        print(f"   🚀 Novelty Type: {features.novelty_type.value}")
+        print(f"   🔬 Research Domains: {', '.join(features.research_domains)}")
+        print(f"   🔤 Technical Terms: {', '.join(features.technical_terms[:5])}{'...' if len(features.technical_terms) > 5 else ''}")
+        print(f"   🧠 Embedding Dimensions: {len(features.embeddings)}")
+        print(f"   📈 Confidence Scores: methodology={features.confidence_scores.get('methodology', 0):.3f}, complexity={features.confidence_scores.get('complexity', 0):.3f}, novelty={features.confidence_scores.get('novelty', 0):.3f}")
 
         # Create response
-        print("📦 [API] Creating response object...")
+        print(f"📦 [API] [{request_id}] Creating response object...")
         response_start = time.time()
         response = SemanticFeaturesResponse(
             methodology=features.methodology.value,
@@ -218,26 +235,42 @@ async def analyze_paper(request: PaperAnalysisRequest):
         response_time = time.time() - response_start
 
         total_request_time = time.time() - request_start_time
-        print(f"✅ [API] Analysis complete: {features.methodology.value}, complexity: {features.complexity_score:.3f}, novelty: {features.novelty_type.value}")
-        print(f"📊 [API] Performance - Analysis: {analysis_time:.3f}s, Response: {response_time:.3f}s, Total: {total_request_time:.3f}s")
-        print(f"📈 [API] Results - Terms: {len(features.technical_terms)}, Domains: {len(features.research_domains)}, Embeddings: {len(features.embeddings)}")
+        print(f"✅ [API] [{request_id}] SEMANTIC ANALYSIS SUCCESSFUL!")
+        print(f"🎉 [API] [{request_id}] Final Results: {features.methodology.value} | {features.complexity_score:.3f} complexity | {features.novelty_type.value} novelty")
+        print(f"📊 [API] [{request_id}] Performance Metrics:")
+        print(f"   ⚡ Analysis Time: {analysis_time:.3f}s")
+        print(f"   📦 Response Creation: {response_time:.3f}s")
+        print(f"   🕐 Total Request Time: {total_request_time:.3f}s")
+        print(f"📈 [API] [{request_id}] Output Metrics:")
+        print(f"   🔤 Technical Terms: {len(features.technical_terms)}")
+        print(f"   🎯 Research Domains: {len(features.research_domains)}")
+        print(f"   🧠 Embedding Dimensions: {len(features.embeddings)}")
+        print(f"🏁 [API] [{request_id}] REQUEST COMPLETED SUCCESSFULLY")
 
         return response
 
     except Exception as e:
         total_request_time = time.time() - request_start_time
-        print(f"❌ [API] Error analyzing paper after {total_request_time:.3f}s: {e}")
+        print(f"❌ [API] [{request_id}] SEMANTIC ANALYSIS FAILED after {total_request_time:.3f}s")
+        print(f"💥 [API] [{request_id}] Error: {str(e)}")
+        print(f"🔍 [API] [{request_id}] Error Type: {type(e).__name__}")
         import traceback
-        print(f"❌ [API] Full traceback: {traceback.format_exc()}")
+        print(f"📍 [API] [{request_id}] Full traceback:")
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 @app.get("/api/semantic/service-status")
 async def get_semantic_service_status():
     """Get semantic analysis service status and capabilities"""
+    status_request_id = f"status_{int(time.time() * 1000)}"
+    print(f"🔍 [API] [{status_request_id}] SERVICE STATUS REQUEST")
+    print(f"🌐 [API] [{status_request_id}] Semantic Analysis Available: {SEMANTIC_ANALYSIS_AVAILABLE}")
+
     if not SEMANTIC_ANALYSIS_AVAILABLE:
+        print(f"❌ [API] [{status_request_id}] Service not available - returning error status")
         return {
             "service_name": "Semantic Analysis Service",
-            "version": "2A.1",
+            "version": "2A.2",
             "is_available": False,
             "error": "Service not available - import failed",
             "capabilities": {},
@@ -245,6 +278,7 @@ async def get_semantic_service_status():
         }
 
     try:
+        print(f"✅ [API] [{status_request_id}] Service available - gathering status information")
         status = {
             "service_name": "Semantic Analysis Service",
             "version": "2A.1",
@@ -276,15 +310,25 @@ async def get_semantic_service_status():
 @app.post("/api/semantic/initialize-service")
 async def initialize_semantic_service():
     """Initialize the semantic analysis service"""
+    init_request_id = f"init_{int(time.time() * 1000)}"
+    init_start_time = time.time()
+
+    print(f"🚀 [API] [{init_request_id}] SERVICE INITIALIZATION REQUEST")
+    print(f"🌐 [API] [{init_request_id}] Service Available: {SEMANTIC_ANALYSIS_AVAILABLE}")
+
     if not SEMANTIC_ANALYSIS_AVAILABLE:
+        print(f"❌ [API] [{init_request_id}] Cannot initialize - service not available")
         raise HTTPException(status_code=503, detail="Semantic analysis service not available")
 
     try:
-        print("🚀 Manually initializing semantic analysis service...")
+        print(f"⚡ [API] [{init_request_id}] Starting service initialization...")
 
         success = await semantic_analysis_service.initialize()
+        init_time = time.time() - init_start_time
 
         if success:
+            print(f"✅ [API] [{init_request_id}] SERVICE INITIALIZATION SUCCESSFUL in {init_time:.3f}s")
+            print(f"🎉 [API] [{init_request_id}] Service is now ready for analysis requests")
             return {
                 "status": "success",
                 "message": "Semantic analysis service initialized successfully",

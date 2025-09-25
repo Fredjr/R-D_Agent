@@ -93,10 +93,19 @@ export function useSemanticAnalysis(): UseSemanticAnalysisReturn {
   const analyzePaper = useCallback(async (request: SemanticAnalysisRequest): Promise<SemanticAnalysisResponse | null> => {
     setIsLoading(true);
     setError(null);
-    
+
+    const requestId = `frontend_${Date.now()}`;
+    const startTime = performance.now();
+
     try {
-      console.log('🧠 [SEMANTIC] Analyzing paper:', request.title.substring(0, 50) + '...');
-      
+      console.log(`🧠 [FRONTEND] [${requestId}] SEMANTIC ANALYSIS REQUEST STARTED`);
+      console.log(`📝 [FRONTEND] [${requestId}] Title: "${request.title.substring(0, 100)}..."`);
+      console.log(`📄 [FRONTEND] [${requestId}] Abstract length: ${request.abstract?.length || 0} chars`);
+      console.log(`📚 [FRONTEND] [${requestId}] Full text: ${request.full_text ? 'Provided' : 'Not provided'}`);
+      console.log(`🔢 [FRONTEND] [${requestId}] PMID: ${request.pmid || 'None'}`);
+      console.log(`🌐 [FRONTEND] [${requestId}] Backend URL: ${BACKEND_BASE}`);
+
+      const fetchStart = performance.now();
       const response = await fetch(`${BACKEND_BASE}/api/semantic/analyze-paper`, {
         method: 'POST',
         headers: {
@@ -104,19 +113,33 @@ export function useSemanticAnalysis(): UseSemanticAnalysisReturn {
         },
         body: JSON.stringify(request),
       });
+      const fetchTime = performance.now() - fetchStart;
+
+      console.log(`📡 [FRONTEND] [${requestId}] HTTP request completed in ${fetchTime.toFixed(1)}ms`);
+      console.log(`📊 [FRONTEND] [${requestId}] Response status: ${response.status} ${response.statusText}`);
 
       if (!response.ok) {
         throw new Error(`Analysis failed: ${response.status} ${response.statusText}`);
       }
 
+      const parseStart = performance.now();
       const result = await response.json();
-      console.log('🧠 [SEMANTIC] Analysis complete:', result);
-      
+      const parseTime = performance.now() - parseStart;
+      const totalTime = performance.now() - startTime;
+
+      console.log(`📦 [FRONTEND] [${requestId}] Response parsed in ${parseTime.toFixed(1)}ms`);
+      console.log(`✅ [FRONTEND] [${requestId}] SEMANTIC ANALYSIS SUCCESSFUL!`);
+      console.log(`🧪 [FRONTEND] [${requestId}] Results: ${result.methodology} | ${(result.complexity_score * 100).toFixed(0)}% complexity | ${result.novelty_type}`);
+      console.log(`🎯 [FRONTEND] [${requestId}] Domains: ${result.research_domains?.join(', ') || 'None'}`);
+      console.log(`⚡ [FRONTEND] [${requestId}] Total time: ${totalTime.toFixed(1)}ms (fetch: ${fetchTime.toFixed(1)}ms, parse: ${parseTime.toFixed(1)}ms)`);
+
       setLastAnalysis(result);
       return result;
     } catch (err) {
+      const totalTime = performance.now() - startTime;
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-      console.error('🧠 [SEMANTIC] Analysis error:', errorMessage);
+      console.error(`❌ [FRONTEND] [${requestId}] SEMANTIC ANALYSIS FAILED after ${totalTime.toFixed(1)}ms`);
+      console.error(`💥 [FRONTEND] [${requestId}] Error: ${errorMessage}`);
       setError(errorMessage);
       return null;
     } finally {
