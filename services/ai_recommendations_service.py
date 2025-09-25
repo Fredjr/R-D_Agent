@@ -153,23 +153,23 @@ class SpotifyInspiredRecommendationsService:
                     # 🧠 SEMANTIC ANALYSIS ENHANCEMENT FOR AI RECOMMENDATIONS
                     logger.info("🧠 Enhancing AI recommendations with semantic analysis...")
 
-                    # Enhance each category with semantic analysis
-                    if recommendations.get("papers_for_you"):
+                    # Enhance each category with semantic analysis (AI recommendations return lists directly)
+                    if recommendations.get("papers_for_you") and isinstance(recommendations["papers_for_you"], list):
                         recommendations["papers_for_you"] = await self._enhance_papers_with_semantic_analysis(
                             recommendations["papers_for_you"]
                         )
 
-                    if recommendations.get("trending_in_field"):
+                    if recommendations.get("trending_in_field") and isinstance(recommendations["trending_in_field"], list):
                         recommendations["trending_in_field"] = await self._enhance_papers_with_semantic_analysis(
                             recommendations["trending_in_field"]
                         )
 
-                    if recommendations.get("cross_pollination"):
+                    if recommendations.get("cross_pollination") and isinstance(recommendations["cross_pollination"], list):
                         recommendations["cross_pollination"] = await self._enhance_papers_with_semantic_analysis(
                             recommendations["cross_pollination"]
                         )
 
-                    if recommendations.get("citation_opportunities"):
+                    if recommendations.get("citation_opportunities") and isinstance(recommendations["citation_opportunities"], list):
                         recommendations["citation_opportunities"] = await self._enhance_papers_with_semantic_analysis(
                             recommendations["citation_opportunities"]
                         )
@@ -198,25 +198,29 @@ class SpotifyInspiredRecommendationsService:
             logger.info("🧠 Enhancing recommendations with semantic analysis...")
 
             # Enhance each category with semantic analysis
-            if recommendations.get("papers_for_you"):
-                recommendations["papers_for_you"] = await self._enhance_papers_with_semantic_analysis(
-                    recommendations["papers_for_you"]
+            if recommendations.get("papers_for_you") and recommendations["papers_for_you"].get("papers"):
+                enhanced_papers = await self._enhance_papers_with_semantic_analysis(
+                    recommendations["papers_for_you"]["papers"]
                 )
+                recommendations["papers_for_you"]["papers"] = enhanced_papers
 
-            if recommendations.get("trending_in_field"):
-                recommendations["trending_in_field"] = await self._enhance_papers_with_semantic_analysis(
-                    recommendations["trending_in_field"]
+            if recommendations.get("trending_in_field") and recommendations["trending_in_field"].get("papers"):
+                enhanced_papers = await self._enhance_papers_with_semantic_analysis(
+                    recommendations["trending_in_field"]["papers"]
                 )
+                recommendations["trending_in_field"]["papers"] = enhanced_papers
 
-            if recommendations.get("cross_pollination"):
-                recommendations["cross_pollination"] = await self._enhance_papers_with_semantic_analysis(
-                    recommendations["cross_pollination"]
+            if recommendations.get("cross_pollination") and recommendations["cross_pollination"].get("papers"):
+                enhanced_papers = await self._enhance_papers_with_semantic_analysis(
+                    recommendations["cross_pollination"]["papers"]
                 )
+                recommendations["cross_pollination"]["papers"] = enhanced_papers
 
-            if recommendations.get("citation_opportunities"):
-                recommendations["citation_opportunities"] = await self._enhance_papers_with_semantic_analysis(
-                    recommendations["citation_opportunities"]
+            if recommendations.get("citation_opportunities") and recommendations["citation_opportunities"].get("papers"):
+                enhanced_papers = await self._enhance_papers_with_semantic_analysis(
+                    recommendations["citation_opportunities"]["papers"]
                 )
+                recommendations["citation_opportunities"]["papers"] = enhanced_papers
 
             logger.info("✅ Semantic analysis enhancement completed")
 
@@ -1028,6 +1032,12 @@ class SpotifyInspiredRecommendationsService:
 
         for paper in papers:
             try:
+                # Ensure paper is a dictionary
+                if not isinstance(paper, dict):
+                    logger.warning(f"⚠️ Skipping non-dictionary paper object: {type(paper)}")
+                    enhanced_papers.append(paper)
+                    continue
+
                 # Create cache key for this paper
                 cache_key = f"semantic_{paper.get('pmid', '')}"
 
@@ -1081,9 +1091,12 @@ class SpotifyInspiredRecommendationsService:
             except Exception as e:
                 logger.error(f"❌ Error enhancing paper with semantic analysis: {e}")
                 # Add paper without semantic enhancement
-                enhanced_paper = paper.copy()
-                enhanced_paper['semantic_analysis'] = None
-                enhanced_papers.append(enhanced_paper)
+                if isinstance(paper, dict):
+                    enhanced_paper = paper.copy()
+                    enhanced_paper['semantic_analysis'] = None
+                    enhanced_papers.append(enhanced_paper)
+                else:
+                    enhanced_papers.append(paper)
 
         logger.info(f"🎯 Enhanced {len(enhanced_papers)} papers with semantic analysis")
         return enhanced_papers
