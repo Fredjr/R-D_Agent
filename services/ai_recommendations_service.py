@@ -123,7 +123,7 @@ class SpotifyInspiredRecommendationsService:
             cache_key = f"weekly_{user_id}_{project_id or 'global'}"
             if cache_key in self.recommendation_cache:
                 cached_data = self.recommendation_cache[cache_key]
-                if datetime.now() - cached_data["timestamp"] < self.cache_ttl:
+                if datetime.now(timezone.utc) - cached_data["timestamp"] < self.cache_ttl:
                     return cached_data["data"]
 
             # Get comprehensive user behavior analysis
@@ -248,7 +248,7 @@ class SpotifyInspiredRecommendationsService:
             # Cache the result
             self.recommendation_cache[cache_key] = {
                 "data": result,
-                "timestamp": datetime.now()
+                "timestamp": datetime.now(timezone.utc)
             }
 
             return result
@@ -263,7 +263,7 @@ class SpotifyInspiredRecommendationsService:
         """Get a pool of available papers for AI agents to analyze"""
         try:
             # Get recent papers from the database (last 2 years)
-            cutoff_date = datetime.now().year - 2
+            cutoff_date = datetime.now(timezone.utc).year - 2
 
             query = db.query(Article).filter(
                 Article.publication_year >= cutoff_date,
@@ -279,7 +279,7 @@ class SpotifyInspiredRecommendationsService:
                     "pmid": paper.pmid,
                     "title": paper.title or "",
                     "abstract": paper.abstract or "",
-                    "pub_year": paper.publication_year or datetime.now().year,
+                    "pub_year": paper.publication_year or datetime.now(timezone.utc).year,
                     "citation_count": paper.citation_count or 0,
                     "authors": paper.authors or [],
                     "journal": paper.journal or "",
@@ -302,7 +302,7 @@ class SpotifyInspiredRecommendationsService:
             cache_key = f"profile_{user_id}_{project_id or 'global'}"
             if cache_key in self.user_behavior_cache:
                 cached_data = self.user_behavior_cache[cache_key]
-                if datetime.now() - cached_data["timestamp"] < self.behavior_cache_ttl:
+                if datetime.now(timezone.utc) - cached_data["timestamp"] < self.behavior_cache_ttl:
                     return cached_data["data"]
 
             profile = {}
@@ -473,7 +473,7 @@ class SpotifyInspiredRecommendationsService:
             # Cache the profile
             self.user_behavior_cache[cache_key] = {
                 "data": profile,
-                "timestamp": datetime.now()
+                "timestamp": datetime.now(timezone.utc)
             }
 
             return profile
@@ -555,7 +555,7 @@ class SpotifyInspiredRecommendationsService:
         try:
             # Get popular recent papers as fallback
             recent_papers = db.query(Article).filter(
-                Article.publication_year >= datetime.now().year - 2,
+                Article.publication_year >= datetime.now(timezone.utc).year - 2,
                 Article.citation_count.isnot(None),
                 Article.citation_count > 10
             ).order_by(desc(Article.citation_count)).limit(12).all()
@@ -567,7 +567,7 @@ class SpotifyInspiredRecommendationsService:
                     "title": paper.title or "Research Paper",
                     "authors": paper.authors[:3] if paper.authors else ["Unknown"],
                     "journal": paper.journal or "Academic Journal",
-                    "year": paper.publication_year or datetime.now().year,
+                    "year": paper.publication_year or datetime.now(timezone.utc).year,
                     "citation_count": paper.citation_count or 0,
                     "relevance_score": 0.7,
                     "reason": "Popular recent research to get you started",
@@ -581,7 +581,7 @@ class SpotifyInspiredRecommendationsService:
                 "recommendations": recommendations,
                 "total": len(recommendations),
                 "category": category,
-                "updated": datetime.now().isoformat(),
+                "updated": datetime.now(timezone.utc).isoformat(),
                 "refresh_reason": "Welcome! Here are some popular papers to get you started"
             }
 
@@ -612,7 +612,7 @@ class SpotifyInspiredRecommendationsService:
                         Article.title.ilike(f'%{domain}%'),
                         Article.abstract.ilike(f'%{domain}%')
                     ),
-                    Article.publication_year >= datetime.now().year - 3  # Recent papers
+                    Article.publication_year >= datetime.now(timezone.utc).year - 3  # Recent papers
                 ).order_by(desc(Article.citation_count)).limit(5).all()
 
                 for paper in domain_papers:
@@ -641,7 +641,7 @@ class SpotifyInspiredRecommendationsService:
                 "title": "Papers for You",
                 "description": "Your personalized research feed",
                 "papers": recommendations[:12],  # Spotify-like grid of 12
-                "updated": datetime.now().isoformat(),
+                "updated": datetime.now(timezone.utc).isoformat(),
                 "refresh_reason": "Based on your recent research activity"
             }
 
@@ -663,13 +663,13 @@ class SpotifyInspiredRecommendationsService:
                         Article.title.ilike(f'%{domain}%'),
                         Article.abstract.ilike(f'%{domain}%')
                     ),
-                    Article.publication_year >= datetime.now().year - 1,  # Very recent
+                    Article.publication_year >= datetime.now(timezone.utc).year - 1,  # Very recent
                     Article.citation_count > 5  # Some traction
                 ).order_by(desc(Article.citation_count)).limit(8).all()
 
                 for paper in trending_papers:
                     # Calculate trending score based on citations per month since publication
-                    months_since_pub = max(1, (datetime.now().year - (paper.publication_year or datetime.now().year)) * 12)
+                    months_since_pub = max(1, (datetime.now(timezone.utc).year - (paper.publication_year or datetime.now(timezone.utc).year)) * 12)
                     trending_score = (paper.citation_count or 0) / months_since_pub
 
                     recommendations.append({
@@ -696,7 +696,7 @@ class SpotifyInspiredRecommendationsService:
                 "title": "Trending in Your Field",
                 "description": "Hot topics and emerging research in your areas",
                 "papers": recommendations[:10],
-                "updated": datetime.now().isoformat(),
+                "updated": datetime.now(timezone.utc).isoformat(),
                 "refresh_reason": "Based on recent citation activity in your research domains"
             }
 
@@ -739,7 +739,7 @@ class SpotifyInspiredRecommendationsService:
                                 Article.abstract.ilike(f'%{adjacent_field}%')
                             )
                         ),
-                        Article.publication_year >= datetime.now().year - 5
+                        Article.publication_year >= datetime.now(timezone.utc).year - 5
                     ).order_by(desc(Article.citation_count)).limit(3).all()
 
                     for paper in cross_papers:
@@ -771,7 +771,7 @@ class SpotifyInspiredRecommendationsService:
                 "title": "Cross-pollination",
                 "description": "Interdisciplinary discoveries at the intersection of your research",
                 "papers": recommendations[:8],
-                "updated": datetime.now().isoformat(),
+                "updated": datetime.now(timezone.utc).isoformat(),
                 "refresh_reason": "Exploring connections between your research domains and adjacent fields"
             }
 
@@ -794,7 +794,7 @@ class SpotifyInspiredRecommendationsService:
                         Article.title.ilike(f'%{domain}%'),
                         Article.abstract.ilike(f'%{domain}%')
                     ),
-                    Article.publication_year >= datetime.now().year,  # Current year only
+                    Article.publication_year >= datetime.now(timezone.utc).year,  # Current year only
                     Article.citation_count < 20  # Papers that could use more citations
                 ).order_by(desc(Article.created_at)).limit(5).all()
 
@@ -827,7 +827,7 @@ class SpotifyInspiredRecommendationsService:
                 "title": "Citation Opportunities",
                 "description": "Recent papers that could cite your work",
                 "papers": recommendations[:8],
-                "updated": datetime.now().isoformat(),
+                "updated": datetime.now(timezone.utc).isoformat(),
                 "refresh_reason": "Based on recent publications in your research areas"
             }
 
@@ -876,7 +876,7 @@ class SpotifyInspiredRecommendationsService:
             score += min((paper.citation_count or 0) / 100, 0.3)
 
             # Recency bonus
-            years_old = datetime.now().year - (paper.publication_year or datetime.now().year)
+            years_old = datetime.now(timezone.utc).year - (paper.publication_year or datetime.now(timezone.utc).year)
             recency_score = max(0, (5 - years_old) / 5) * 0.2
             score += recency_score
 
@@ -935,7 +935,7 @@ class SpotifyInspiredRecommendationsService:
             score = 0.0
 
             # Recency is key for citation opportunities
-            years_old = datetime.now().year - (paper.publication_year or datetime.now().year)
+            years_old = datetime.now(timezone.utc).year - (paper.publication_year or datetime.now(timezone.utc).year)
             if years_old == 0:  # Current year
                 score += 0.5
             elif years_old == 1:  # Last year
@@ -1000,8 +1000,9 @@ class SpotifyInspiredRecommendationsService:
             return 0.0
 
         # Calculate papers per week over last 3 months
+        now_utc = datetime.now(timezone.utc)
         recent_articles = [a for a in saved_articles if
-                          (datetime.now() - a.added_at).days <= 90]
+                          (now_utc - a.added_at).days <= 90]
         return len(recent_articles) / 12  # 12 weeks in 3 months
 
     def _calculate_recency_bias(self, saved_articles: List) -> float:
