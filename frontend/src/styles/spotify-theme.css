@@ -855,8 +855,7 @@ a:hover {
 
 /* Ensure Share Project button has proper contrast */
 button[class*="share"],
-.share-project-button,
-button:contains("Share Project") {
+.share-project-button {
   color: #1a1a1a !important;
   background: white !important;
   border: 1px solid #d1d5db !important;

@@ -43,6 +43,8 @@ interface EnhancedHomePageProps {
   onSave?: (paper: Paper) => void;
   onShare?: (paper: Paper) => void;
   onSeeAll?: (category: string) => void;
+  userName?: string;
+  isLoading?: boolean;
 }
 
 export const EnhancedHomePage: React.FC<EnhancedHomePageProps> = ({
@@ -50,10 +52,14 @@ export const EnhancedHomePage: React.FC<EnhancedHomePageProps> = ({
   onPlay,
   onSave,
   onShare,
-  onSeeAll
+  onSeeAll,
+  userName,
+  isLoading
 }) => {
+  // Set default values
+  const displayName = userName || 'Researcher';
+  const loading = isLoading || false;
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [userName] = useState('Dr. Smith'); // This would come from user context
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -63,7 +69,7 @@ export const EnhancedHomePage: React.FC<EnhancedHomePageProps> = ({
   const getPersonalizedGreeting = (): string => {
     const hour = currentTime.getHours();
     const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
-    return `Good ${timeOfDay}, ${userName}`;
+    return `Good ${timeOfDay}, ${displayName}`;
   };
 
   const getContextualMessage = (): string => {
@@ -172,6 +178,9 @@ export const EnhancedHomePage: React.FC<EnhancedHomePageProps> = ({
               onShare={onShare}
               onSeeAll={onSeeAll}
               showPersonalizedGreeting={index === 0}
+              userName={displayName}
+              isLoading={loading}
+              showProgress={section.papers.length > 4}
             />
           ))}
 

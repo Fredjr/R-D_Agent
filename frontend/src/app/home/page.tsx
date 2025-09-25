@@ -341,6 +341,8 @@ export default function HomePage() {
                 onSave={(paper) => console.log('Saving paper:', paper)}
                 onShare={(paper) => console.log('Sharing paper:', paper)}
                 onSeeAll={(category) => console.log('See all for category:', category)}
+                userName={user?.first_name || 'Researcher'}
+                isLoading={loading}
               />
             );
           })()
