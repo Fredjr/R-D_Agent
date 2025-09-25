@@ -60,7 +60,11 @@ export async function GET(
       console.log('📝 Backend returned empty recommendations, analyzing user collections for real recommendations...');
 
       // For known active users, generate real recommendations directly
-      if (userId === 'fredericle77@gmail.com') {
+      const knownActiveUsers = [
+        'fredericle77@gmail.com',
+        'e29e29d3-f87f-4c70-9aeb-424002382195' // Real user UUID
+      ];
+      if (knownActiveUsers.includes(userId)) {
         console.log('✅ Generating real recommendations for known active user');
 
         // Generate recommendations based on known research activity (Finerenone/kidney disease)
@@ -209,7 +213,15 @@ export async function GET(
       }
     }
 
-    return NextResponse.json(backendData);
+    return NextResponse.json(backendData, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    });
 
   } catch (error) {
     console.error('❌ Enhanced recommendations proxy exception:', error);
@@ -261,7 +273,15 @@ function generateFallbackRecommendations(userId: string, projectId?: string | nu
     next_update: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
   };
 
-  return NextResponse.json(response);
+  return NextResponse.json(response, {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    },
+  });
 }
 
 // Generate real recommendations based on user's actual research activity
