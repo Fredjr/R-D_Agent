@@ -79,7 +79,14 @@ export async function GET(
               citation_count: 127,
               relevance_score: 0.95,
               reason: "Based on your research in nephrology and kidney disease studies",
-              category: "personalized"
+              category: "personalized",
+              // 🎯 Phase 1.1c: Enhanced metadata
+              reading_status: "unread",
+              is_trending: false,
+              is_new: true,
+              is_highly_cited: true,
+              publication_date: "2024-09-15",
+              impact_score: 8.5
             },
             {
               pmid: "38234567",
@@ -90,7 +97,14 @@ export async function GET(
               citation_count: 89,
               relevance_score: 0.92,
               reason: "Based on your research in diabetes and metabolic disorders",
-              category: "personalized"
+              category: "personalized",
+              // 🎯 Phase 1.1c: Enhanced metadata
+              reading_status: "reading",
+              is_trending: false,
+              is_new: true,
+              is_highly_cited: false,
+              publication_date: "2024-08-22",
+              impact_score: 7.2
             },
             {
               pmid: "38345678",
@@ -101,7 +115,14 @@ export async function GET(
               citation_count: 156,
               relevance_score: 0.94,
               reason: "Based on your research in cardiovascular and related studies",
-              category: "personalized"
+              category: "personalized",
+              // 🎯 Phase 1.1c: Enhanced metadata
+              reading_status: "saved",
+              is_trending: false,
+              is_new: false,
+              is_highly_cited: true,
+              publication_date: "2024-07-10",
+              impact_score: 9.1
             }
           ],
           trending_in_field: [
@@ -114,7 +135,14 @@ export async function GET(
               citation_count: 234,
               relevance_score: 0.96,
               reason: "Trending in nephrology and diabetes research",
-              category: "trending"
+              category: "trending",
+              // 🎯 Phase 1.1c: Enhanced metadata
+              reading_status: "unread",
+              is_trending: true,
+              is_new: true,
+              is_highly_cited: true,
+              publication_date: "2024-09-20",
+              impact_score: 9.8
             }
           ],
           cross_pollination: [
