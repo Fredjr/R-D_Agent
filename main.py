@@ -1,4 +1,5 @@
 # DATABASE_URL secret verified working - testing Cloud Run environment injection
+# Railway deployment fix: Force rebuild with fixed requirements.txt
 from fastapi import FastAPI, Response, Depends, HTTPException, WebSocket, WebSocketDisconnect, Request, Header, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import UploadFile, File, Form
