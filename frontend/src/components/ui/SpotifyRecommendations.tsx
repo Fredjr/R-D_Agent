@@ -23,22 +23,18 @@ interface Paper {
     opportunity_badge?: string;
   };
 
-  // 🧠 Phase 2A.2: Semantic Analysis Fields
+  // 🧠 Phase 2A.2: Semantic Analysis Fields (Updated to match backend)
   semantic_analysis?: {
     methodology?: 'experimental' | 'theoretical' | 'computational' | 'review' | 'meta_analysis' | 'case_study' | 'survey';
     complexity_score?: number; // 0.0-1.0 scale
-    novelty_type?: 'breakthrough' | 'incremental' | 'replication' | 'review';
+    novelty_classification?: 'breakthrough' | 'incremental' | 'replication' | 'review';
     research_domains?: string[]; // ['machine_learning', 'biology', 'chemistry', etc.]
     technical_terms?: string[];
     confidence_scores?: {
       methodology: number;
       complexity: number;
       novelty: number;
-    };
-    analysis_metadata?: {
-      analysis_time_seconds?: number;
-      service_initialized?: boolean;
-      embedding_dimensions?: number;
+      domains: number;
     };
   };
 }
@@ -118,6 +114,32 @@ export const SpotifyRecommendationCard: React.FC<SpotifyRecommendationCardProps>
           </div>
         )}
 
+        {/* 🧠 Semantic Analysis Visual Indicators */}
+        {paper.semantic_analysis && (
+          <div className="absolute bottom-2 right-2 flex flex-col gap-1">
+            {/* Methodology Badge */}
+            {paper.semantic_analysis.methodology && (
+              <div className={`px-2 py-1 rounded text-xs font-medium ${
+                paper.semantic_analysis.methodology === 'experimental' ? 'bg-blue-500/80 text-white' :
+                paper.semantic_analysis.methodology === 'theoretical' ? 'bg-purple-500/80 text-white' :
+                paper.semantic_analysis.methodology === 'computational' ? 'bg-green-500/80 text-white' :
+                'bg-gray-500/80 text-white'
+              }`}>
+                {paper.semantic_analysis.methodology === 'experimental' ? '🧪' :
+                 paper.semantic_analysis.methodology === 'theoretical' ? '📐' :
+                 paper.semantic_analysis.methodology === 'computational' ? '💻' : '📄'}
+              </div>
+            )}
+
+            {/* Novelty Indicator */}
+            {paper.semantic_analysis.novelty_classification === 'breakthrough' && (
+              <div className="px-2 py-1 bg-yellow-500/80 text-white rounded text-xs font-medium animate-pulse">
+                🚀
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Play button overlay */}
         <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
           isHovered ? 'opacity-100' : 'opacity-0'
@@ -154,6 +176,50 @@ export const SpotifyRecommendationCard: React.FC<SpotifyRecommendationCardProps>
         {paper.year && (
           <div className="text-[var(--spotify-muted-text)] text-xs">
             {paper.year} • {paper.journal}
+          </div>
+        )}
+
+        {/* 🧠 Semantic Analysis Info */}
+        {paper.semantic_analysis && (
+          <div className="space-y-1">
+            {/* Complexity Score */}
+            {paper.semantic_analysis.complexity_score !== undefined && (
+              <div className="flex items-center gap-2">
+                <span className="text-[var(--spotify-muted-text)] text-xs">Complexity:</span>
+                <div className="flex-1 bg-gray-600 rounded-full h-1.5">
+                  <div
+                    className={`h-1.5 rounded-full ${
+                      paper.semantic_analysis.complexity_score < 0.3 ? 'bg-green-500' :
+                      paper.semantic_analysis.complexity_score < 0.7 ? 'bg-yellow-500' :
+                      'bg-red-500'
+                    }`}
+                    style={{ width: `${paper.semantic_analysis.complexity_score * 100}%` }}
+                  />
+                </div>
+                <span className="text-[var(--spotify-muted-text)] text-xs">
+                  {Math.round(paper.semantic_analysis.complexity_score * 100)}%
+                </span>
+              </div>
+            )}
+
+            {/* Research Domains */}
+            {paper.semantic_analysis.research_domains && paper.semantic_analysis.research_domains.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {paper.semantic_analysis.research_domains.slice(0, 2).map((domain, index) => (
+                  <span
+                    key={index}
+                    className="px-2 py-0.5 bg-[var(--spotify-green)]/20 text-[var(--spotify-green)] text-xs rounded-full"
+                  >
+                    {domain.replace('_', ' ')}
+                  </span>
+                ))}
+                {paper.semantic_analysis.research_domains.length > 2 && (
+                  <span className="text-[var(--spotify-muted-text)] text-xs">
+                    +{paper.semantic_analysis.research_domains.length - 2} more
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

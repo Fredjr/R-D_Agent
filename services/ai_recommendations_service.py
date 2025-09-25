@@ -36,6 +36,14 @@ except ImportError as e:
     logger.warning(f"AI agents not available: {e}")
     AI_AGENTS_AVAILABLE = False
 
+# Import semantic analysis service
+try:
+    from services.semantic_analysis_service import SemanticAnalysisService
+    SEMANTIC_ANALYSIS_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Semantic analysis service not available: {e}")
+    SEMANTIC_ANALYSIS_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 class SpotifyInspiredRecommendationsService:
@@ -43,6 +51,17 @@ class SpotifyInspiredRecommendationsService:
 
     def __init__(self):
         self.recommendation_cache = {}
+        self.semantic_cache = {}  # Cache for semantic analysis results
+
+        # Initialize semantic analysis service
+        self.semantic_service = None
+        if SEMANTIC_ANALYSIS_AVAILABLE:
+            try:
+                self.semantic_service = SemanticAnalysisService()
+                logger.info("✅ Semantic analysis service initialized")
+            except Exception as e:
+                logger.error(f"❌ Failed to initialize semantic analysis service: {e}")
+                self.semantic_service = None
 
         # Initialize AI agents if available
         self.ai_orchestrator = None
@@ -131,6 +150,32 @@ class SpotifyInspiredRecommendationsService:
 
                     logger.info(f"✅ AI-enhanced recommendations generated for user {user_id}")
 
+                    # 🧠 SEMANTIC ANALYSIS ENHANCEMENT FOR AI RECOMMENDATIONS
+                    logger.info("🧠 Enhancing AI recommendations with semantic analysis...")
+
+                    # Enhance each category with semantic analysis
+                    if recommendations.get("papers_for_you"):
+                        recommendations["papers_for_you"] = await self._enhance_papers_with_semantic_analysis(
+                            recommendations["papers_for_you"]
+                        )
+
+                    if recommendations.get("trending_in_field"):
+                        recommendations["trending_in_field"] = await self._enhance_papers_with_semantic_analysis(
+                            recommendations["trending_in_field"]
+                        )
+
+                    if recommendations.get("cross_pollination"):
+                        recommendations["cross_pollination"] = await self._enhance_papers_with_semantic_analysis(
+                            recommendations["cross_pollination"]
+                        )
+
+                    if recommendations.get("citation_opportunities"):
+                        recommendations["citation_opportunities"] = await self._enhance_papers_with_semantic_analysis(
+                            recommendations["citation_opportunities"]
+                        )
+
+                    logger.info("✅ AI recommendations semantic analysis enhancement completed")
+
                 except Exception as e:
                     logger.warning(f"⚠️ AI agents failed, falling back to traditional method: {e}")
                     # Fallback to traditional methods
@@ -148,6 +193,32 @@ class SpotifyInspiredRecommendationsService:
                     "cross_pollination": await self._generate_cross_pollination(user_profile, db),
                     "citation_opportunities": await self._generate_citation_opportunities(user_profile, db)
                 }
+
+            # 🧠 SEMANTIC ANALYSIS ENHANCEMENT
+            logger.info("🧠 Enhancing recommendations with semantic analysis...")
+
+            # Enhance each category with semantic analysis
+            if recommendations.get("papers_for_you"):
+                recommendations["papers_for_you"] = await self._enhance_papers_with_semantic_analysis(
+                    recommendations["papers_for_you"]
+                )
+
+            if recommendations.get("trending_in_field"):
+                recommendations["trending_in_field"] = await self._enhance_papers_with_semantic_analysis(
+                    recommendations["trending_in_field"]
+                )
+
+            if recommendations.get("cross_pollination"):
+                recommendations["cross_pollination"] = await self._enhance_papers_with_semantic_analysis(
+                    recommendations["cross_pollination"]
+                )
+
+            if recommendations.get("citation_opportunities"):
+                recommendations["citation_opportunities"] = await self._enhance_papers_with_semantic_analysis(
+                    recommendations["citation_opportunities"]
+                )
+
+            logger.info("✅ Semantic analysis enhancement completed")
 
             # Add weekly mix metadata
             week_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -938,6 +1009,108 @@ class SpotifyInspiredRecommendationsService:
 
     def _analyze_organization_style(self, user_id: str, project_id: Optional[str], db: Session) -> str:
         return "thematic"
+
+    async def _enhance_papers_with_semantic_analysis(self, papers: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Enhance papers with semantic analysis features
+
+        Args:
+            papers: List of paper dictionaries
+
+        Returns:
+            Enhanced papers with semantic analysis data
+        """
+        if not self.semantic_service:
+            logger.warning("🔍 Semantic analysis service not available, returning papers without enhancement")
+            return papers
+
+        enhanced_papers = []
+
+        for paper in papers:
+            try:
+                # Create cache key for this paper
+                cache_key = f"semantic_{paper.get('pmid', '')}"
+
+                # Check cache first
+                if cache_key in self.semantic_cache:
+                    semantic_features = self.semantic_cache[cache_key]
+                    logger.debug(f"📋 Using cached semantic analysis for paper: {paper.get('title', 'Unknown')[:50]}...")
+                else:
+                    # Perform semantic analysis
+                    title = paper.get('title', '')
+                    abstract = paper.get('abstract', '')
+
+                    if title and abstract:
+                        logger.info(f"🧠 Analyzing paper: {title[:50]}...")
+                        semantic_features = await self.semantic_service.analyze_paper(title, abstract)
+
+                        # Cache the result
+                        self.semantic_cache[cache_key] = semantic_features
+                        logger.debug(f"💾 Cached semantic analysis for: {title[:50]}...")
+                    else:
+                        logger.warning(f"⚠️ Skipping semantic analysis for paper with missing title/abstract: {paper.get('pmid', 'Unknown')}")
+                        semantic_features = None
+
+                # Create enhanced paper with semantic features
+                enhanced_paper = paper.copy()
+
+                if semantic_features:
+                    enhanced_paper.update({
+                        'semantic_analysis': {
+                            'methodology': semantic_features.methodology.value,
+                            'complexity_score': semantic_features.complexity_score,
+                            'novelty_classification': semantic_features.novelty_classification.value,
+                            'research_domains': semantic_features.research_domains,
+                            'technical_terms': semantic_features.technical_terms,
+                            'confidence_scores': {
+                                'methodology': semantic_features.confidence_scores.methodology,
+                                'complexity': semantic_features.confidence_scores.complexity,
+                                'novelty': semantic_features.confidence_scores.novelty,
+                                'domains': semantic_features.confidence_scores.domains
+                            }
+                        }
+                    })
+                    logger.debug(f"✅ Enhanced paper with semantic analysis: {title[:50]}...")
+                else:
+                    # Add empty semantic analysis to maintain consistency
+                    enhanced_paper['semantic_analysis'] = None
+                    logger.debug(f"➖ Paper without semantic analysis: {paper.get('title', 'Unknown')[:50]}...")
+
+                enhanced_papers.append(enhanced_paper)
+
+            except Exception as e:
+                logger.error(f"❌ Error enhancing paper with semantic analysis: {e}")
+                # Add paper without semantic enhancement
+                enhanced_paper = paper.copy()
+                enhanced_paper['semantic_analysis'] = None
+                enhanced_papers.append(enhanced_paper)
+
+        logger.info(f"🎯 Enhanced {len(enhanced_papers)} papers with semantic analysis")
+        return enhanced_papers
+
+    def _apply_semantic_filtering(self, papers: List[Dict[str, Any]], user_preferences: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Apply semantic-based filtering to papers based on user preferences
+
+        Args:
+            papers: List of papers with semantic analysis
+            user_preferences: User preference data
+
+        Returns:
+            Filtered and ranked papers
+        """
+        if not papers:
+            return papers
+
+        # For now, return all papers - we can add sophisticated filtering later
+        # This is where we could implement:
+        # - Complexity matching based on user expertise
+        # - Methodology preference filtering
+        # - Domain-specific ranking
+        # - Novelty preference matching
+
+        logger.info(f"🎯 Applied semantic filtering to {len(papers)} papers")
+        return papers
 
 # Global service instance
 _spotify_recommendations_service = None
