@@ -265,7 +265,7 @@ class SpotifyInspiredRecommendationsService:
             cutoff_date = datetime.now().year - 2
 
             query = db.query(Article).filter(
-                Article.pub_year >= cutoff_date,
+                Article.publication_year >= cutoff_date,
                 Article.citation_count.isnot(None)
             ).order_by(desc(Article.citation_count)).limit(200)
 
@@ -278,7 +278,7 @@ class SpotifyInspiredRecommendationsService:
                     "pmid": paper.pmid,
                     "title": paper.title or "",
                     "abstract": paper.abstract or "",
-                    "pub_year": paper.pub_year or datetime.now().year,
+                    "pub_year": paper.publication_year or datetime.now().year,
                     "citation_count": paper.citation_count or 0,
                     "authors": paper.authors or [],
                     "journal": paper.journal or "",
@@ -370,8 +370,6 @@ class SpotifyInspiredRecommendationsService:
 
                 # Try to get user's collections and projects for context
                 try:
-                    from database import Collection, Project
-
                     # Get user's collections
                     user_collections = db.query(Collection).filter(
                         or_(
