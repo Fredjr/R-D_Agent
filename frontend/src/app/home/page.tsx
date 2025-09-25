@@ -122,12 +122,13 @@ export default function HomePage() {
       console.log('🔄 HOME PAGE: User object:', JSON.stringify(user, null, 2));
 
       // Try enhanced recommendations first, fallback to regular if needed
-      const enhancedUrl = `/api/proxy/recommendations/enhanced/${user.user_id}`;
+      const enhancedUrl = `/api/proxy/recommendations/enhanced/${user.user_id}?t=${Date.now()}`;
       console.log('🔄 HOME PAGE: Attempting enhanced recommendations from:', enhancedUrl);
       let response = await fetch(enhancedUrl, {
         headers: {
           'User-ID': user.user_id,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
         }
       });
 
