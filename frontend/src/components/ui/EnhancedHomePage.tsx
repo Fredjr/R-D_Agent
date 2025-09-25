@@ -62,6 +62,12 @@ export const EnhancedHomePage: React.FC<EnhancedHomePageProps> = ({
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
+    // 🧪 TESTING LOGS: HomePage initialization
+    console.log('🏠 [HomePage] Component initialized');
+    console.log(`📊 [HomePage] Sections count: ${sections.length}`);
+    console.log(`👤 [HomePage] User: ${displayName}`);
+    console.log(`⏰ [HomePage] Current time: ${currentTime.toLocaleTimeString()}`);
+
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
@@ -180,7 +186,7 @@ export const EnhancedHomePage: React.FC<EnhancedHomePageProps> = ({
               showPersonalizedGreeting={index === 0}
               userName={displayName}
               isLoading={loading}
-              showProgress={section.papers.length > 4}
+              showProgress={section.papers.length > 2} // 🧪 Adjusted for testing with 3 articles
             />
           ))}
 

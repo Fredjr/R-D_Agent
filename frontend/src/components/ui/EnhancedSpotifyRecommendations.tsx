@@ -333,15 +333,46 @@ export const EnhancedScrollableSection: React.FC<EnhancedScrollableSectionProps>
   const [isScrolling, setIsScrolling] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
 
+  // 🧪 TESTING LOGS: Component initialization
+  useEffect(() => {
+    console.log(`🧪 [EnhancedScrollableSection] Initialized section: "${section.title}"`);
+    console.log(`📊 Papers count: ${section.papers.length}`);
+    console.log(`🎯 Progress indicator threshold: Papers > 2 (adjusted for testing)`);
+    console.log(`📋 Papers:`, section.papers.map(p => ({
+      title: p.title.substring(0, 50) + '...',
+      category: p.category,
+      pmid: p.pmid
+    })));
+  }, [section]);
+
   const checkScrollButtons = () => {
     if (scrollContainerRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
-      setCanScrollLeft(scrollLeft > 0);
-      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
+      const newCanScrollLeft = scrollLeft > 0;
+      const newCanScrollRight = scrollLeft < scrollWidth - clientWidth - 10;
+
+      // 🧪 TESTING LOGS: Scroll button visibility
+      if (newCanScrollLeft !== canScrollLeft || newCanScrollRight !== canScrollRight) {
+        console.log(`🖱️ [ScrollButtons] Section: "${section.title}"`);
+        console.log(`   📐 Dimensions: scrollLeft=${scrollLeft}, scrollWidth=${scrollWidth}, clientWidth=${clientWidth}`);
+        console.log(`   ⬅️ Can scroll left: ${newCanScrollLeft} (was: ${canScrollLeft})`);
+        console.log(`   ➡️ Can scroll right: ${newCanScrollRight} (was: ${canScrollRight})`);
+      }
+
+      setCanScrollLeft(newCanScrollLeft);
+      setCanScrollRight(newCanScrollRight);
 
       // Calculate scroll progress for progress indicator
       const maxScroll = scrollWidth - clientWidth;
       const progress = maxScroll > 0 ? (scrollLeft / maxScroll) * 100 : 0;
+
+      // 🧪 TESTING LOGS: Progress indicator
+      if (Math.abs(progress - scrollProgress) > 5) { // Log significant changes
+        console.log(`📊 [ProgressIndicator] Section: "${section.title}"`);
+        console.log(`   📈 Progress: ${Math.round(progress)}% (was: ${Math.round(scrollProgress)}%)`);
+        console.log(`   🎯 Show progress: ${showProgress && section.papers.length > 2}`);
+      }
+
       setScrollProgress(progress);
     }
   };
@@ -350,13 +381,42 @@ export const EnhancedScrollableSection: React.FC<EnhancedScrollableSectionProps>
     checkScrollButtons();
     const container = scrollContainerRef.current;
     if (container) {
-      container.addEventListener('scroll', checkScrollButtons);
-      return () => container.removeEventListener('scroll', checkScrollButtons);
+      // 🧪 TESTING LOGS: Scroll event listener setup
+      console.log(`🔧 [Setup] Adding scroll listener for section: "${section.title}"`);
+
+      const handleScroll = () => {
+        checkScrollButtons();
+
+        // 🧪 TESTING LOGS: Snap-to-grid behavior
+        const { scrollLeft } = container;
+        const cardWidth = 208 + 24; // card width + gap
+        const nearestSnapPoint = Math.round(scrollLeft / cardWidth) * cardWidth;
+        const snapDistance = Math.abs(scrollLeft - nearestSnapPoint);
+
+        if (snapDistance < 5) { // Close to snap point
+          console.log(`📐 [SnapToGrid] Section: "${section.title}"`);
+          console.log(`   📍 ScrollLeft: ${scrollLeft}px`);
+          console.log(`   🎯 Nearest snap point: ${nearestSnapPoint}px`);
+          console.log(`   📏 Snap distance: ${snapDistance}px`);
+          console.log(`   ✅ Snapped to grid!`);
+        }
+      };
+
+      container.addEventListener('scroll', handleScroll);
+      return () => {
+        console.log(`🔧 [Cleanup] Removing scroll listener for section: "${section.title}"`);
+        container.removeEventListener('scroll', handleScroll);
+      };
     }
   }, [section.papers]);
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
+      // 🧪 TESTING LOGS: Button scroll functionality
+      console.log(`🖱️ [ButtonScroll] Section: "${section.title}"`);
+      console.log(`   🎯 Direction: ${direction}`);
+      console.log(`   📍 Current scrollLeft: ${scrollContainerRef.current.scrollLeft}`);
+
       setIsScrolling(true);
 
       // Enhanced scroll amount calculation - scroll by 2-3 cards
@@ -367,25 +427,49 @@ export const EnhancedScrollableSection: React.FC<EnhancedScrollableSectionProps>
       const newScrollLeft = scrollContainerRef.current.scrollLeft +
         (direction === 'left' ? -scrollAmount : scrollAmount);
 
+      console.log(`   📐 Scroll amount: ${scrollAmount}px`);
+      console.log(`   🎯 Target scrollLeft: ${newScrollLeft}`);
+      console.log(`   ⚡ Animation: smooth scrolling enabled`);
+
       scrollContainerRef.current.scrollTo({
         left: newScrollLeft,
         behavior: 'smooth'
       });
 
       // Reset scrolling state after animation
-      setTimeout(() => setIsScrolling(false), 500);
+      setTimeout(() => {
+        setIsScrolling(false);
+        console.log(`   ✅ [ButtonScroll] Animation completed for "${section.title}"`);
+      }, 500);
     }
   };
 
   // Enhanced scroll with momentum (for mouse wheel)
   const handleWheel = (e: React.WheelEvent) => {
     if (scrollContainerRef.current && Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+      // 🧪 TESTING LOGS: Mouse wheel scrolling
+      console.log(`🖱️ [WheelScroll] Section: "${section.title}"`);
+      console.log(`   📍 Current scrollLeft: ${scrollContainerRef.current.scrollLeft}`);
+      console.log(`   🎯 Delta X: ${e.deltaX}, Delta Y: ${e.deltaY}`);
+      console.log(`   ✅ Horizontal scroll detected (|deltaX| > |deltaY|)`);
+
       e.preventDefault();
       setIsScrolling(true);
 
+      const oldScrollLeft = scrollContainerRef.current.scrollLeft;
       scrollContainerRef.current.scrollLeft += e.deltaX;
 
-      setTimeout(() => setIsScrolling(false), 300);
+      console.log(`   📐 Scroll change: ${scrollContainerRef.current.scrollLeft - oldScrollLeft}px`);
+      console.log(`   ⚡ Momentum scrolling active`);
+
+      setTimeout(() => {
+        setIsScrolling(false);
+        console.log(`   ✅ [WheelScroll] Momentum completed for "${section.title}"`);
+      }, 300);
+    } else if (scrollContainerRef.current) {
+      // 🧪 TESTING LOGS: Vertical scroll ignored
+      console.log(`🖱️ [WheelScroll] Section: "${section.title}" - Vertical scroll ignored`);
+      console.log(`   📊 Delta X: ${e.deltaX}, Delta Y: ${e.deltaY}`);
     }
   };
 
@@ -432,7 +516,7 @@ export const EnhancedScrollableSection: React.FC<EnhancedScrollableSectionProps>
 
         <div className="flex items-center gap-3">
           {/* Progress indicator */}
-          {showProgress && section.papers.length > 3 && (
+          {showProgress && section.papers.length > 2 && (
             <div className="flex items-center gap-2">
               <div className="w-16 h-1 bg-gray-700 rounded-full overflow-hidden">
                 <div
@@ -456,7 +540,19 @@ export const EnhancedScrollableSection: React.FC<EnhancedScrollableSectionProps>
       </div>
 
       {/* Enhanced scrollable container with improved controls */}
-      <div className="relative group">
+      <div
+        className="relative group"
+        onMouseEnter={() => {
+          console.log(`🖱️ [HoverDetection] Mouse entered section: "${section.title}"`);
+          console.log(`   👁️ Scroll buttons should become visible on hover`);
+          console.log(`   ⬅️ Left button visible: ${canScrollLeft}`);
+          console.log(`   ➡️ Right button visible: ${canScrollRight}`);
+        }}
+        onMouseLeave={() => {
+          console.log(`🖱️ [HoverDetection] Mouse left section: "${section.title}"`);
+          console.log(`   👁️ Scroll buttons should fade out`);
+        }}
+      >
         {/* Enhanced left scroll button */}
         <button
           onClick={() => scroll('left')}
