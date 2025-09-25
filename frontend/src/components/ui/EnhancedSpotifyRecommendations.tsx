@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { PlayIcon, HeartIcon, ShareIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { PlayIcon, HeartIcon, ShareIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, ChevronUpIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartSolidIcon, FireIcon, SparklesIcon } from '@heroicons/react/24/solid';
 import {
   MethodologyBadge,
@@ -131,6 +131,7 @@ export const EnhancedSpotifyCard: React.FC<EnhancedSpotifyCardProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isSemanticExpanded, setIsSemanticExpanded] = useState(false);
 
   const sizeClasses = {
     small: 'w-44 h-60',
@@ -360,10 +361,10 @@ export const EnhancedSpotifyCard: React.FC<EnhancedSpotifyCardProps> = ({
           "{paper.reason}"
         </p>
 
-        {/* 🧠 Phase 2A.2: Semantic Analysis Features */}
+        {/* 🧠 Phase 2A.2: Enhanced Expandable Semantic Analysis Features */}
         {paper.semantic_analysis && (
           <div className="space-y-2 pt-2 border-t border-gray-700/50">
-            {/* Methodology and Novelty badges */}
+            {/* Compact View - Always Visible */}
             <div className="flex items-center gap-2 flex-wrap">
               {paper.semantic_analysis.methodology && (
                 <MethodologyBadge methodology={paper.semantic_analysis.methodology} size="sm" />
@@ -375,31 +376,133 @@ export const EnhancedSpotifyCard: React.FC<EnhancedSpotifyCardProps> = ({
                   variant={paper.semantic_analysis.novelty_type === 'breakthrough' ? 'glow' : 'badge'}
                 />
               )}
+
+              {/* Expand/Collapse Button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsSemanticExpanded(!isSemanticExpanded);
+                }}
+                className="ml-auto flex items-center gap-1 text-gray-400 hover:text-white text-xs transition-colors duration-200 px-2 py-1 rounded-md hover:bg-gray-700/50"
+                title={isSemanticExpanded ? "Hide details" : "Show full semantic analysis"}
+              >
+                <InformationCircleIcon className="w-3 h-3" />
+                {isSemanticExpanded ? <ChevronUpIcon className="w-3 h-3" /> : <ChevronDownIcon className="w-3 h-3" />}
+              </button>
             </div>
 
-            {/* Complexity indicator */}
-            {paper.semantic_analysis.complexity_score !== undefined && (
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-500 text-xs">Complexity</span>
-                  <span className="text-gray-400 text-xs">
-                    {(paper.semantic_analysis.complexity_score * 100).toFixed(0)}%
-                  </span>
+            {/* Quick complexity preview when collapsed */}
+            {!isSemanticExpanded && paper.semantic_analysis.complexity_score !== undefined && (
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 text-xs">Complexity</span>
+                <div className="flex-1">
+                  <ComplexityIndicator
+                    score={paper.semantic_analysis.complexity_score}
+                    size="sm"
+                    showLabel={false}
+                    showScore={false}
+                  />
                 </div>
-                <ComplexityIndicator
-                  score={paper.semantic_analysis.complexity_score}
-                  size="sm"
-                  showLabel={false}
-                  showScore={false}
-                />
+                <span className="text-gray-400 text-xs">
+                  {(paper.semantic_analysis.complexity_score * 100).toFixed(0)}%
+                </span>
               </div>
             )}
 
-            {/* Research domains */}
-            {paper.semantic_analysis.research_domains && paper.semantic_analysis.research_domains.length > 0 && (
+            {/* Research domains preview when collapsed */}
+            {!isSemanticExpanded && paper.semantic_analysis.research_domains && paper.semantic_analysis.research_domains.length > 0 && (
               <div className="space-y-1">
                 <span className="text-gray-500 text-xs">Domains</span>
                 <DomainTags domains={paper.semantic_analysis.research_domains} maxDisplay={3} size="sm" />
+              </div>
+            )}
+
+            {/* Expanded View - Toggleable */}
+            {isSemanticExpanded && (
+              <div className="space-y-3 pt-2 border-t border-gray-600/30 bg-gray-800/30 rounded-lg p-3 animate-in slide-in-from-top-2 duration-200">
+                {/* Complexity indicator with full details */}
+                {paper.semantic_analysis.complexity_score !== undefined && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-300 text-sm font-medium">Technical Complexity</span>
+                      <span className="text-white text-sm font-semibold">
+                        {(paper.semantic_analysis.complexity_score * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                    <ComplexityIndicator
+                      score={paper.semantic_analysis.complexity_score}
+                      size="md"
+                      showLabel={false}
+                      showScore={false}
+                    />
+                    <p className="text-gray-400 text-xs">
+                      {paper.semantic_analysis.complexity_score < 0.3 ? "Beginner-friendly content" :
+                       paper.semantic_analysis.complexity_score < 0.7 ? "Intermediate technical depth" :
+                       "Advanced technical complexity"}
+                    </p>
+                  </div>
+                )}
+
+                {/* Research domains with full list */}
+                {paper.semantic_analysis.research_domains && paper.semantic_analysis.research_domains.length > 0 && (
+                  <div className="space-y-2">
+                    <span className="text-gray-300 text-sm font-medium">Research Domains</span>
+                    <DomainTags domains={paper.semantic_analysis.research_domains} maxDisplay={10} size="sm" />
+                  </div>
+                )}
+
+                {/* Technical terms if available */}
+                {paper.semantic_analysis.technical_terms && paper.semantic_analysis.technical_terms.length > 0 && (
+                  <div className="space-y-2">
+                    <span className="text-gray-300 text-sm font-medium">Key Technical Terms</span>
+                    <div className="flex flex-wrap gap-1">
+                      {paper.semantic_analysis.technical_terms.slice(0, 8).map((term, index) => (
+                        <span
+                          key={index}
+                          className="px-2 py-1 bg-blue-600/20 text-blue-300 text-xs rounded-md border border-blue-500/30"
+                        >
+                          {term}
+                        </span>
+                      ))}
+                      {paper.semantic_analysis.technical_terms.length > 8 && (
+                        <span className="px-2 py-1 text-gray-400 text-xs">
+                          +{paper.semantic_analysis.technical_terms.length - 8} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Confidence scores */}
+                {paper.semantic_analysis.confidence_scores && (
+                  <div className="space-y-2">
+                    <span className="text-gray-300 text-sm font-medium">Analysis Confidence</span>
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      {Object.entries(paper.semantic_analysis.confidence_scores).map(([key, value]) => (
+                        <div key={key} className="text-center">
+                          <div className="text-gray-400 capitalize">{key}</div>
+                          <div className="text-white font-semibold">{(value * 100).toFixed(0)}%</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Analysis metadata */}
+                {paper.semantic_analysis.analysis_metadata && (
+                  <div className="pt-2 border-t border-gray-600/30">
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <span>
+                        Analysis: {paper.semantic_analysis.analysis_metadata.service_initialized ? 'AI-powered' : 'Rule-based'}
+                      </span>
+                      {paper.semantic_analysis.analysis_metadata.analysis_time_seconds && (
+                        <span>
+                          {(paper.semantic_analysis.analysis_metadata.analysis_time_seconds * 1000).toFixed(0)}ms
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
