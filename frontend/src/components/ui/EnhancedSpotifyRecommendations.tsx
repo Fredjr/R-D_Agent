@@ -46,17 +46,44 @@ interface EnhancedSpotifyCardProps {
 const getFieldColor = (category: string): string => {
   const colorMap: Record<string, string> = {
     'ai_ml': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    'biology': 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+    'biology': 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
     'physics': 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
     'chemistry': 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
     'medicine': 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
     'engineering': 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
     'mathematics': 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
     'computer_science': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    'trending': 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+    'hot': 'linear-gradient(135deg, #ff8a80 0%, #ff5722 100%)',
+    'personalized': 'linear-gradient(135deg, #1ed760 0%, #1db954 100%)',
+    'cross-pollination': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    'getting_started': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     'default': 'linear-gradient(135deg, #1db954 0%, #1ed760 100%)'
   };
-  
+
   return colorMap[category.toLowerCase()] || colorMap.default;
+};
+
+// Get field-specific accent color for UI elements
+const getFieldAccentColor = (category: string): string => {
+  const accentMap: Record<string, string> = {
+    'ai_ml': '#667eea',
+    'biology': '#11998e',
+    'physics': '#4facfe',
+    'chemistry': '#43e97b',
+    'medicine': '#fa709a',
+    'engineering': '#a8edea',
+    'mathematics': '#ff9a9e',
+    'computer_science': '#667eea',
+    'trending': '#fcb69f',
+    'hot': '#ff5722',
+    'personalized': '#1ed760',
+    'cross-pollination': '#667eea',
+    'getting_started': '#667eea',
+    'default': '#1ed760'
+  };
+
+  return accentMap[category.toLowerCase()] || accentMap.default;
 };
 
 // Enhanced card with improved animations and visual hierarchy
@@ -94,34 +121,50 @@ export const EnhancedSpotifyCard: React.FC<EnhancedSpotifyCardProps> = ({
   // Generate reading time estimate
   const estimatedReadTime = Math.max(3, Math.floor(paper.title.length / 10));
 
+  const accentColor = getFieldAccentColor(paper.category);
+
   return (
-    <div 
-      className={`${sizeClasses[size]} bg-[var(--spotify-card-bg)] rounded-xl p-4 hover:bg-[var(--spotify-card-hover)] transition-all duration-300 cursor-pointer group relative transform hover:scale-105 hover:shadow-2xl`}
+    <div
+      className={`${sizeClasses[size]} bg-[var(--spotify-card-bg)] rounded-xl p-4 hover:bg-[var(--spotify-card-hover)] transition-all duration-500 cursor-pointer group relative transform hover:scale-[1.02] hover:shadow-2xl hover:shadow-black/20`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{
         '--spotify-card-bg': '#181818',
-        '--spotify-card-hover': '#282828'
+        '--spotify-card-hover': '#282828',
+        '--accent-color': accentColor,
+        boxShadow: isHovered ? `0 8px 32px ${accentColor}20` : '0 4px 16px rgba(0,0,0,0.2)'
       } as React.CSSProperties}
     >
       {/* Enhanced Cover Art with Dynamic Gradients */}
-      <div 
+      <div
         className="w-full aspect-square rounded-xl mb-4 relative overflow-hidden shadow-lg"
-        style={{ 
+        style={{
           background: getFieldColor(paper.category),
-          boxShadow: isHovered ? '0 8px 32px rgba(0,0,0,0.3)' : '0 4px 16px rgba(0,0,0,0.2)'
+          boxShadow: isHovered ? `0 12px 40px ${accentColor}30` : '0 6px 20px rgba(0,0,0,0.15)'
         }}
       >
-        {/* Animated gradient overlay */}
-        <div className={`absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-black/40 transition-opacity duration-300 ${
-          isHovered ? 'opacity-60' : 'opacity-30'
+        {/* Animated gradient overlay with shimmer effect */}
+        <div className={`absolute inset-0 bg-gradient-to-br from-transparent via-white/5 to-black/40 transition-all duration-500 ${
+          isHovered ? 'opacity-70' : 'opacity-40'
+        }`} />
+
+        {/* Subtle animated shimmer effect */}
+        <div className={`absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent transform -skew-x-12 transition-transform duration-1000 ${
+          isHovered ? 'translate-x-full' : '-translate-x-full'
         }`} />
         
-        {/* Enhanced category badge with icon */}
-        <div className="absolute top-3 left-3 px-3 py-1.5 bg-black/60 backdrop-blur-sm rounded-full text-xs text-white font-semibold flex items-center gap-1">
+        {/* Enhanced category badge with icon and glow effect */}
+        <div
+          className="absolute top-3 left-3 px-3 py-1.5 backdrop-blur-sm rounded-full text-xs text-white font-semibold flex items-center gap-1 border border-white/20"
+          style={{
+            background: `linear-gradient(135deg, ${accentColor}80, ${accentColor}60)`,
+            boxShadow: `0 4px 12px ${accentColor}40`
+          }}
+        >
           {paper.category === 'ai_ml' && <SparklesIcon className="w-3 h-3" />}
           {paper.category === 'trending' && <FireIcon className="w-3 h-3" />}
           {paper.category === 'hot' && <FireIcon className="w-3 h-3" />}
+          {paper.category === 'personalized' && <SparklesIcon className="w-3 h-3" />}
           {paper.category.replace('_', ' ').toUpperCase()}
         </div>
 
@@ -132,22 +175,28 @@ export const EnhancedSpotifyCard: React.FC<EnhancedSpotifyCardProps> = ({
           </div>
         )}
         
-        {/* Enhanced play button with ripple effect */}
-        <div className={`absolute inset-0 flex items-center justify-center transition-all duration-300 ${
-          isHovered ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
+        {/* Enhanced play button with ripple effect and field-specific color */}
+        <div className={`absolute inset-0 flex items-center justify-center transition-all duration-500 ${
+          isHovered ? 'opacity-100 scale-100' : 'opacity-0 scale-75'
         }`}>
           <button
             onClick={handlePlay}
-            className={`w-14 h-14 bg-[var(--spotify-green)] rounded-full flex items-center justify-center hover:scale-110 transition-all duration-200 shadow-xl ${
+            className={`w-16 h-16 rounded-full flex items-center justify-center hover:scale-110 transition-all duration-300 shadow-2xl relative overflow-hidden ${
               isPlaying ? 'animate-pulse' : ''
             }`}
             style={{
-              background: isPlaying ? 
-                'radial-gradient(circle, #1ed760 0%, #1db954 70%)' : 
-                'linear-gradient(135deg, #1ed760 0%, #1db954 100%)'
+              background: isPlaying ?
+                `radial-gradient(circle, ${accentColor} 0%, ${accentColor}dd 70%)` :
+                `linear-gradient(135deg, ${accentColor} 0%, ${accentColor}dd 100%)`,
+              boxShadow: `0 8px 24px ${accentColor}60`
             }}
           >
-            <PlayIcon className="w-7 h-7 text-black ml-0.5" />
+            {/* Ripple effect background */}
+            <div className={`absolute inset-0 rounded-full transition-all duration-300 ${
+              isPlaying ? 'animate-ping' : ''
+            }`} style={{ background: `${accentColor}40` }} />
+
+            <PlayIcon className="w-8 h-8 text-white ml-0.5 relative z-10" />
           </button>
         </div>
 
@@ -176,32 +225,54 @@ export const EnhancedSpotifyCard: React.FC<EnhancedSpotifyCardProps> = ({
       </div>
 
       {/* Enhanced Paper Info */}
-      <div className="space-y-2">
-        {/* Title with better typography */}
-        <h3 className="text-white font-semibold text-sm leading-tight line-clamp-2 group-hover:text-[var(--spotify-green)] transition-colors duration-200">
+      <div className="space-y-3">
+        {/* Title with better typography and field-specific hover color */}
+        <h3
+          className="text-white font-semibold text-sm leading-tight line-clamp-2 transition-colors duration-300"
+          style={{
+            color: isHovered ? accentColor : 'white'
+          }}
+        >
           {paper.title}
         </h3>
         
-        {/* Authors with photos */}
+        {/* Authors with enhanced photos and styling */}
         <div className="flex items-center gap-2">
           {showAuthorPhotos && paper.authors.slice(0, 3).map((author, index) => (
-            <div key={index} className="w-6 h-6 rounded-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center text-xs text-white font-medium">
+            <div
+              key={index}
+              className="w-7 h-7 rounded-full flex items-center justify-center text-xs text-white font-medium border border-white/20 shadow-sm"
+              style={{
+                background: `linear-gradient(135deg, ${accentColor}60, ${accentColor}40)`
+              }}
+            >
               {author.split(' ').map(n => n[0]).join('').slice(0, 2)}
             </div>
           ))}
-          <p className="text-gray-400 text-xs truncate flex-1">
+          <p className="text-gray-400 text-xs truncate flex-1 group-hover:text-gray-300 transition-colors duration-200">
             {paper.authors.slice(0, 2).join(', ')}
             {paper.authors.length > 2 && ` +${paper.authors.length - 2} more`}
           </p>
         </div>
 
-        {/* Journal and year */}
-        <p className="text-gray-500 text-xs">
-          {paper.journal} • {paper.year}
-        </p>
+        {/* Journal and year with quality indicators */}
+        <div className="flex items-center justify-between">
+          <p className="text-gray-500 text-xs group-hover:text-gray-400 transition-colors duration-200">
+            {paper.journal} • {paper.year}
+          </p>
 
-        {/* Reason with better styling */}
-        <p className="text-gray-400 text-xs line-clamp-2 italic">
+          {/* Quality indicator based on citation count */}
+          {paper.citation_count > 50 && (
+            <div className="flex items-center gap-1">
+              {paper.citation_count > 200 && <span className="text-yellow-400 text-xs">⭐</span>}
+              {paper.citation_count > 100 && <span className="text-blue-400 text-xs">🔥</span>}
+              <span className="text-gray-500 text-xs">{paper.citation_count}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Reason with enhanced styling */}
+        <p className="text-gray-400 text-xs line-clamp-2 italic group-hover:text-gray-300 transition-colors duration-200">
           "{paper.reason}"
         </p>
       </div>
