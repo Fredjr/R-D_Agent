@@ -12308,8 +12308,8 @@ async def test_semantic_analysis():
 
 @app.get("/mesh/autocomplete")
 async def get_mesh_autocomplete_suggestions(
-    q: str = Query(..., description="Search query for autocomplete", min_length=2),
-    limit: int = Query(8, description="Maximum number of suggestions", ge=1, le=20)
+    q: str = Query(..., description="Search query for autocomplete"),
+    limit: int = Query(8, description="Maximum number of suggestions")
 ):
     """
     Get intelligent autocomplete suggestions for medical research terms.
@@ -12324,6 +12324,21 @@ async def get_mesh_autocomplete_suggestions(
     - GET /mesh/autocomplete?q=crispr&limit=10
     """
     try:
+        # Basic validation
+        if not q or len(q.strip()) < 1:
+            return {
+                "status": "error",
+                "error": "Query must be at least 1 character long",
+                "mesh_terms": [],
+                "trending_keywords": [],
+                "suggested_queries": [],
+                "query": q,
+                "total_suggestions": 0
+            }
+
+        if limit < 1 or limit > 20:
+            limit = 8  # Default to 8 if invalid
+
         logger.info(f"🔍 MeSH autocomplete request: query='{q}', limit={limit}")
 
         from services.mesh_autocomplete_service import get_mesh_autocomplete_service
