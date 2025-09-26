@@ -558,7 +558,7 @@ class SpotifyInspiredRecommendationsService:
                 Article.publication_year >= datetime.now(timezone.utc).year - 2,
                 Article.citation_count.isnot(None),
                 Article.citation_count > 10
-            ).order_by(desc(Article.citation_count)).limit(12).all()
+            ).order_by(desc(Article.citation_count)).limit(20).all()
 
             recommendations = []
             for paper in recent_papers:
@@ -613,7 +613,7 @@ class SpotifyInspiredRecommendationsService:
                         Article.abstract.ilike(f'%{domain}%')
                     ),
                     Article.publication_year >= datetime.now(timezone.utc).year - 3  # Recent papers
-                ).order_by(desc(Article.citation_count)).limit(5).all()
+                ).order_by(desc(Article.citation_count)).limit(15).all()
 
                 for paper in domain_papers:
                     relevance_score = self._calculate_personalized_relevance(paper, user_profile)
@@ -665,7 +665,7 @@ class SpotifyInspiredRecommendationsService:
                     ),
                     Article.publication_year >= datetime.now(timezone.utc).year - 1,  # Very recent
                     Article.citation_count > 5  # Some traction
-                ).order_by(desc(Article.citation_count)).limit(8).all()
+                ).order_by(desc(Article.citation_count)).limit(15).all()
 
                 for paper in trending_papers:
                     # Calculate trending score based on citations per month since publication
@@ -740,7 +740,7 @@ class SpotifyInspiredRecommendationsService:
                             )
                         ),
                         Article.publication_year >= datetime.now(timezone.utc).year - 5
-                    ).order_by(desc(Article.citation_count)).limit(3).all()
+                    ).order_by(desc(Article.citation_count)).limit(10).all()
 
                     for paper in cross_papers:
                         cross_pollination_score = self._calculate_interdisciplinary_score(
@@ -796,7 +796,7 @@ class SpotifyInspiredRecommendationsService:
                     ),
                     Article.publication_year >= datetime.now(timezone.utc).year,  # Current year only
                     Article.citation_count < 20  # Papers that could use more citations
-                ).order_by(desc(Article.created_at)).limit(5).all()
+                ).order_by(desc(Article.created_at)).limit(15).all()
 
                 for paper in recent_papers:
                     citation_opportunity_score = self._calculate_citation_opportunity_score(
