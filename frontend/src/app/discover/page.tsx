@@ -301,126 +301,7 @@ export default function DiscoverPage() {
           </button>
         </div>
 
-        {/* Clean Recommendation Sections */}
-        <div className="space-y-8">
-          {/* Papers for You */}
-          {(() => {
-            const papersForYou = recommendations.recommendations.papers_for_you;
-            const papers = Array.isArray(papersForYou) ? papersForYou : papersForYou?.papers || [];
-
-            if (papers.length > 0) {
-              const sectionData = {
-                title: "Made for You",
-                description: "Personalized recommendations based on your research",
-                papers: papers,
-                updated: "Today",
-                icon: MusicalNoteIcon,
-                color: "#1db954",
-                category: "papers_for_you"
-              };
-
-              return (
-                <SpotifyCleanSection
-                  section={sectionData}
-                  onPlay={handlePlayPaper}
-                  onSave={handleSavePaper}
-                  onShare={handleSharePaper}
-                  onSeeAll={handleSeeAll}
-                  showPersonalizedGreeting={true}
-                  userName={(user as any)?.name || user?.email?.split('@')[0] || 'Researcher'}
-                />
-              );
-            }
-            return null;
-          })()}
-
-          {/* Trending in Field */}
-          {(() => {
-            const trendingPapers = recommendations.recommendations.trending_in_field;
-            const papers = Array.isArray(trendingPapers) ? trendingPapers : trendingPapers?.papers || [];
-
-            if (papers.length > 0) {
-              const sectionData = {
-                title: "Trending in Your Field",
-                description: "Popular papers in your research area",
-                papers: papers,
-                updated: "Today",
-                icon: FireIcon,
-                color: "#ff6b35",
-                category: "trending_in_field"
-              };
-
-              return (
-                <SpotifyCleanSection
-                  section={sectionData}
-                  onPlay={handlePlayPaper}
-                  onSave={handleSavePaper}
-                  onShare={handleSharePaper}
-                  onSeeAll={handleSeeAll}
-                />
-              );
-            }
-            return null;
-          })()}
-
-          {/* Cross-Pollination */}
-          {(() => {
-            const crossPollination = recommendations.recommendations.cross_pollination;
-            const papers = Array.isArray(crossPollination) ? crossPollination : crossPollination?.papers || [];
-
-            if (papers.length > 0) {
-              const sectionData = {
-                title: "Cross-Pollination",
-                description: "Discover connections across research domains",
-                papers: papers,
-                updated: "Today",
-                icon: BeakerIcon,
-                color: "#8b5cf6",
-                category: "cross_pollination"
-              };
-
-              return (
-                <SpotifyCleanSection
-                  section={sectionData}
-                  onPlay={handlePlayPaper}
-                  onSave={handleSavePaper}
-                  onShare={handleSharePaper}
-                  onSeeAll={handleSeeAll}
-                />
-              );
-            }
-            return null;
-          })()}
-
-          {/* Citation Opportunities */}
-          {(() => {
-            const citationOpportunities = recommendations.recommendations.citation_opportunities;
-            const papers = Array.isArray(citationOpportunities) ? citationOpportunities : citationOpportunities?.papers || [];
-
-            if (papers.length > 0) {
-              const sectionData = {
-                title: "Citation Opportunities",
-                description: "Papers that could enhance your research",
-                papers: papers,
-                updated: "Today",
-                icon: LightBulbIcon,
-                color: "#f59e0b",
-                category: "citation_opportunities"
-              };
-
-              return (
-                <SpotifyCleanSection
-                  section={sectionData}
-                  onPlay={handlePlayPaper}
-                  onSave={handleSavePaper}
-                  onShare={handleSharePaper}
-                  onSeeAll={handleSeeAll}
-                />
-              );
-            }
-            return null;
-          })()}
-        </div>
+        {/* Duplicate section removed - using single section below */}
 
 
         {/* Refresh Button */}
@@ -477,6 +358,12 @@ export default function DiscoverPage() {
                   onPlay={handlePlayPaper}
                   onSave={handleSavePaper}
                   onShare={handleSharePaper}
+                  onClick={(paper) => {
+                    // Open PubMed article in new tab
+                    if (paper.pmid) {
+                      window.open(`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`, '_blank');
+                    }
+                  }}
                   onSeeAll={handleSeeAll}
                   showPersonalizedGreeting={true}
                   userName={(user as any)?.name || user?.email?.split('@')[0] || 'Researcher'}
@@ -517,6 +404,12 @@ export default function DiscoverPage() {
                   onPlay={handlePlayPaper}
                   onSave={handleSavePaper}
                   onShare={handleSharePaper}
+                  onClick={(paper) => {
+                    // Open PubMed article in new tab
+                    if (paper.pmid) {
+                      window.open(`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`, '_blank');
+                    }
+                  }}
                   onSeeAll={handleSeeAll}
                 />
               );
@@ -554,6 +447,12 @@ export default function DiscoverPage() {
                   onPlay={handlePlayPaper}
                   onSave={handleSavePaper}
                   onShare={handleSharePaper}
+                  onClick={(paper) => {
+                    // Open PubMed article in new tab
+                    if (paper.pmid) {
+                      window.open(`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`, '_blank');
+                    }
+                  }}
                   onSeeAll={handleSeeAll}
                 />
               );
@@ -591,6 +490,12 @@ export default function DiscoverPage() {
                   onPlay={handlePlayPaper}
                   onSave={handleSavePaper}
                   onShare={handleSharePaper}
+                  onClick={(paper) => {
+                    // Open PubMed article in new tab
+                    if (paper.pmid) {
+                      window.open(`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`, '_blank');
+                    }
+                  }}
                   onSeeAll={handleSeeAll}
                 />
               );
