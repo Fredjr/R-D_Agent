@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { PageHeader } from '@/components/ui/Navigation';
 import { Button } from '@/components/ui/Button';
+import { MobileResponsiveLayout } from '@/components/ui/MobileResponsiveLayout';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function SettingsPage() {
@@ -366,21 +367,20 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--spotify-black)]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <PageHeader
-          title="Settings"
-          description="Manage your account preferences and application settings"
-          breadcrumb={[
-            { label: 'Research Hub', href: '/' },
-            { label: 'Settings', current: true }
-          ]}
-        />
+    <MobileResponsiveLayout>
+      <div className="w-full max-w-none py-6 sm:py-8">
+        {/* Mobile-friendly header */}
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-[var(--spotify-white)] mb-2">Settings</h1>
+          <p className="text-[var(--spotify-light-text)] text-sm sm:text-base">
+            Manage your account preferences and application settings
+          </p>
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 sm:gap-8">
           {/* Settings Navigation */}
           <div className="lg:col-span-1">
-            <nav className="space-y-1">
+            <nav className="flex lg:flex-col overflow-x-auto lg:overflow-x-visible space-x-2 lg:space-x-0 lg:space-y-1 pb-2 lg:pb-0">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 return (
@@ -432,6 +432,6 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
-    </div>
+    </MobileResponsiveLayout>
   );
 }

@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { MagnifyingGlassIcon, FunnelIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline';
 import { PageHeader } from '@/components/ui/Navigation';
 import { Button } from '@/components/ui/Button';
+import { MobileResponsiveLayout } from '@/components/ui/MobileResponsiveLayout';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface SearchResult {
@@ -116,20 +117,19 @@ function SearchPageContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--spotify-black)]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <PageHeader
-          title="Search"
-          description="Find projects, reports, collections, and research across your workspace"
-          breadcrumb={[
-            { label: 'Research Hub', href: '/' },
-            { label: 'Search', current: true }
-          ]}
-        />
+    <MobileResponsiveLayout>
+      <div className="w-full max-w-none py-6 sm:py-8">
+        {/* Mobile-friendly header */}
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-[var(--spotify-white)] mb-2">Search</h1>
+          <p className="text-[var(--spotify-light-text)] text-sm sm:text-base">
+            Find projects, reports, collections, and research across your workspace
+          </p>
+        </div>
 
         {/* Search Input */}
-        <div className="mb-8">
-          <div className="relative max-w-2xl">
+        <div className="mb-6 sm:mb-8">
+          <div className="relative w-full">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <MagnifyingGlassIcon className="h-5 w-5 text-[var(--spotify-muted-text)]" />
             </div>
@@ -139,7 +139,7 @@ function SearchPageContent() {
               onChange={(e) => setQuery(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSearch(query)}
               placeholder="Search projects, reports, collections..."
-              className="block w-full pl-10 pr-3 py-3 bg-[var(--spotify-dark-gray)] border border-[var(--spotify-border-gray)] rounded-lg text-[var(--spotify-white)] placeholder-[var(--spotify-muted-text)] focus:outline-none focus:ring-2 focus:ring-[var(--spotify-green)] focus:border-transparent"
+              className="block w-full pl-10 pr-3 py-3 bg-[var(--spotify-dark-gray)] border border-[var(--spotify-border-gray)] rounded-lg text-[var(--spotify-white)] placeholder-[var(--spotify-muted-text)] focus:outline-none focus:ring-2 focus:ring-[var(--spotify-green)] focus:border-transparent text-sm sm:text-base"
             />
           </div>
           
@@ -303,7 +303,7 @@ function SearchPageContent() {
           )}
         </div>
       </div>
-    </div>
+    </MobileResponsiveLayout>
   );
 }
 

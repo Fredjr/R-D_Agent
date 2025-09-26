@@ -9,6 +9,7 @@ import { SpotifyRecommendations } from '@/components/ui/SpotifyRecommendations';
 import { SpotifyTopBar } from '@/components/ui/SpotifyNavigation';
 import { EnhancedHomePage } from '@/components/ui/EnhancedHomePage';
 import { Button } from '@/components/ui/Button';
+import { MobileResponsiveLayout } from '@/components/ui/MobileResponsiveLayout';
 import { 
   PlusIcon, 
   FolderIcon, 
@@ -254,56 +255,47 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--spotify-black)]">
-      {/* Top Navigation */}
-      <SpotifyTopBar
-        title="Home"
-        showSearch={true}
-        onSearch={(query) => {
-          // Navigate to search page with query
-          router.push(`/search?q=${encodeURIComponent(query)}`);
-        }}
-      />
-
+    <MobileResponsiveLayout>
       {/* Header */}
-      <div className="bg-gradient-to-b from-[var(--spotify-dark-gray)] to-[var(--spotify-black)] px-6 py-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-white mb-2">
+      <div className="bg-gradient-to-b from-[var(--spotify-dark-gray)] to-[var(--spotify-black)] -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <div className="w-full max-w-none">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2 truncate">
                 Good {getTimeOfDay()}, {user.first_name || user.username}
               </h1>
-              <p className="text-[var(--spotify-light-text)] text-lg">
+              <p className="text-[var(--spotify-light-text)] text-base sm:text-lg">
                 Discover new research tailored to your interests
               </p>
             </div>
             <Button
               onClick={handleRefresh}
               variant="outline"
-              className="border-[var(--spotify-green)] text-[var(--spotify-green)] hover:bg-[var(--spotify-green)] hover:text-black"
+              size="sm"
+              className="border-[var(--spotify-green)] text-[var(--spotify-green)] hover:bg-[var(--spotify-green)] hover:text-black flex-shrink-0 w-full sm:w-auto"
             >
-              Refresh Recommendations
+              Refresh
             </Button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="w-full max-w-none py-6 sm:py-8">
         {/* Quick Actions */}
-        <section className="mb-12">
-          <h2 className="text-2xl font-bold text-white mb-6">Quick Actions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <section className="mb-8 sm:mb-12">
+          <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6">Quick Actions</h2>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {quickActions.map((action, index) => (
               <button
                 key={index}
                 onClick={() => router.push(action.href)}
-                className="group p-6 bg-[var(--spotify-dark-gray)] rounded-lg hover:bg-[var(--spotify-gray)] transition-all duration-200 text-left"
+                className="group p-4 sm:p-6 bg-[var(--spotify-dark-gray)] rounded-lg hover:bg-[var(--spotify-gray)] transition-all duration-200 text-left w-full"
               >
-                <div className={`w-12 h-12 ${action.color} rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                  <action.icon className="w-6 h-6 text-white" />
+                <div className={`w-10 h-10 sm:w-12 sm:h-12 ${action.color} rounded-lg flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform`}>
+                  <action.icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                 </div>
-                <h3 className="text-white font-semibold mb-2">{action.title}</h3>
-                <p className="text-[var(--spotify-light-text)] text-sm">{action.description}</p>
+                <h3 className="text-white font-semibold mb-1 sm:mb-2 text-sm sm:text-base truncate">{action.title}</h3>
+                <p className="text-[var(--spotify-light-text)] text-xs sm:text-sm line-clamp-2">{action.description}</p>
               </button>
             ))}
           </div>
@@ -360,26 +352,27 @@ export default function HomePage() {
         )}
 
         {/* Recent Activity Preview */}
-        <section className="mt-16">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-white">Recent Activity</h2>
+        <section className="mt-12 sm:mt-16">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 sm:mb-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-white">Recent Activity</h2>
             <Button
               onClick={() => router.push('/dashboard')}
               variant="ghost"
-              className="text-[var(--spotify-light-text)] hover:text-white"
+              size="sm"
+              className="text-[var(--spotify-light-text)] hover:text-white self-start sm:self-auto"
             >
               View All →
             </Button>
           </div>
-          <div className="bg-[var(--spotify-dark-gray)] rounded-lg p-6">
+          <div className="bg-[var(--spotify-dark-gray)] rounded-lg p-4 sm:p-6">
             <div className="flex items-center text-[var(--spotify-light-text)]">
-              <ClockIcon className="w-5 h-5 mr-2" />
-              <span>Your recent projects and collections will appear here</span>
+              <ClockIcon className="w-5 h-5 mr-2 flex-shrink-0" />
+              <span className="text-sm sm:text-base">Your recent projects and collections will appear here</span>
             </div>
           </div>
         </section>
       </div>
-    </div>
+    </MobileResponsiveLayout>
   );
 }
 
