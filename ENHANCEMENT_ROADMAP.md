@@ -272,3 +272,343 @@ This roadmap transforms the platform from a "PubMed skin" into:
 - Context-aware research discovery engine
 
 This creates significant barriers to entry and user lock-in through intelligent, personalized research workflows.
+
+---
+
+## 🔧 TECHNICAL IMPLEMENTATION DETAILS
+
+### **Graph Database Architecture (Neo4j)**
+
+#### Core Cypher Queries:
+```cypher
+// Get strongest neighbors for recommendations
+MATCH (p:Paper {pmid:$pmid})-[r]-(n:Paper)
+RETURN n.pmid AS neighbor, r.weight AS score, type(r) AS relation
+ORDER BY score DESC LIMIT 30;
+
+// Build ego network for visualization
+MATCH (p:Paper {pmid:$pmid})-[r]-(n:Paper)-[r2]-(m:Paper)
+WHERE r.weight > 0.35 AND r2.weight > 0.35
+RETURN p,n,m,r,r2 LIMIT 100;
+
+// Community detection for "Gaps to Explore"
+CALL gds.louvain.stream({
+  nodeProjection: 'Paper',
+  relationshipProjection: {
+    SIMILAR: { type:'SIMILAR', properties:'weight' },
+    CO_CITED: { type:'CO_CITED', properties:'weight' }
+  }
+}) YIELD nodeId, communityId
+RETURN gds.util.asNode(nodeId).pmid AS pmid, communityId;
+```
+
+#### Edge Weight Calculation:
+```sql
+WITH co_citation AS (
+  SELECT c1.dst_pmid AS pmid1, c2.dst_pmid AS pmid2, COUNT(*) AS count
+  FROM citations c1 JOIN citations c2 ON c1.src_pmid = c2.src_pmid
+  WHERE c1.dst_pmid < c2.dst_pmid
+  GROUP BY pmid1, pmid2
+)
+SELECT pmid1, pmid2,
+       LOG(1 + count) / LOG(1 + MAX(count) OVER()) AS co_citation_score
+FROM co_citation WHERE co_citation_score > 0.2;
+```
+
+### **Hybrid Recommendation Engine**
+
+```python
+import faiss
+import numpy as np
+
+def recommend_papers(user_vector, user_collection_pmids, topk=50):
+    # Vector similarity search
+    D, I = faiss_index.search(user_vector.reshape(1,-1), 200)
+    vector_candidates = [paper_ids[i] for i in I[0]]
+
+    # Graph-based expansion
+    graph_neighbors = graph_api.get_neighbors_bulk(user_collection_pmids, limit=200)
+
+    # Merge and score candidates
+    all_candidates = set(vector_candidates) | set(graph_neighbors)
+    scored_papers = []
+
+    for pmid in all_candidates:
+        embedding = embedding_store[pmid]
+        cosine_sim = np.dot(user_vector, embedding) / (
+            np.linalg.norm(user_vector) * np.linalg.norm(embedding)
+        )
+        graph_affinity = graph_api.get_affinity(user_collection_pmids, pmid)
+        recency_boost = 1.0 if papers[pmid].year >= 2023 else 0.7
+
+        final_score = (
+            0.45 * cosine_sim +
+            0.25 * graph_affinity +
+            0.20 * recency_boost +
+            0.10 * papers[pmid].citation_count_normalized
+        )
+        scored_papers.append((pmid, final_score))
+
+    return sorted(scored_papers, key=lambda x: x[1], reverse=True)[:topk]
+```
+
+### **LLM Relationship Explanation Service**
+
+```python
+def explain_paper_relationship(paperA, paperB, relationship_type="unknown"):
+    prompt = f"""
+You are a biomedical research assistant. Explain the relationship between
+these two papers in ONE sentence (≤28 words). Use precise verbs like
+"cites", "extends", "contradicts", "validates", "uses methodology from".
+
+Paper A: {paperA['title']}
+Abstract A: {paperA['abstract'][:1200]}
+
+Paper B: {paperB['title']}
+Abstract B: {paperB['abstract'][:1200]}
+
+Relationship type: {relationship_type}
+Explanation:
+"""
+
+    response = gemini_api.generate(prompt, max_tokens=50)
+    return response.text.strip()
+```
+
+### **Gap Detection Algorithm**
+
+```python
+import networkx as nx
+
+def detect_collection_gaps(collection_pmids, global_graph):
+    # Create subgraph with 1-hop expansion
+    subgraph = global_graph.subgraph(collection_pmids).copy()
+
+    for pmid in collection_pmids:
+        neighbors = list(global_graph.neighbors(pmid))
+        subgraph.add_nodes_from(neighbors)
+        subgraph.add_edges_from((pmid, n) for n in neighbors)
+
+    # Community detection
+    communities = nx.algorithms.community.louvain_communities(
+        subgraph, weight="weight"
+    )
+
+    gaps = []
+    for community in communities:
+        user_coverage = len(set(community) & set(collection_pmids)) / len(community)
+        recent_papers = sum(1 for n in community if papers[n].year >= 2023)
+        avg_citations = np.mean([papers[n].citation_count for n in community])
+
+        if user_coverage < 0.3 and recent_papers > 3 and avg_citations > 10:
+            gaps.append({
+                "cluster_papers": list(community)[:5],
+                "coverage": user_coverage,
+                "recent_count": recent_papers,
+                "avg_citations": avg_citations,
+                "gap_score": (1 - user_coverage) * recent_papers * 0.1
+            })
+
+    return sorted(gaps, key=lambda g: g["gap_score"], reverse=True)[:5]
+```
+
+---
+
+## 🎨 UX/UI INTEGRATION STRATEGY
+
+### **Complementary Integration with Existing Features**
+
+#### **1. Generate-Review → Collection Seeding**
+```typescript
+// After generate-review completes
+const handleReviewComplete = (reviewResults: ReviewResult[]) => {
+  // Existing: Save articles to collection
+  await saveArticlesToCollection(reviewResults.articles);
+
+  // NEW: Trigger graph expansion
+  const graphExpansion = await getGraphNeighbors(reviewResults.articles);
+  showGraphExpansionSuggestions(graphExpansion);
+
+  // NEW: Detect research gaps
+  const gaps = await detectCollectionGaps(collection.id);
+  showGapExplorationWidget(gaps);
+};
+```
+
+#### **2. Deep-Dive → Graph Context**
+```typescript
+// After deep-dive analysis
+const handleDeepDiveComplete = (analysis: DeepDiveResult) => {
+  // Existing: Display analysis results
+  displayAnalysis(analysis);
+
+  // NEW: Show related papers in graph context
+  const relatedPapers = await getGraphContext(analysis.pmid);
+  showRelatedPapersPanel(relatedPapers);
+
+  // NEW: Suggest collection additions
+  const suggestions = await getSimilarPapers(analysis.pmid, 10);
+  showCollectionSuggestions(suggestions);
+};
+```
+
+### **2. Enhanced Home Page Flow**
+
+#### **Search → Generate-Review Integration**
+```typescript
+const EnhancedSearchInterface = () => {
+  const [query, setQuery] = useState('');
+  const [meshSuggestions, setMeshSuggestions] = useState([]);
+
+  const handleSearch = async (searchQuery: string) => {
+    // NEW: Semantic search first
+    const semanticResults = await semanticSearch(searchQuery);
+
+    // Existing: Option to trigger generate-review
+    const showGenerateReview = semanticResults.length > 20;
+
+    return (
+      <SearchResults
+        results={semanticResults}
+        onGenerateReview={() => triggerGenerateReview(searchQuery)}
+        showGenerateReviewOption={showGenerateReview}
+      />
+    );
+  };
+};
+```
+
+### **3. Collection Intelligence Widgets**
+
+#### **Gap Explorer Widget**
+```typescript
+const GapExplorerWidget = ({ collectionId }: { collectionId: string }) => {
+  const [gaps, setGaps] = useState<ResearchGap[]>([]);
+
+  useEffect(() => {
+    detectCollectionGaps(collectionId).then(setGaps);
+  }, [collectionId]);
+
+  return (
+    <div className="bg-[var(--spotify-dark-gray)] rounded-lg p-4">
+      <h3 className="text-lg font-semibold mb-3">🧭 Gaps to Explore</h3>
+      {gaps.map(gap => (
+        <div key={gap.cluster_id} className="mb-3 p-3 bg-[var(--spotify-medium-gray)] rounded">
+          <p className="text-sm text-[var(--spotify-light-text)]">
+            Your collection is missing <strong>{gap.recent_count} recent papers</strong> in
+            <span className="text-[var(--spotify-green)]"> {gap.cluster_name}</span>
+          </p>
+          <button
+            onClick={() => exploreGap(gap)}
+            className="mt-2 text-xs bg-[var(--spotify-green)] text-black px-3 py-1 rounded-full"
+          >
+            Explore Cluster →
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+};
+```
+
+### **4. Graph-Enhanced Network View**
+
+#### **Fix + Enhance Existing Network**
+```typescript
+// Enhanced version of existing NetworkView component
+const EnhancedNetworkView = ({ collectionId, centerPmid }: NetworkProps) => {
+  const [graphData, setGraphData] = useState<GraphData>();
+  const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const [relationshipExplanation, setRelationshipExplanation] = useState<string>('');
+
+  const handleNodeHover = async (pmid: string) => {
+    if (centerPmid && pmid !== centerPmid) {
+      // NEW: Get LLM explanation of relationship
+      const explanation = await explainRelationship(centerPmid, pmid);
+      setRelationshipExplanation(explanation);
+    }
+  };
+
+  const handleNodeClick = (pmid: string) => {
+    setSelectedNode(pmid);
+    // Existing: Show paper details in sidebar
+    // NEW: Show quick actions (add to collection, deep-dive, generate-review)
+  };
+
+  return (
+    <div className="flex h-full">
+      <div className="flex-1">
+        {/* Existing network visualization */}
+        <NetworkCanvas
+          data={graphData}
+          onNodeHover={handleNodeHover}
+          onNodeClick={handleNodeClick}
+        />
+
+        {/* NEW: Relationship tooltip */}
+        {relationshipExplanation && (
+          <div className="absolute bottom-4 left-4 bg-black/80 text-white p-2 rounded text-sm max-w-xs">
+            {relationshipExplanation}
+          </div>
+        )}
+      </div>
+
+      {/* Enhanced sidebar */}
+      {selectedNode && (
+        <PaperDetailsSidebar
+          pmid={selectedNode}
+          onAddToCollection={(pmid) => addToCollection(collectionId, pmid)}
+          onDeepDive={(pmid) => triggerDeepDive(pmid)}
+          onGenerateReview={(pmid) => triggerGenerateReview(`pmid:${pmid}`)}
+        />
+      )}
+    </div>
+  );
+};
+```
+
+---
+
+## 🚀 IMPLEMENTATION PRIORITY MATRIX
+
+### **Phase 1: Foundation (Weeks 1-2) - HIGH IMPACT**
+1. **MeSH Autocomplete Service** ✅ Complements existing search
+2. **Semantic Search Backend** ✅ Enhances generate-review targeting
+3. **Fix Network View Issues** ✅ Builds on existing feature
+4. **LLM Relationship Explanations** ✅ Adds context to existing graphs
+
+### **Phase 2: Intelligence (Weeks 3-4) - MEDIUM IMPACT**
+1. **Gap Detection Algorithm** ✅ Enhances collection value
+2. **Hybrid Recommendation Engine** ✅ Improves existing recommendations
+3. **Graph-Enhanced Collection View** ✅ Builds on existing collections
+4. **Search → Generate-Review Integration** ✅ Connects existing features
+
+### **Phase 3: Advanced (Weeks 5-6) - DIFFERENTIATION**
+1. **Community Detection & Clustering** ✅ Advanced collection intelligence
+2. **Collaborative Filtering** ✅ Multi-user recommendations
+3. **Research Trend Analysis** ✅ Predictive insights
+4. **Advanced Graph Algorithms** ✅ Sophisticated relationship detection
+
+---
+
+## 💡 KEY INTEGRATION POINTS
+
+### **1. Preserve Existing Workflows**
+- Generate-review remains primary research tool
+- Deep-dive keeps current analysis depth
+- Collections maintain current structure
+- Network view gets enhanced, not replaced
+
+### **2. Add Intelligence Layers**
+- Semantic search improves generate-review targeting
+- Graph context enhances deep-dive insights
+- Gap detection adds collection intelligence
+- Relationship explanations add network context
+
+### **3. Create Synergies**
+- Search results can trigger generate-review
+- Generate-review results seed graph exploration
+- Deep-dive insights inform gap detection
+- Network exploration suggests new deep-dives
+
+This approach ensures we **enhance without disrupting** existing advanced features while creating a **cohesive intelligent research platform**.
