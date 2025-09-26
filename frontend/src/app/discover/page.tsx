@@ -3,13 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import {
-  SpotifyRecommendationSection,
-  WeeklyMixHeader,
-  SpotifyRecommendationCard
-} from '@/components/ui/SpotifyRecommendations';
-import { SpotifyTopBar } from '@/components/ui/SpotifyNavigation';
-import { EnhancedDiscoverPage } from '@/components/ui/EnhancedDiscoverPage';
+import { MobileResponsiveLayout } from '@/components/ui/MobileResponsiveLayout';
+import { SpotifyCleanSection } from '@/components/ui/SpotifyCleanSection';
 import { LoadingSpinner, ErrorAlert } from '@/components/ui';
 import { 
   MusicalNoteIcon, 
@@ -286,27 +281,147 @@ export default function DiscoverPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--spotify-black)]">
-      {/* Enhanced Discover Page */}
-      <EnhancedDiscoverPage
-        recommendations={recommendations.recommendations}
-        onPlay={handlePlayPaper}
-        onSave={handleSavePaper}
-        onShare={handleSharePaper}
-        onSeeAll={handleSeeAll}
-        onSearch={(query) => {
-          console.log('Search:', query);
-          // TODO: Implement search functionality
-        }}
-      />
+    <MobileResponsiveLayout>
+      <div className="w-full max-w-none py-6 sm:py-8">
+        {/* Mobile-friendly header */}
+        <div className="mb-6 sm:mb-8 px-4 sm:px-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-[var(--spotify-white)] mb-2">Discover</h1>
+          <p className="text-[var(--spotify-light-text)] text-sm sm:text-base">
+            Personalized research recommendations for you
+          </p>
 
-      {/* Legacy content for fallback - can be removed after testing */}
-      <div className="max-w-7xl mx-auto px-6 py-8 hidden">
-        {/* Weekly Mix Header */}
-        <WeeklyMixHeader 
-          weekOf={recommendations.week_of}
-          userInsights={recommendations.user_insights}
-        />
+          {/* Refresh Button */}
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="mt-4 flex items-center space-x-2 px-4 py-2 bg-[var(--spotify-green)] text-black rounded-full font-medium hover:scale-105 transition-transform disabled:opacity-50"
+          >
+            <ArrowPathIcon className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
+        </div>
+
+        {/* Clean Recommendation Sections */}
+        <div className="space-y-8">
+          {/* Papers for You */}
+          {(() => {
+            const papersForYou = recommendations.recommendations.papers_for_you;
+            const papers = Array.isArray(papersForYou) ? papersForYou : papersForYou?.papers || [];
+
+            if (papers.length > 0) {
+              const sectionData = {
+                title: "Made for You",
+                description: "Personalized recommendations based on your research",
+                papers: papers,
+                updated: "Today",
+                icon: MusicalNoteIcon,
+                color: "#1db954",
+                category: "papers_for_you"
+              };
+
+              return (
+                <SpotifyCleanSection
+                  section={sectionData}
+                  onPlay={handlePlayPaper}
+                  onSave={handleSavePaper}
+                  onShare={handleSharePaper}
+                  onSeeAll={handleSeeAll}
+                  showPersonalizedGreeting={true}
+                  userName={user?.name || 'Researcher'}
+                />
+              );
+            }
+            return null;
+          })()}
+
+          {/* Trending in Field */}
+          {(() => {
+            const trendingPapers = recommendations.recommendations.trending_in_field;
+            const papers = Array.isArray(trendingPapers) ? trendingPapers : trendingPapers?.papers || [];
+
+            if (papers.length > 0) {
+              const sectionData = {
+                title: "Trending in Your Field",
+                description: "Popular papers in your research area",
+                papers: papers,
+                updated: "Today",
+                icon: FireIcon,
+                color: "#ff6b35",
+                category: "trending_in_field"
+              };
+
+              return (
+                <SpotifyCleanSection
+                  section={sectionData}
+                  onPlay={handlePlayPaper}
+                  onSave={handleSavePaper}
+                  onShare={handleSharePaper}
+                  onSeeAll={handleSeeAll}
+                />
+              );
+            }
+            return null;
+          })()}
+
+          {/* Cross-Pollination */}
+          {(() => {
+            const crossPollination = recommendations.recommendations.cross_pollination;
+            const papers = Array.isArray(crossPollination) ? crossPollination : crossPollination?.papers || [];
+
+            if (papers.length > 0) {
+              const sectionData = {
+                title: "Cross-Pollination",
+                description: "Discover connections across research domains",
+                papers: papers,
+                updated: "Today",
+                icon: BeakerIcon,
+                color: "#8b5cf6",
+                category: "cross_pollination"
+              };
+
+              return (
+                <SpotifyCleanSection
+                  section={sectionData}
+                  onPlay={handlePlayPaper}
+                  onSave={handleSavePaper}
+                  onShare={handleSharePaper}
+                  onSeeAll={handleSeeAll}
+                />
+              );
+            }
+            return null;
+          })()}
+
+          {/* Citation Opportunities */}
+          {(() => {
+            const citationOpportunities = recommendations.recommendations.citation_opportunities;
+            const papers = Array.isArray(citationOpportunities) ? citationOpportunities : citationOpportunities?.papers || [];
+
+            if (papers.length > 0) {
+              const sectionData = {
+                title: "Citation Opportunities",
+                description: "Papers that could enhance your research",
+                papers: papers,
+                updated: "Today",
+                icon: LightBulbIcon,
+                color: "#f59e0b",
+                category: "citation_opportunities"
+              };
+
+              return (
+                <SpotifyCleanSection
+                  section={sectionData}
+                  onPlay={handlePlayPaper}
+                  onSave={handleSavePaper}
+                  onShare={handleSharePaper}
+                  onSeeAll={handleSeeAll}
+                />
+              );
+            }
+            return null;
+          })()}
+        </div>
+
 
         {/* Refresh Button */}
         <div className="flex justify-between items-center mb-8">
@@ -484,6 +599,6 @@ export default function DiscoverPage() {
           </p>
         </div>
       </div>
-    </div>
+    </MobileResponsiveLayout>
   );
 }

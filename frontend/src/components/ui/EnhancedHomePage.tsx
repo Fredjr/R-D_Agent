@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { EnhancedScrollableSection } from './EnhancedSpotifyRecommendations';
+import { SpotifyCleanSection } from './SpotifyCleanSection';
 import { ClockIcon, FireIcon, SparklesIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 
 interface Paper {
@@ -293,7 +293,7 @@ export const EnhancedHomePage: React.FC<EnhancedHomePageProps> = ({
       <div className="px-8 pb-8">
         <div className="max-w-7xl mx-auto space-y-8">
           {sections.map((section, index) => (
-            <EnhancedScrollableSection
+            <SpotifyCleanSection
               key={section.title}
               section={section}
               onPlay={onPlay}
@@ -303,7 +303,6 @@ export const EnhancedHomePage: React.FC<EnhancedHomePageProps> = ({
               showPersonalizedGreeting={index === 0}
               userName={displayName}
               isLoading={loading}
-              showProgress={section.papers.length > 2} // 🧪 Adjusted for testing with 3 articles
             />
           ))}
 
