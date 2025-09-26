@@ -13,6 +13,7 @@ import time
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import text, or_, func
 import bcrypt
+import logging
 try:
     from email_service import email_service
 except ImportError as e:
@@ -88,6 +89,10 @@ except ImportError as e:
 except Exception as e:
     print(f"❌ Unexpected error importing semantic analysis service: {e}")
     SEMANTIC_ANALYSIS_AVAILABLE = False
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Embeddings and Pinecone
 from langchain_community.embeddings import HuggingFaceEmbeddings
