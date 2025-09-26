@@ -10,6 +10,7 @@ import { SpotifyTopBar } from '@/components/ui/SpotifyNavigation';
 import { EnhancedHomePage } from '@/components/ui/EnhancedHomePage';
 import { Button } from '@/components/ui/Button';
 import { MobileResponsiveLayout } from '@/components/ui/MobileResponsiveLayout';
+import MeSHAutocompleteSearch from '@/components/MeSHAutocompleteSearch';
 import { 
   PlusIcon, 
   FolderIcon, 
@@ -109,6 +110,33 @@ export default function HomePage() {
 
     // Home page now focuses on research - recommendations moved to Discover
   }, [user, router]);
+
+  // Handler for MeSH search
+  const handleMeSHSearch = async (query: string, suggestions: any) => {
+    console.log('🔍 MeSH search triggered:', { query, suggestions });
+
+    // For now, redirect to search page with the query
+    // TODO: Implement semantic search results display
+    router.push(`/search?q=${encodeURIComponent(query)}`);
+  };
+
+  // Handler for generate-review from search
+  const handleGenerateReviewFromSearch = async (query: string, optimizedQuery?: any) => {
+    console.log('🚀 Generate-review triggered from search:', { query, optimizedQuery });
+
+    // Use the optimized query if available, otherwise use the original query
+    const searchQuery = optimizedQuery?.query || query;
+    const objective = optimizedQuery?.description || `Comprehensive review of ${query}`;
+
+    // Redirect to project creation with generate-review
+    const params = new URLSearchParams({
+      action: 'generate-review',
+      query: searchQuery,
+      objective: objective
+    });
+
+    router.push(`/project/new?${params.toString()}`);
+  };
 
   const loadRecommendations = async () => {
     if (!user) return;
@@ -307,18 +335,14 @@ export default function HomePage() {
               Search medical literature with intelligent autocomplete and semantic discovery
             </p>
 
-            {/* Enhanced Search Interface */}
+            {/* Enhanced Search Interface with MeSH Autocomplete */}
             <div className="space-y-4">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search MeSH terms, topics, or enter PMIDs..."
-                  className="w-full bg-[var(--spotify-black)] border border-[var(--spotify-border-gray)] rounded-lg px-4 py-3 text-white placeholder-[var(--spotify-muted-text)] focus:outline-none focus:ring-2 focus:ring-[var(--spotify-green)] focus:border-transparent"
-                />
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                  <ChartBarIcon className="w-5 h-5 text-[var(--spotify-muted-text)]" />
-                </div>
-              </div>
+              <MeSHAutocompleteSearch
+                onSearch={handleMeSHSearch}
+                onGenerateReview={handleGenerateReviewFromSearch}
+                placeholder="Search MeSH terms, topics, or enter PMIDs..."
+                className="w-full"
+              />
 
               {/* Quick Search Suggestions */}
               <div className="flex flex-wrap gap-2">
