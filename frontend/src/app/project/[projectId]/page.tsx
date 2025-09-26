@@ -531,6 +531,108 @@ export default function ProjectPage() {
     }
   };
 
+  // Smart Action Handlers for Phase 1.2
+  const handleGenerateReviewFromNetwork = async (pmid: string, title: string) => {
+    console.log('🚀 Generate Review from Network:', { pmid, title });
+
+    try {
+      // Use the paper title and PMID to create an optimized query
+      const optimizedQuery = `"${pmid}"[PMID] OR "${title}"[Title]`;
+
+      // Start the review job with the paper as the focus
+      const jobResponse = await startReviewJob({
+        molecule: title.substring(0, 50), // Use first 50 chars of title as molecule
+        objective: `Comprehensive review focusing on: ${title}`,
+        projectId: projectId,
+        clinicalMode: false,
+        dagMode: false,
+        fullTextOnly: false,
+        preference: 'precision' as 'precision' | 'recall'
+      });
+
+      // Start polling for job completion
+      reviewJob.startJob(jobResponse.job_id);
+
+      alert(`🚀 Review generation started for "${title}"!\n\nThis process will continue in the background.`);
+
+    } catch (error: any) {
+      console.error('Error starting review from network:', error);
+      alert(`❌ Failed to start review: ${error.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleDeepDiveFromNetwork = async (pmid: string, title: string) => {
+    console.log('🔍 Deep Dive from Network:', { pmid, title });
+
+    try {
+      // Start deep dive job with the specific paper
+      const jobResponse = await startDeepDiveJob({
+        article_title: title,
+        article_pmid: pmid,
+        projectId: projectId
+      });
+
+      // Start polling for job completion
+      deepDiveJob.startJob(jobResponse.job_id);
+
+      alert(`🔍 Deep dive analysis started for "${title}"!\n\nThis process will continue in the background.`);
+
+    } catch (error: any) {
+      console.error('Error starting deep dive from network:', error);
+      alert(`❌ Failed to start deep dive: ${error.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleExploreClusterFromNetwork = async (pmid: string, title: string) => {
+    console.log('🌐 Explore Cluster from Network:', { pmid, title });
+
+    // For now, this will trigger a similar work exploration
+    // In the future, this could be enhanced with more sophisticated clustering
+    try {
+      // Create a new collection for the cluster exploration
+      const collectionResponse = await fetch(`/api/proxy/projects/${projectId}/collections`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user?.email || 'default_user',
+        },
+        body: JSON.stringify({
+          name: `Cluster: ${title.substring(0, 30)}...`,
+          description: `Research cluster exploration around: ${title}`
+        })
+      });
+
+      if (!collectionResponse.ok) {
+        throw new Error('Failed to create cluster collection');
+      }
+
+      const collection = await collectionResponse.json();
+
+      // Add the source paper to the collection
+      await fetch(`/api/proxy/collections/${collection.collection_id}/articles?projectId=${projectId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user?.email || 'default_user',
+        },
+        body: JSON.stringify({
+          pmid: pmid,
+          title: title
+        })
+      });
+
+      // Refresh collections and switch to collections tab
+      await fetchCollections();
+      setActiveTab('collections');
+
+      alert(`🌐 Cluster collection created: "${collection.name}"!\n\nYou can now explore related papers in the Collections tab.`);
+
+    } catch (error: any) {
+      console.error('Error creating cluster exploration:', error);
+      alert(`❌ Failed to create cluster: ${error.message || 'Unknown error'}`);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -1418,6 +1520,9 @@ export default function ProjectPage() {
                   projectId={projectId}
                   onDeepDiveCreated={fetchProjectData}
                   onArticleSaved={fetchProjectData}
+                  onGenerateReview={handleGenerateReviewFromNetwork}
+                  onDeepDive={handleDeepDiveFromNetwork}
+                  onExploreCluster={handleExploreClusterFromNetwork}
                 />
               </div>
             </div>

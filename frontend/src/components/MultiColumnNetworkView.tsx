@@ -33,6 +33,10 @@ interface MultiColumnNetworkViewProps {
   onDeepDiveCreated?: () => void;
   onArticleSaved?: () => void;
   className?: string;
+  // Smart Actions for Phase 1.2
+  onGenerateReview?: (pmid: string, title: string) => void;
+  onDeepDive?: (pmid: string, title: string) => void;
+  onExploreCluster?: (pmid: string, title: string) => void;
 }
 
 export default function MultiColumnNetworkView({
@@ -41,7 +45,10 @@ export default function MultiColumnNetworkView({
   projectId,
   onDeepDiveCreated,
   onArticleSaved,
-  className = ''
+  className = '',
+  onGenerateReview,
+  onDeepDive,
+  onExploreCluster
 }: MultiColumnNetworkViewProps) {
   const { user } = useAuth();
   const [columns, setColumns] = useState<PaperColumn[]>([]);
@@ -358,6 +365,9 @@ export default function MultiColumnNetworkView({
                 className="h-full"
                 disableInternalSidebar={true}
                 projectId={projectId}
+                onGenerateReview={onGenerateReview}
+                onDeepDive={onDeepDive}
+                onExploreCluster={onExploreCluster}
               />
             </ErrorBoundary>
           </div>
@@ -403,6 +413,9 @@ export default function MultiColumnNetworkView({
                   onAddExplorationNodes={handleMainAddExplorationNodes}
                   onCreatePaperColumn={handleCreatePaperColumn}
                   showCreateColumnButton={true}
+                  onGenerateReview={onGenerateReview}
+                  onDeepDive={onDeepDive}
+                  onExploreCluster={onExploreCluster}
                 />
               </ErrorBoundary>
               </div>
@@ -524,6 +537,9 @@ export default function MultiColumnNetworkView({
                       year: column.paper.metadata.year || new Date().getFullYear(),
                       citation_count: column.paper.metadata.citation_count || 0
                     } : undefined}
+                    onGenerateReview={onGenerateReview}
+                    onDeepDive={onDeepDive}
+                    onExploreCluster={onExploreCluster}
                   />
                 )}
               </ErrorBoundary>
@@ -567,6 +583,9 @@ export default function MultiColumnNetworkView({
                       }
                       onCreatePaperColumn={handleCreatePaperColumn}
                       showCreateColumnButton={true}
+                      onGenerateReview={onGenerateReview}
+                      onDeepDive={onDeepDive}
+                      onExploreCluster={onExploreCluster}
                     />
                   </ErrorBoundary>
                 </div>

@@ -109,6 +109,10 @@ interface NetworkViewProps {
   disableInternalSidebar?: boolean;
   // Project ID for collection network endpoints (replaces URL parsing)
   projectId?: string;
+  // Smart Actions for Phase 1.2
+  onGenerateReview?: (pmid: string, title: string) => void;
+  onDeepDive?: (pmid: string, title: string) => void;
+  onExploreCluster?: (pmid: string, title: string) => void;
 }
 
 // Function to create article-specific network when backend data is unavailable
@@ -316,7 +320,10 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   forceNetworkType,
   articleMetadata,
   disableInternalSidebar = false,
-  projectId
+  projectId,
+  onGenerateReview,
+  onDeepDive,
+  onExploreCluster
 }, ref) => {
   const { user } = useAuth();
   const [networkData, setNetworkData] = useState<NetworkData | null>(null);
@@ -1435,6 +1442,9 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             onShowReferences={(pmid) => handleNavigationChange('references', pmid)}
             onExplorePeople={(authors) => handleNavigationChange('authors', authors.join(','))}
             onAddExplorationNodes={addExplorationNodesToGraph}
+            onGenerateReview={onGenerateReview}
+            onDeepDive={onDeepDive}
+            onExploreCluster={onExploreCluster}
           />
         </div>
       )}
