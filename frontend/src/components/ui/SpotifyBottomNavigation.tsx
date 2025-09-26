@@ -3,19 +3,21 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
-  HomeIcon, 
-  MagnifyingGlassIcon, 
-  FolderIcon, 
+import {
+  HomeIcon,
+  MagnifyingGlassIcon,
+  FolderIcon,
   ChartBarIcon,
-  Cog6ToothIcon 
+  MusicalNoteIcon,
+  Cog6ToothIcon
 } from '@heroicons/react/24/outline';
-import { 
-  HomeIcon as HomeIconSolid, 
-  MagnifyingGlassIcon as MagnifyingGlassIconSolid, 
-  FolderIcon as FolderIconSolid, 
+import {
+  HomeIcon as HomeIconSolid,
+  MagnifyingGlassIcon as MagnifyingGlassIconSolid,
+  FolderIcon as FolderIconSolid,
   ChartBarIcon as ChartBarIconSolid,
-  Cog6ToothIcon as Cog6ToothIconSolid 
+  MusicalNoteIcon as MusicalNoteIconSolid,
+  Cog6ToothIcon as Cog6ToothIconSolid
 } from '@heroicons/react/24/solid';
 import { cn } from '@/lib/utils';
 
@@ -43,6 +45,13 @@ const navigationItems: NavigationItem[] = [
     label: 'Search'
   },
   {
+    name: 'Discover',
+    href: '/discover',
+    icon: MusicalNoteIcon,
+    activeIcon: MusicalNoteIconSolid,
+    label: 'Discover'
+  },
+  {
     name: 'Collections',
     href: '/collections',
     icon: FolderIcon,
@@ -55,13 +64,6 @@ const navigationItems: NavigationItem[] = [
     icon: ChartBarIcon,
     activeIcon: ChartBarIconSolid,
     label: 'Dashboard'
-  },
-  {
-    name: 'Settings',
-    href: '/settings',
-    icon: Cog6ToothIcon,
-    activeIcon: Cog6ToothIconSolid,
-    label: 'Settings'
   }
 ];
 
