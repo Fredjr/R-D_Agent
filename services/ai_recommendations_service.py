@@ -408,13 +408,29 @@ class SpotifyInspiredRecommendationsService:
 
                     logger.info(f"📁 Found {len(user_projects)} projects for user")
 
-                    # If user has collections or projects, generate domain-based recommendations
-                    if len(user_collections) > 0 or len(user_projects) > 0:
-                        logger.info(f"✅ User has activity, generating domain-based recommendations")
+                    # If user has collections, try to get articles directly from collections
+                    if len(user_collections) > 0:
+                        logger.info(f"✅ User has collections, trying to get articles from collections directly")
 
-                        # Extract research domains from collection names and descriptions
-                        research_domains = []
+                        # Get articles from user's collections using a different approach
+                        collection_articles = []
                         for collection in user_collections:
+                            articles_in_collection = db.query(ArticleCollection).filter(
+                                ArticleCollection.collection_id == collection.collection_id
+                            ).all()
+                            collection_articles.extend(articles_in_collection)
+                            logger.info(f"📄 Collection '{collection.collection_name}' has {len(articles_in_collection)} articles")
+
+                        logger.info(f"📊 Total articles found in collections: {len(collection_articles)}")
+
+                        if len(collection_articles) > 0:
+                            # Use these articles as saved_articles for profile building
+                            saved_articles = collection_articles
+                            logger.info(f"✅ Using {len(saved_articles)} articles from collections for profile building")
+                        else:
+                            # Extract research domains from collection names and descriptions
+                            research_domains = []
+                            for collection in user_collections:
                             collection_text = f"{collection.collection_name} {collection.description or ''}".lower()
 
                             # Detect research domains
