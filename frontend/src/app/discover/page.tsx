@@ -327,7 +327,7 @@ export default function DiscoverPage() {
                   onShare={handleSharePaper}
                   onSeeAll={handleSeeAll}
                   showPersonalizedGreeting={true}
-                  userName={user?.name || 'Researcher'}
+                  userName={(user as any)?.name || user?.email?.split('@')[0] || 'Researcher'}
                 />
               );
             }

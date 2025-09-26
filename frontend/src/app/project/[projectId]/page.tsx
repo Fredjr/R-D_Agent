@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { MobileResponsiveLayout } from '@/components/ui/MobileResponsiveLayout';
 import AnnotationsFeed from '@/components/AnnotationsFeed';
 import ActivityFeed from '@/components/ActivityFeed';
 import ResultsList from '@/components/ResultsList';
@@ -14,6 +15,9 @@ import { startReviewJob, startDeepDiveJob } from '@/lib/api';
 import AsyncJobProgress from '@/components/AsyncJobProgress';
 import { SpotifyTopBar, SpotifyBreadcrumb, SpotifyTabs } from '@/components/ui/SpotifyNavigation';
 import { SpotifyCollectionCard } from '@/components/ui/SpotifyCard';
+import { SpotifyProjectHeader } from '@/components/ui/SpotifyProjectHeader';
+import { SpotifyProjectTabs } from '@/components/ui/SpotifyProjectTabs';
+import { SpotifyQuickActions, createQuickActions } from '@/components/ui/SpotifyQuickActions';
 import {
   Button,
   Card,
@@ -552,111 +556,67 @@ export default function ProjectPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--spotify-black)]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <PageHeader
-          title={project.project_name}
-          description={project.description}
-          breadcrumb={[
-            { label: 'Projects', href: '/dashboard' },
-            { label: project.project_name, current: true }
-          ]}
-          actions={
-            <div className="flex items-center space-x-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowShareModal(true)}
-                className="bg-white text-gray-900 border-gray-300 hover:bg-gray-50"
-              >
-                Share Project
-              </Button>
-              <Button
-                variant="spotifyPrimary"
-                size="spotifySm"
-                onClick={() => setShowSettingsModal(true)}
-              >
-                Settings
-              </Button>
-            </div>
-          }
+    <MobileResponsiveLayout>
+      <div className="w-full max-w-none">
+        {/* Spotify-Style Project Header */}
+        <SpotifyProjectHeader
+          project={project}
+          onPlay={() => {
+            // Navigate to first tab or main view
+            setActiveTab('overview');
+          }}
+          onShare={() => setShowShareModal(true)}
+          onSettings={() => setShowSettingsModal(true)}
+          onInvite={() => setShowInviteModal(true)}
         />
 
-        {/* Action Buttons */}
-        <div className="mb-8 flex flex-wrap gap-4">
-          <button 
-            onClick={() => setShowReportModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-          >
-            New Report
-          </button>
-          <button 
-            onClick={() => setShowNoteModal(true)}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-          >
-            Add Note
-          </button>
-        </div>
-
         {/* Quick Actions */}
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-          <div className="flex flex-wrap gap-3">
-            <button 
-              onClick={() => setShowDeepDiveModal(true)}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-            >
-              Start Deep Dive Analysis
-            </button>
-            <button
-              onClick={() => setShowSummaryModal(true)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-            >
-              Generate Summary Report
-            </button>
-            <button
-              onClick={handleGenerateComprehensiveSummary}
-              disabled={generatingComprehensiveSummary}
-              className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-            >
-              {generatingComprehensiveSummary ? 'Analyzing...' : 'Comprehensive Analysis'}
-            </button>
-            <button 
-              onClick={() => setShowInviteModal(true)}
-              className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-            >
-              Invite Collaborators
-            </button>
-          </div>
+        <div className="py-6">
+          <SpotifyQuickActions
+            actions={createQuickActions(
+              {
+                onNewReport: () => setShowReportModal(true),
+                onAddNote: () => setShowNoteModal(true),
+                onDeepDive: () => setShowDeepDiveModal(true),
+                onSummary: () => setShowSummaryModal(true),
+                onComprehensiveAnalysis: handleGenerateComprehensiveSummary,
+                onInviteCollaborators: () => setShowInviteModal(true)
+              },
+              {
+                generatingComprehensiveSummary,
+                creatingNote
+              }
+            )}
+          />
         </div>
 
-        {/* Tab Navigation */}
-        <div className="mb-8">
-          <ProjectNavigation
+        {/* Spotify-Style Tab Navigation */}
+        <div className="py-4">
+          <SpotifyProjectTabs
             activeTab={activeTab}
             onTabChange={(tab) => setActiveTab(tab as 'overview' | 'collections' | 'network' | 'activity')}
             tabs={[
               {
                 id: 'overview',
                 label: 'Overview',
-                icon: <span>📊</span>,
+                icon: '📊',
                 count: (project.reports?.length || 0) + ((project as any).deep_dives?.length || 0)
               },
               {
                 id: 'collections',
                 label: 'Collections',
-                icon: <span>📁</span>,
+                icon: '📁',
                 count: (project as any).collections?.length || 0
               },
               {
                 id: 'network',
                 label: 'Network View',
-                icon: <span>🕸️</span>
+                icon: '🕸️'
               },
               {
                 id: 'activity',
                 label: 'Activity & Notes',
-                icon: <span>📝</span>,
+                icon: '📝',
                 count: (project as any).annotations?.length || 0
               }
             ]}
@@ -1618,6 +1578,6 @@ export default function ProjectPage() {
           </div>
         </div>
       )}
-    </div>
+    </MobileResponsiveLayout>
   );
 }
