@@ -104,7 +104,7 @@ class SpotifyInspiredRecommendationsService:
             "deep_dive_analysis": 1.2
         }
     
-    async def get_weekly_recommendations(self, user_id: str, project_id: Optional[str] = None) -> Dict[str, Any]:
+    async def get_weekly_recommendations(self, user_id: str, project_id: Optional[str] = None, force_refresh: bool = False) -> Dict[str, Any]:
         """
         Generate Spotify-style weekly recommendations with 4 main categories
 
@@ -119,9 +119,9 @@ class SpotifyInspiredRecommendationsService:
             db_gen = get_db()
             db = next(db_gen)
 
-            # Check cache first
+            # Check cache first (unless force refresh is requested)
             cache_key = f"weekly_{user_id}_{project_id or 'global'}"
-            if cache_key in self.recommendation_cache:
+            if not force_refresh and cache_key in self.recommendation_cache:
                 cached_data = self.recommendation_cache[cache_key]
                 if datetime.now(timezone.utc) - cached_data["timestamp"] < self.cache_ttl:
                     return cached_data["data"]

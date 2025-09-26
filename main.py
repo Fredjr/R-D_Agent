@@ -12310,6 +12310,7 @@ async def test_semantic_analysis():
 async def get_weekly_recommendations(
     user_id: str,
     project_id: Optional[str] = Query(None, description="Optional project context"),
+    force_refresh: bool = Query(False, description="Force refresh cache"),
     request: Request = None
 ):
     """
@@ -12331,7 +12332,8 @@ async def get_weekly_recommendations(
         # Generate weekly recommendations
         result = await recommendations_service.get_weekly_recommendations(
             user_id=current_user,
-            project_id=project_id
+            project_id=project_id,
+            force_refresh=force_refresh
         )
 
         return result
