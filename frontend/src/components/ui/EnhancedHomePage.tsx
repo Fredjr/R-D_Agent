@@ -48,7 +48,10 @@ interface RecommendationSection {
   description: string;
   papers: Paper[];
   updated: string;
-  refresh_reason: string;
+  refresh_reason?: string;
+  icon: React.ComponentType<any>;
+  color: string;
+  category: string;
 }
 
 interface EnhancedHomePageProps {
@@ -211,7 +214,10 @@ export const EnhancedHomePage: React.FC<EnhancedHomePageProps> = ({
       description: "Your personalized mix of research papers",
       papers: recommendations.papers_for_you,
       updated: `Updated ${new Date().toLocaleDateString()}`,
-      refresh_reason: "Based on your reading history and research interests"
+      refresh_reason: "Based on your reading history and research interests",
+      icon: SparklesIcon,
+      color: "#1db954",
+      category: "papers_for_you"
     });
   } else {
     // 🧠 Demo section with semantic analysis data
@@ -220,7 +226,10 @@ export const EnhancedHomePage: React.FC<EnhancedHomePageProps> = ({
       description: "Your personalized mix of research papers",
       papers: demoSemanticPapers,
       updated: `Updated ${new Date().toLocaleDateString()}`,
-      refresh_reason: "🧠 Demo: Papers with semantic analysis features enabled"
+      refresh_reason: "🧠 Demo: Papers with semantic analysis features enabled",
+      icon: SparklesIcon,
+      color: "#1db954",
+      category: "papers_for_you"
     });
   }
 
@@ -230,7 +239,10 @@ export const EnhancedHomePage: React.FC<EnhancedHomePageProps> = ({
       description: "Hot topics gaining attention in your research area",
       papers: recommendations.trending_in_field,
       updated: `Updated ${new Date().toLocaleDateString()}`,
-      refresh_reason: "Based on recent activity in your research domain"
+      refresh_reason: "Based on recent activity in your research domain",
+      icon: FireIcon,
+      color: "#ff6b35",
+      category: "trending_in_field"
     });
   }
 
@@ -240,7 +252,10 @@ export const EnhancedHomePage: React.FC<EnhancedHomePageProps> = ({
       description: "Interdisciplinary discoveries and new perspectives",
       papers: recommendations.cross_pollination,
       updated: `Updated ${new Date().toLocaleDateString()}`,
-      refresh_reason: "Exploring connections across research domains"
+      refresh_reason: "Exploring connections across research domains",
+      icon: ClockIcon,
+      color: "#8b5cf6",
+      category: "cross_pollination"
     });
   }
 
@@ -250,7 +265,10 @@ export const EnhancedHomePage: React.FC<EnhancedHomePageProps> = ({
       description: "Papers that could benefit from your expertise",
       papers: recommendations.citation_opportunities,
       updated: `Updated ${new Date().toLocaleDateString()}`,
-      refresh_reason: "Based on your publication history and expertise"
+      refresh_reason: "Based on your publication history and expertise",
+      icon: UserGroupIcon,
+      color: "#f59e0b",
+      category: "citation_opportunities"
     });
   }
 
