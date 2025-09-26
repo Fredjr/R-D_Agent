@@ -61,9 +61,7 @@ interface QuickAction {
 export default function HomePage() {
   const { user } = useAuth();
   const router = useRouter();
-  const [recommendations, setRecommendations] = useState<RecommendationData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Removed recommendations state - now handled by Discover page
 
   const quickActions: QuickAction[] = [
     {
@@ -109,7 +107,7 @@ export default function HomePage() {
       return;
     }
 
-    loadRecommendations();
+    // Home page now focuses on research - recommendations moved to Discover
   }, [user, router]);
 
   const loadRecommendations = async () => {
@@ -269,12 +267,12 @@ export default function HomePage() {
               </p>
             </div>
             <Button
-              onClick={handleRefresh}
+              onClick={() => router.push('/discover')}
               variant="outline"
               size="sm"
               className="border-[var(--spotify-green)] text-[var(--spotify-green)] hover:bg-[var(--spotify-green)] hover:text-black flex-shrink-0 w-full sm:w-auto"
             >
-              Refresh
+              Discover →
             </Button>
           </div>
         </div>
@@ -301,61 +299,58 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Recommendations Section */}
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <LoadingSpinner size="xl" />
-              <p className="text-[var(--spotify-light-text)] mt-4 text-lg">
-                Generating your personalized recommendations...
-              </p>
+        {/* Research Hub Section */}
+        <section className="mb-12 sm:mb-16">
+          <div className="bg-[var(--spotify-dark-gray)] rounded-lg p-6 sm:p-8">
+            <h2 className="text-xl sm:text-2xl font-bold text-white mb-4">Start Your Research</h2>
+            <p className="text-[var(--spotify-light-text)] mb-6">
+              Search medical literature with intelligent autocomplete and semantic discovery
+            </p>
+
+            {/* Enhanced Search Interface */}
+            <div className="space-y-4">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search MeSH terms, topics, or enter PMIDs..."
+                  className="w-full bg-[var(--spotify-black)] border border-[var(--spotify-border-gray)] rounded-lg px-4 py-3 text-white placeholder-[var(--spotify-muted-text)] focus:outline-none focus:ring-2 focus:ring-[var(--spotify-green)] focus:border-transparent"
+                />
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <ChartBarIcon className="w-5 h-5 text-[var(--spotify-muted-text)]" />
+                </div>
+              </div>
+
+              {/* Quick Search Suggestions */}
+              <div className="flex flex-wrap gap-2">
+                <span className="text-sm text-[var(--spotify-light-text)]">Try:</span>
+                {['immune checkpoint inhibitors', 'CRISPR gene editing', 'diabetes treatment', 'cancer immunotherapy'].map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    className="px-3 py-1 bg-[var(--spotify-medium-gray)] text-[var(--spotify-light-text)] rounded-full text-sm hover:bg-[var(--spotify-light-gray)] transition-colors"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+
+              {/* Search Options */}
+              <div className="flex flex-wrap gap-4 pt-2">
+                <label className="flex items-center text-sm text-[var(--spotify-light-text)]">
+                  <input type="checkbox" className="mr-2 rounded" />
+                  Recent papers only (2024-2025)
+                </label>
+                <label className="flex items-center text-sm text-[var(--spotify-light-text)]">
+                  <input type="checkbox" className="mr-2 rounded" />
+                  High-impact journals
+                </label>
+                <label className="flex items-center text-sm text-[var(--spotify-light-text)]">
+                  <input type="checkbox" className="mr-2 rounded" />
+                  Review articles
+                </label>
+              </div>
             </div>
           </div>
-        ) : error ? (
-          <div className="py-20">
-            <ErrorAlert title="Failed to load recommendations">
-              <p className="mb-4">{error}</p>
-              <Button
-                onClick={handleRefresh}
-                className="bg-[var(--spotify-green)] text-black hover:bg-[var(--spotify-green-hover)]"
-              >
-                Try Again
-              </Button>
-            </ErrorAlert>
-          </div>
-        ) : recommendations ? (
-          (() => {
-            console.log('🎨 HOME PAGE: Rendering Enhanced Home Page with data:', JSON.stringify(recommendations, null, 2));
-            return (
-              <EnhancedHomePage
-                recommendations={recommendations}
-                onPlay={(paper) => console.log('Playing paper:', paper)}
-                onSave={(paper) => console.log('Saving paper:', paper)}
-                onShare={(paper) => console.log('Sharing paper:', paper)}
-                onClick={(paper) => {
-                  // Open PubMed article in new tab
-                  if (paper.pmid) {
-                    window.open(`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`, '_blank');
-                  }
-                }}
-                onSeeAll={(category) => console.log('See all for category:', category)}
-                userName={user?.first_name || 'Researcher'}
-                isLoading={loading}
-              />
-            );
-          })()
-        ) : (
-          (() => {
-            console.log('⚠️ HOME PAGE: No recommendations to render, recommendations state is:', recommendations);
-            return (
-              <div className="py-20 text-center">
-                <p className="text-[var(--spotify-light-text)] text-lg">
-                  No recommendations available at the moment.
-                </p>
-              </div>
-            );
-          })()
-        )}
+        </section>
 
         {/* Recent Activity Preview */}
         <section className="mt-12 sm:mt-16">
