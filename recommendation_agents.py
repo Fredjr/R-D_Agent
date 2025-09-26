@@ -376,11 +376,11 @@ class RecommendationOrchestrator:
                                          available_papers: List[Dict]) -> Dict[str, Any]:
         """Generate all recommendation categories in parallel"""
         
-        # Execute all agents in parallel for efficiency
+        # Execute all agents in parallel for efficiency - Spotify-style abundance
         tasks = [
-            self.agents['papers_for_you'].generate_recommendations(user_profile, available_papers, 12),
-            self.agents['trending'].generate_recommendations(user_profile, available_papers, 12),
-            self.agents['cross_pollination'].generate_recommendations(user_profile, available_papers, 12),
+            self.agents['papers_for_you'].generate_recommendations(user_profile, available_papers, 20),
+            self.agents['trending'].generate_recommendations(user_profile, available_papers, 18),
+            self.agents['cross_pollination'].generate_recommendations(user_profile, available_papers, 15),
             self.agents['citation_opportunities'].generate_recommendations(user_profile, available_papers, 12)
         ]
         

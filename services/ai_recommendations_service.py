@@ -551,17 +551,46 @@ class SpotifyInspiredRecommendationsService:
             }
 
     async def _generate_fallback_recommendations(self, db: Session, category: str) -> Dict[str, Any]:
-        """Generate sample recommendations for new users"""
+        """Generate sample recommendations for new users - Spotify-style abundance"""
         try:
-            # Get popular recent papers as fallback
+            # Try multiple fallback strategies to ensure we always have recommendations
+            recent_papers = []
+
+            # Strategy 1: Popular recent papers (last 2 years, >10 citations)
             recent_papers = db.query(Article).filter(
                 Article.publication_year >= datetime.now(timezone.utc).year - 2,
                 Article.citation_count.isnot(None),
                 Article.citation_count > 10
             ).order_by(desc(Article.citation_count)).limit(20).all()
 
-            recommendations = []
+            # Strategy 2: If not enough, try recent papers with any citations
+            if len(recent_papers) < 15:
+                additional_papers = db.query(Article).filter(
+                    Article.publication_year >= datetime.now(timezone.utc).year - 3,
+                    Article.citation_count.isnot(None),
+                    Article.citation_count > 0
+                ).order_by(desc(Article.citation_count)).limit(25).all()
+                recent_papers.extend(additional_papers)
+
+            # Strategy 3: If still not enough, get any recent papers
+            if len(recent_papers) < 15:
+                any_papers = db.query(Article).filter(
+                    Article.publication_year >= datetime.now(timezone.utc).year - 5
+                ).order_by(desc(Article.created_at)).limit(30).all()
+                recent_papers.extend(any_papers)
+
+            # Remove duplicates and limit to 20
+            seen_pmids = set()
+            unique_papers = []
             for paper in recent_papers:
+                if paper.pmid not in seen_pmids:
+                    unique_papers.append(paper)
+                    seen_pmids.add(paper.pmid)
+                if len(unique_papers) >= 20:
+                    break
+
+            recommendations = []
+            for paper in unique_papers:
                 recommendations.append({
                     "pmid": paper.pmid,
                     "title": paper.title or "Research Paper",
@@ -640,7 +669,7 @@ class SpotifyInspiredRecommendationsService:
             return {
                 "title": "Papers for You",
                 "description": "Your personalized research feed",
-                "papers": recommendations[:12],  # Spotify-like grid of 12
+                "papers": recommendations[:20],  # Spotify-style abundance of 20
                 "updated": datetime.now(timezone.utc).isoformat(),
                 "refresh_reason": "Based on your recent research activity"
             }
@@ -655,17 +684,33 @@ class SpotifyInspiredRecommendationsService:
             recommendations = []
             primary_domains = user_profile.get("primary_domains", [])
 
-            # Get trending papers in user's research fields
+            # Get trending papers in user's research fields with flexible date range
             for domain in primary_domains[:2]:  # Top 2 domains
-                # Find papers with high recent citation velocity in this domain
-                trending_papers = db.query(Article).filter(
-                    or_(
-                        Article.title.ilike(f'%{domain}%'),
-                        Article.abstract.ilike(f'%{domain}%')
-                    ),
-                    Article.publication_year >= datetime.now(timezone.utc).year - 1,  # Very recent
-                    Article.citation_count > 5  # Some traction
-                ).order_by(desc(Article.citation_count)).limit(15).all()
+                # Try recent papers first (last 3 years), then expand if needed
+                trending_papers = []
+
+                # Try last 3 years first
+                for years_back in [3, 5, 10]:
+                    trending_papers = db.query(Article).filter(
+                        or_(
+                            Article.title.ilike(f'%{domain}%'),
+                            Article.abstract.ilike(f'%{domain}%')
+                        ),
+                        Article.publication_year >= datetime.now(timezone.utc).year - years_back,
+                        Article.citation_count > 5  # Some traction
+                    ).order_by(desc(Article.citation_count)).limit(15).all()
+
+                    if trending_papers:
+                        break
+
+                # If still no results, get any papers in the domain
+                if not trending_papers:
+                    trending_papers = db.query(Article).filter(
+                        or_(
+                            Article.title.ilike(f'%{domain}%'),
+                            Article.abstract.ilike(f'%{domain}%')
+                        )
+                    ).order_by(desc(Article.citation_count)).limit(15).all()
 
                 for paper in trending_papers:
                     # Calculate trending score based on citations per month since publication
@@ -727,20 +772,42 @@ class SpotifyInspiredRecommendationsService:
                 adjacent_fields = cross_domain_map.get(primary_domain.lower(), [])
 
                 for adjacent_field in adjacent_fields[:3]:
-                    # Find papers that mention both domains
-                    cross_papers = db.query(Article).filter(
-                        and_(
-                            or_(
-                                Article.title.ilike(f'%{primary_domain}%'),
-                                Article.abstract.ilike(f'%{primary_domain}%')
+                    # Find papers that mention both domains with flexible date range
+                    cross_papers = []
+
+                    # Try different time ranges
+                    for years_back in [5, 10, 20]:
+                        cross_papers = db.query(Article).filter(
+                            and_(
+                                or_(
+                                    Article.title.ilike(f'%{primary_domain}%'),
+                                    Article.abstract.ilike(f'%{primary_domain}%')
+                                ),
+                                or_(
+                                    Article.title.ilike(f'%{adjacent_field}%'),
+                                    Article.abstract.ilike(f'%{adjacent_field}%')
+                                )
                             ),
-                            or_(
-                                Article.title.ilike(f'%{adjacent_field}%'),
-                                Article.abstract.ilike(f'%{adjacent_field}%')
+                            Article.publication_year >= datetime.now(timezone.utc).year - years_back
+                        ).order_by(desc(Article.citation_count)).limit(10).all()
+
+                        if cross_papers:
+                            break
+
+                    # If still no results, try without date restriction
+                    if not cross_papers:
+                        cross_papers = db.query(Article).filter(
+                            and_(
+                                or_(
+                                    Article.title.ilike(f'%{primary_domain}%'),
+                                    Article.abstract.ilike(f'%{primary_domain}%')
+                                ),
+                                or_(
+                                    Article.title.ilike(f'%{adjacent_field}%'),
+                                    Article.abstract.ilike(f'%{adjacent_field}%')
+                                )
                             )
-                        ),
-                        Article.publication_year >= datetime.now(timezone.utc).year - 5
-                    ).order_by(desc(Article.citation_count)).limit(10).all()
+                        ).order_by(desc(Article.citation_count)).limit(10).all()
 
                     for paper in cross_papers:
                         cross_pollination_score = self._calculate_interdisciplinary_score(
@@ -788,15 +855,32 @@ class SpotifyInspiredRecommendationsService:
 
             # Find recent papers in user's field that might benefit from citing their work
             for domain in primary_domains[:3]:
-                # Get very recent papers (last 6 months) in the domain
-                recent_papers = db.query(Article).filter(
-                    or_(
-                        Article.title.ilike(f'%{domain}%'),
-                        Article.abstract.ilike(f'%{domain}%')
-                    ),
-                    Article.publication_year >= datetime.now(timezone.utc).year,  # Current year only
-                    Article.citation_count < 20  # Papers that could use more citations
-                ).order_by(desc(Article.created_at)).limit(15).all()
+                # Get recent papers with flexible date range
+                recent_papers = []
+
+                # Try different time ranges to find suitable papers
+                for years_back in [1, 2, 3, 5]:
+                    recent_papers = db.query(Article).filter(
+                        or_(
+                            Article.title.ilike(f'%{domain}%'),
+                            Article.abstract.ilike(f'%{domain}%')
+                        ),
+                        Article.publication_year >= datetime.now(timezone.utc).year - years_back,
+                        Article.citation_count < 100  # Papers that could use more citations
+                    ).order_by(desc(Article.publication_year), desc(Article.citation_count)).limit(15).all()
+
+                    if recent_papers:
+                        break
+
+                # If still no results, get any papers in the domain with moderate citations
+                if not recent_papers:
+                    recent_papers = db.query(Article).filter(
+                        or_(
+                            Article.title.ilike(f'%{domain}%'),
+                            Article.abstract.ilike(f'%{domain}%')
+                        ),
+                        Article.citation_count < 100
+                    ).order_by(desc(Article.publication_year), desc(Article.citation_count)).limit(15).all()
 
                 for paper in recent_papers:
                     citation_opportunity_score = self._calculate_citation_opportunity_score(
