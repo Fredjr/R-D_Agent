@@ -431,17 +431,17 @@ class SpotifyInspiredRecommendationsService:
                             # Extract research domains from collection names and descriptions
                             research_domains = []
                             for collection in user_collections:
-                            collection_text = f"{collection.collection_name} {collection.description or ''}".lower()
+                                collection_text = f"{collection.collection_name} {collection.description or ''}".lower()
 
-                            # Detect research domains
-                            if any(term in collection_text for term in ['kidney', 'renal', 'nephrology']):
-                                research_domains.append('nephrology')
-                            if any(term in collection_text for term in ['diabetes', 'diabetic', 'glucose']):
-                                research_domains.append('diabetes')
-                            if any(term in collection_text for term in ['cardiovascular', 'heart', 'cardiac']):
-                                research_domains.append('cardiovascular')
-                            if any(term in collection_text for term in ['finerenone', 'mineralocorticoid', 'pharmacology']):
-                                research_domains.append('pharmacology')
+                                # Detect research domains
+                                if any(term in collection_text for term in ['kidney', 'renal', 'nephrology']):
+                                    research_domains.append('nephrology')
+                                if any(term in collection_text for term in ['diabetes', 'diabetic', 'glucose']):
+                                    research_domains.append('diabetes')
+                                if any(term in collection_text for term in ['cardiovascular', 'heart', 'cardiac']):
+                                    research_domains.append('cardiovascular')
+                                if any(term in collection_text for term in ['finerenone', 'mineralocorticoid', 'pharmacology']):
+                                    research_domains.append('pharmacology')
 
                         # Remove duplicates
                         research_domains = list(set(research_domains))
