@@ -103,7 +103,194 @@ class SpotifyInspiredRecommendationsService:
             "shared_paper": 0.8,
             "deep_dive_analysis": 1.2
         }
-    
+
+    async def _get_direct_user_recommendations(self, user_id: str, project_id: Optional[str], db: Session) -> Optional[Dict[str, Any]]:
+        """Direct approach to get recommendations from user's collection articles"""
+        try:
+            logger.info(f"🎯 Direct approach: Getting recommendations for user: {user_id}")
+
+            # Get user's collections directly
+            user_collections = db.query(Collection).filter(
+                Collection.created_by == user_id
+            ).all()
+
+            logger.info(f"📚 Found {len(user_collections)} collections for user")
+
+            # Get all articles from user's collections
+            user_articles = []
+            for collection in user_collections:
+                articles_in_collection = db.query(ArticleCollection).filter(
+                    ArticleCollection.collection_id == collection.collection_id
+                ).all()
+                user_articles.extend(articles_in_collection)
+                logger.info(f"📄 Collection '{collection.collection_name}' has {len(articles_in_collection)} articles")
+
+            logger.info(f"📊 Total user articles found: {len(user_articles)}")
+
+            # If no articles found, return None to use fallback
+            if not user_articles:
+                return None
+
+            # Extract research domains from user's articles
+            research_domains = set()
+            for article in user_articles:
+                title_lower = (article.article_title or "").lower()
+
+                # Detect domains from article titles
+                if any(term in title_lower for term in ['kidney', 'renal', 'nephrology']):
+                    research_domains.add('nephrology')
+                if any(term in title_lower for term in ['diabetes', 'diabetic', 'glucose']):
+                    research_domains.add('diabetes')
+                if any(term in title_lower for term in ['cardiovascular', 'heart', 'cardiac']):
+                    research_domains.add('cardiovascular')
+                if any(term in title_lower for term in ['finerenone', 'mineralocorticoid', 'pharmacology']):
+                    research_domains.add('pharmacology')
+                if any(term in title_lower for term in ['cancer', 'tumor', 'oncology']):
+                    research_domains.add('oncology')
+                if any(term in title_lower for term in ['treatment', 'therapy', 'clinical']):
+                    research_domains.add('clinical_medicine')
+
+            research_domains = list(research_domains)
+            logger.info(f"🔬 Detected research domains: {research_domains}")
+
+            # Generate recommendations based on detected domains
+            recommendations = await self._generate_domain_based_recommendations(research_domains, db)
+
+            return {
+                "recommendations": recommendations,
+                "user_insights": {
+                    "research_domains": research_domains,
+                    "activity_level": "active" if len(user_articles) > 5 else "moderate",
+                    "discovery_preference": "balanced",
+                    "collaboration_tendency": 0.7
+                }
+            }
+
+        except Exception as e:
+            logger.error(f"❌ Error in direct user recommendations: {e}")
+            return None
+
+    async def _generate_domain_based_recommendations(self, research_domains: List[str], db: Session) -> Dict[str, Any]:
+        """Generate recommendations based on detected research domains"""
+        try:
+            recommendations = {
+                "papers_for_you": [],
+                "trending_in_field": [],
+                "cross_pollination": [],
+                "citation_opportunities": []
+            }
+
+            # Get all available articles from the database
+            all_articles = db.query(Article).limit(100).all()  # Get a reasonable sample
+            logger.info(f"📊 Found {len(all_articles)} articles in database for recommendations")
+
+            if not all_articles:
+                # If no articles in Article table, generate fallback
+                return {
+                    "papers_for_you": await self._generate_fallback_recommendations(db, "papers_for_you"),
+                    "trending_in_field": await self._generate_fallback_recommendations(db, "trending_in_field"),
+                    "cross_pollination": await self._generate_fallback_recommendations(db, "cross_pollination"),
+                    "citation_opportunities": await self._generate_fallback_recommendations(db, "citation_opportunities")
+                }
+
+            # Generate Papers for You based on user's domains
+            papers_for_you = []
+            for domain in research_domains[:3]:  # Top 3 domains
+                domain_papers = [
+                    article for article in all_articles
+                    if domain.lower() in (article.title or "").lower() or
+                       domain.lower() in (article.abstract or "").lower()
+                ][:8]  # 8 papers per domain
+
+                for paper in domain_papers:
+                    papers_for_you.append({
+                        "pmid": paper.pmid,
+                        "title": paper.title,
+                        "authors": paper.authors[:3] if paper.authors else [],
+                        "journal": paper.journal,
+                        "year": paper.publication_year,
+                        "citation_count": paper.citation_count or 0,
+                        "relevance_score": 0.9,
+                        "reason": f"Matches your research in {domain}",
+                        "category": "papers_for_you"
+                    })
+
+            # Generate Trending in Field
+            trending_papers = sorted(all_articles, key=lambda x: x.citation_count or 0, reverse=True)[:15]
+            trending_in_field = []
+            for paper in trending_papers:
+                trending_in_field.append({
+                    "pmid": paper.pmid,
+                    "title": paper.title,
+                    "authors": paper.authors[:3] if paper.authors else [],
+                    "journal": paper.journal,
+                    "year": paper.publication_year,
+                    "citation_count": paper.citation_count or 0,
+                    "relevance_score": 0.8,
+                    "reason": "Highly cited in your field",
+                    "category": "trending_in_field"
+                })
+
+            # Generate Cross-pollination (papers from different domains)
+            cross_pollination = []
+            other_domains = ['machine learning', 'artificial intelligence', 'bioinformatics', 'genetics']
+            for domain in other_domains:
+                domain_papers = [
+                    article for article in all_articles
+                    if domain.lower() in (article.title or "").lower()
+                ][:5]  # 5 papers per cross-domain
+
+                for paper in domain_papers:
+                    cross_pollination.append({
+                        "pmid": paper.pmid,
+                        "title": paper.title,
+                        "authors": paper.authors[:3] if paper.authors else [],
+                        "journal": paper.journal,
+                        "year": paper.publication_year,
+                        "citation_count": paper.citation_count or 0,
+                        "relevance_score": 0.7,
+                        "reason": f"Cross-domain insights from {domain}",
+                        "category": "cross_pollination"
+                    })
+
+            # Generate Citation Opportunities (recent papers with moderate citations)
+            citation_opportunities = []
+            recent_papers = [
+                article for article in all_articles
+                if (article.publication_year or 0) >= 2020 and
+                   10 <= (article.citation_count or 0) <= 100
+            ][:15]
+
+            for paper in recent_papers:
+                citation_opportunities.append({
+                    "pmid": paper.pmid,
+                    "title": paper.title,
+                    "authors": paper.authors[:3] if paper.authors else [],
+                    "journal": paper.journal,
+                    "year": paper.publication_year,
+                    "citation_count": paper.citation_count or 0,
+                    "relevance_score": 0.6,
+                    "reason": "Good citation opportunity",
+                    "category": "citation_opportunities"
+                })
+
+            return {
+                "papers_for_you": papers_for_you[:20],  # Spotify-style abundance
+                "trending_in_field": trending_in_field[:15],
+                "cross_pollination": cross_pollination[:15],
+                "citation_opportunities": citation_opportunities[:15]
+            }
+
+        except Exception as e:
+            logger.error(f"❌ Error generating domain-based recommendations: {e}")
+            # Return fallback recommendations
+            return {
+                "papers_for_you": await self._generate_fallback_recommendations(db, "papers_for_you"),
+                "trending_in_field": await self._generate_fallback_recommendations(db, "trending_in_field"),
+                "cross_pollination": await self._generate_fallback_recommendations(db, "cross_pollination"),
+                "citation_opportunities": await self._generate_fallback_recommendations(db, "citation_opportunities")
+            }
+
     async def get_weekly_recommendations(self, user_id: str, project_id: Optional[str] = None, force_refresh: bool = False) -> Dict[str, Any]:
         """
         Generate Spotify-style weekly recommendations with 4 main categories
@@ -126,7 +313,30 @@ class SpotifyInspiredRecommendationsService:
                 if datetime.now(timezone.utc) - cached_data["timestamp"] < self.cache_ttl:
                     return cached_data["data"]
 
-            # Get comprehensive user behavior analysis
+            # DIRECT APPROACH: Try to get user articles directly first
+            direct_recommendations = await self._get_direct_user_recommendations(user_id, project_id, db)
+            if direct_recommendations:
+                logger.info(f"✅ Using direct user recommendations approach")
+                result = {
+                    "status": "success",
+                    "week_of": self._get_week_start().isoformat(),
+                    "user_id": user_id,
+                    "project_id": project_id,
+                    "recommendations": direct_recommendations["recommendations"],
+                    "user_insights": direct_recommendations["user_insights"],
+                    "generated_at": datetime.now(timezone.utc).isoformat(),
+                    "next_update": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+                }
+
+                # Cache the result
+                self.recommendation_cache[cache_key] = {
+                    "data": result,
+                    "timestamp": datetime.now(timezone.utc)
+                }
+
+                return result
+
+            # Get comprehensive user behavior analysis (fallback)
             user_profile = await self._build_user_research_profile(user_id, project_id, db)
 
             # Try AI-enhanced recommendations first
