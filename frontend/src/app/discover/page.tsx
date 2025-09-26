@@ -463,7 +463,10 @@ export default function DiscoverPage() {
                 description: "Personalized recommendations based on your research",
                 updated: "21/09/2025 • Based on your recent activity and saved papers",
                 refresh_reason: "Updated based on your research activity and saved papers",
-                papers: papers
+                papers: papers,
+                icon: MusicalNoteIcon,
+                color: "#1db954",
+                category: "papers_for_you"
               };
 
               console.log('🎨 DISCOVER PAGE: Rendering Papers for You section with:', JSON.stringify(sectionData, null, 2));
@@ -500,7 +503,10 @@ export default function DiscoverPage() {
                 description: "Hot topics gaining attention in your research area",
                 updated: "21/09/2025 • Latest trends and breakthrough discoveries",
                 refresh_reason: "Updated with latest trending research in your field",
-                papers: papers
+                papers: papers,
+                icon: FireIcon,
+                color: "#ff6b35",
+                category: "trending_in_field"
               };
 
               console.log('🎨 DISCOVER PAGE: Rendering Trending section with:', JSON.stringify(sectionData, null, 2));
@@ -534,7 +540,10 @@ export default function DiscoverPage() {
                 description: "Interdisciplinary discoveries and new perspectives",
                 updated: "21/09/2025 • Exploring connections across research domains",
                 refresh_reason: "Updated with interdisciplinary research opportunities",
-                papers: papers
+                papers: papers,
+                icon: BeakerIcon,
+                color: "#8b5cf6",
+                category: "cross_pollination"
               };
 
               console.log('🎨 DISCOVER PAGE: Rendering Cross-pollination section with:', JSON.stringify(sectionData, null, 2));
@@ -568,7 +577,10 @@ export default function DiscoverPage() {
                 description: "Papers that could benefit from your expertise",
                 updated: "21/09/2025 • Recent papers in your field with citation gaps",
                 refresh_reason: "Updated with papers that could benefit from your research",
-                papers: papers
+                papers: papers,
+                icon: LightBulbIcon,
+                color: "#f59e0b",
+                category: "citation_opportunities"
               };
 
               console.log('🎨 DISCOVER PAGE: Rendering Citation Opportunities section with:', JSON.stringify(sectionData, null, 2));
