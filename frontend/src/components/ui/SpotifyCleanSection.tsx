@@ -49,6 +49,7 @@ interface SpotifyCleanSectionProps {
   onPlay?: (paper: Paper) => void;
   onSave?: (paper: Paper) => void;
   onShare?: (paper: Paper) => void;
+  onClick?: (paper: Paper) => void;
   onSeeAll?: (category: string) => void;
   showPersonalizedGreeting?: boolean;
   userName?: string;
@@ -60,6 +61,7 @@ export const SpotifyCleanSection: React.FC<SpotifyCleanSectionProps> = ({
   onPlay,
   onSave,
   onShare,
+  onClick,
   onSeeAll,
   showPersonalizedGreeting = false,
   userName = 'Researcher',
@@ -179,6 +181,7 @@ export const SpotifyCleanSection: React.FC<SpotifyCleanSectionProps> = ({
                   onPlay={onPlay}
                   onSave={onSave}
                   onShare={onShare}
+                  onClick={onClick}
                   size="md"
                 />
               </div>

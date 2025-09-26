@@ -42,6 +42,7 @@ interface SpotifyCleanArticleCardProps {
   onPlay?: (paper: any) => void;
   onSave?: (paper: any) => void;
   onShare?: (paper: any) => void;
+  onClick?: (paper: any) => void;
   isPlaying?: boolean;
   isSaved?: boolean;
   size?: 'sm' | 'md' | 'lg';
@@ -52,6 +53,7 @@ export function SpotifyCleanArticleCard({
   onPlay,
   onSave,
   onShare,
+  onClick,
   isPlaying = false,
   isSaved = false,
   size = 'md'
@@ -129,7 +131,10 @@ export function SpotifyCleanArticleCard({
   const additionalAuthors = paper.authors?.length > 1 ? ` +${paper.authors.length - 1}` : '';
 
   return (
-    <div className={cn("group cursor-pointer", sizeClasses[size])}>
+    <div
+      className={cn("group cursor-pointer", sizeClasses[size])}
+      onClick={() => onClick?.(paper)}
+    >
       {/* Article Visual */}
       {getArticleVisual()}
       

@@ -332,6 +332,12 @@ export default function HomePage() {
                 onPlay={(paper) => console.log('Playing paper:', paper)}
                 onSave={(paper) => console.log('Saving paper:', paper)}
                 onShare={(paper) => console.log('Sharing paper:', paper)}
+                onClick={(paper) => {
+                  // Open PubMed article in new tab
+                  if (paper.pmid) {
+                    window.open(`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`, '_blank');
+                  }
+                }}
                 onSeeAll={(category) => console.log('See all for category:', category)}
                 userName={user?.first_name || 'Researcher'}
                 isLoading={loading}

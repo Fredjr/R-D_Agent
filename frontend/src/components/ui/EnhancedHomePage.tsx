@@ -64,104 +64,21 @@ interface EnhancedHomePageProps {
   onPlay?: (paper: Paper) => void;
   onSave?: (paper: Paper) => void;
   onShare?: (paper: Paper) => void;
+  onClick?: (paper: Paper) => void;
   onSeeAll?: (category: string) => void;
   userName?: string;
   isLoading?: boolean;
 }
 
-// 🧠 Demo papers with semantic analysis data for testing
-const demoSemanticPapers: Paper[] = [
-  {
-    pmid: "demo_001",
-    title: "Deep Learning Approaches for Protein Structure Prediction: A Comprehensive Review",
-    authors: ["Smith, J.", "Johnson, A.", "Williams, R."],
-    journal: "Nature Machine Intelligence",
-    year: 2024,
-    citation_count: 127,
-    relevance_score: 0.95,
-    reason: "This paper presents novel deep learning architectures for protein folding prediction, achieving state-of-the-art results on benchmark datasets.",
-    category: "Machine Learning",
-    semantic_analysis: {
-      methodology: 'computational' as const,
-      complexity_score: 0.75,
-      novelty_type: 'breakthrough' as const,
-      research_domains: ['machine_learning', 'biology', 'computer_science'],
-      technical_terms: ['deep learning', 'protein folding', 'neural networks', 'AlphaFold', 'transformer architecture'],
-      confidence_scores: {
-        methodology: 0.92,
-        complexity: 0.88,
-        novelty: 0.85,
-      },
-      analysis_metadata: {
-        analysis_time_seconds: 0.003,
-        service_initialized: true,
-        embedding_dimensions: 384,
-      },
-    },
-  },
-  {
-    pmid: "demo_002",
-    title: "Experimental Validation of CRISPR-Cas9 Gene Editing in Human Embryos",
-    authors: ["Chen, L.", "Rodriguez, M.", "Kim, S."],
-    journal: "Cell",
-    year: 2024,
-    citation_count: 89,
-    relevance_score: 0.88,
-    reason: "Groundbreaking experimental study demonstrating safe and effective gene editing in human embryos using CRISPR technology.",
-    category: "Biology",
-    semantic_analysis: {
-      methodology: 'experimental' as const,
-      complexity_score: 0.45,
-      novelty_type: 'breakthrough' as const,
-      research_domains: ['biology', 'medicine', 'genetics'],
-      technical_terms: ['CRISPR-Cas9', 'gene editing', 'embryos', 'genetic modification', 'bioethics'],
-      confidence_scores: {
-        methodology: 0.95,
-        complexity: 0.82,
-        novelty: 0.91,
-      },
-      analysis_metadata: {
-        analysis_time_seconds: 0.002,
-        service_initialized: true,
-        embedding_dimensions: 384,
-      },
-    },
-  },
-  {
-    pmid: "demo_003",
-    title: "Theoretical Framework for Quantum Computing Applications in Drug Discovery",
-    authors: ["Patel, R.", "Thompson, K.", "Liu, X."],
-    journal: "Nature Quantum Information",
-    year: 2024,
-    citation_count: 34,
-    relevance_score: 0.72,
-    reason: "Novel theoretical approach combining quantum computing principles with pharmaceutical research methodologies.",
-    category: "Physics",
-    semantic_analysis: {
-      methodology: 'theoretical' as const,
-      complexity_score: 0.92,
-      novelty_type: 'incremental' as const,
-      research_domains: ['physics', 'computer_science', 'chemistry'],
-      technical_terms: ['quantum computing', 'drug discovery', 'quantum algorithms', 'molecular simulation', 'quantum advantage'],
-      confidence_scores: {
-        methodology: 0.89,
-        complexity: 0.94,
-        novelty: 0.76,
-      },
-      analysis_metadata: {
-        analysis_time_seconds: 0.004,
-        service_initialized: true,
-        embedding_dimensions: 384,
-      },
-    },
-  },
-];
+// Demo data removed - now using real recommendations only
+
 
 export const EnhancedHomePage: React.FC<EnhancedHomePageProps> = ({
   recommendations,
   onPlay,
   onSave,
   onShare,
+  onClick,
   onSeeAll,
   userName,
   isLoading
@@ -215,18 +132,6 @@ export const EnhancedHomePage: React.FC<EnhancedHomePageProps> = ({
       papers: recommendations.papers_for_you,
       updated: `Updated ${new Date().toLocaleDateString()}`,
       refresh_reason: "Based on your reading history and research interests",
-      icon: SparklesIcon,
-      color: "#1db954",
-      category: "papers_for_you"
-    });
-  } else {
-    // 🧠 Demo section with semantic analysis data
-    sections.push({
-      title: "Made for You",
-      description: "Your personalized mix of research papers",
-      papers: demoSemanticPapers,
-      updated: `Updated ${new Date().toLocaleDateString()}`,
-      refresh_reason: "🧠 Demo: Papers with semantic analysis features enabled",
       icon: SparklesIcon,
       color: "#1db954",
       category: "papers_for_you"
@@ -317,6 +222,7 @@ export const EnhancedHomePage: React.FC<EnhancedHomePageProps> = ({
               onPlay={onPlay}
               onSave={onSave}
               onShare={onShare}
+              onClick={onClick}
               onSeeAll={onSeeAll}
               showPersonalizedGreeting={index === 0}
               userName={displayName}
