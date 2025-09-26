@@ -469,12 +469,14 @@ export default function DiscoverPage() {
               console.log('🎨 DISCOVER PAGE: Rendering Papers for You section with:', JSON.stringify(sectionData, null, 2));
 
               return (
-                <SpotifyRecommendationSection
+                <SpotifyCleanSection
                   section={sectionData}
                   onPlay={handlePlayPaper}
                   onSave={handleSavePaper}
                   onShare={handleSharePaper}
                   onSeeAll={handleSeeAll}
+                  showPersonalizedGreeting={true}
+                  userName={(user as any)?.name || user?.email?.split('@')[0] || 'Researcher'}
                 />
               );
             } else {
@@ -504,7 +506,7 @@ export default function DiscoverPage() {
               console.log('🎨 DISCOVER PAGE: Rendering Trending section with:', JSON.stringify(sectionData, null, 2));
 
               return (
-                <SpotifyRecommendationSection
+                <SpotifyCleanSection
                   section={sectionData}
                   onPlay={handlePlayPaper}
                   onSave={handleSavePaper}
@@ -538,7 +540,7 @@ export default function DiscoverPage() {
               console.log('🎨 DISCOVER PAGE: Rendering Cross-pollination section with:', JSON.stringify(sectionData, null, 2));
 
               return (
-                <SpotifyRecommendationSection
+                <SpotifyCleanSection
                   section={sectionData}
                   onPlay={handlePlayPaper}
                   onSave={handleSavePaper}
@@ -572,7 +574,7 @@ export default function DiscoverPage() {
               console.log('🎨 DISCOVER PAGE: Rendering Citation Opportunities section with:', JSON.stringify(sectionData, null, 2));
 
               return (
-                <SpotifyRecommendationSection
+                <SpotifyCleanSection
                   section={sectionData}
                   onPlay={handlePlayPaper}
                   onSave={handleSavePaper}
