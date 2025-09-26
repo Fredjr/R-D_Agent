@@ -25,6 +25,10 @@ interface NetworkSidebarProps {
   // NEW: Multi-column support
   onCreatePaperColumn?: (paper: NetworkNode) => void;
   showCreateColumnButton?: boolean;
+  // NEW: Smart Actions for Phase 1.2
+  onGenerateReview?: (pmid: string, title: string) => void;
+  onDeepDive?: (pmid: string, title: string) => void;
+  onExploreCluster?: (pmid: string, title: string) => void;
 }
 
 export default function NetworkSidebar({
@@ -42,7 +46,10 @@ export default function NetworkSidebar({
   onExplorePeople,
   onAddExplorationNodes,
   onCreatePaperColumn,
-  showCreateColumnButton = false
+  showCreateColumnButton = false,
+  onGenerateReview,
+  onDeepDive,
+  onExploreCluster
 }: NetworkSidebarProps) {
   console.log('🔍 NetworkSidebar rendered with props:', {
     hasSelectedNode: !!selectedNode,
@@ -575,6 +582,66 @@ export default function NetworkSidebar({
               title="Create Paper Column"
             >
               ➕ Column
+            </Button>
+          )}
+        </div>
+
+        {/* Smart Action Buttons - Phase 1.2 Enhancement */}
+        <div className="mt-2 flex gap-1">
+          {onGenerateReview && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 text-xs bg-blue-50 hover:bg-blue-100 border-blue-200"
+              onClick={() => {
+                console.log('🚀 Generate Review button clicked!', selectedNode);
+                if (selectedNode) {
+                  onGenerateReview(selectedNode.id, metadata.title || 'Unknown Title');
+                } else {
+                  console.error('❌ No selected node for generate review');
+                }
+              }}
+              title="Generate comprehensive review using this paper as seed"
+            >
+              🚀 Review
+            </Button>
+          )}
+
+          {onDeepDive && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 text-xs bg-purple-50 hover:bg-purple-100 border-purple-200"
+              onClick={() => {
+                console.log('🔍 Deep Dive button clicked!', selectedNode);
+                if (selectedNode) {
+                  onDeepDive(selectedNode.id, metadata.title || 'Unknown Title');
+                } else {
+                  console.error('❌ No selected node for deep dive');
+                }
+              }}
+              title="Perform deep analysis of this paper's methodology and findings"
+            >
+              🔍 Deep Dive
+            </Button>
+          )}
+
+          {onExploreCluster && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 text-xs bg-green-50 hover:bg-green-100 border-green-200"
+              onClick={() => {
+                console.log('🌐 Explore Cluster button clicked!', selectedNode);
+                if (selectedNode) {
+                  onExploreCluster(selectedNode.id, metadata.title || 'Unknown Title');
+                } else {
+                  console.error('❌ No selected node for explore cluster');
+                }
+              }}
+              title="Explore research cluster around this paper's topic"
+            >
+              🌐 Cluster
             </Button>
           )}
         </div>
