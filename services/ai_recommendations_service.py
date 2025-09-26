@@ -315,6 +315,23 @@ class SpotifyInspiredRecommendationsService:
             # Enhanced query with better debugging
             logger.info(f"🔍 Querying articles for user_id: {user_id}, resolved_user_id: {resolved_user_id}, project_id: {project_id}")
 
+            # First, let's check if there are any ArticleCollection records at all
+            total_article_collections = db.query(ArticleCollection).count()
+            logger.info(f"📊 Total ArticleCollection records in database: {total_article_collections}")
+
+            # Check if there are any collections for this user
+            user_collections = db.query(Collection).filter(
+                or_(
+                    Collection.created_by == user_id,
+                    Collection.created_by == resolved_user_id
+                )
+            ).all()
+            logger.info(f"📚 Found {len(user_collections)} collections for user")
+
+            if user_collections:
+                for col in user_collections[:3]:  # Log first 3 collections
+                    logger.info(f"📁 Collection: {col.collection_name} (ID: {col.collection_id}, created_by: {col.created_by})")
+
             if project_id:
                 # Query with project filter
                 saved_articles_query = db.query(ArticleCollection).join(Collection).filter(
