@@ -18,8 +18,8 @@ interface SpotifyCleanArticleCardProps {
     pmid: string;
     title: string;
     authors: string[];
-    journal: string;
-    year: number;
+    journal?: string;
+    year?: number;
     abstract?: string;
     semantic_analysis?: {
       methodology?: 'experimental' | 'theoretical' | 'computational' | 'review' | 'meta_analysis' | 'case_study' | 'survey';
@@ -116,9 +116,11 @@ export function SpotifyCleanArticleCard({
         </div>
         
         {/* Journal badge */}
-        <div className="absolute top-2 right-2 px-2 py-1 bg-black/50 rounded text-white text-xs font-medium">
-          {paper.year}
-        </div>
+        {paper.year && (
+          <div className="absolute top-2 right-2 px-2 py-1 bg-black/50 rounded text-white text-xs font-medium">
+            {paper.year}
+          </div>
+        )}
       </div>
     );
   };
@@ -144,9 +146,11 @@ export function SpotifyCleanArticleCard({
         </p>
         
         {/* Journal */}
-        <p className="text-[var(--spotify-muted-text)] text-xs">
-          {paper.journal}
-        </p>
+        {paper.journal && (
+          <p className="text-[var(--spotify-muted-text)] text-xs">
+            {paper.journal}
+          </p>
+        )}
       </div>
       
       {/* Action Buttons */}
