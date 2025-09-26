@@ -170,6 +170,13 @@ class SpotifyInspiredRecommendationsService:
             logger.error(f"❌ Error in direct user recommendations: {e}")
             return None
 
+    def _get_week_start(self) -> datetime:
+        """Get the start of the current week (Monday)"""
+        today = datetime.now(timezone.utc)
+        days_since_monday = today.weekday()
+        week_start = today - timedelta(days=days_since_monday)
+        return week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+
     async def _generate_domain_based_recommendations(self, research_domains: List[str], db: Session) -> Dict[str, Any]:
         """Generate recommendations based on detected research domains"""
         try:
