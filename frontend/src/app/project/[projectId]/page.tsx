@@ -155,6 +155,20 @@ export default function ProjectPage() {
     }
   });
 
+  // Async job management for deep-dive
+  const deepDiveJob = useAsyncJob({
+    pollInterval: 5000, // 5 seconds
+    storageKey: `deepDiveJob_${projectId}`,
+    onComplete: (result) => {
+      // Handle completed deep dive
+      alert(`✅ Deep dive analysis completed!\n\nResults are saved to the project.`);
+      fetchProjectData(); // Refresh project data
+    },
+    onError: (error) => {
+      alert(`❌ Failed to complete deep dive: ${error}. Please try again.`);
+    }
+  });
+
   // Comprehensive project summary state
   const [comprehensiveSummary, setComprehensiveSummary] = useState<any>(null);
   const [generatingComprehensiveSummary, setGeneratingComprehensiveSummary] = useState(false);
@@ -1454,6 +1468,22 @@ export default function ProjectPage() {
             onCancel={reviewJob.cancelJob}
             onReset={reviewJob.resetJob}
             jobType="Generate Review"
+            className="mb-6"
+          />
+        )}
+
+        {/* Deep Dive Job Progress */}
+        {deepDiveJob.jobId && (
+          <AsyncJobProgress
+            jobId={deepDiveJob.jobId}
+            status={deepDiveJob.status}
+            progress={deepDiveJob.progress}
+            error={deepDiveJob.error}
+            startedAt={deepDiveJob.startedAt}
+            completedAt={deepDiveJob.completedAt}
+            onCancel={deepDiveJob.cancelJob}
+            onReset={deepDiveJob.resetJob}
+            jobType="Deep Dive Analysis"
             className="mb-6"
           />
         )}
