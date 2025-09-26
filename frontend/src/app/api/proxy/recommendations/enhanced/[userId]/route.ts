@@ -220,6 +220,10 @@ export async function GET(
     console.log('✅ Backend recommendations successful for user:', userId);
     console.log('📊 Backend response structure:', JSON.stringify(backendData, null, 2));
 
+    // Always use backend data when available, even if empty
+    // The backend service has been updated to return real recommendations
+    console.log('✅ Using backend recommendations data directly');
+
     // Check if backend returned empty recommendations and enhance for better UX
     const recommendations = backendData.recommendations || {};
     const totalRecommendations =
@@ -228,190 +232,17 @@ export async function GET(
       (recommendations.cross_pollination || []).length +
       (recommendations.citation_opportunities || []).length;
 
-    if (totalRecommendations === 0) {
-      console.log('📝 Backend returned empty recommendations, analyzing user collections for real recommendations...');
-
-      // For known active users, generate real recommendations directly
-      const knownActiveUsers = [
-        'fredericle77@gmail.com',
-        'e29e29d3-f87f-4c70-9aeb-424002382195' // Real user UUID
-      ];
-      if (knownActiveUsers.includes(userId)) {
-        console.log('✅ Generating real recommendations for known active user');
-
-        // Generate recommendations based on known research activity (Finerenone/kidney disease)
-        backendData.recommendations = {
-          papers_for_you: [
-            {
-              pmid: "38123456",
-              title: "Novel Therapeutic Approaches in Chronic Kidney Disease Management",
-              authors: ["Smith, J.A.", "Johnson, M.B.", "Williams, C.D."],
-              journal: "Nature Reviews Nephrology",
-              year: 2024,
-              citation_count: 127,
-              relevance_score: 0.95,
-              reason: "Based on your research in nephrology and kidney disease studies",
-              category: "personalized",
-              // 🎯 Phase 1.1c: Enhanced metadata
-              reading_status: "unread",
-              is_trending: false,
-              is_new: true,
-              is_highly_cited: true,
-              publication_date: "2024-09-15",
-              impact_score: 8.5
-            },
-            {
-              pmid: "38234567",
-              title: "Advances in Type 2 Diabetes Treatment: Beyond Metformin",
-              authors: ["Brown, K.L.", "Davis, R.M.", "Wilson, P.J."],
-              journal: "Diabetes Care",
-              year: 2024,
-              citation_count: 89,
-              relevance_score: 0.92,
-              reason: "Based on your research in diabetes and metabolic disorders",
-              category: "personalized",
-              // 🎯 Phase 1.1c: Enhanced metadata
-              reading_status: "reading",
-              is_trending: false,
-              is_new: true,
-              is_highly_cited: false,
-              publication_date: "2024-08-22",
-              impact_score: 7.2
-            },
-            {
-              pmid: "38345678",
-              title: "Cardiovascular Outcomes in Diabetic Nephropathy: Latest Evidence",
-              authors: ["Taylor, A.B.", "Anderson, L.K.", "Martinez, S.R."],
-              journal: "Circulation",
-              year: 2024,
-              citation_count: 156,
-              relevance_score: 0.94,
-              reason: "Based on your research in cardiovascular and related studies",
-              category: "personalized",
-              // 🎯 Phase 1.1c: Enhanced metadata
-              reading_status: "saved",
-              is_trending: false,
-              is_new: false,
-              is_highly_cited: true,
-              publication_date: "2024-07-10",
-              impact_score: 9.1
-            }
-          ],
-          trending_in_field: [
-            {
-              pmid: "38567890",
-              title: "Breakthrough in Diabetic Kidney Disease: SGLT2 Inhibitors and Beyond",
-              authors: ["Chen, L.Y.", "Rodriguez, M.C.", "Kim, J.S."],
-              journal: "New England Journal of Medicine",
-              year: 2024,
-              citation_count: 234,
-              relevance_score: 0.96,
-              reason: "Trending in nephrology and diabetes research",
-              category: "trending",
-              // 🎯 Phase 1.1c: Enhanced metadata
-              reading_status: "unread",
-              is_trending: true,
-              is_new: true,
-              is_highly_cited: true,
-              publication_date: "2024-09-20",
-              impact_score: 9.8
-            }
-          ],
-          cross_pollination: [
-            {
-              pmid: "38789012",
-              title: "Interdisciplinary Approaches: Nephrology Meets Cardiovascular Medicine",
-              authors: ["Interdisciplinary, Team", "Cross, Functional", "Research, Group"],
-              journal: "Nature Interdisciplinary Science",
-              year: 2024,
-              citation_count: 67,
-              relevance_score: 0.87,
-              reason: "Combines your interests in nephrology and cardiovascular research",
-              category: "cross-pollination"
-            }
-          ],
-          citation_opportunities: []
-        };
-
-        backendData.user_insights = {
-          ...backendData.user_insights,
-          research_domains: ["nephrology", "diabetes", "cardiovascular", "pharmacology"],
-          activity_level: "high",
-          total_collections: 3,
-          total_articles: 3
-        };
-      } else {
-        // Try to generate real recommendations for other users
-        try {
-          console.log('🔍 Attempting to generate real recommendations for user:', userId);
-          const realRecommendations = await generateRealRecommendations(userId, projectId);
-
-          console.log('📊 Real recommendations result:', realRecommendations ? `Found ${realRecommendations.total} recommendations` : 'null');
-
-          if (realRecommendations && realRecommendations.total > 0) {
-            console.log('✅ Generated real recommendations based on user research activity');
-            console.log('🔬 Research domains found:', realRecommendations.research_domains);
-            backendData.recommendations = realRecommendations.recommendations;
-            backendData.user_insights = {
-              ...backendData.user_insights,
-              research_domains: realRecommendations.research_domains,
-              activity_level: realRecommendations.activity_level,
-              total_collections: realRecommendations.total_collections,
-              total_articles: realRecommendations.total_articles
-            };
-          } else {
-            console.log('📝 No real research activity found, providing getting started content...');
-          }
-        } catch (error) {
-          console.error('❌ Error generating real recommendations:', error);
-          console.log('📝 Falling back to getting started content due to error...');
-        }
-      }
-
-      // If we still don't have recommendations, provide getting started content
-      if (!backendData.recommendations ||
-          (!backendData.recommendations.papers_for_you?.length &&
-           !backendData.recommendations.trending_in_field?.length)) {
-        console.log('📝 Providing getting started content...');
-
-        // Enhance empty response with helpful getting started content
-        backendData.recommendations = {
-          papers_for_you: [{
-            pmid: "getting_started_1",
-            title: "Welcome to Your Research Discovery Journey!",
-            authors: ["R&D Agent Team"],
-            journal: "Getting Started Guide",
-            year: 2024,
-            citation_count: 0,
-            relevance_score: 1.0,
-            reason: "Start by creating your first project and adding articles to get personalized recommendations",
-            category: "getting_started",
-            is_getting_started: true
-          }],
-          trending_in_field: [{
-            pmid: "getting_started_2",
-            title: "How to Build Your Research Collection",
-            authors: ["R&D Agent Team"],
-            journal: "User Guide",
-            year: 2024,
-            citation_count: 0,
-            relevance_score: 1.0,
-            reason: "Learn how to organize your research and discover new papers",
-            category: "getting_started",
-            is_getting_started: true
-          }],
-          cross_pollination: [],
-          citation_opportunities: []
-        };
-
-        // Update user insights for new users
-        backendData.user_insights = {
-          ...backendData.user_insights,
-          activity_level: "new_user",
-          discovery_preference: "getting_started"
-        };
-      }
+    // Only generate fallback data if backend is completely empty AND user has no data
+    if (totalRecommendations === 0 && (!backendData.user_insights || Object.keys(backendData.user_insights).length === 0)) {
+      console.log('📝 Backend returned completely empty data, generating minimal fallback...');
+      return await generateFallbackRecommendations(userId, projectId);
     }
+
+    // Use backend data as-is (it now contains real recommendations from the updated service)
+    console.log('✅ Using real backend recommendations data');
+
+        // Backend data is now real - no need to override with mock data
+        console.log('✅ Backend service now provides real recommendations, using as-is');
 
     // 🧠 Phase 2A.2: Add Semantic Analysis to All Papers
     console.log('🧠 SEMANTIC: Starting semantic analysis integration...');
