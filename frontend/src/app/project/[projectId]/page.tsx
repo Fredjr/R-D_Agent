@@ -567,8 +567,9 @@ export default function ProjectPage() {
     try {
       // Start deep dive job with the specific paper
       const jobResponse = await startDeepDiveJob({
-        article_title: title,
-        article_pmid: pmid,
+        title: title,
+        pmid: pmid,
+        objective: `Deep dive analysis of: ${title}`,
         projectId: projectId
       });
 
