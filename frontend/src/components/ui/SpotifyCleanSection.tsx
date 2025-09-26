@@ -16,12 +16,21 @@ interface Paper {
   reason: string;
   category: string;
   semantic_analysis?: {
-    methodology?: string;
+    methodology?: 'experimental' | 'theoretical' | 'computational' | 'review' | 'meta_analysis' | 'case_study' | 'survey';
     complexity_score?: number;
-    novelty_type?: string;
+    novelty_type?: 'breakthrough' | 'incremental' | 'replication' | 'review';
     research_domains?: string[];
     technical_terms?: string[];
-    confidence_score?: number;
+    confidence_scores?: {
+      methodology: number;
+      complexity: number;
+      novelty: number;
+    };
+    analysis_metadata?: {
+      analysis_time_seconds?: number;
+      service_initialized?: boolean;
+      embedding_dimensions?: number;
+    };
   };
 }
 
