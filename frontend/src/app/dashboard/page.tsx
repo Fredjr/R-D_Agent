@@ -20,6 +20,7 @@ import {
   PageHeader
 } from '@/components/ui';
 import { SpotifyTopBar } from '@/components/ui/SpotifyNavigation';
+import { MobileResponsiveLayout } from '@/components/ui/MobileResponsiveLayout';
 
 interface Project {
   project_id: string;
@@ -197,36 +198,28 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--spotify-black)]">
-      {/* Top Navigation */}
-      <SpotifyTopBar
-        title="Projects"
-        showSearch={true}
-        onSearch={(query) => {
-          // Navigate to search page with query
-          router.push(`/search?q=${encodeURIComponent(query)}`);
-        }}
-      />
+    <MobileResponsiveLayout>
+      <div className="w-full max-w-none py-6 sm:py-8">
+        {/* Mobile-friendly header */}
+        <div className="mb-6 sm:mb-8">
+          <div className="flex flex-col gap-4 mb-6">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl sm:text-3xl font-bold text-[var(--spotify-white)] mb-2">Research Projects</h1>
+              <p className="text-[var(--spotify-light-text)] text-sm sm:text-base">
+                Manage your research projects and collaborate with your team
+              </p>
+            </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <PageHeader
-          title="Research Projects"
-          description="Manage your research projects and collaborate with your team"
-          breadcrumb={[
-            { label: 'Research Hub', href: '/' },
-            { label: 'Projects', current: true }
-          ]}
-          actions={
             <div className="flex flex-col sm:flex-row gap-3">
-              <Link href="/discover">
-                <Button variant="outline" className="inline-flex items-center">
-                  <MusicalNoteIcon className="h-5 w-5 mr-2" />
+              <Link href="/discover" className="w-full sm:w-auto">
+                <Button variant="outline" className="inline-flex items-center justify-center w-full">
+                  <MusicalNoteIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                   Discover Papers
                 </Button>
               </Link>
-              <Link href="/">
-                <Button variant="outline" className="inline-flex items-center">
-                  <BeakerIcon className="h-5 w-5 mr-2" />
+              <Link href="/" className="w-full sm:w-auto">
+                <Button variant="outline" className="inline-flex items-center justify-center w-full">
+                  <BeakerIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                   Research Hub
                 </Button>
               </Link>
@@ -234,14 +227,14 @@ export default function Dashboard() {
                 onClick={() => setShowCreateModal(true)}
                 variant="spotifyPrimary"
                 size="spotifyDefault"
-                className="inline-flex items-center"
+                className="inline-flex items-center justify-center w-full sm:w-auto"
               >
-                <PlusIcon className="h-5 w-5 mr-2" />
+                <PlusIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                 New Project
               </Button>
             </div>
-          }
-        />
+          </div>
+        </div>
 
         {/* Error Display */}
         {error && (
@@ -540,6 +533,6 @@ export default function Dashboard() {
           </div>
         )}
       </div>
-    </div>
+    </MobileResponsiveLayout>
   );
 }
