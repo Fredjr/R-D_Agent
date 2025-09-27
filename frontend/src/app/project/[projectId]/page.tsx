@@ -682,8 +682,13 @@ export default function ProjectPage() {
           'User-ID': user?.email || 'default_user',
         },
         body: JSON.stringify({
-          pmid: pmid,
-          title: title
+          article_pmid: pmid,
+          article_title: title,
+          article_authors: [],
+          article_journal: '',
+          article_year: new Date().getFullYear(),
+          source_type: 'cluster_exploration',
+          notes: `Source paper for cluster exploration: ${title}`
         })
       });
 

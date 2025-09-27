@@ -278,11 +278,13 @@ function SearchPageContent() {
           'User-ID': user.email,
         },
         body: JSON.stringify({
-          pmid: selectedArticleForAction.metadata.pmid,
-          title: selectedArticleForAction.title,
-          authors: selectedArticleForAction.metadata.authors?.join(', ') || '',
-          journal: selectedArticleForAction.metadata.journal || '',
-          year: selectedArticleForAction.metadata.year || new Date().getFullYear()
+          article_pmid: selectedArticleForAction.metadata.pmid,
+          article_title: selectedArticleForAction.title,
+          article_authors: selectedArticleForAction.metadata.authors || [],
+          article_journal: selectedArticleForAction.metadata.journal || '',
+          article_year: selectedArticleForAction.metadata.year || new Date().getFullYear(),
+          source_type: 'search',
+          notes: `Added from search: ${selectedArticleForAction.title}`
         })
       });
 
