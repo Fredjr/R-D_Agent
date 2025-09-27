@@ -559,14 +559,8 @@ export default function ProjectPage() {
       // Use the paper title and PMID to create an optimized query
       const optimizedQuery = `"${pmid}"[PMID] OR "${title}"[Title]`;
 
-      console.log('🚀 [Project Page] Starting review job with params:', {
-        molecule: title.substring(0, 50),
-        objective: `Comprehensive review focusing on: ${title}`,
-        projectId
-      });
-
-      // Start the review job with the paper as the focus
-      const jobResponse = await startReviewJob({
+      // Try with minimal payload first to debug backend issues
+      const reviewPayload = {
         molecule: title.substring(0, 50), // Use first 50 chars of title as molecule
         objective: `Comprehensive review focusing on: ${title}`,
         projectId: projectId,
@@ -574,7 +568,12 @@ export default function ProjectPage() {
         dagMode: false,
         fullTextOnly: false,
         preference: 'precision' as 'precision' | 'recall'
-      });
+      };
+
+      console.log('🚀 [Project Page] Starting review job with params:', reviewPayload);
+
+      // Start the review job with the paper as the focus
+      const jobResponse = await startReviewJob(reviewPayload);
 
       console.log('🚀 [Project Page] Review job response:', jobResponse);
 
@@ -600,20 +599,18 @@ export default function ProjectPage() {
     });
 
     try {
-      console.log('🔍 [Project Page] Starting deep dive job with params:', {
-        title,
-        pmid,
-        objective: `Deep dive analysis of: ${title}`,
-        projectId
-      });
-
-      // Start deep dive job with the specific paper
-      const jobResponse = await startDeepDiveJob({
+      // Try with minimal payload first to debug backend issues
+      const deepDivePayload = {
         pmid: pmid,
         title: title,
         objective: `Deep dive analysis of: ${title}`,
         projectId: projectId
-      });
+      };
+
+      console.log('🔍 [Project Page] Starting deep dive job with params:', deepDivePayload);
+
+      // Start deep dive job with the specific paper
+      const jobResponse = await startDeepDiveJob(deepDivePayload);
 
       console.log('🔍 [Project Page] Deep dive job response:', jobResponse);
 
@@ -636,6 +633,9 @@ export default function ProjectPage() {
       projectId,
       userId: user?.email
     });
+
+    // Add alert to confirm function is being called
+    alert(`🌐 Cluster exploration started for: ${title.substring(0, 50)}...\n\nCheck console for detailed logs.`);
 
     // For now, this will trigger a similar work exploration
     // In the future, this could be enhanced with more sophisticated clustering
