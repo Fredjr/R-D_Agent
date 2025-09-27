@@ -26,8 +26,8 @@ interface NetworkSidebarProps {
   onCreatePaperColumn?: (paper: NetworkNode) => void;
   showCreateColumnButton?: boolean;
   // NEW: Smart Actions for Phase 1.2
-  onGenerateReview?: (pmid: string, title: string) => void;
-  onDeepDive?: (pmid: string, title: string) => void;
+  onGenerateReview?: (pmid: string, title: string, fullTextOnly?: boolean) => void;
+  onDeepDive?: (pmid: string, title: string, fullTextOnly?: boolean) => void;
   onExploreCluster?: (pmid: string, title: string) => void;
 }
 
