@@ -201,15 +201,30 @@ export async function GET(request: NextRequest) {
     if (referenceArticles.length === 0) {
       console.log(`⚠️ No references found via eLink for PMID ${pmid}, trying alternative search`);
 
-      // Alternative: Search for older papers on the same topic
+      // Alternative: Search for foundational papers on the same topic
       try {
-        const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=type+1+diabetes+therapy&retmax=5&retmode=json&sort=pub_date`;
+        // Extract keywords from the source article title for better search
+        const sourceTitle = sourceArticle.title.toLowerCase();
+        let searchTerm = 'diabetes therapy';
+
+        if (sourceTitle.includes('type 1 diabetes')) {
+          searchTerm = 'type 1 diabetes treatment';
+        } else if (sourceTitle.includes('diabetes')) {
+          searchTerm = 'diabetes management';
+        } else if (sourceTitle.includes('cardiovascular')) {
+          searchTerm = 'cardiovascular disease';
+        } else if (sourceTitle.includes('cancer')) {
+          searchTerm = 'cancer treatment';
+        }
+
+        // Search for older, foundational papers (published before 2020)
+        const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(searchTerm)}+AND+("2015"[Date - Publication]:"2019"[Date - Publication])&retmax=5&retmode=json&sort=relevance`;
         const searchResponse = await fetch(searchUrl);
 
         if (searchResponse.ok) {
           const searchData = await searchResponse.json();
           const altPmids = searchData.esearchresult?.idlist || [];
-          console.log(`🔍 Found ${altPmids.length} alternative reference articles`);
+          console.log(`🔍 Found ${altPmids.length} foundational reference articles for "${searchTerm}"`);
 
           if (altPmids.length > 0) {
             referenceArticles = await fetchArticleDetails(altPmids.slice(0, 3));

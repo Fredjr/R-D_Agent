@@ -26,8 +26,8 @@ export interface UseAsyncJobOptions {
 
 export function useAsyncJob(options: UseAsyncJobOptions = {}) {
   const {
-    pollInterval = 5000, // 5 seconds
-    maxPollTime = 30 * 60 * 1000, // 30 minutes
+    pollInterval = 10000, // 10 seconds (reduced polling frequency)
+    maxPollTime = 45 * 60 * 1000, // 45 minutes (increased timeout)
     onProgress,
     onComplete,
     onError,
