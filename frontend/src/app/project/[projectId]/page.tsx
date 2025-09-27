@@ -573,13 +573,38 @@ export default function ProjectPage() {
 
       console.log('🚀 [Project Page] Starting review job with params:', reviewPayload);
 
-      // Start the review job with the paper as the focus
-      const jobResponse = await startReviewJob(reviewPayload);
+      // Test direct API call to debug backend issues
+      try {
+        console.log('🔍 [Project Page] Testing direct API call to backend...');
+        const directResponse = await fetch('/api/proxy/generate-review-async', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(reviewPayload)
+        });
 
-      console.log('🚀 [Project Page] Review job response:', jobResponse);
+        console.log('🔍 [Project Page] Direct API response status:', directResponse.status);
 
-      // Start polling for job completion
-      reviewJob.startJob(jobResponse.job_id);
+        if (!directResponse.ok) {
+          const errorText = await directResponse.text();
+          console.error('🔍 [Project Page] Direct API error response:', errorText);
+          throw new Error(`Direct API call failed: ${directResponse.status} - ${errorText}`);
+        }
+
+        const jobResponse = await directResponse.json();
+        console.log('🔍 [Project Page] Direct API success response:', jobResponse);
+
+        // If direct call worked, continue with normal flow
+        // Start polling for job completion
+        reviewJob.startJob(jobResponse.job_id);
+
+      } catch (directError: any) {
+        console.error('🔍 [Project Page] Direct API call failed:', directError);
+
+        // Fallback to original startReviewJob function
+        console.log('🚀 [Project Page] Falling back to startReviewJob function...');
+        const jobResponse = await startReviewJob(reviewPayload);
+        reviewJob.startJob(jobResponse.job_id);
+      }
 
       console.log('✅ [Project Page] Review job started successfully from network sidebar');
       alert(`🚀 Review generation started for "${title}"!\n\nThis process will continue in the background.`);
@@ -610,13 +635,37 @@ export default function ProjectPage() {
 
       console.log('🔍 [Project Page] Starting deep dive job with params:', deepDivePayload);
 
-      // Start deep dive job with the specific paper
-      const jobResponse = await startDeepDiveJob(deepDivePayload);
+      // Test direct API call to debug backend issues
+      try {
+        console.log('🔍 [Project Page] Testing direct deep dive API call to backend...');
+        const directResponse = await fetch('/api/proxy/deep-dive-async', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(deepDivePayload)
+        });
 
-      console.log('🔍 [Project Page] Deep dive job response:', jobResponse);
+        console.log('🔍 [Project Page] Direct deep dive API response status:', directResponse.status);
 
-      // Start polling for job completion
-      deepDiveJob.startJob(jobResponse.job_id);
+        if (!directResponse.ok) {
+          const errorText = await directResponse.text();
+          console.error('🔍 [Project Page] Direct deep dive API error response:', errorText);
+          throw new Error(`Direct deep dive API call failed: ${directResponse.status} - ${errorText}`);
+        }
+
+        const jobResponse = await directResponse.json();
+        console.log('🔍 [Project Page] Direct deep dive API success response:', jobResponse);
+
+        // If direct call worked, continue with normal flow
+        deepDiveJob.startJob(jobResponse.job_id);
+
+      } catch (directError: any) {
+        console.error('🔍 [Project Page] Direct deep dive API call failed:', directError);
+
+        // Fallback to original startDeepDiveJob function
+        console.log('🔍 [Project Page] Falling back to startDeepDiveJob function...');
+        const jobResponse = await startDeepDiveJob(deepDivePayload);
+        deepDiveJob.startJob(jobResponse.job_id);
+      }
 
       console.log('✅ [Project Page] Deep dive job started successfully from network sidebar');
       alert(`🔍 Deep dive analysis started for "${title}"!\n\nThis process will continue in the background.`);
