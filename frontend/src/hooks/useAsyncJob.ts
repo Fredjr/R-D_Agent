@@ -102,11 +102,21 @@ export function useAsyncJob(options: UseAsyncJobOptions = {}) {
         }
 
         const jobStatus = await pollJobStatus(jobId, userId);
-        
+
+        // Enhanced debugging
+        const elapsed = startTimeRef.current ? Date.now() - startTimeRef.current.getTime() : 0;
+        console.log(`🔄 [useAsyncJob] Job ${jobId} status:`, {
+          status: jobStatus.status,
+          created_at: jobStatus.created_at,
+          elapsed_minutes: Math.round(elapsed / 60000),
+          result: jobStatus.result ? 'Present' : 'Null',
+          article_count: jobStatus.article_count || 'N/A'
+        });
+
         setState(prev => ({
           ...prev,
           status: jobStatus.status as any,
-          progress: `Status: ${jobStatus.status}`,
+          progress: `Status: ${jobStatus.status} (${Math.round(elapsed / 60000)}m)`,
         }));
 
         if (onProgress) {
@@ -146,7 +156,29 @@ export function useAsyncJob(options: UseAsyncJobOptions = {}) {
           }
           
         } else {
-          // Still processing, schedule next poll
+          // Still processing - check if it's been too long
+          const elapsed = startTimeRef.current ? Date.now() - startTimeRef.current.getTime() : 0;
+
+          if (elapsed > 25 * 60 * 1000) { // 25 minutes - assume job is stuck
+            console.error(`❌ [useAsyncJob] Job ${jobId} appears stuck after ${Math.round(elapsed / 60000)} minutes`);
+            setState(prev => ({
+              ...prev,
+              status: 'failed',
+              error: 'Job appears to be stuck - please try again',
+              progress: 'Job timeout',
+              completedAt: new Date(),
+            }));
+
+            if (onError) onError('Job appears to be stuck - please try again');
+
+            // Clear from localStorage when failed
+            if (persistToLocalStorage && typeof window !== 'undefined') {
+              localStorage.removeItem(storageKey);
+            }
+            return;
+          }
+
+          // Schedule next poll
           pollTimeoutRef.current = setTimeout(poll, pollInterval);
         }
         
