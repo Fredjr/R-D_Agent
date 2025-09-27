@@ -139,6 +139,7 @@ export default function ProjectPage() {
   const reviewJob = useAsyncJob({
     pollInterval: 5000, // 5 seconds
     storageKey: `reviewJob_${projectId}`,
+    userId: user?.email,
     onComplete: (result) => {
       // Handle completed review
       const arr = Array.isArray(result?.results) ? result.results : [];
@@ -160,6 +161,7 @@ export default function ProjectPage() {
   const deepDiveJob = useAsyncJob({
     pollInterval: 5000, // 5 seconds
     storageKey: `deepDiveJob_${projectId}`,
+    userId: user?.email,
     onComplete: (result) => {
       // Handle completed deep dive
       alert(`✅ Deep dive analysis completed!\n\nResults are saved to the project.`);
