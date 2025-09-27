@@ -14,6 +14,7 @@ import { useAsyncJob } from '@/hooks/useAsyncJob';
 import { startReviewJob, startDeepDiveJob } from '@/lib/api';
 import AsyncJobProgress from '@/components/AsyncJobProgress';
 import ClusterExplorationModal from '@/components/ClusterExplorationModal';
+import InlineJobResults from '@/components/InlineJobResults';
 import { SpotifyTopBar, SpotifyBreadcrumb, SpotifyTabs } from '@/components/ui/SpotifyNavigation';
 import { SpotifyCollectionCard } from '@/components/ui/SpotifyCard';
 import { SpotifyProjectHeader } from '@/components/ui/SpotifyProjectHeader';
@@ -137,9 +138,12 @@ export default function ProjectPage() {
 
   // Async job management for generate-review
   const reviewJob = useAsyncJob({
-    pollInterval: 5000, // 5 seconds
+    pollInterval: 10000, // 10 seconds (reduced polling frequency)
     storageKey: `reviewJob_${projectId}`,
     userId: user?.email,
+    onProgress: (status) => {
+      console.log(`🚀 [Review Job] Status: ${status}`);
+    },
     onComplete: (result) => {
       // Handle completed review
       const arr = Array.isArray(result?.results) ? result.results : [];
@@ -149,25 +153,42 @@ export default function ProjectPage() {
       setReportDiagnostics(result?.diagnostics ?? null);
       setReportQueries(Array.isArray(result?.queries) ? result.queries : null);
 
-      alert(`✅ Report generated successfully!\n\nResults are displayed below and saved to the project.`);
+      // Show inline results
+      setInlineResults({
+        show: true,
+        jobType: 'review',
+        result: result
+      });
+
       fetchProjectData(); // Refresh project data
     },
     onError: (error) => {
+      console.error('❌ [Review Job] Error:', error);
       alert(`❌ Failed to generate report: ${error}. Please try again.`);
     }
   });
 
   // Async job management for deep-dive
   const deepDiveJob = useAsyncJob({
-    pollInterval: 5000, // 5 seconds
+    pollInterval: 10000, // 10 seconds (reduced polling frequency)
     storageKey: `deepDiveJob_${projectId}`,
     userId: user?.email,
+    onProgress: (status) => {
+      console.log(`🔍 [Deep Dive Job] Status: ${status}`);
+    },
     onComplete: (result) => {
       // Handle completed deep dive
-      alert(`✅ Deep dive analysis completed!\n\nResults are saved to the project.`);
+      // Show inline results
+      setInlineResults({
+        show: true,
+        jobType: 'deep-dive',
+        result: result
+      });
+
       fetchProjectData(); // Refresh project data
     },
     onError: (error) => {
+      console.error('❌ [Deep Dive Job] Error:', error);
       alert(`❌ Failed to complete deep dive: ${error}. Please try again.`);
     }
   });
@@ -612,7 +633,28 @@ export default function ProjectPage() {
       }
 
       console.log('✅ [Project Page] Review job started successfully from network sidebar');
-      alert(`🚀 Review generation started for "${title}"!\n\nThis process will continue in the background.`);
+
+      // Show a more informative notification
+      const notification = document.createElement('div');
+      notification.className = 'fixed top-4 right-4 bg-blue-600 text-white px-6 py-4 rounded-lg shadow-lg z-50 max-w-sm';
+      notification.innerHTML = `
+        <div class="flex items-center space-x-3">
+          <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+          <div>
+            <div class="font-medium">Review Generation Started</div>
+            <div class="text-sm opacity-90">Processing "${title.substring(0, 40)}..."</div>
+            <div class="text-xs opacity-75 mt-1">Results will appear here when complete</div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(notification);
+
+      // Remove notification after 5 seconds
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 5000);
 
     } catch (error: any) {
       console.error('❌ [Project Page] Error starting review from network:', error);
@@ -676,7 +718,28 @@ export default function ProjectPage() {
       }
 
       console.log('✅ [Project Page] Deep dive job started successfully from network sidebar');
-      alert(`🔍 Deep dive analysis started for "${title}"!\n\nThis process will continue in the background.`);
+
+      // Show a more informative notification
+      const notification = document.createElement('div');
+      notification.className = 'fixed top-4 right-4 bg-purple-600 text-white px-6 py-4 rounded-lg shadow-lg z-50 max-w-sm';
+      notification.innerHTML = `
+        <div class="flex items-center space-x-3">
+          <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+          <div>
+            <div class="font-medium">Deep Dive Analysis Started</div>
+            <div class="text-sm opacity-90">Processing "${title.substring(0, 40)}..."</div>
+            <div class="text-xs opacity-75 mt-1">Results will appear here when complete</div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(notification);
+
+      // Remove notification after 5 seconds
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 5000);
 
     } catch (error: any) {
       console.error('❌ [Project Page] Error starting deep dive from network:', error);
@@ -701,6 +764,17 @@ export default function ProjectPage() {
     results: { citations: [], references: [], similar: [] },
     loading: false,
     currentCollectionId: null
+  });
+
+  // State for inline job results
+  const [inlineResults, setInlineResults] = useState<{
+    show: boolean;
+    jobType: 'review' | 'deep-dive' | null;
+    result: any;
+  }>({
+    show: false,
+    jobType: null,
+    result: null
   });
 
   const handleExploreClusterFromNetwork = async (pmid: string, title: string) => {
@@ -1939,6 +2013,25 @@ export default function ProjectPage() {
         onAddToCollection={handleAddClusterArticlesToCollection}
         projectId={projectId}
       />
+
+      {/* Inline Job Results Modal */}
+      {inlineResults.show && inlineResults.jobType && (
+        <InlineJobResults
+          jobType={inlineResults.jobType}
+          jobStatus="completed"
+          result={inlineResults.result}
+          onClose={() => setInlineResults({ show: false, jobType: null, result: null })}
+          onViewFullResults={() => {
+            // Close inline results and switch to appropriate tab
+            setInlineResults({ show: false, jobType: null, result: null });
+            if (inlineResults.jobType === 'review') {
+              setActiveTab('reports');
+            } else {
+              setActiveTab('deep-dives');
+            }
+          }}
+        />
+      )}
     </MobileResponsiveLayout>
   );
 }
