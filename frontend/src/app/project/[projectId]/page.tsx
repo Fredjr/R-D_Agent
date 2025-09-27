@@ -2022,13 +2022,9 @@ export default function ProjectPage() {
           result={inlineResults.result}
           onClose={() => setInlineResults({ show: false, jobType: null, result: null })}
           onViewFullResults={() => {
-            // Close inline results and switch to appropriate tab
+            // Close inline results and switch to overview tab where results are displayed
             setInlineResults({ show: false, jobType: null, result: null });
-            if (inlineResults.jobType === 'review') {
-              setActiveTab('reports');
-            } else {
-              setActiveTab('deep-dives');
-            }
+            setActiveTab('overview');
           }}
         />
       )}
