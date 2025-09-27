@@ -37,11 +37,18 @@ export async function POST(request: NextRequest) {
 
     console.log('🔍 [Sync Deep Dive] Enhanced payload:', enhancedBody);
 
-    // Call synchronous backend endpoint
-    const response = await fetch(`${BACKEND_URL}/deep-dive`, {
+    // Call the endpoint that creates a database record (like dashboard does)
+    const projectId = enhancedBody.projectId;
+    const response = await fetch(`${BACKEND_URL}/projects/${projectId}/deep-dive-analyses`, {
       method: 'POST',
       headers,
-      body: JSON.stringify(enhancedBody),
+      body: JSON.stringify({
+        article_pmid: enhancedBody.pmid,
+        article_title: enhancedBody.title,
+        article_url: enhancedBody.full_text_url || null,
+        // Add the enhanced parameters
+        ...enhancedBody
+      }),
     });
 
     console.log(`🔍 [Sync Deep Dive] Backend response status: ${response.status}`);
