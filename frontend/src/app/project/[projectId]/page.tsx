@@ -660,12 +660,18 @@ export default function ProjectPage() {
     });
 
     try {
-      // Try with minimal payload first to debug backend issues
+      // Enhanced payload with more content for deep dive
       const deepDivePayload = {
         pmid: pmid,
         title: title,
         objective: `Deep dive analysis of: ${title}`,
-        projectId: projectId
+        projectId: projectId,
+        // Add abstract and DOI if available (we'll fetch from PubMed)
+        abstract: `Please analyze the paper titled "${title}" with PMID ${pmid}. Use available abstract and metadata.`,
+        doi: null,
+        // Request abstract-based analysis as fallback
+        analysis_mode: 'abstract_based',
+        full_text_url: null // We don't have full text URLs
       };
 
       console.log('🔍 [Project Page] Starting deep dive job with params:', deepDivePayload);
