@@ -18,6 +18,12 @@ interface SearchResult {
     date?: string;
     tags?: string[];
     projectName?: string;
+    pmid?: string;
+    journal?: string;
+    year?: number;
+    authors?: string[];
+    url?: string;
+    doi?: string;
   };
 }
 
@@ -33,58 +39,87 @@ function SearchPageContent() {
     project: 'all'
   });
   const [showFilters, setShowFilters] = useState(false);
+  const [searchStats, setSearchStats] = useState<{
+    total_found: number;
+    query_type: string;
+    mesh_enhanced: boolean;
+    optimized_query?: string;
+  } | null>(null);
 
-  const handleSearch = async (searchQuery: string) => {
+  const handleSearch = async (searchQuery: string, meshData?: any) => {
     if (!searchQuery.trim()) return;
-    
+
+    console.log('🔍 [Search Page] Starting search:', {
+      query: searchQuery,
+      hasMeshData: !!meshData,
+      meshTerms: meshData?.mesh_terms?.length || 0,
+      suggestedQueries: meshData?.suggested_queries?.length || 0
+    });
+
     setIsLoading(true);
     try {
-      // TODO: Implement actual search API call
-      // For now, return mock results
-      const mockResults: SearchResult[] = [
-        {
-          id: '1',
-          type: 'project',
-          title: 'Machine Learning in Healthcare',
-          description: 'Comprehensive analysis of ML applications in medical diagnosis',
-          metadata: {
-            author: 'Research Team',
-            date: '2024-01-15',
-            tags: ['machine-learning', 'healthcare', 'diagnosis']
-          }
-        },
-        {
-          id: '2',
-          type: 'report',
-          title: 'COVID-19 Treatment Efficacy Study',
-          description: 'Meta-analysis of treatment protocols and outcomes',
-          metadata: {
-            author: 'Dr. Smith',
-            date: '2024-01-10',
-            projectName: 'Pandemic Response Research'
-          }
-        },
-        {
-          id: '3',
-          type: 'collection',
-          title: 'Neural Networks Papers',
-          description: 'Curated collection of seminal neural network research',
-          metadata: {
-            date: '2024-01-08',
-            tags: ['neural-networks', 'deep-learning']
-          }
+      // Build API URL with parameters
+      const params = new URLSearchParams({
+        q: searchQuery,
+        limit: '20'
+      });
+
+      // Add MeSH data if available
+      if (meshData?.mesh_terms && meshData.mesh_terms.length > 0) {
+        params.append('mesh_terms', JSON.stringify(meshData.mesh_terms));
+      }
+      if (meshData?.suggested_queries && meshData.suggested_queries.length > 0) {
+        params.append('suggested_queries', JSON.stringify(meshData.suggested_queries));
+      }
+
+      const apiUrl = `/api/proxy/pubmed/search?${params}`;
+      console.log('🔍 [Search Page] API call:', apiUrl);
+
+      const response = await fetch(apiUrl);
+
+      if (!response.ok) {
+        throw new Error(`Search API failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ [Search Page] Search results:', {
+        total_found: data.total_found,
+        query_type: data.query_type,
+        mesh_enhanced: data.mesh_enhanced,
+        optimized_query: data.optimized_query
+      });
+
+      // Convert PubMed articles to SearchResult format
+      const searchResults: SearchResult[] = data.articles.map((article: any) => ({
+        id: article.pmid,
+        type: 'article' as const,
+        title: article.title,
+        description: article.abstract || 'No abstract available',
+        metadata: {
+          pmid: article.pmid,
+          authors: article.authors,
+          journal: article.journal,
+          year: article.year,
+          url: article.url,
+          doi: article.doi,
+          date: `${article.year}-01-01` // Approximate date for sorting
         }
-      ];
-      
-      // Filter results based on query
-      const filteredResults = mockResults.filter(result =>
-        result.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        result.description.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      
-      setResults(filteredResults);
+      }));
+
+      setResults(searchResults);
+      setSearchStats({
+        total_found: data.total_found,
+        query_type: data.query_type,
+        mesh_enhanced: data.mesh_enhanced,
+        optimized_query: data.optimized_query
+      });
+
     } catch (error) {
-      console.error('Search failed:', error);
+      console.error('❌ [Search Page] Search failed:', error);
+      setResults([]);
+      setSearchStats(null);
+      // Show user-friendly error message
+      alert(`Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }
@@ -92,7 +127,21 @@ function SearchPageContent() {
 
   useEffect(() => {
     if (query) {
-      handleSearch(query);
+      // Check for MeSH data from home page
+      let meshData = null;
+      try {
+        const storedMeshData = sessionStorage.getItem('meshSearchData');
+        if (storedMeshData) {
+          meshData = JSON.parse(storedMeshData);
+          // Clear the data after use
+          sessionStorage.removeItem('meshSearchData');
+          console.log('🔍 [Search Page] Using MeSH data from home page:', meshData);
+        }
+      } catch (e) {
+        console.warn('Failed to parse stored MeSH data');
+      }
+
+      handleSearch(query, meshData);
     }
   }, [query]);
 
@@ -123,7 +172,7 @@ function SearchPageContent() {
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-[var(--spotify-white)] mb-2">Search</h1>
           <p className="text-[var(--spotify-light-text)] text-sm sm:text-base">
-            Find projects, reports, collections, and research across your workspace
+            Search millions of biomedical research articles from PubMed
           </p>
         </div>
 
@@ -138,7 +187,7 @@ function SearchPageContent() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSearch(query)}
-              placeholder="Search projects, reports, collections..."
+              placeholder="Search PubMed articles, PMIDs, DOIs..."
               className="block w-full pl-10 pr-3 py-3 bg-[var(--spotify-dark-gray)] border border-[var(--spotify-border-gray)] rounded-lg text-[var(--spotify-white)] placeholder-[var(--spotify-muted-text)] focus:outline-none focus:ring-2 focus:ring-[var(--spotify-green)] focus:border-transparent text-sm sm:text-base"
             />
           </div>
@@ -223,50 +272,94 @@ function SearchPageContent() {
           {isLoading ? (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--spotify-green)] mx-auto"></div>
-              <p className="text-[var(--spotify-light-text)] mt-2">Searching...</p>
+              <p className="text-[var(--spotify-light-text)] mt-2">Searching PubMed...</p>
             </div>
           ) : results.length > 0 ? (
             <>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <p className="text-[var(--spotify-light-text)]">
                   Found {results.length} result{results.length !== 1 ? 's' : ''} for "{query}"
                 </p>
+                {searchStats && (
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <span className={`px-2 py-1 rounded-full ${
+                      searchStats.query_type === 'pmid' ? 'bg-blue-500/20 text-blue-400' :
+                      searchStats.query_type === 'doi' ? 'bg-purple-500/20 text-purple-400' :
+                      'bg-green-500/20 text-green-400'
+                    }`}>
+                      {searchStats.query_type.toUpperCase()} Search
+                    </span>
+                    {searchStats.mesh_enhanced && (
+                      <span className="px-2 py-1 rounded-full bg-orange-500/20 text-orange-400">
+                        MeSH Enhanced
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
+
+              {searchStats?.optimized_query && searchStats.optimized_query !== query && (
+                <div className="bg-[var(--spotify-medium-gray)] rounded-lg p-3 text-sm">
+                  <span className="text-[var(--spotify-light-text)]">Optimized query: </span>
+                  <code className="text-[var(--spotify-green)]">{searchStats.optimized_query}</code>
+                </div>
+              )}
               
               {results.map((result) => (
                 <div
                   key={result.id}
                   className="bg-[var(--spotify-dark-gray)] rounded-lg p-6 border border-[var(--spotify-border-gray)] hover:bg-[var(--spotify-medium-gray)] transition-colors cursor-pointer"
+                  onClick={() => {
+                    if (result.metadata.url) {
+                      window.open(result.metadata.url, '_blank');
+                    }
+                  }}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <div className="flex items-center mb-2">
-                        <span className="text-2xl mr-3">{getResultIcon(result.type)}</span>
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getResultTypeColor(result.type)}`}>
-                          {result.type.charAt(0).toUpperCase() + result.type.slice(1)}
-                        </span>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center">
+                          <span className="text-2xl mr-3">{getResultIcon(result.type)}</span>
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getResultTypeColor(result.type)}`}>
+                            {result.type.charAt(0).toUpperCase() + result.type.slice(1)}
+                          </span>
+                        </div>
+                        {result.metadata.pmid && (
+                          <span className="text-xs text-[var(--spotify-muted-text)] font-mono">
+                            PMID: {result.metadata.pmid}
+                          </span>
+                        )}
                       </div>
-                      
-                      <h3 className="text-lg font-semibold text-[var(--spotify-white)] mb-2">
+
+                      <h3 className="text-lg font-semibold text-[var(--spotify-white)] mb-2 hover:text-[var(--spotify-green)] transition-colors">
                         {result.title}
                       </h3>
-                      
-                      <p className="text-[var(--spotify-light-text)] mb-3">
+
+                      <p className="text-[var(--spotify-light-text)] mb-3 line-clamp-3">
                         {result.description}
                       </p>
-                      
-                      <div className="flex items-center text-sm text-[var(--spotify-muted-text)] space-x-4">
-                        {result.metadata.author && (
-                          <span>By {result.metadata.author}</span>
+
+                      <div className="flex flex-wrap items-center text-sm text-[var(--spotify-muted-text)] gap-4 mb-2">
+                        {result.metadata.authors && result.metadata.authors.length > 0 && (
+                          <span>
+                            By {result.metadata.authors.slice(0, 3).join(', ')}
+                            {result.metadata.authors.length > 3 && ` +${result.metadata.authors.length - 3} more`}
+                          </span>
                         )}
-                        {result.metadata.date && (
-                          <span>{new Date(result.metadata.date).toLocaleDateString()}</span>
+                        {result.metadata.journal && (
+                          <span>{result.metadata.journal}</span>
                         )}
-                        {result.metadata.projectName && (
-                          <span>in {result.metadata.projectName}</span>
+                        {result.metadata.year && (
+                          <span>{result.metadata.year}</span>
                         )}
                       </div>
-                      
+
+                      {result.metadata.doi && (
+                        <div className="text-xs text-[var(--spotify-muted-text)] mb-2">
+                          DOI: {result.metadata.doi}
+                        </div>
+                      )}
+
                       {result.metadata.tags && (
                         <div className="flex flex-wrap gap-2 mt-3">
                           {result.metadata.tags.map((tag) => (
@@ -279,6 +372,32 @@ function SearchPageContent() {
                           ))}
                         </div>
                       )}
+
+                      {/* Action buttons for articles */}
+                      {result.type === 'article' && result.metadata.pmid && (
+                        <div className="flex gap-2 mt-4">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log('Add to project:', result.metadata.pmid);
+                              // TODO: Implement add to project functionality
+                            }}
+                            className="px-3 py-1 text-xs bg-[var(--spotify-green)]/20 text-[var(--spotify-green)] rounded hover:bg-[var(--spotify-green)]/30 transition-colors"
+                          >
+                            Add to Project
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log('Deep dive:', result.metadata.pmid);
+                              // TODO: Implement deep dive functionality
+                            }}
+                            className="px-3 py-1 text-xs bg-[var(--spotify-blue)]/20 text-[var(--spotify-blue)] rounded hover:bg-[var(--spotify-blue)]/30 transition-colors"
+                          >
+                            Deep Dive
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -287,18 +406,37 @@ function SearchPageContent() {
           ) : query ? (
             <div className="text-center py-12">
               <MagnifyingGlassIcon className="h-16 w-16 text-[var(--spotify-muted-text)] mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-[var(--spotify-white)] mb-2">No results found</h3>
-              <p className="text-[var(--spotify-light-text)]">
-                Try adjusting your search terms or filters
+              <h3 className="text-lg font-medium text-[var(--spotify-white)] mb-2">No articles found</h3>
+              <p className="text-[var(--spotify-light-text)] mb-4">
+                No PubMed articles found for "{query}"
               </p>
+              <div className="text-sm text-[var(--spotify-muted-text)] space-y-1">
+                <p>Try:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>Different keywords or synonyms</li>
+                  <li>Broader search terms</li>
+                  <li>Specific PMID (e.g., 12345678)</li>
+                  <li>DOI (e.g., 10.1038/nature12373)</li>
+                </ul>
+              </div>
             </div>
           ) : (
             <div className="text-center py-12">
               <MagnifyingGlassIcon className="h-16 w-16 text-[var(--spotify-muted-text)] mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-[var(--spotify-white)] mb-2">Start searching</h3>
-              <p className="text-[var(--spotify-light-text)]">
-                Enter a search term to find projects, reports, and collections
+              <h3 className="text-lg font-medium text-[var(--spotify-white)] mb-2">Search PubMed</h3>
+              <p className="text-[var(--spotify-light-text)] mb-4">
+                Search millions of biomedical research articles
               </p>
+              <div className="text-sm text-[var(--spotify-muted-text)] space-y-1">
+                <p>You can search by:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>Keywords and topics</li>
+                  <li>Author names</li>
+                  <li>PMID numbers</li>
+                  <li>DOI identifiers</li>
+                  <li>Journal names</li>
+                </ul>
+              </div>
             </div>
           )}
         </div>

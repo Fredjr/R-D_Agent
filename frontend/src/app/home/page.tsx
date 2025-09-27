@@ -121,10 +121,23 @@ export default function HomePage() {
       total_suggestions: suggestions?.total_suggestions || 0
     });
 
-    // For now, redirect to search page with the query
-    // TODO: Implement semantic search results display
-    console.log('🏠 [Home Page] Redirecting to search page with query:', query);
-    router.push(`/search?q=${encodeURIComponent(query)}`);
+    // Redirect to search page with query and MeSH data
+    const searchParams = new URLSearchParams({
+      q: query
+    });
+
+    // Store MeSH data in sessionStorage for the search page to use
+    if (suggestions) {
+      sessionStorage.setItem('meshSearchData', JSON.stringify({
+        query,
+        mesh_terms: suggestions.mesh_terms || [],
+        trending_keywords: suggestions.trending_keywords || [],
+        suggested_queries: suggestions.suggested_queries || []
+      }));
+    }
+
+    console.log('🏠 [Home Page] Redirecting to search page with MeSH-enhanced query:', query);
+    router.push(`/search?${searchParams.toString()}`);
   };
 
   // Handler for generate-review from search
