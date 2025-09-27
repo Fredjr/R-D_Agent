@@ -598,8 +598,8 @@ export default function ProjectPage() {
 
       // Test direct API call to debug backend issues
       try {
-        console.log('🔍 [Project Page] Testing direct API call to backend...');
-        const directResponse = await fetch('/api/proxy/generate-review-async', {
+        console.log('🔍 [Project Page] Using synchronous API call (async jobs not working)...');
+        const directResponse = await fetch('/api/proxy/generate-review-sync', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -616,45 +616,33 @@ export default function ProjectPage() {
           throw new Error(`Direct API call failed: ${directResponse.status} - ${errorText}`);
         }
 
-        const jobResponse = await directResponse.json();
-        console.log('🔍 [Project Page] Direct API success response:', jobResponse);
+        const result = await directResponse.json();
+        console.log('🔍 [Project Page] Synchronous API success response:', result);
 
-        // If direct call worked, continue with normal flow
-        // Start polling for job completion
-        reviewJob.startJob(jobResponse.job_id);
+        // Process results immediately (no job polling needed)
+        const arr = Array.isArray(result?.results) ? result.results : [];
+        const enriched = arr.map((it: any) => ({ ...it, _objective: reviewPayload.objective, query: reviewPayload.objective }));
+
+        setReportResults(enriched);
+        setReportDiagnostics(result?.diagnostics ?? null);
+        setReportQueries(Array.isArray(result?.queries) ? result.queries : null);
+        setReportObjective(reviewPayload.objective);
+
+        // Show inline results
+        setInlineResults({
+          show: true,
+          jobType: 'review',
+          result: result
+        });
+
+        fetchProjectData(); // Refresh project data
 
       } catch (directError: any) {
-        console.error('🔍 [Project Page] Direct API call failed:', directError);
-
-        // Fallback to original startReviewJob function
-        console.log('🚀 [Project Page] Falling back to startReviewJob function...');
-        const jobResponse = await startReviewJob(reviewPayload, user?.email);
-        reviewJob.startJob(jobResponse.job_id);
+        console.error('🔍 [Project Page] Synchronous API call failed:', directError);
+        throw directError; // Re-throw to be caught by outer try-catch
       }
 
-      console.log('✅ [Project Page] Review job started successfully from network sidebar');
-
-      // Show a more informative notification
-      const notification = document.createElement('div');
-      notification.className = 'fixed top-4 right-4 bg-blue-600 text-white px-6 py-4 rounded-lg shadow-lg z-50 max-w-sm';
-      notification.innerHTML = `
-        <div class="flex items-center space-x-3">
-          <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-          <div>
-            <div class="font-medium">Review Generation Started</div>
-            <div class="text-sm opacity-90">Processing "${title.substring(0, 40)}..."</div>
-            <div class="text-xs opacity-75 mt-1">Results will appear here when complete</div>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(notification);
-
-      // Remove notification after 5 seconds
-      setTimeout(() => {
-        if (notification.parentNode) {
-          notification.parentNode.removeChild(notification);
-        }
-      }, 5000);
+      console.log('✅ [Project Page] Review completed successfully from network sidebar');
 
     } catch (error: any) {
       console.error('❌ [Project Page] Error starting review from network:', error);
@@ -684,8 +672,8 @@ export default function ProjectPage() {
 
       // Test direct API call to debug backend issues
       try {
-        console.log('🔍 [Project Page] Testing direct deep dive API call to backend...');
-        const directResponse = await fetch('/api/proxy/deep-dive-async', {
+        console.log('🔍 [Project Page] Using synchronous deep dive API call...');
+        const directResponse = await fetch('/api/proxy/deep-dive-sync', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -702,44 +690,24 @@ export default function ProjectPage() {
           throw new Error(`Direct deep dive API call failed: ${directResponse.status} - ${errorText}`);
         }
 
-        const jobResponse = await directResponse.json();
-        console.log('🔍 [Project Page] Direct deep dive API success response:', jobResponse);
+        const result = await directResponse.json();
+        console.log('🔍 [Project Page] Synchronous deep dive API success response:', result);
 
-        // If direct call worked, continue with normal flow
-        deepDiveJob.startJob(jobResponse.job_id);
+        // Show inline results immediately
+        setInlineResults({
+          show: true,
+          jobType: 'deep-dive',
+          result: result
+        });
+
+        fetchProjectData(); // Refresh project data
 
       } catch (directError: any) {
-        console.error('🔍 [Project Page] Direct deep dive API call failed:', directError);
-
-        // Fallback to original startDeepDiveJob function
-        console.log('🔍 [Project Page] Falling back to startDeepDiveJob function...');
-        const jobResponse = await startDeepDiveJob(deepDivePayload, user?.email);
-        deepDiveJob.startJob(jobResponse.job_id);
+        console.error('🔍 [Project Page] Synchronous deep dive API call failed:', directError);
+        throw directError; // Re-throw to be caught by outer try-catch
       }
 
-      console.log('✅ [Project Page] Deep dive job started successfully from network sidebar');
-
-      // Show a more informative notification
-      const notification = document.createElement('div');
-      notification.className = 'fixed top-4 right-4 bg-purple-600 text-white px-6 py-4 rounded-lg shadow-lg z-50 max-w-sm';
-      notification.innerHTML = `
-        <div class="flex items-center space-x-3">
-          <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-          <div>
-            <div class="font-medium">Deep Dive Analysis Started</div>
-            <div class="text-sm opacity-90">Processing "${title.substring(0, 40)}..."</div>
-            <div class="text-xs opacity-75 mt-1">Results will appear here when complete</div>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(notification);
-
-      // Remove notification after 5 seconds
-      setTimeout(() => {
-        if (notification.parentNode) {
-          notification.parentNode.removeChild(notification);
-        }
-      }, 5000);
+      console.log('✅ [Project Page] Deep dive completed successfully from network sidebar');
 
     } catch (error: any) {
       console.error('❌ [Project Page] Error starting deep dive from network:', error);
