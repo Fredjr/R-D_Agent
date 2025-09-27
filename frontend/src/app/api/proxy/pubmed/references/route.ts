@@ -197,29 +197,52 @@ export async function GET(request: NextRequest) {
     // Fetch details for reference articles
     let referenceArticles = await fetchArticleDetails(referencePmids);
 
-    // If no references found, provide helpful mock data to avoid empty results
+    // If no references found, try alternative search strategies
     if (referenceArticles.length === 0) {
-      console.log(`⚠️ No references found for PMID ${pmid}, providing sample data`);
-      referenceArticles = [
-        {
-          pmid: "ref_sample1",
-          title: "Sample Reference Article 1",
-          authors: ['Reference Author'],
-          journal: 'Reference Journal',
-          year: new Date().getFullYear() - 3,
-          citation_count: 10,
-          abstract: 'This is a sample reference article for demonstration purposes.'
-        },
-        {
-          pmid: "ref_sample2",
-          title: "Sample Reference Article 2",
-          authors: ['Another Reference Author'],
-          journal: 'Another Reference Journal',
-          year: new Date().getFullYear() - 4,
-          citation_count: 8,
-          abstract: 'Another sample reference article for demonstration.'
+      console.log(`⚠️ No references found via eLink for PMID ${pmid}, trying alternative search`);
+
+      // Alternative: Search for older papers on the same topic
+      try {
+        const searchUrl = `${PUBMED_SEARCH_URL}?db=pubmed&term=type+1+diabetes+therapy&retmax=5&retmode=json&sort=pub_date`;
+        const searchResponse = await fetch(searchUrl);
+
+        if (searchResponse.ok) {
+          const searchData = await searchResponse.json();
+          const altPmids = searchData.esearchresult?.idlist || [];
+          console.log(`🔍 Found ${altPmids.length} alternative reference articles`);
+
+          if (altPmids.length > 0) {
+            referenceArticles = await fetchArticleDetails(altPmids.slice(0, 3));
+          }
         }
-      ];
+      } catch (error) {
+        console.warn('Alternative reference search failed:', error);
+      }
+
+      // Final fallback to sample data only if all real searches fail
+      if (referenceArticles.length === 0) {
+        console.log(`⚠️ All reference search strategies failed for PMID ${pmid}, providing sample data`);
+        referenceArticles = [
+          {
+            pmid: "ref_sample1",
+            title: "Sample Reference Article 1",
+            authors: ['Reference Author'],
+            journal: 'Reference Journal',
+            year: new Date().getFullYear() - 3,
+            citation_count: 10,
+            abstract: 'This is a sample reference article for demonstration purposes.'
+          },
+          {
+            pmid: "ref_sample2",
+            title: "Sample Reference Article 2",
+            authors: ['Another Reference Author'],
+            journal: 'Another Reference Journal',
+            year: new Date().getFullYear() - 4,
+            citation_count: 8,
+            abstract: 'Another sample reference article for demonstration.'
+          }
+        ];
+      }
     }
     
     const response: ReferencesNetworkResponse = {

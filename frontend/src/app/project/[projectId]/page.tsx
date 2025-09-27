@@ -752,11 +752,20 @@ export default function ProjectPage() {
         console.warn('🌐 [Project Page] References fetch failed:', error);
       }
 
-      // Strategy 3: Find similar articles by title
+      // Strategy 3: Find similar articles by title - use better keywords
       console.log('🌐 [Project Page] Searching for similar articles by title keywords');
       try {
-        const titleWords = title.split(' ').slice(0, 3).join(' ');
-        const similarResponse = await fetch(`/api/proxy/pubmed/search?q=${encodeURIComponent(titleWords)}&limit=8`);
+        // Extract meaningful keywords from title, avoiding common words
+        const commonWords = ['the', 'and', 'or', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'a', 'an'];
+        const titleWords = title.toLowerCase()
+          .split(' ')
+          .filter(word => word.length > 3 && !commonWords.includes(word))
+          .slice(0, 4) // Take up to 4 meaningful words
+          .join(' ');
+
+        console.log('🌐 [Project Page] Using search keywords:', titleWords);
+
+        const similarResponse = await fetch(`/api/proxy/pubmed/search?q=${encodeURIComponent(titleWords)}&limit=10`);
         if (similarResponse.ok) {
           const similarData = await similarResponse.json();
           console.log('🌐 [Project Page] Similar API response:', similarData);
