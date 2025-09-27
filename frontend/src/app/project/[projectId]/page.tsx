@@ -13,6 +13,7 @@ import Collections from '@/components/Collections';
 import { useAsyncJob } from '@/hooks/useAsyncJob';
 import { startReviewJob, startDeepDiveJob } from '@/lib/api';
 import AsyncJobProgress from '@/components/AsyncJobProgress';
+import ClusterExplorationModal from '@/components/ClusterExplorationModal';
 import { SpotifyTopBar, SpotifyBreadcrumb, SpotifyTabs } from '@/components/ui/SpotifyNavigation';
 import { SpotifyCollectionCard } from '@/components/ui/SpotifyCard';
 import { SpotifyProjectHeader } from '@/components/ui/SpotifyProjectHeader';
@@ -626,6 +627,25 @@ export default function ProjectPage() {
     }
   };
 
+  // State for inline cluster exploration
+  const [clusterExploration, setClusterExploration] = useState<{
+    isOpen: boolean;
+    sourceArticle: { pmid: string; title: string } | null;
+    results: {
+      citations: any[];
+      references: any[];
+      similar: any[];
+    };
+    loading: boolean;
+    currentCollectionId: string | null;
+  }>({
+    isOpen: false,
+    sourceArticle: null,
+    results: { citations: [], references: [], similar: [] },
+    loading: false,
+    currentCollectionId: null
+  });
+
   const handleExploreClusterFromNetwork = async (pmid: string, title: string) => {
     console.log('🌐 [Project Page] Explore Cluster from Network triggered:', {
       pmid,
@@ -634,163 +654,135 @@ export default function ProjectPage() {
       userId: user?.email
     });
 
-    // Add alert to confirm function is being called
-    alert(`🌐 Cluster exploration started for: ${title.substring(0, 50)}...\n\nCheck console for detailed logs.`);
+    // Get current collection ID - if we're in collections tab, use the first collection
+    // In the future, this could be more sophisticated to detect which specific collection
+    const currentCollection = collections.length > 0 ? collections[0] : null;
 
-    // For now, this will trigger a similar work exploration
-    // In the future, this could be enhanced with more sophisticated clustering
+    // Open cluster exploration modal/sidebar
+    setClusterExploration({
+      isOpen: true,
+      sourceArticle: { pmid, title },
+      results: { citations: [], references: [], similar: [] },
+      loading: true,
+      currentCollectionId: currentCollection?.collection_id || null
+    });
+
     try {
-      const collectionName = `Cluster: ${title.substring(0, 30)}...`;
-      const collectionDescription = `Research cluster exploration around: ${title}`;
-
-      console.log('🌐 [Project Page] Creating cluster collection with params:', {
-        name: collectionName,
-        description: collectionDescription,
-        projectId
-      });
-
-      // Create a new collection for the cluster exploration
-      const collectionResponse = await fetch(`/api/proxy/projects/${projectId}/collections`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-ID': user?.email || 'default_user',
-        },
-        body: JSON.stringify({
-          collection_name: collectionName,
-          description: collectionDescription,
-          color: '#FF9800',
-          icon: 'cluster'
-        })
-      });
-
-      if (!collectionResponse.ok) {
-        throw new Error('Failed to create cluster collection');
-      }
-
-      const collection = await collectionResponse.json();
-      console.log('🌐 [Project Page] Cluster collection created:', collection);
-
-      // Add the source paper to the collection
-      console.log('🌐 [Project Page] Adding source paper to collection:', { pmid, title });
-      const sourceArticleResponse = await fetch(`/api/proxy/collections/${collection.collection_id}/articles?projectId=${projectId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-ID': user?.email || 'default_user',
-        },
-        body: JSON.stringify({
-          article_pmid: pmid,
-          article_title: title,
-          article_authors: [],
-          article_journal: '',
-          article_year: new Date().getFullYear(),
-          source_type: 'cluster_exploration',
-          notes: `Source paper for cluster exploration: ${title}`
-        })
-      });
-
-      if (!sourceArticleResponse.ok) {
-        throw new Error('Failed to add source paper to collection');
-      }
-
-      // Now find and add related cluster papers using multiple strategies
       console.log('🌐 [Project Page] Finding related cluster papers for PMID:', pmid);
-      try {
-        let relatedArticles: any[] = [];
+      let citations: any[] = [];
+      let references: any[] = [];
+      let similar: any[] = [];
 
-        // Strategy 1: Use citations API to find papers that cite this one
-        console.log('🌐 [Project Page] Fetching citations for PMID:', pmid);
+      // Strategy 1: Find papers that cite this one
+      console.log('🌐 [Project Page] Fetching citations for PMID:', pmid);
+      try {
         const citationsResponse = await fetch(`/api/proxy/pubmed/citations?pmid=${pmid}&type=citations&limit=5`);
         if (citationsResponse.ok) {
           const citationsData = await citationsResponse.json();
-          console.log('🌐 [Project Page] Found citations:', citationsData.articles?.length || 0);
-          if (citationsData.articles) {
-            relatedArticles = [...relatedArticles, ...citationsData.articles.slice(0, 3)];
-          }
+          citations = citationsData.articles?.slice(0, 3) || [];
+          console.log('🌐 [Project Page] Found citations:', citations.length);
         }
+      } catch (error) {
+        console.warn('🌐 [Project Page] Citations fetch failed:', error);
+      }
 
-        // Strategy 2: Use references API to find papers this one references
-        console.log('🌐 [Project Page] Fetching references for PMID:', pmid);
+      // Strategy 2: Find papers this one references
+      console.log('🌐 [Project Page] Fetching references for PMID:', pmid);
+      try {
         const referencesResponse = await fetch(`/api/proxy/pubmed/references?pmid=${pmid}&limit=5`);
         if (referencesResponse.ok) {
           const referencesData = await referencesResponse.json();
-          console.log('🌐 [Project Page] Found references:', referencesData.articles?.length || 0);
-          if (referencesData.articles) {
-            relatedArticles = [...relatedArticles, ...referencesData.articles.slice(0, 3)];
-          }
+          references = referencesData.articles?.slice(0, 3) || [];
+          console.log('🌐 [Project Page] Found references:', references.length);
         }
-
-        // Strategy 3: Use title-based search for similar articles
-        if (relatedArticles.length < 5) {
-          console.log('🌐 [Project Page] Searching for similar articles by title keywords');
-          const titleWords = title.split(' ').slice(0, 3).join(' '); // Use first 3 words
-          const similarResponse = await fetch(`/api/proxy/pubmed/search?q=${encodeURIComponent(titleWords)}&limit=8`);
-          if (similarResponse.ok) {
-            const similarData = await similarResponse.json();
-            console.log('🌐 [Project Page] Found similar articles:', similarData.articles?.length || 0);
-            if (similarData.articles) {
-              // Filter out the source article and add remaining
-              const filteredSimilar = similarData.articles.filter((article: any) => article.pmid !== pmid);
-              relatedArticles = [...relatedArticles, ...filteredSimilar.slice(0, 3)];
-            }
-          }
-        }
-
-        // Remove duplicates based on PMID
-        const uniqueArticles = relatedArticles.filter((article, index, self) =>
-          index === self.findIndex(a => a.pmid === article.pmid)
-        ).slice(0, 5); // Limit to 5 related articles
-
-        console.log('🌐 [Project Page] Adding', uniqueArticles.length, 'unique related articles to collection');
-
-        // Add related articles to the collection
-        for (const article of uniqueArticles) {
-          try {
-            const addResponse = await fetch(`/api/proxy/collections/${collection.collection_id}/articles?projectId=${projectId}`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'User-ID': user?.email || 'default_user',
-              },
-              body: JSON.stringify({
-                article_pmid: article.pmid,
-                article_title: article.title,
-                article_authors: article.authors || [],
-                article_journal: article.journal || '',
-                article_year: article.year || new Date().getFullYear(),
-                source_type: 'cluster_exploration',
-                notes: `Related paper found through cluster exploration from: ${title}`
-              })
-            });
-
-            if (addResponse.ok) {
-              console.log('🌐 [Project Page] Added cluster article:', article.title.substring(0, 50) + '...');
-            } else {
-              console.warn('🌐 [Project Page] Failed to add cluster article (API error):', article.title);
-            }
-          } catch (error) {
-            console.warn('🌐 [Project Page] Failed to add cluster article (exception):', article.title, error);
-          }
-        }
-
-        console.log('🌐 [Project Page] Cluster exploration completed. Total articles in collection should be:', uniqueArticles.length + 1);
-
       } catch (error) {
-        console.warn('🌐 [Project Page] Cluster discovery failed, continuing with source paper only:', error);
+        console.warn('🌐 [Project Page] References fetch failed:', error);
       }
 
-      // Refresh collections and switch to collections tab
-      console.log('🌐 [Project Page] Refreshing collections and switching to collections tab');
-      await fetchCollections();
-      setActiveTab('collections');
+      // Strategy 3: Find similar articles by title
+      console.log('🌐 [Project Page] Searching for similar articles by title keywords');
+      try {
+        const titleWords = title.split(' ').slice(0, 3).join(' ');
+        const similarResponse = await fetch(`/api/proxy/pubmed/search?q=${encodeURIComponent(titleWords)}&limit=8`);
+        if (similarResponse.ok) {
+          const similarData = await similarResponse.json();
+          similar = similarData.articles?.filter((article: any) => article.pmid !== pmid).slice(0, 3) || [];
+          console.log('🌐 [Project Page] Found similar articles:', similar.length);
+        }
+      } catch (error) {
+        console.warn('🌐 [Project Page] Similar articles fetch failed:', error);
+      }
+
+      // Update cluster exploration with results
+      setClusterExploration(prev => ({
+        ...prev,
+        results: { citations, references, similar },
+        loading: false
+      }));
 
       console.log('✅ [Project Page] Cluster exploration completed successfully');
-      alert(`🌐 Cluster collection created: "${collection.name}"!\n\nYou can now explore related papers in the Collections tab.`);
 
     } catch (error: any) {
-      console.error('❌ [Project Page] Error creating cluster exploration:', error);
-      alert(`❌ Failed to create cluster: ${error.message || 'Unknown error'}`);
+      console.error('❌ [Project Page] Error in cluster exploration:', error);
+      setClusterExploration(prev => ({
+        ...prev,
+        loading: false
+      }));
+    }
+  };
+
+  // Handle adding selected cluster articles to current collection
+  const handleAddClusterArticlesToCollection = async (articles: any[], collectionId: string) => {
+    if (!user?.email) return;
+
+    console.log('🔗 [Project Page] Adding cluster articles to collection:', {
+      articlesCount: articles.length,
+      collectionId,
+      articles: articles.map(a => ({ pmid: a.pmid, title: a.title.substring(0, 50) + '...' }))
+    });
+
+    const addPromises = articles.map(async (article) => {
+      try {
+        const response = await fetch(`/api/proxy/collections/${collectionId}/articles?projectId=${projectId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-ID': user.email,
+          },
+          body: JSON.stringify({
+            article_pmid: article.pmid,
+            article_title: article.title,
+            article_authors: article.authors || [],
+            article_journal: article.journal || '',
+            article_year: article.year || new Date().getFullYear(),
+            source_type: 'cluster_exploration',
+            notes: `Added from cluster exploration of: ${clusterExploration.sourceArticle?.title}`
+          })
+        });
+
+        if (response.ok) {
+          console.log('✅ [Project Page] Added cluster article:', article.title.substring(0, 50) + '...');
+          return true;
+        } else {
+          console.warn('❌ [Project Page] Failed to add cluster article:', article.title);
+          return false;
+        }
+      } catch (error) {
+        console.error('❌ [Project Page] Error adding cluster article:', article.title, error);
+        return false;
+      }
+    });
+
+    const results = await Promise.all(addPromises);
+    const successCount = results.filter(Boolean).length;
+
+    // Refresh collections to show updated counts
+    await fetchCollections();
+
+    if (successCount === articles.length) {
+      alert(`✅ Successfully added ${successCount} papers to your collection!`);
+    } else {
+      alert(`⚠️ Added ${successCount} of ${articles.length} papers to your collection. Some papers may have failed to add.`);
     }
   };
 
@@ -1863,6 +1855,18 @@ export default function ProjectPage() {
           </div>
         </div>
       )}
+
+      {/* Cluster Exploration Modal */}
+      <ClusterExplorationModal
+        isOpen={clusterExploration.isOpen}
+        sourceArticle={clusterExploration.sourceArticle}
+        results={clusterExploration.results}
+        loading={clusterExploration.loading}
+        currentCollectionId={clusterExploration.currentCollectionId}
+        onClose={() => setClusterExploration(prev => ({ ...prev, isOpen: false }))}
+        onAddToCollection={handleAddClusterArticlesToCollection}
+        projectId={projectId}
+      />
     </MobileResponsiveLayout>
   );
 }
