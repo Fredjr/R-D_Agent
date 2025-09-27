@@ -37,7 +37,7 @@ function parseArticleXML(xmlText: string): PubMedArticle[] {
         if (!pmid) continue;
 
         // Extract title
-        const titleMatch = articleXml.match(/<ArticleTitle>(.*?)<\/ArticleTitle>/s);
+        const titleMatch = articleXml.match(/<ArticleTitle>([\s\S]*?)<\/ArticleTitle>/);
         const title = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, '').trim() : 'No title available';
 
         // Extract authors
@@ -64,7 +64,7 @@ function parseArticleXML(xmlText: string): PubMedArticle[] {
         const year = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
 
         // Extract abstract
-        const abstractMatch = articleXml.match(/<AbstractText[^>]*>(.*?)<\/AbstractText>/s);
+        const abstractMatch = articleXml.match(/<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/);
         const abstract = abstractMatch ? abstractMatch[1].replace(/<[^>]*>/g, '').trim() : 'No abstract available';
 
         // Extract DOI if available
