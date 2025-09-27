@@ -1580,6 +1580,9 @@ export default function ProjectPage() {
             <Collections
               projectId={projectId}
               onRefresh={fetchProjectData}
+              onGenerateReview={handleGenerateReviewFromNetwork}
+              onDeepDive={handleDeepDiveFromNetwork}
+              onExploreCluster={handleExploreClusterFromNetwork}
             />
           </div>
         )}

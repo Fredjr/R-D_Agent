@@ -14,9 +14,19 @@ import { SourceBadge } from './DataSourceIndicators';
 interface CollectionsProps {
   projectId: string;
   onRefresh?: () => void;
+  // Smart Actions for Phase 1.2
+  onGenerateReview?: (pmid: string, title: string) => void;
+  onDeepDive?: (pmid: string, title: string) => void;
+  onExploreCluster?: (pmid: string, title: string) => void;
 }
 
-export default function Collections({ projectId, onRefresh }: CollectionsProps) {
+export default function Collections({
+  projectId,
+  onRefresh,
+  onGenerateReview,
+  onDeepDive,
+  onExploreCluster
+}: CollectionsProps) {
   const { user } = useAuth();
 
   // Use global collection sync instead of local state
@@ -186,6 +196,9 @@ export default function Collections({ projectId, onRefresh }: CollectionsProps) 
               projectId={projectId}
               onDeepDiveCreated={onRefresh}
               onArticleSaved={onRefresh}
+              onGenerateReview={onGenerateReview}
+              onDeepDive={onDeepDive}
+              onExploreCluster={onExploreCluster}
             />
           </div>
         </div>
