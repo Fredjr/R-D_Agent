@@ -694,42 +694,88 @@ export default function ProjectPage() {
         throw new Error('Failed to add source paper to collection');
       }
 
-      // Now find and add related cluster papers
+      // Now find and add related cluster papers using multiple strategies
       console.log('🌐 [Project Page] Finding related cluster papers for PMID:', pmid);
       try {
-        // Use PubMed to find similar articles
-        const clusterResponse = await fetch(`/api/proxy/pubmed/search?q=${pmid}&limit=10`);
-        if (clusterResponse.ok) {
-          const clusterData = await clusterResponse.json();
-          console.log('🌐 [Project Page] Found cluster articles:', clusterData.articles?.length || 0);
+        let relatedArticles: any[] = [];
 
-          // Add related articles to the collection (skip the first one as it's likely the source)
-          const relatedArticles = clusterData.articles?.slice(1, 6) || []; // Take up to 5 related articles
+        // Strategy 1: Use citations API to find papers that cite this one
+        console.log('🌐 [Project Page] Fetching citations for PMID:', pmid);
+        const citationsResponse = await fetch(`/api/proxy/pubmed/citations?pmid=${pmid}&type=citations&limit=5`);
+        if (citationsResponse.ok) {
+          const citationsData = await citationsResponse.json();
+          console.log('🌐 [Project Page] Found citations:', citationsData.articles?.length || 0);
+          if (citationsData.articles) {
+            relatedArticles = [...relatedArticles, ...citationsData.articles.slice(0, 3)];
+          }
+        }
 
-          for (const article of relatedArticles) {
-            try {
-              await fetch(`/api/proxy/collections/${collection.collection_id}/articles?projectId=${projectId}`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'User-ID': user?.email || 'default_user',
-                },
-                body: JSON.stringify({
-                  article_pmid: article.pmid,
-                  article_title: article.title,
-                  article_authors: article.authors || [],
-                  article_journal: article.journal || '',
-                  article_year: article.year || new Date().getFullYear(),
-                  source_type: 'cluster_exploration',
-                  notes: `Related paper found through cluster exploration from: ${title}`
-                })
-              });
-              console.log('🌐 [Project Page] Added cluster article:', article.title.substring(0, 50) + '...');
-            } catch (error) {
-              console.warn('🌐 [Project Page] Failed to add cluster article:', article.title, error);
+        // Strategy 2: Use references API to find papers this one references
+        console.log('🌐 [Project Page] Fetching references for PMID:', pmid);
+        const referencesResponse = await fetch(`/api/proxy/pubmed/references?pmid=${pmid}&limit=5`);
+        if (referencesResponse.ok) {
+          const referencesData = await referencesResponse.json();
+          console.log('🌐 [Project Page] Found references:', referencesData.articles?.length || 0);
+          if (referencesData.articles) {
+            relatedArticles = [...relatedArticles, ...referencesData.articles.slice(0, 3)];
+          }
+        }
+
+        // Strategy 3: Use title-based search for similar articles
+        if (relatedArticles.length < 5) {
+          console.log('🌐 [Project Page] Searching for similar articles by title keywords');
+          const titleWords = title.split(' ').slice(0, 3).join(' '); // Use first 3 words
+          const similarResponse = await fetch(`/api/proxy/pubmed/search?q=${encodeURIComponent(titleWords)}&limit=8`);
+          if (similarResponse.ok) {
+            const similarData = await similarResponse.json();
+            console.log('🌐 [Project Page] Found similar articles:', similarData.articles?.length || 0);
+            if (similarData.articles) {
+              // Filter out the source article and add remaining
+              const filteredSimilar = similarData.articles.filter((article: any) => article.pmid !== pmid);
+              relatedArticles = [...relatedArticles, ...filteredSimilar.slice(0, 3)];
             }
           }
         }
+
+        // Remove duplicates based on PMID
+        const uniqueArticles = relatedArticles.filter((article, index, self) =>
+          index === self.findIndex(a => a.pmid === article.pmid)
+        ).slice(0, 5); // Limit to 5 related articles
+
+        console.log('🌐 [Project Page] Adding', uniqueArticles.length, 'unique related articles to collection');
+
+        // Add related articles to the collection
+        for (const article of uniqueArticles) {
+          try {
+            const addResponse = await fetch(`/api/proxy/collections/${collection.collection_id}/articles?projectId=${projectId}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'User-ID': user?.email || 'default_user',
+              },
+              body: JSON.stringify({
+                article_pmid: article.pmid,
+                article_title: article.title,
+                article_authors: article.authors || [],
+                article_journal: article.journal || '',
+                article_year: article.year || new Date().getFullYear(),
+                source_type: 'cluster_exploration',
+                notes: `Related paper found through cluster exploration from: ${title}`
+              })
+            });
+
+            if (addResponse.ok) {
+              console.log('🌐 [Project Page] Added cluster article:', article.title.substring(0, 50) + '...');
+            } else {
+              console.warn('🌐 [Project Page] Failed to add cluster article (API error):', article.title);
+            }
+          } catch (error) {
+            console.warn('🌐 [Project Page] Failed to add cluster article (exception):', article.title, error);
+          }
+        }
+
+        console.log('🌐 [Project Page] Cluster exploration completed. Total articles in collection should be:', uniqueArticles.length + 1);
+
       } catch (error) {
         console.warn('🌐 [Project Page] Cluster discovery failed, continuing with source paper only:', error);
       }
