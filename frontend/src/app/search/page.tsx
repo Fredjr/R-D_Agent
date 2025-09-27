@@ -182,6 +182,7 @@ function SearchPageContent() {
   const loadProjectCollections = async (projectId: string) => {
     if (!user?.email) return;
 
+    console.log('🔗 [Search Page] Loading collections for project:', projectId);
     setIsLoadingCollections(true);
     try {
       const response = await fetch(`/api/proxy/projects/${projectId}/collections`, {
@@ -190,12 +191,30 @@ function SearchPageContent() {
         }
       });
 
+      console.log('🔗 [Search Page] Collections API response status:', response.status);
+
       if (response.ok) {
         const data = await response.json();
-        setProjectCollections(data.collections || []);
+        console.log('🔗 [Search Page] Collections API response data:', data);
+
+        // Handle different possible response formats
+        let collections = [];
+        if (Array.isArray(data)) {
+          collections = data;
+        } else if (data.collections && Array.isArray(data.collections)) {
+          collections = data.collections;
+        } else if (data.data && Array.isArray(data.data)) {
+          collections = data.data;
+        }
+
+        console.log('🔗 [Search Page] Parsed collections:', collections.length, collections);
+        setProjectCollections(collections);
+      } else {
+        console.error('🔗 [Search Page] Collections API failed:', response.status);
+        setProjectCollections([]);
       }
     } catch (error) {
-      console.error('Failed to load collections:', error);
+      console.error('🔗 [Search Page] Failed to load collections:', error);
       setProjectCollections([]);
     } finally {
       setIsLoadingCollections(false);
@@ -253,6 +272,7 @@ function SearchPageContent() {
 
   // Handle project selection - show collections
   const handleProjectSelection = async (projectId: string) => {
+    console.log('🔗 [Search Page] Project selected:', projectId);
     setSelectedProjectId(projectId);
     setShowCollectionSelection(true);
     await loadProjectCollections(projectId);
