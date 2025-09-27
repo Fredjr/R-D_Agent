@@ -18,11 +18,26 @@ export async function POST(request: NextRequest) {
       headers['User-ID'] = userId;
     }
 
+    // Enhance the payload for better deep dive analysis
+    const enhancedBody = {
+      ...body,
+      // Add analysis parameters
+      analysis_depth: 'comprehensive',
+      include_methodology: true,
+      include_results: true,
+      include_implications: true,
+      // Force abstract-based analysis if no full text
+      fallback_to_abstract: true,
+      require_content: false
+    };
+
+    console.log('🔍 [Sync Deep Dive] Enhanced payload:', enhancedBody);
+
     // Call synchronous backend endpoint
     const response = await fetch(`${BACKEND_URL}/deep-dive`, {
       method: 'POST',
       headers,
-      body: JSON.stringify(body),
+      body: JSON.stringify(enhancedBody),
     });
 
     console.log(`🔍 [Sync Deep Dive] Backend response status: ${response.status}`);
@@ -37,6 +52,41 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await response.json();
+
+    // Check if result contains an error
+    if (result.error) {
+      console.error('🔍 [Sync Deep Dive] Backend returned error:', result.error);
+
+      // If it's a content access error, try with abstract-only mode
+      if (result.error.includes('Unable to fetch or parse article content')) {
+        console.log('🔍 [Sync Deep Dive] Retrying with abstract-only analysis...');
+
+        const abstractOnlyBody = {
+          ...enhancedBody,
+          analysis_mode: 'abstract_only',
+          content_source: 'pubmed_abstract',
+          require_full_text: false
+        };
+
+        const retryResponse = await fetch(`${BACKEND_URL}/deep-dive`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(abstractOnlyBody),
+        });
+
+        if (retryResponse.ok) {
+          const retryResult = await retryResponse.json();
+          console.log('🔍 [Sync Deep Dive] Abstract-only retry success');
+          return NextResponse.json(retryResult);
+        }
+      }
+
+      return NextResponse.json({
+        error: result.error,
+        suggestion: 'Try uploading a PDF or providing a full-text URL for better analysis'
+      }, { status: 400 });
+    }
+
     console.log('🔍 [Sync Deep Dive] Success:', {
       hasSections: !!result?.sections,
       sectionsCount: result?.sections?.length || 0,
