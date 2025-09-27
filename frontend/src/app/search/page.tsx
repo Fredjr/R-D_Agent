@@ -51,6 +51,10 @@ function SearchPageContent() {
   const [selectedArticleForAction, setSelectedArticleForAction] = useState<SearchResult | null>(null);
   const [userProjects, setUserProjects] = useState<any[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [projectCollections, setProjectCollections] = useState<any[]>([]);
+  const [isLoadingCollections, setIsLoadingCollections] = useState(false);
+  const [showCollectionSelection, setShowCollectionSelection] = useState(false);
 
   const handleSearch = async (searchQuery: string, meshData?: any) => {
     if (!searchQuery.trim()) return;
@@ -174,6 +178,30 @@ function SearchPageContent() {
     }
   };
 
+  // Load collections for selected project
+  const loadProjectCollections = async (projectId: string) => {
+    if (!user?.email) return;
+
+    setIsLoadingCollections(true);
+    try {
+      const response = await fetch(`/api/proxy/projects/${projectId}/collections`, {
+        headers: {
+          'User-ID': user.email
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setProjectCollections(data.collections || []);
+      }
+    } catch (error) {
+      console.error('Failed to load collections:', error);
+      setProjectCollections([]);
+    } finally {
+      setIsLoadingCollections(false);
+    }
+  };
+
   // Handle "Add to Project" button click
   const handleAddToProject = (article: SearchResult) => {
     console.log('🔗 [Search Page] Add to Project clicked:', article.metadata.pmid);
@@ -192,48 +220,58 @@ function SearchPageContent() {
     }
 
     try {
-      // Navigate to deep dive page with the article PMID
-      const deepDiveUrl = `/deep-dive?pmid=${article.metadata.pmid}&title=${encodeURIComponent(article.title)}`;
-      console.log('🔍 [Search Page] Navigating to deep dive:', deepDiveUrl);
-      window.open(deepDiveUrl, '_blank');
+      // Start deep dive job using the API
+      const response = await fetch('/api/proxy/deep-dive-async', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          pmid: article.metadata.pmid,
+          title: article.title,
+          objective: `Deep dive analysis of: ${article.title}`,
+          projectId: null // No specific project for search results
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to start deep-dive job. Status ${response.status}. ${errorText}`);
+      }
+
+      const jobData = await response.json();
+      console.log('🔍 [Search Page] Deep dive job started:', jobData);
+
+      // Navigate to a results page or show success message
+      alert(`🔍 Deep dive analysis started for "${article.title}"!\n\nJob ID: ${jobData.job_id}\n\nThe analysis will run in the background. You can check the results later.`);
+
     } catch (error) {
       console.error('❌ [Search Page] Error starting deep dive:', error);
       alert(`❌ Failed to start deep dive: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
-  // Add article to selected project
-  const addArticleToProject = async (projectId: string) => {
-    if (!selectedArticleForAction || !user?.email) return;
+  // Handle project selection - show collections
+  const handleProjectSelection = async (projectId: string) => {
+    setSelectedProjectId(projectId);
+    setShowCollectionSelection(true);
+    await loadProjectCollections(projectId);
+  };
+
+  // Add article to existing collection
+  const addArticleToCollection = async (collectionId: string) => {
+    if (!selectedArticleForAction || !user?.email || !selectedProjectId) return;
 
     try {
-      console.log('🔗 [Search Page] Adding article to project:', {
-        projectId,
+      console.log('🔗 [Search Page] Adding article to existing collection:', {
+        collectionId,
+        projectId: selectedProjectId,
         pmid: selectedArticleForAction.metadata.pmid,
         title: selectedArticleForAction.title
       });
 
-      // Create a new collection in the project for this article
-      const collectionResponse = await fetch(`/api/proxy/projects/${projectId}/collections`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-ID': user.email,
-        },
-        body: JSON.stringify({
-          name: `Search Result: ${selectedArticleForAction.title.substring(0, 50)}...`,
-          description: `Article added from search: ${selectedArticleForAction.title}`
-        })
-      });
-
-      if (!collectionResponse.ok) {
-        throw new Error('Failed to create collection');
-      }
-
-      const collection = await collectionResponse.json();
-
-      // Add the article to the collection
-      const articleResponse = await fetch(`/api/proxy/collections/${collection.collection_id}/articles?projectId=${projectId}`, {
+      // Add the article to the existing collection
+      const articleResponse = await fetch(`/api/proxy/collections/${collectionId}/articles?projectId=${selectedProjectId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -252,15 +290,65 @@ function SearchPageContent() {
         throw new Error('Failed to add article to collection');
       }
 
-      console.log('✅ [Search Page] Article added to project successfully');
-      alert(`✅ Article added to project!\n\nThe article has been saved to a new collection in your project.`);
-      setShowAddToProjectModal(false);
-      setSelectedArticleForAction(null);
+      console.log('✅ [Search Page] Article added to existing collection successfully');
+      alert(`✅ Article added to collection!\n\nThe article has been saved to the selected collection.`);
+      resetModal();
 
     } catch (error) {
-      console.error('❌ [Search Page] Error adding article to project:', error);
+      console.error('❌ [Search Page] Error adding article to collection:', error);
       alert(`❌ Failed to add article: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  };
+
+  // Add article to new collection in selected project
+  const addArticleToNewCollection = async () => {
+    if (!selectedArticleForAction || !user?.email || !selectedProjectId) return;
+
+    try {
+      console.log('🔗 [Search Page] Creating new collection and adding article:', {
+        projectId: selectedProjectId,
+        pmid: selectedArticleForAction.metadata.pmid,
+        title: selectedArticleForAction.title
+      });
+
+      // Create a new collection in the project for this article
+      const collectionResponse = await fetch(`/api/proxy/projects/${selectedProjectId}/collections`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user.email,
+        },
+        body: JSON.stringify({
+          collection_name: `Search Result: ${selectedArticleForAction.title.substring(0, 50)}...`,
+          description: `Article added from search: ${selectedArticleForAction.title}`,
+          color: '#3B82F6',
+          icon: 'folder'
+        })
+      });
+
+      if (!collectionResponse.ok) {
+        const errorText = await collectionResponse.text();
+        throw new Error(`Failed to create collection: ${errorText}`);
+      }
+
+      const collection = await collectionResponse.json();
+
+      // Add the article to the new collection
+      await addArticleToCollection(collection.collection_id);
+
+    } catch (error) {
+      console.error('❌ [Search Page] Error creating new collection:', error);
+      alert(`❌ Failed to create collection: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  // Reset modal state
+  const resetModal = () => {
+    setShowAddToProjectModal(false);
+    setShowCollectionSelection(false);
+    setSelectedArticleForAction(null);
+    setSelectedProjectId(null);
+    setProjectCollections([]);
   };
 
   const getResultIcon = (type: string) => {
@@ -562,7 +650,7 @@ function SearchPageContent() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-[var(--spotify-dark-gray)] rounded-lg p-6 w-full max-w-md border border-[var(--spotify-border-gray)]">
               <h3 className="text-lg font-semibold text-[var(--spotify-white)] mb-4">
-                Add Article to Project
+                {showCollectionSelection ? 'Select Collection' : 'Add Article to Project'}
               </h3>
 
               <div className="mb-4 p-3 bg-[var(--spotify-medium-gray)] rounded-lg">
@@ -574,56 +662,104 @@ function SearchPageContent() {
                 </p>
               </div>
 
-              {isLoadingProjects ? (
-                <div className="text-center py-4">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[var(--spotify-green)] mx-auto"></div>
-                  <p className="text-[var(--spotify-light-text)] mt-2 text-sm">Loading projects...</p>
-                </div>
-              ) : userProjects.length > 0 ? (
-                <div className="space-y-2 mb-4 max-h-60 overflow-y-auto">
-                  {userProjects.map((project) => (
-                    <button
-                      key={project.project_id}
-                      onClick={() => addArticleToProject(project.project_id)}
-                      className="w-full text-left p-3 bg-[var(--spotify-medium-gray)] hover:bg-[var(--spotify-light-gray)] rounded-lg transition-colors"
-                    >
-                      <div className="font-medium text-[var(--spotify-white)] text-sm">
-                        {project.project_name}
-                      </div>
-                      <div className="text-xs text-[var(--spotify-muted-text)]">
-                        {project.project_description || 'No description'}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-4 mb-4">
-                  <p className="text-[var(--spotify-light-text)] text-sm">
-                    No projects found. Create a project first.
-                  </p>
-                </div>
-              )}
+              {!showCollectionSelection ? (
+                // Project Selection
+                <>
+                  {isLoadingProjects ? (
+                    <div className="text-center py-4">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[var(--spotify-green)] mx-auto"></div>
+                      <p className="text-[var(--spotify-light-text)] mt-2 text-sm">Loading projects...</p>
+                    </div>
+                  ) : userProjects.length > 0 ? (
+                    <div className="space-y-2 mb-4 max-h-60 overflow-y-auto">
+                      {userProjects.map((project) => (
+                        <button
+                          key={project.project_id}
+                          onClick={() => handleProjectSelection(project.project_id)}
+                          className="w-full text-left p-3 bg-[var(--spotify-medium-gray)] hover:bg-[var(--spotify-light-gray)] rounded-lg transition-colors"
+                        >
+                          <div className="font-medium text-[var(--spotify-white)] text-sm">
+                            {project.project_name}
+                          </div>
+                          <div className="text-xs text-[var(--spotify-muted-text)]">
+                            {project.project_description || 'No description'}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 mb-4">
+                      <p className="text-[var(--spotify-light-text)] text-sm">
+                        No projects found. Create a project first.
+                      </p>
+                    </div>
+                  )}
 
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    setShowAddToProjectModal(false);
-                    setSelectedArticleForAction(null);
-                  }}
-                  className="flex-1 px-4 py-2 bg-[var(--spotify-medium-gray)] text-[var(--spotify-white)] rounded hover:bg-[var(--spotify-light-gray)] transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    // Navigate to create new project
-                    window.open('/project/new', '_blank');
-                  }}
-                  className="flex-1 px-4 py-2 bg-[var(--spotify-green)] text-black rounded hover:bg-[var(--spotify-green)]/80 transition-colors"
-                >
-                  New Project
-                </button>
-              </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={resetModal}
+                      className="flex-1 px-4 py-2 bg-[var(--spotify-medium-gray)] text-[var(--spotify-white)] rounded hover:bg-[var(--spotify-light-gray)] transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        window.open('/project/new', '_blank');
+                      }}
+                      className="flex-1 px-4 py-2 bg-[var(--spotify-green)] text-black rounded hover:bg-[var(--spotify-green)]/80 transition-colors"
+                    >
+                      New Project
+                    </button>
+                  </div>
+                </>
+              ) : (
+                // Collection Selection
+                <>
+                  {isLoadingCollections ? (
+                    <div className="text-center py-4">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[var(--spotify-green)] mx-auto"></div>
+                      <p className="text-[var(--spotify-light-text)] mt-2 text-sm">Loading collections...</p>
+                    </div>
+                  ) : (
+                    <>
+                      {projectCollections.length > 0 && (
+                        <div className="space-y-2 mb-4 max-h-40 overflow-y-auto">
+                          <p className="text-sm text-[var(--spotify-light-text)] mb-2">Existing Collections:</p>
+                          {projectCollections.map((collection) => (
+                            <button
+                              key={collection.collection_id}
+                              onClick={() => addArticleToCollection(collection.collection_id)}
+                              className="w-full text-left p-3 bg-[var(--spotify-medium-gray)] hover:bg-[var(--spotify-light-gray)] rounded-lg transition-colors"
+                            >
+                              <div className="font-medium text-[var(--spotify-white)] text-sm">
+                                {collection.collection_name}
+                              </div>
+                              <div className="text-xs text-[var(--spotify-muted-text)]">
+                                {collection.description || 'No description'}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setShowCollectionSelection(false)}
+                          className="flex-1 px-4 py-2 bg-[var(--spotify-medium-gray)] text-[var(--spotify-white)] rounded hover:bg-[var(--spotify-light-gray)] transition-colors"
+                        >
+                          Back
+                        </button>
+                        <button
+                          onClick={addArticleToNewCollection}
+                          className="flex-1 px-4 py-2 bg-[var(--spotify-green)] text-black rounded hover:bg-[var(--spotify-green)]/80 transition-colors"
+                        >
+                          New Collection
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
             </div>
           </div>
         )}

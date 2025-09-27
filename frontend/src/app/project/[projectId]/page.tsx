@@ -611,8 +611,8 @@ export default function ProjectPage() {
 
       // Start deep dive job with the specific paper
       const jobResponse = await startDeepDiveJob({
-        title: title,
         pmid: pmid,
+        title: title,
         objective: `Deep dive analysis of: ${title}`,
         projectId: projectId
       });
@@ -659,8 +659,10 @@ export default function ProjectPage() {
           'User-ID': user?.email || 'default_user',
         },
         body: JSON.stringify({
-          name: collectionName,
-          description: collectionDescription
+          collection_name: collectionName,
+          description: collectionDescription,
+          color: '#FF9800',
+          icon: 'cluster'
         })
       });
 
