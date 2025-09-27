@@ -217,21 +217,52 @@ export async function GET(request: NextRequest) {
           searchTerm = 'cancer treatment';
         }
 
+        console.log(`🔍 [References] Searching for foundational papers with term: "${searchTerm}"`);
+
         // Search for older, foundational papers (published before 2020)
         const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(searchTerm)}+AND+("2015"[Date - Publication]:"2019"[Date - Publication])&retmax=5&retmode=json&sort=relevance`;
+        console.log(`🔍 [References] Search URL: ${searchUrl}`);
+
         const searchResponse = await fetch(searchUrl);
+        console.log(`🔍 [References] Search response status: ${searchResponse.status}`);
 
         if (searchResponse.ok) {
           const searchData = await searchResponse.json();
           const altPmids = searchData.esearchresult?.idlist || [];
-          console.log(`🔍 Found ${altPmids.length} foundational reference articles for "${searchTerm}"`);
+          console.log(`🔍 [References] Found ${altPmids.length} foundational reference articles for "${searchTerm}":`, altPmids);
 
           if (altPmids.length > 0) {
+            console.log(`🔍 [References] Fetching details for PMIDs:`, altPmids.slice(0, 3));
             referenceArticles = await fetchArticleDetails(altPmids.slice(0, 3));
+            console.log(`🔍 [References] Successfully fetched ${referenceArticles.length} reference articles`);
           }
+        } else {
+          console.warn(`🔍 [References] Search failed with status: ${searchResponse.status}`);
         }
       } catch (error) {
-        console.warn('Alternative reference search failed:', error);
+        console.error('🔍 [References] Alternative reference search failed:', error);
+      }
+
+      // Second fallback: Simple search without date restrictions
+      if (referenceArticles.length === 0) {
+        try {
+          console.log(`🔍 [References] Trying simple search without date restrictions`);
+          const simpleSearchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent('diabetes treatment')}&retmax=3&retmode=json&sort=relevance`;
+          const simpleResponse = await fetch(simpleSearchUrl);
+
+          if (simpleResponse.ok) {
+            const simpleData = await simpleResponse.json();
+            const simplePmids = simpleData.esearchresult?.idlist || [];
+            console.log(`🔍 [References] Simple search found ${simplePmids.length} articles:`, simplePmids);
+
+            if (simplePmids.length > 0) {
+              referenceArticles = await fetchArticleDetails(simplePmids.slice(0, 2));
+              console.log(`🔍 [References] Simple search fetched ${referenceArticles.length} articles`);
+            }
+          }
+        } catch (error) {
+          console.error('🔍 [References] Simple search also failed:', error);
+        }
       }
 
       // Final fallback to sample data only if all real searches fail
