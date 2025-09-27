@@ -94,6 +94,9 @@ export default function NetworkSidebar({
   const [selectedArticleToSave, setSelectedArticleToSave] = useState<any>(null);
   const [savingToCollection, setSavingToCollection] = useState(false);
 
+  // OA/Full-Text toggle for smart actions
+  const [fullTextOnly, setFullTextOnly] = useState(true); // Default to OA/Full-Text for better quality
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
@@ -586,6 +589,39 @@ export default function NetworkSidebar({
           )}
         </div>
 
+        {/* OA/Full-Text Toggle for Smart Actions */}
+        <div className="mt-2 mb-2 p-2 bg-gray-50 rounded-lg border">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-gray-600 font-medium">Analysis Mode:</span>
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={fullTextOnly}
+                onChange={(e) => setFullTextOnly(e.target.checked)}
+                className="sr-only"
+              />
+              <div className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors ${
+                fullTextOnly ? 'bg-green-500' : 'bg-gray-300'
+              }`}>
+                <div className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                  fullTextOnly ? 'translate-x-4' : 'translate-x-0.5'
+                }`} />
+              </div>
+              <span className={`ml-2 text-xs font-medium ${
+                fullTextOnly ? 'text-green-700' : 'text-gray-500'
+              }`}>
+                {fullTextOnly ? 'OA/Full-Text Only' : 'All Articles'}
+              </span>
+            </label>
+          </div>
+          <div className="mt-1 text-xs text-gray-500">
+            {fullTextOnly
+              ? '🔓 Higher quality analysis with full-text access'
+              : '📄 May include limited analysis from abstracts only'
+            }
+          </div>
+        </div>
+
         {/* Smart Action Buttons - Phase 1.2 Enhancement */}
         <div className="mt-2 flex gap-1">
           {onGenerateReview && (
@@ -594,9 +630,9 @@ export default function NetworkSidebar({
               size="sm"
               className="flex-1 text-xs bg-blue-50 hover:bg-blue-100 border-blue-200"
               onClick={() => {
-                console.log('🚀 Generate Review button clicked!', selectedNode);
+                console.log('🚀 Generate Review button clicked!', selectedNode, { fullTextOnly });
                 if (selectedNode) {
-                  onGenerateReview(selectedNode.id, metadata.title || 'Unknown Title');
+                  onGenerateReview(selectedNode.id, metadata.title || 'Unknown Title', fullTextOnly);
                 } else {
                   console.error('❌ No selected node for generate review');
                 }
@@ -613,9 +649,9 @@ export default function NetworkSidebar({
               size="sm"
               className="flex-1 text-xs bg-purple-50 hover:bg-purple-100 border-purple-200"
               onClick={() => {
-                console.log('🔍 Deep Dive button clicked!', selectedNode);
+                console.log('🔍 Deep Dive button clicked!', selectedNode, { fullTextOnly });
                 if (selectedNode) {
-                  onDeepDive(selectedNode.id, metadata.title || 'Unknown Title');
+                  onDeepDive(selectedNode.id, metadata.title || 'Unknown Title', fullTextOnly);
                 } else {
                   console.error('❌ No selected node for deep dive');
                 }
