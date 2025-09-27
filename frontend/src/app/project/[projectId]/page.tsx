@@ -698,7 +698,26 @@ export default function ProjectPage() {
         }
 
         const result = await directResponse.json();
-        console.log('🔍 [Project Page] Synchronous deep dive API success response:', result);
+        console.log('🔍 [Project Page] Synchronous deep dive API response:', result);
+
+        // Check if the result contains an error
+        if (result.error) {
+          console.error('❌ [Project Page] Deep dive failed with error:', result.error);
+
+          // Show error message to user
+          alert(`Deep Dive Failed: ${result.error}\n\nSuggestion: Try using the dashboard deep dive with a full-text URL or PDF upload for better results.`);
+
+          return;
+        }
+
+        // Check if result has actual analysis content
+        if (!result.sections && !result.analysis && !result.content) {
+          console.error('❌ [Project Page] Deep dive returned empty result:', result);
+
+          alert('Deep Dive Failed: No analysis content returned.\n\nThis may be because the article is behind a paywall. Try using the dashboard deep dive with a full-text URL or PDF upload.');
+
+          return;
+        }
 
         // Show inline results immediately
         setInlineResults({
