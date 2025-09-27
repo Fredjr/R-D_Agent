@@ -70,13 +70,18 @@ export async function fetchReview(args: FetchReviewArgs): Promise<any> {
 }
 
 // NEW: Async review with polling
-export async function startReviewJob(args: FetchReviewArgs): Promise<{job_id: string, status: string, poll_url: string}> {
+export async function startReviewJob(args: FetchReviewArgs, userId?: string): Promise<{job_id: string, status: string, poll_url: string}> {
   const url = `${getEndpoint()}/generate-review-async`;
   const payload = buildPayload(args);
 
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (userId) {
+    headers['User-ID'] = userId;
+  }
+
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(payload),
   });
 
@@ -201,13 +206,18 @@ export async function fetchDeepDive(args: FetchDeepDiveArgs): Promise<any> {
 }
 
 // NEW: Async deep-dive with polling
-export async function startDeepDiveJob(args: FetchDeepDiveArgs): Promise<{job_id: string, status: string, poll_url: string}> {
+export async function startDeepDiveJob(args: FetchDeepDiveArgs, userId?: string): Promise<{job_id: string, status: string, poll_url: string}> {
   const url = `${getEndpoint()}/deep-dive-async`;
   const payload = buildDeepDivePayload(args);
 
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (userId) {
+    headers['User-ID'] = userId;
+  }
+
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(payload),
   });
 

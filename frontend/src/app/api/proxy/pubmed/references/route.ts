@@ -203,7 +203,7 @@ export async function GET(request: NextRequest) {
 
       // Alternative: Search for older papers on the same topic
       try {
-        const searchUrl = `${PUBMED_SEARCH_URL}?db=pubmed&term=type+1+diabetes+therapy&retmax=5&retmode=json&sort=pub_date`;
+        const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=type+1+diabetes+therapy&retmax=5&retmode=json&sort=pub_date`;
         const searchResponse = await fetch(searchUrl);
 
         if (searchResponse.ok) {
