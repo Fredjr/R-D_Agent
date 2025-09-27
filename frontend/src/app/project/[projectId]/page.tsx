@@ -547,11 +547,25 @@ export default function ProjectPage() {
 
   // Smart Action Handlers for Phase 1.2
   const handleGenerateReviewFromNetwork = async (pmid: string, title: string) => {
-    console.log('🚀 Generate Review from Network:', { pmid, title });
+    console.log('🚀 [Project Page] Generate Review from Network triggered:', {
+      pmid,
+      title,
+      projectId,
+      hasReviewJob: !!reviewJob,
+      reviewJobStatus: reviewJob?.status
+    });
 
     try {
       // Use the paper title and PMID to create an optimized query
       const optimizedQuery = `"${pmid}"[PMID] OR "${title}"[Title]`;
+
+      console.log('🚀 [Project Page] Starting review job with params:', {
+        molecule: title.substring(0, 50),
+        objective: `Comprehensive review focusing on: ${title}`,
+        projectId,
+        pmid,
+        optimizedQuery
+      });
 
       // Start the review job with the paper as the focus
       const jobResponse = await startReviewJob({
@@ -564,21 +578,37 @@ export default function ProjectPage() {
         preference: 'precision' as 'precision' | 'recall'
       });
 
+      console.log('🚀 [Project Page] Review job response:', jobResponse);
+
       // Start polling for job completion
       reviewJob.startJob(jobResponse.job_id);
 
+      console.log('✅ [Project Page] Review job started successfully from network sidebar');
       alert(`🚀 Review generation started for "${title}"!\n\nThis process will continue in the background.`);
 
     } catch (error: any) {
-      console.error('Error starting review from network:', error);
+      console.error('❌ [Project Page] Error starting review from network:', error);
       alert(`❌ Failed to start review: ${error.message || 'Unknown error'}`);
     }
   };
 
   const handleDeepDiveFromNetwork = async (pmid: string, title: string) => {
-    console.log('🔍 Deep Dive from Network:', { pmid, title });
+    console.log('🔍 [Project Page] Deep Dive from Network triggered:', {
+      pmid,
+      title,
+      projectId,
+      hasDeepDiveJob: !!deepDiveJob,
+      deepDiveJobStatus: deepDiveJob?.status
+    });
 
     try {
+      console.log('🔍 [Project Page] Starting deep dive job with params:', {
+        title,
+        pmid,
+        objective: `Deep dive analysis of: ${title}`,
+        projectId
+      });
+
       // Start deep dive job with the specific paper
       const jobResponse = await startDeepDiveJob({
         title: title,
@@ -587,23 +617,40 @@ export default function ProjectPage() {
         projectId: projectId
       });
 
+      console.log('🔍 [Project Page] Deep dive job response:', jobResponse);
+
       // Start polling for job completion
       deepDiveJob.startJob(jobResponse.job_id);
 
+      console.log('✅ [Project Page] Deep dive job started successfully from network sidebar');
       alert(`🔍 Deep dive analysis started for "${title}"!\n\nThis process will continue in the background.`);
 
     } catch (error: any) {
-      console.error('Error starting deep dive from network:', error);
+      console.error('❌ [Project Page] Error starting deep dive from network:', error);
       alert(`❌ Failed to start deep dive: ${error.message || 'Unknown error'}`);
     }
   };
 
   const handleExploreClusterFromNetwork = async (pmid: string, title: string) => {
-    console.log('🌐 Explore Cluster from Network:', { pmid, title });
+    console.log('🌐 [Project Page] Explore Cluster from Network triggered:', {
+      pmid,
+      title,
+      projectId,
+      userId: user?.email
+    });
 
     // For now, this will trigger a similar work exploration
     // In the future, this could be enhanced with more sophisticated clustering
     try {
+      const collectionName = `Cluster: ${title.substring(0, 30)}...`;
+      const collectionDescription = `Research cluster exploration around: ${title}`;
+
+      console.log('🌐 [Project Page] Creating cluster collection with params:', {
+        name: collectionName,
+        description: collectionDescription,
+        projectId
+      });
+
       // Create a new collection for the cluster exploration
       const collectionResponse = await fetch(`/api/proxy/projects/${projectId}/collections`, {
         method: 'POST',
@@ -612,8 +659,8 @@ export default function ProjectPage() {
           'User-ID': user?.email || 'default_user',
         },
         body: JSON.stringify({
-          name: `Cluster: ${title.substring(0, 30)}...`,
-          description: `Research cluster exploration around: ${title}`
+          name: collectionName,
+          description: collectionDescription
         })
       });
 
@@ -622,8 +669,10 @@ export default function ProjectPage() {
       }
 
       const collection = await collectionResponse.json();
+      console.log('🌐 [Project Page] Cluster collection created:', collection);
 
       // Add the source paper to the collection
+      console.log('🌐 [Project Page] Adding source paper to collection:', { pmid, title });
       await fetch(`/api/proxy/collections/${collection.collection_id}/articles?projectId=${projectId}`, {
         method: 'POST',
         headers: {
@@ -637,13 +686,15 @@ export default function ProjectPage() {
       });
 
       // Refresh collections and switch to collections tab
+      console.log('🌐 [Project Page] Refreshing collections and switching to collections tab');
       await fetchCollections();
       setActiveTab('collections');
 
+      console.log('✅ [Project Page] Cluster exploration completed successfully');
       alert(`🌐 Cluster collection created: "${collection.name}"!\n\nYou can now explore related papers in the Collections tab.`);
 
     } catch (error: any) {
-      console.error('Error creating cluster exploration:', error);
+      console.error('❌ [Project Page] Error creating cluster exploration:', error);
       alert(`❌ Failed to create cluster: ${error.message || 'Unknown error'}`);
     }
   };

@@ -76,20 +76,30 @@ export default function MeSHAutocompleteSearch({
   const fetchSuggestions = async (searchQuery: string) => {
     if (!searchQuery || searchQuery.length < 2) return;
 
+    console.log(`🔍 [MeSH Autocomplete] Fetching suggestions for: "${searchQuery}"`);
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/proxy/mesh/autocomplete?q=${encodeURIComponent(searchQuery)}&limit=8`);
-      
+      const apiUrl = `/api/proxy/mesh/autocomplete?q=${encodeURIComponent(searchQuery)}&limit=8`;
+      console.log(`📡 [MeSH Autocomplete] API call: ${apiUrl}`);
+
+      const response = await fetch(apiUrl);
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data: MeSHAutocompleteResponse = await response.json();
+      console.log(`✅ [MeSH Autocomplete] Received ${data.total_suggestions} suggestions:`, {
+        mesh_terms: data.mesh_terms.length,
+        trending_keywords: data.trending_keywords.length,
+        suggested_queries: data.suggested_queries.length
+      });
+
       setSuggestions(data);
       setShowSuggestions(true);
       setSelectedIndex(-1);
     } catch (error) {
-      console.error('❌ MeSH autocomplete error:', error);
+      console.error('❌ [MeSH Autocomplete] Error:', error);
       setSuggestions(null);
       setShowSuggestions(false);
     } finally {
@@ -133,12 +143,14 @@ export default function MeSHAutocompleteSearch({
   };
 
   const handleSuggestionSelect = (suggestion: MeSHSuggestion) => {
+    console.log(`🎯 [MeSH Autocomplete] Selected suggestion:`, suggestion);
     setQuery(suggestion.term);
     setShowSuggestions(false);
     setSelectedIndex(-1);
-    
+
     // Trigger search with the selected term
     if (onSearch && suggestions) {
+      console.log(`🔍 [MeSH Autocomplete] Triggering search for: "${suggestion.term}"`);
       onSearch(suggestion.term, suggestions);
     }
   };
@@ -155,9 +167,14 @@ export default function MeSHAutocompleteSearch({
 
   const handleGenerateReview = (optimizedQuery?: OptimizedQuery) => {
     if (!query.trim()) return;
-    
+
+    console.log(`📝 [MeSH Autocomplete] Generate Review triggered:`, {
+      query: query,
+      optimizedQuery: optimizedQuery
+    });
+
     setShowSuggestions(false);
-    
+
     if (onGenerateReview) {
       onGenerateReview(query, optimizedQuery);
     }

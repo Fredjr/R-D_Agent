@@ -113,20 +113,39 @@ export default function HomePage() {
 
   // Handler for MeSH search
   const handleMeSHSearch = async (query: string, suggestions: any) => {
-    console.log('🔍 MeSH search triggered:', { query, suggestions });
+    console.log('🏠 [Home Page] MeSH search triggered:', {
+      query,
+      mesh_terms: suggestions?.mesh_terms?.length || 0,
+      trending_keywords: suggestions?.trending_keywords?.length || 0,
+      suggested_queries: suggestions?.suggested_queries?.length || 0,
+      total_suggestions: suggestions?.total_suggestions || 0
+    });
 
     // For now, redirect to search page with the query
     // TODO: Implement semantic search results display
+    console.log('🏠 [Home Page] Redirecting to search page with query:', query);
     router.push(`/search?q=${encodeURIComponent(query)}`);
   };
 
   // Handler for generate-review from search
   const handleGenerateReviewFromSearch = async (query: string, optimizedQuery?: any) => {
-    console.log('🚀 Generate-review triggered from search:', { query, optimizedQuery });
+    console.log('🏠 [Home Page] Generate-review triggered from MeSH search:', {
+      query,
+      optimizedQuery,
+      hasOptimizedQuery: !!optimizedQuery,
+      optimizedQueryType: optimizedQuery?.type,
+      meshId: optimizedQuery?.mesh_id
+    });
 
     // Use the optimized query if available, otherwise use the original query
     const searchQuery = optimizedQuery?.query || query;
     const objective = optimizedQuery?.description || `Comprehensive review of ${query}`;
+
+    console.log('🏠 [Home Page] Final query parameters:', {
+      searchQuery,
+      objective,
+      originalQuery: query
+    });
 
     // Redirect to project creation with generate-review
     const params = new URLSearchParams({
@@ -135,6 +154,7 @@ export default function HomePage() {
       objective: objective
     });
 
+    console.log('🏠 [Home Page] Navigating to project creation with params:', params.toString());
     router.push(`/project/new?${params.toString()}`);
   };
 
