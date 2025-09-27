@@ -18,17 +18,21 @@ export async function POST(request: NextRequest) {
       headers['User-ID'] = userId;
     }
 
-    // Enhance the payload for better deep dive analysis
+    // Enhance the payload based on fullTextOnly toggle
+    const isFullTextOnly = body.fullTextOnly || false;
+
     const enhancedBody = {
       ...body,
-      // Add analysis parameters
-      analysis_depth: 'comprehensive',
+      // Add analysis parameters based on OA/Full-Text preference
+      analysis_depth: isFullTextOnly ? 'comprehensive' : 'standard',
       include_methodology: true,
       include_results: true,
       include_implications: true,
-      // Force abstract-based analysis if no full text
-      fallback_to_abstract: true,
-      require_content: false
+      // Analysis mode based on toggle
+      analysis_mode: isFullTextOnly ? 'full_text_preferred' : 'abstract_based',
+      fallback_to_abstract: !isFullTextOnly,
+      require_content: isFullTextOnly,
+      fullTextOnly: isFullTextOnly
     };
 
     console.log('🔍 [Sync Deep Dive] Enhanced payload:', enhancedBody);

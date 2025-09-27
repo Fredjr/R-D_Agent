@@ -18,19 +18,28 @@ export async function POST(request: NextRequest) {
       headers['User-ID'] = userId;
     }
 
-    // Enhance the payload for better search results
+    // Enhance the payload based on fullTextOnly toggle
+    const isFullTextOnly = body.fullTextOnly || false;
+
     const enhancedBody = {
       ...body,
-      // Add search filters for better quality
+      // Add search filters based on OA/Full-Text preference
       filters: {
         publication_types: ['Journal Article', 'Research Article', 'Clinical Trial', 'Review'],
         exclude_types: ['Commentary', 'Editorial', 'Letter', 'Reply', 'Foreword'],
-        min_abstract_length: 100,
-        require_abstract: true
+        min_abstract_length: isFullTextOnly ? 200 : 100,
+        require_abstract: true,
+        // OA/Full-Text specific filters
+        ...(isFullTextOnly && {
+          open_access_only: true,
+          require_full_text: true,
+          min_citation_count: 2
+        })
       },
-      // Improve search strategy
-      search_strategy: 'comprehensive',
-      quality_threshold: 0.6
+      // Improve search strategy based on mode
+      search_strategy: isFullTextOnly ? 'precision' : 'comprehensive',
+      quality_threshold: isFullTextOnly ? 0.8 : 0.6,
+      fullTextOnly: isFullTextOnly
     };
 
     console.log('🚀 [Sync Review] Enhanced payload:', enhancedBody);

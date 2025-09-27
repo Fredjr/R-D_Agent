@@ -570,7 +570,7 @@ export default function ProjectPage() {
   };
 
   // Smart Action Handlers for Phase 1.2
-  const handleGenerateReviewFromNetwork = async (pmid: string, title: string) => {
+  const handleGenerateReviewFromNetwork = async (pmid: string, title: string, fullTextOnly: boolean = false) => {
     console.log('🚀 [Project Page] Generate Review from Network triggered:', {
       pmid,
       title,
@@ -583,14 +583,14 @@ export default function ProjectPage() {
       // Use the paper title and PMID to create an optimized query
       const optimizedQuery = `"${pmid}"[PMID] OR "${title}"[Title]`;
 
-      // Try with minimal payload first to debug backend issues
+      // Enhanced payload with OA/Full-Text option
       const reviewPayload = {
         molecule: title.substring(0, 50), // Use first 50 chars of title as molecule
         objective: `Comprehensive review focusing on: ${title}`,
         projectId: projectId,
         clinicalMode: false,
         dagMode: false,
-        fullTextOnly: false,
+        fullTextOnly: fullTextOnly, // Use the toggle value
         preference: 'precision' as 'precision' | 'recall'
       };
 
@@ -650,7 +650,7 @@ export default function ProjectPage() {
     }
   };
 
-  const handleDeepDiveFromNetwork = async (pmid: string, title: string) => {
+  const handleDeepDiveFromNetwork = async (pmid: string, title: string, fullTextOnly: boolean = false) => {
     console.log('🔍 [Project Page] Deep Dive from Network triggered:', {
       pmid,
       title,
@@ -660,7 +660,7 @@ export default function ProjectPage() {
     });
 
     try {
-      // Enhanced payload with more content for deep dive
+      // Enhanced payload with OA/Full-Text option
       const deepDivePayload = {
         pmid: pmid,
         title: title,
@@ -669,9 +669,10 @@ export default function ProjectPage() {
         // Add abstract and DOI if available (we'll fetch from PubMed)
         abstract: `Please analyze the paper titled "${title}" with PMID ${pmid}. Use available abstract and metadata.`,
         doi: null,
-        // Request abstract-based analysis as fallback
-        analysis_mode: 'abstract_based',
-        full_text_url: null // We don't have full text URLs
+        // Request analysis mode based on toggle
+        analysis_mode: fullTextOnly ? 'full_text_preferred' : 'abstract_based',
+        full_text_url: null, // We don't have full text URLs
+        fullTextOnly: fullTextOnly // Pass the toggle value to backend
       };
 
       console.log('🔍 [Project Page] Starting deep dive job with params:', deepDivePayload);
