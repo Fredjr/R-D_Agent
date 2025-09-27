@@ -316,7 +316,7 @@ export default function ProjectPage() {
           dagMode: reportToGenerate.dagMode,
           fullTextOnly: reportToGenerate.fullTextOnly,
           preference: reportToGenerate.preference as 'precision' | 'recall'
-        });
+        }, user?.email);
 
         // Start polling for job completion
         reviewJob.startJob(jobResponse.job_id);
@@ -578,7 +578,10 @@ export default function ProjectPage() {
         console.log('🔍 [Project Page] Testing direct API call to backend...');
         const directResponse = await fetch('/api/proxy/generate-review-async', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'User-ID': user?.email || 'default_user'
+          },
           body: JSON.stringify(reviewPayload)
         });
 
@@ -602,7 +605,7 @@ export default function ProjectPage() {
 
         // Fallback to original startReviewJob function
         console.log('🚀 [Project Page] Falling back to startReviewJob function...');
-        const jobResponse = await startReviewJob(reviewPayload);
+        const jobResponse = await startReviewJob(reviewPayload, user?.email);
         reviewJob.startJob(jobResponse.job_id);
       }
 
@@ -640,7 +643,10 @@ export default function ProjectPage() {
         console.log('🔍 [Project Page] Testing direct deep dive API call to backend...');
         const directResponse = await fetch('/api/proxy/deep-dive-async', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'User-ID': user?.email || 'default_user'
+          },
           body: JSON.stringify(deepDivePayload)
         });
 
@@ -663,7 +669,7 @@ export default function ProjectPage() {
 
         // Fallback to original startDeepDiveJob function
         console.log('🔍 [Project Page] Falling back to startDeepDiveJob function...');
-        const jobResponse = await startDeepDiveJob(deepDivePayload);
+        const jobResponse = await startDeepDiveJob(deepDivePayload, user?.email);
         deepDiveJob.startJob(jobResponse.job_id);
       }
 
