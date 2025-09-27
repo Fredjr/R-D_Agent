@@ -33,13 +33,28 @@ export async function POST(request: NextRequest) {
       }, { status: deepDivesResponse.status });
     }
 
-    const deepDives = await deepDivesResponse.json();
+    const deepDivesData = await deepDivesResponse.json();
+    console.log('🔧 [Fix Stuck Deep Dives] Raw response:', deepDivesData);
+
+    // Handle different response formats
+    let deepDives = [];
+    if (Array.isArray(deepDivesData)) {
+      deepDives = deepDivesData;
+    } else if (deepDivesData.analyses && Array.isArray(deepDivesData.analyses)) {
+      deepDives = deepDivesData.analyses;
+    } else if (deepDivesData.data && Array.isArray(deepDivesData.data)) {
+      deepDives = deepDivesData.data;
+    } else {
+      console.log('🔧 [Fix Stuck Deep Dives] Unexpected response format:', deepDivesData);
+      deepDives = [];
+    }
+
     console.log('🔧 [Fix Stuck Deep Dives] Found deep dives:', deepDives.length);
 
     // Find processing deep dives older than 1 hour
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    const stuckDeepDives = deepDives.filter((dd: any) => 
-      dd.processing_status === 'processing' && 
+    const stuckDeepDives = deepDives.filter((dd: any) =>
+      dd.processing_status === 'processing' &&
       new Date(dd.created_at) < oneHourAgo
     );
 
