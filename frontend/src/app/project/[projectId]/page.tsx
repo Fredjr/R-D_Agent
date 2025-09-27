@@ -562,9 +562,7 @@ export default function ProjectPage() {
       console.log('🚀 [Project Page] Starting review job with params:', {
         molecule: title.substring(0, 50),
         objective: `Comprehensive review focusing on: ${title}`,
-        projectId,
-        pmid,
-        optimizedQuery
+        projectId
       });
 
       // Start the review job with the paper as the focus
@@ -675,7 +673,7 @@ export default function ProjectPage() {
 
       // Add the source paper to the collection
       console.log('🌐 [Project Page] Adding source paper to collection:', { pmid, title });
-      await fetch(`/api/proxy/collections/${collection.collection_id}/articles?projectId=${projectId}`, {
+      const sourceArticleResponse = await fetch(`/api/proxy/collections/${collection.collection_id}/articles?projectId=${projectId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -691,6 +689,50 @@ export default function ProjectPage() {
           notes: `Source paper for cluster exploration: ${title}`
         })
       });
+
+      if (!sourceArticleResponse.ok) {
+        throw new Error('Failed to add source paper to collection');
+      }
+
+      // Now find and add related cluster papers
+      console.log('🌐 [Project Page] Finding related cluster papers for PMID:', pmid);
+      try {
+        // Use PubMed to find similar articles
+        const clusterResponse = await fetch(`/api/proxy/pubmed/search?q=${pmid}&limit=10`);
+        if (clusterResponse.ok) {
+          const clusterData = await clusterResponse.json();
+          console.log('🌐 [Project Page] Found cluster articles:', clusterData.articles?.length || 0);
+
+          // Add related articles to the collection (skip the first one as it's likely the source)
+          const relatedArticles = clusterData.articles?.slice(1, 6) || []; // Take up to 5 related articles
+
+          for (const article of relatedArticles) {
+            try {
+              await fetch(`/api/proxy/collections/${collection.collection_id}/articles?projectId=${projectId}`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'User-ID': user?.email || 'default_user',
+                },
+                body: JSON.stringify({
+                  article_pmid: article.pmid,
+                  article_title: article.title,
+                  article_authors: article.authors || [],
+                  article_journal: article.journal || '',
+                  article_year: article.year || new Date().getFullYear(),
+                  source_type: 'cluster_exploration',
+                  notes: `Related paper found through cluster exploration from: ${title}`
+                })
+              });
+              console.log('🌐 [Project Page] Added cluster article:', article.title.substring(0, 50) + '...');
+            } catch (error) {
+              console.warn('🌐 [Project Page] Failed to add cluster article:', article.title, error);
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('🌐 [Project Page] Cluster discovery failed, continuing with source paper only:', error);
+      }
 
       // Refresh collections and switch to collections tab
       console.log('🌐 [Project Page] Refreshing collections and switching to collections tab');
