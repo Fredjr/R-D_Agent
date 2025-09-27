@@ -46,6 +46,12 @@ function SearchPageContent() {
     optimized_query?: string;
   } | null>(null);
 
+  // Modal states for article actions
+  const [showAddToProjectModal, setShowAddToProjectModal] = useState(false);
+  const [selectedArticleForAction, setSelectedArticleForAction] = useState<SearchResult | null>(null);
+  const [userProjects, setUserProjects] = useState<any[]>([]);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+
   const handleSearch = async (searchQuery: string, meshData?: any) => {
     if (!searchQuery.trim()) return;
 
@@ -144,6 +150,118 @@ function SearchPageContent() {
       handleSearch(query, meshData);
     }
   }, [query]);
+
+  // Load user projects for "Add to Project" functionality
+  const loadUserProjects = async () => {
+    if (!user?.email) return;
+
+    setIsLoadingProjects(true);
+    try {
+      const response = await fetch('/api/proxy/projects', {
+        headers: {
+          'User-ID': user.email
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUserProjects(data.projects || []);
+      }
+    } catch (error) {
+      console.error('Failed to load projects:', error);
+    } finally {
+      setIsLoadingProjects(false);
+    }
+  };
+
+  // Handle "Add to Project" button click
+  const handleAddToProject = (article: SearchResult) => {
+    console.log('🔗 [Search Page] Add to Project clicked:', article.metadata.pmid);
+    setSelectedArticleForAction(article);
+    setShowAddToProjectModal(true);
+    loadUserProjects();
+  };
+
+  // Handle "Deep Dive" button click
+  const handleDeepDive = async (article: SearchResult) => {
+    console.log('🔍 [Search Page] Deep Dive clicked:', article.metadata.pmid);
+
+    if (!article.metadata.pmid) {
+      alert('❌ No PMID available for deep dive analysis');
+      return;
+    }
+
+    try {
+      // Navigate to deep dive page with the article PMID
+      const deepDiveUrl = `/deep-dive?pmid=${article.metadata.pmid}&title=${encodeURIComponent(article.title)}`;
+      console.log('🔍 [Search Page] Navigating to deep dive:', deepDiveUrl);
+      window.open(deepDiveUrl, '_blank');
+    } catch (error) {
+      console.error('❌ [Search Page] Error starting deep dive:', error);
+      alert(`❌ Failed to start deep dive: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  // Add article to selected project
+  const addArticleToProject = async (projectId: string) => {
+    if (!selectedArticleForAction || !user?.email) return;
+
+    try {
+      console.log('🔗 [Search Page] Adding article to project:', {
+        projectId,
+        pmid: selectedArticleForAction.metadata.pmid,
+        title: selectedArticleForAction.title
+      });
+
+      // Create a new collection in the project for this article
+      const collectionResponse = await fetch(`/api/proxy/projects/${projectId}/collections`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user.email,
+        },
+        body: JSON.stringify({
+          name: `Search Result: ${selectedArticleForAction.title.substring(0, 50)}...`,
+          description: `Article added from search: ${selectedArticleForAction.title}`
+        })
+      });
+
+      if (!collectionResponse.ok) {
+        throw new Error('Failed to create collection');
+      }
+
+      const collection = await collectionResponse.json();
+
+      // Add the article to the collection
+      const articleResponse = await fetch(`/api/proxy/collections/${collection.collection_id}/articles?projectId=${projectId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user.email,
+        },
+        body: JSON.stringify({
+          pmid: selectedArticleForAction.metadata.pmid,
+          title: selectedArticleForAction.title,
+          authors: selectedArticleForAction.metadata.authors?.join(', ') || '',
+          journal: selectedArticleForAction.metadata.journal || '',
+          year: selectedArticleForAction.metadata.year || new Date().getFullYear()
+        })
+      });
+
+      if (!articleResponse.ok) {
+        throw new Error('Failed to add article to collection');
+      }
+
+      console.log('✅ [Search Page] Article added to project successfully');
+      alert(`✅ Article added to project!\n\nThe article has been saved to a new collection in your project.`);
+      setShowAddToProjectModal(false);
+      setSelectedArticleForAction(null);
+
+    } catch (error) {
+      console.error('❌ [Search Page] Error adding article to project:', error);
+      alert(`❌ Failed to add article: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
 
   const getResultIcon = (type: string) => {
     switch (type) {
@@ -379,8 +497,7 @@ function SearchPageContent() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              console.log('Add to project:', result.metadata.pmid);
-                              // TODO: Implement add to project functionality
+                              handleAddToProject(result);
                             }}
                             className="px-3 py-1 text-xs bg-[var(--spotify-green)]/20 text-[var(--spotify-green)] rounded hover:bg-[var(--spotify-green)]/30 transition-colors"
                           >
@@ -389,8 +506,7 @@ function SearchPageContent() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              console.log('Deep dive:', result.metadata.pmid);
-                              // TODO: Implement deep dive functionality
+                              handleDeepDive(result);
                             }}
                             className="px-3 py-1 text-xs bg-[var(--spotify-blue)]/20 text-[var(--spotify-blue)] rounded hover:bg-[var(--spotify-blue)]/30 transition-colors"
                           >
@@ -440,6 +556,77 @@ function SearchPageContent() {
             </div>
           )}
         </div>
+
+        {/* Add to Project Modal */}
+        {showAddToProjectModal && selectedArticleForAction && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-[var(--spotify-dark-gray)] rounded-lg p-6 w-full max-w-md border border-[var(--spotify-border-gray)]">
+              <h3 className="text-lg font-semibold text-[var(--spotify-white)] mb-4">
+                Add Article to Project
+              </h3>
+
+              <div className="mb-4 p-3 bg-[var(--spotify-medium-gray)] rounded-lg">
+                <h4 className="font-medium text-[var(--spotify-white)] text-sm mb-1">
+                  {selectedArticleForAction.title}
+                </h4>
+                <p className="text-xs text-[var(--spotify-muted-text)]">
+                  PMID: {selectedArticleForAction.metadata.pmid}
+                </p>
+              </div>
+
+              {isLoadingProjects ? (
+                <div className="text-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[var(--spotify-green)] mx-auto"></div>
+                  <p className="text-[var(--spotify-light-text)] mt-2 text-sm">Loading projects...</p>
+                </div>
+              ) : userProjects.length > 0 ? (
+                <div className="space-y-2 mb-4 max-h-60 overflow-y-auto">
+                  {userProjects.map((project) => (
+                    <button
+                      key={project.project_id}
+                      onClick={() => addArticleToProject(project.project_id)}
+                      className="w-full text-left p-3 bg-[var(--spotify-medium-gray)] hover:bg-[var(--spotify-light-gray)] rounded-lg transition-colors"
+                    >
+                      <div className="font-medium text-[var(--spotify-white)] text-sm">
+                        {project.project_name}
+                      </div>
+                      <div className="text-xs text-[var(--spotify-muted-text)]">
+                        {project.project_description || 'No description'}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4 mb-4">
+                  <p className="text-[var(--spotify-light-text)] text-sm">
+                    No projects found. Create a project first.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setShowAddToProjectModal(false);
+                    setSelectedArticleForAction(null);
+                  }}
+                  className="flex-1 px-4 py-2 bg-[var(--spotify-medium-gray)] text-[var(--spotify-white)] rounded hover:bg-[var(--spotify-light-gray)] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    // Navigate to create new project
+                    window.open('/project/new', '_blank');
+                  }}
+                  className="flex-1 px-4 py-2 bg-[var(--spotify-green)] text-black rounded hover:bg-[var(--spotify-green)]/80 transition-colors"
+                >
+                  New Project
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </MobileResponsiveLayout>
   );
