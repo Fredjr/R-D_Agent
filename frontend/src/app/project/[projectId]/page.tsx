@@ -679,7 +679,9 @@ export default function ProjectPage() {
         const citationsResponse = await fetch(`/api/proxy/pubmed/citations?pmid=${pmid}&type=citations&limit=5`);
         if (citationsResponse.ok) {
           const citationsData = await citationsResponse.json();
-          citations = citationsData.articles?.slice(0, 3) || [];
+          console.log('🌐 [Project Page] Citations API response:', citationsData);
+          // Citations API returns { citations: [...] }
+          citations = citationsData.citations?.slice(0, 3) || [];
           console.log('🌐 [Project Page] Found citations:', citations.length);
         }
       } catch (error) {
@@ -692,7 +694,9 @@ export default function ProjectPage() {
         const referencesResponse = await fetch(`/api/proxy/pubmed/references?pmid=${pmid}&limit=5`);
         if (referencesResponse.ok) {
           const referencesData = await referencesResponse.json();
-          references = referencesData.articles?.slice(0, 3) || [];
+          console.log('🌐 [Project Page] References API response:', referencesData);
+          // References API returns { references: [...] }
+          references = referencesData.references?.slice(0, 3) || [];
           console.log('🌐 [Project Page] Found references:', references.length);
         }
       } catch (error) {
@@ -706,6 +710,8 @@ export default function ProjectPage() {
         const similarResponse = await fetch(`/api/proxy/pubmed/search?q=${encodeURIComponent(titleWords)}&limit=8`);
         if (similarResponse.ok) {
           const similarData = await similarResponse.json();
+          console.log('🌐 [Project Page] Similar API response:', similarData);
+          // Search API returns { articles: [...] }
           similar = similarData.articles?.filter((article: any) => article.pmid !== pmid).slice(0, 3) || [];
           console.log('🌐 [Project Page] Found similar articles:', similar.length);
         }
