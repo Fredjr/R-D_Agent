@@ -93,7 +93,7 @@ export async function startReviewJob(args: FetchReviewArgs, userId?: string): Pr
   return res.json();
 }
 
-export async function pollJobStatus(jobId: string): Promise<{
+export async function pollJobStatus(jobId: string, userId?: string): Promise<{
   job_id: string,
   job_type: string,
   status: string,
@@ -103,9 +103,14 @@ export async function pollJobStatus(jobId: string): Promise<{
 }> {
   const url = `${getEndpoint()}/jobs/${jobId}/status`;
 
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (userId) {
+    headers['User-ID'] = userId;
+  }
+
   const res = await fetch(url, {
     method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
   });
 
   if (!res.ok) {
@@ -119,12 +124,13 @@ export async function pollJobStatus(jobId: string): Promise<{
 export async function waitForJobCompletion(
   jobId: string,
   onProgress?: (status: string) => void,
-  pollInterval: number = 5000 // 5 seconds
+  pollInterval: number = 5000, // 5 seconds
+  userId?: string
 ): Promise<any> {
   return new Promise((resolve, reject) => {
     const poll = async () => {
       try {
-        const status = await pollJobStatus(jobId);
+        const status = await pollJobStatus(jobId, userId);
 
         if (onProgress) {
           onProgress(status.status);

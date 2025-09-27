@@ -21,6 +21,7 @@ export interface UseAsyncJobOptions {
   onError?: (error: string) => void;
   persistToLocalStorage?: boolean;
   storageKey?: string;
+  userId?: string; // User ID for authentication
 }
 
 export function useAsyncJob(options: UseAsyncJobOptions = {}) {
@@ -31,7 +32,8 @@ export function useAsyncJob(options: UseAsyncJobOptions = {}) {
     onComplete,
     onError,
     persistToLocalStorage = true,
-    storageKey = 'asyncJob'
+    storageKey = 'asyncJob',
+    userId
   } = options;
 
   const [state, setState] = useState<AsyncJobState>({
@@ -99,7 +101,7 @@ export function useAsyncJob(options: UseAsyncJobOptions = {}) {
           return;
         }
 
-        const jobStatus = await pollJobStatus(jobId);
+        const jobStatus = await pollJobStatus(jobId, userId);
         
         setState(prev => ({
           ...prev,
