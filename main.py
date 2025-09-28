@@ -4113,7 +4113,7 @@ async def health_check():
 async def debug_llm_status():
     """Debug endpoint to check LLM initialization status"""
     try:
-        genai_key_available = bool(_GENAI_KEY)
+        openai_key_available = bool(_OPENAI_KEY)
         llm_analyzer = get_llm_analyzer()
         llm_analyzer_available = llm_analyzer is not None
 
@@ -4129,20 +4129,19 @@ async def debug_llm_status():
                 test_result = f"LLM test failed: {str(e)[:100]}"
 
         return {
-            "genai_key_available": genai_key_available,
+            "openai_key_available": openai_key_available,
             "llm_analyzer_available": llm_analyzer_available,
             "test_result": test_result,
             "environment_check": {
-                "GOOGLE_GENAI_API_KEY": bool(os.getenv("GOOGLE_GENAI_API_KEY")),
-                "GOOGLE_API_KEY": bool(os.getenv("GOOGLE_API_KEY")),
-                "GEMINI_MODEL": os.getenv("GEMINI_MODEL", "not_set"),
-                "GEMINI_SMALL_MODEL": os.getenv("GEMINI_SMALL_MODEL", "not_set")
+                "OPENAI_API_KEY": bool(os.getenv("OPENAI_API_KEY")),
+                "OPENAI_MODEL": os.getenv("OPENAI_MODEL", "not_set"),
+                "OPENAI_SMALL_MODEL": os.getenv("OPENAI_SMALL_MODEL", "not_set")
             }
         }
     except Exception as e:
         return {
             "error": f"Debug check failed: {str(e)}",
-            "genai_key_available": False,
+            "openai_key_available": False,
             "llm_analyzer_available": False
         }
 
