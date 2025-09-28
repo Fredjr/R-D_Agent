@@ -85,6 +85,55 @@ html {
   display: none;
 }
 
+/* Google Maps-like Network View Enhancements */
+.network-view-container {
+  cursor: grab;
+  transition: all 0.2s ease;
+}
+
+.network-view-container:active {
+  cursor: grabbing;
+}
+
+.network-view-container .react-flow__pane {
+  cursor: grab;
+}
+
+.network-view-container .react-flow__pane:active {
+  cursor: grabbing;
+}
+
+/* Smooth panel transitions */
+.network-panel {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(8px);
+}
+
+.network-panel:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Enhanced button interactions */
+.network-button {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+}
+
+.network-button:hover {
+  transform: scale(1.05);
+}
+
+.network-button:active {
+  transform: scale(0.95);
+}
+
+/* Smooth scrolling for horizontal containers */
+.smooth-scroll {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Line clamp utilities */
 .line-clamp-2 {
   display: -webkit-box;
