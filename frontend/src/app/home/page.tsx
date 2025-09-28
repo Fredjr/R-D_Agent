@@ -71,7 +71,13 @@ export default function HomePage() {
   const { trackEvent, trackRecommendationInteraction } = useRealTimeAnalytics('home');
 
   // Semantic recommendations state
-  const [semanticRecommendations, setSemanticRecommendations] = useState({
+  const [semanticRecommendations, setSemanticRecommendations] = useState<{
+    crossDomain: any[];
+    trending: any[];
+    personalized: any[];
+    loading: boolean;
+    error: string | null;
+  }>({
     crossDomain: [],
     trending: [],
     personalized: [],
