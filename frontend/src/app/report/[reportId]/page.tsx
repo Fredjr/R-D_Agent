@@ -34,7 +34,6 @@ export default function ReportDetailPage() {
     journal?: string;
     year?: number;
   } | null>(null);
-  const [regenerating, setRegenerating] = useState(false);
 
   useEffect(() => {
     if (!reportId || !user) return;
