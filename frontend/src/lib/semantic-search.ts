@@ -64,10 +64,16 @@ export class SemanticSearchEngine {
     query: SemanticSearchQuery,
     userProfile?: any
   ): Promise<SearchResult[]> {
-    console.log('🧠 SEMANTIC SEARCH ENGINE: Starting search with query:', query);
+    // Clean the query first - remove instructional text
+    const cleanedQuery = this.cleanQuery(query.query);
+    const cleanedSearchQuery = { ...query, query: cleanedQuery };
+
+    console.log('🧠 SEMANTIC SEARCH ENGINE: Starting search with query:', cleanedSearchQuery);
+    console.log('🧠 SEMANTIC SEARCH ENGINE: Original query:', query.query);
+    console.log('🧠 SEMANTIC SEARCH ENGINE: Cleaned query:', cleanedQuery);
 
     // Step 1: Expand query semantically
-    const expandedQuery = await this.expandQuery(query);
+    const expandedQuery = await this.expandQuery(cleanedSearchQuery);
     console.log('🧠 SEMANTIC SEARCH ENGINE: Expanded query:', expandedQuery);
 
     // Step 2: Execute multi-modal search
@@ -75,11 +81,11 @@ export class SemanticSearchEngine {
     console.log('🧠 SEMANTIC SEARCH ENGINE: Multi-modal search results:', searchResults.length, 'papers');
 
     // Step 3: Apply semantic ranking
-    const rankedResults = this.applySemanticRanking(searchResults, query, userProfile);
+    const rankedResults = this.applySemanticRanking(searchResults, cleanedSearchQuery, userProfile);
     console.log('🧠 SEMANTIC SEARCH ENGINE: Ranked results:', rankedResults.length, 'papers');
 
     // Step 4: Apply post-processing filters
-    const finalResults = this.applyPostProcessingFilters(rankedResults, query);
+    const finalResults = this.applyPostProcessingFilters(rankedResults, cleanedSearchQuery);
     console.log('🧠 SEMANTIC SEARCH ENGINE: Final filtered results:', finalResults.length, 'papers');
 
     return finalResults;
@@ -265,6 +271,28 @@ export class SemanticSearchEngine {
     }
 
     return filteredResults;
+  }
+
+  /**
+   * Clean query by removing instructional text and formatting
+   */
+  private cleanQuery(query: string): string {
+    // Remove common instructional prefixes
+    let cleaned = query
+      .replace(/^\d+\.\s*Enter query:\s*["']?/i, '') // Remove "2. Enter query: "
+      .replace(/^Enter query:\s*["']?/i, '')        // Remove "Enter query: "
+      .replace(/^Query:\s*["']?/i, '')              // Remove "Query: "
+      .replace(/^Search:\s*["']?/i, '')             // Remove "Search: "
+      .replace(/["']$/g, '')                        // Remove trailing quotes
+      .trim();
+
+    // If the query is still empty or too short, return original
+    if (!cleaned || cleaned.length < 3) {
+      return query;
+    }
+
+    console.log('🧹 QUERY CLEANING:', { original: query, cleaned });
+    return cleaned;
   }
 
   /**
