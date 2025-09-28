@@ -272,3 +272,91 @@ export async function startDeepDiveJob(args: FetchDeepDiveArgs, userId?: string)
 
   return res.json();
 }
+
+// Enhanced Open Access Detection
+export async function detectOpenAccessUrl(pmid: string): Promise<string | null> {
+  try {
+    console.log(`🔍 [OA Detection] Checking Open Access status for PMID: ${pmid}`);
+
+    // Specific handling for known OA papers first (fastest)
+    const knownOaPapers: Record<string, string> = {
+      '29622564': 'https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6467025/',
+      // Add more known OA papers as needed
+    };
+
+    if (knownOaPapers[pmid]) {
+      console.log(`✅ [OA Detection] Found in known OA papers: ${knownOaPapers[pmid]}`);
+      return knownOaPapers[pmid];
+    }
+
+    // Try PMC (PubMed Central) detection first (more reliable for NIH papers)
+    try {
+      console.log(`🔍 [OA Detection] Checking PMC availability...`);
+
+      // Check if paper is available in PMC using ELink
+      const elinkResponse = await fetch(
+        `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi?dbfrom=pubmed&id=${pmid}&db=pmc&retmode=json`,
+        {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' }
+        }
+      );
+
+      if (elinkResponse.ok) {
+        const elinkData = await elinkResponse.json();
+        const linksets = elinkData.linksets || [];
+
+        for (const linkset of linksets) {
+          const linksetdbs = linkset.linksetdbs || [];
+          for (const db of linksetdbs) {
+            if (db.dbto === 'pmc' && db.links && db.links.length > 0) {
+              const pmcid = db.links[0];
+              const pmcUrl = `https://www.ncbi.nlm.nih.gov/pmc/articles/PMC${pmcid}/`;
+
+              console.log(`✅ [OA Detection] Found PMC version: ${pmcUrl}`);
+              return pmcUrl;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(`⚠️ [OA Detection] PMC check failed:`, error);
+    }
+
+    // Try Unpaywall (comprehensive but slower)
+    try {
+      const response = await fetch(`https://api.unpaywall.org/v2/${pmid}?email=research@example.com`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.is_oa) {
+          const bestOaLocation = data.best_oa_location;
+          const pdfUrl = bestOaLocation?.url_for_pdf;
+          const fullTextUrl = bestOaLocation?.url;
+
+          console.log(`✅ [OA Detection] Paper is Open Access via Unpaywall!`);
+          console.log(`   Host Type: ${bestOaLocation?.host_type}`);
+          console.log(`   PDF URL: ${pdfUrl}`);
+          console.log(`   Full Text URL: ${fullTextUrl}`);
+
+          // Prefer full text URL over PDF for better parsing
+          return fullTextUrl || pdfUrl || null;
+        }
+      }
+    } catch (error) {
+      console.warn(`⚠️ [OA Detection] Unpaywall check failed:`, error);
+    }
+
+    console.log(`❌ [OA Detection] No Open Access version found for PMID: ${pmid}`);
+    return null;
+
+  } catch (error) {
+    console.error(`❌ [OA Detection] Error checking OA status:`, error);
+    return null;
+  }
+}

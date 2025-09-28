@@ -197,7 +197,7 @@ export async function GET(request: NextRequest) {
       total_analyses: analyses.length,
       healthy_analyses: healthyAnalyses.length,
       empty_analyses: emptyAnalyses.length,
-      empty_analysis_details: emptyAnalyses.map(a => ({
+      empty_analysis_details: emptyAnalyses.map((a: any) => ({
         analysis_id: a.analysis_id,
         title: a.article_title || 'Missing',
         pmid: a.article_pmid || 'Missing',
