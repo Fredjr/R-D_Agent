@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import ScientificModelCard from '@/components/ScientificModelCard';
 import ExperimentalMethodsTable from '@/components/ExperimentalMethodsTable';
 import ResultsInterpretationCard from '@/components/ResultsInterpretationCard';
+import ContentQualityIndicator from '@/components/ContentQualityIndicator';
 
 interface Analysis {
   analysis_id: string;
@@ -363,6 +364,18 @@ export default function AnalysisDetailPage() {
                     Results interpretation analysis not available
                   </div>
                 )}
+              </div>
+
+              {/* Enhanced Content Quality Indicator */}
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <ContentQualityIndicator
+                  data={{
+                    content_quality: analysis.content_quality,
+                    grounding_source: analysis.grounding_source,
+                    grounding: analysis.grounding,
+                    user_notice: analysis.user_notice
+                  }}
+                />
               </div>
             </div>
           ) : (

@@ -27,6 +27,9 @@ interface ResultsInterpretationData {
   hypothesis_alignment: string;
   key_results: StatisticalResult[];
   limitations_biases_in_results: string[];
+  // Enhanced fields from new backend
+  clinical_significance?: string;
+  reproducibility_assessment?: string;
   fact_anchors: FactAnchor[];
 }
 
@@ -112,6 +115,33 @@ export default function ResultsInterpretationCard({ data, className = '' }: Resu
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Enhanced Fields from New Backend */}
+        {/* Clinical Significance */}
+        {data.clinical_significance && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <CheckCircleIcon className="h-5 w-5 text-blue-600" />
+              <label className="block text-sm font-medium text-gray-700">Clinical Significance</label>
+            </div>
+            <div className="p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400">
+              <p className="text-sm text-gray-900">{data.clinical_significance}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Reproducibility Assessment */}
+        {data.reproducibility_assessment && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <ChartBarIcon className="h-5 w-5 text-purple-600" />
+              <label className="block text-sm font-medium text-gray-700">Reproducibility Assessment</label>
+            </div>
+            <div className="p-3 bg-purple-50 rounded-lg border-l-4 border-purple-400">
+              <p className="text-sm text-gray-900">{data.reproducibility_assessment}</p>
             </div>
           </div>
         )}
