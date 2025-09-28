@@ -8106,6 +8106,39 @@ def _fetch_article_text_from_url(url: str, timeout: float = 20.0) -> str:
     try:
         if not url or not url.startswith("http"):
             return ""
+
+        # Enhanced PMC URL handling - try multiple formats
+        if "ncbi.nlm.nih.gov/pmc/articles/" in url:
+            # Extract PMC ID and try different URL formats
+            pmc_match = re.search(r"PMC(\d+)", url)
+            if pmc_match:
+                pmcid = pmc_match.group(1)
+                # Try PDF URL first for better text extraction
+                pdf_url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/PMC{pmcid}/pdf/main.pdf"
+                pdf_text = _fetch_article_text_from_url_direct(pdf_url, timeout)
+                if pdf_text and len(pdf_text) > 2000:
+                    return pdf_text
+
+                # Try full-text HTML URL
+                html_url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/PMC{pmcid}/"
+                html_text = _fetch_article_text_from_url_direct(html_url, timeout)
+                if html_text and len(html_text) > 2000:
+                    return html_text
+
+        # For direct PDF URLs, ensure we get the PDF
+        if url.endswith(".pdf") or "pdf" in url.lower():
+            return _fetch_article_text_from_url_direct(url, timeout)
+
+        # Default processing
+        return _fetch_article_text_from_url_direct(url, timeout)
+    except Exception:
+        return ""
+
+def _fetch_article_text_from_url_direct(url: str, timeout: float = 20.0) -> str:
+    """Direct URL fetching without PMC URL transformation"""
+    try:
+        if not url or not url.startswith("http"):
+            return ""
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (DeepDiveBot)"})
         with urllib.request.urlopen(req, timeout=timeout) as r:
             ctype = (r.headers.get("Content-Type") or "").lower()
@@ -8114,7 +8147,11 @@ def _fetch_article_text_from_url(url: str, timeout: float = 20.0) -> str:
                 if _HAS_PDF:
                     try:
                         # Attempt to extract PDF text
-                        return pdf_extract_text(io.BytesIO(raw))[:200000]
+                        extracted_text = pdf_extract_text(io.BytesIO(raw))[:200000]
+                        # Validate extracted text quality
+                        if len(extracted_text) > 500 and not _is_garbled_text(extracted_text):
+                            return extracted_text
+                        return ""
                     except Exception:
                         return ""
                 return ""
@@ -8126,10 +8163,79 @@ def _fetch_article_text_from_url(url: str, timeout: float = 20.0) -> str:
                     text = raw.decode("latin-1", errors="ignore")
                 except Exception:
                     text = raw.decode(errors="ignore")
+
+            # Enhanced HTML processing for PMC articles
+            if "ncbi.nlm.nih.gov/pmc" in url:
+                return _extract_pmc_article_content(text)
+
             return _strip_html(text)
     except Exception:
         return ""
 
+
+def _is_garbled_text(text: str) -> bool:
+    """Check if extracted text appears to be garbled or low quality"""
+    try:
+        if not text or len(text) < 100:
+            return True
+
+        # Check for excessive non-ASCII characters
+        non_ascii_ratio = sum(1 for c in text if ord(c) > 127) / len(text)
+        if non_ascii_ratio > 0.3:
+            return True
+
+        # Check for excessive special characters
+        special_chars = sum(1 for c in text if c in "!@#$%^&*()_+=[]{}|;:,.<>?")
+        special_ratio = special_chars / len(text)
+        if special_ratio > 0.2:
+            return True
+
+        # Check for reasonable word structure
+        words = text.split()
+        if len(words) < 50:  # Too few words
+            return True
+
+        # Check average word length (should be reasonable for scientific text)
+        avg_word_len = sum(len(w) for w in words[:100]) / min(100, len(words))
+        if avg_word_len < 2 or avg_word_len > 15:
+            return True
+
+        return False
+    except Exception:
+        return True
+
+def _extract_pmc_article_content(html_text: str) -> str:
+    """Enhanced extraction of PMC article content"""
+    try:
+        # PMC articles have specific structure - extract main content areas
+        content_patterns = [
+            r'<div[^>]*class="[^"]*article-content[^"]*"[^>]*>(.*?)</div>',
+            r'<div[^>]*class="[^"]*main-content[^"]*"[^>]*>(.*?)</div>',
+            r'<article[^>]*>(.*?)</article>',
+            r'<div[^>]*id="[^"]*content[^"]*"[^>]*>(.*?)</div>',
+            r'<section[^>]*class="[^"]*abstract[^"]*"[^>]*>(.*?)</section>',
+            r'<section[^>]*class="[^"]*body[^"]*"[^>]*>(.*?)</section>',
+        ]
+
+        extracted_content = []
+
+        for pattern in content_patterns:
+            matches = re.findall(pattern, html_text, re.DOTALL | re.IGNORECASE)
+            for match in matches:
+                clean_text = _strip_html(match).strip()
+                if len(clean_text) > 200:  # Meaningful content
+                    extracted_content.append(clean_text)
+
+        if extracted_content:
+            combined = "\n\n".join(extracted_content)
+            # Remove excessive whitespace
+            combined = re.sub(r'\n\s*\n\s*\n', '\n\n', combined)
+            return combined[:200000]
+
+        # Fallback to general HTML stripping
+        return _strip_html(html_text)[:200000]
+    except Exception:
+        return _strip_html(html_text)[:200000]
 
 def _fetch_url_raw_text(url: str, timeout: float = 15.0) -> str:
     try:
@@ -8439,7 +8545,7 @@ def _resolve_oa_fulltext(pmid: Optional[str], landing_html: str, doi_hint: Optio
     Returns: (text, grounding, source, meta) where grounding in {full_text, abstract_only, none},
     source hints e.g. pmc|publisher|repository|pubmed_abstract|europe_pmc|none; meta carries resolved identifiers.
     """
-    # 1) PMC via ELink
+    # 1) Enhanced PMC via ELink with multiple format attempts
     try:
         if pmid:
             elink = _fetch_json(f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi?dbfrom=pubmed&id={urllib.parse.quote(pmid)}&db=pmc&retmode=json")
@@ -8447,14 +8553,29 @@ def _resolve_oa_fulltext(pmid: Optional[str], landing_html: str, doi_hint: Optio
             for db in links:
                 if (db.get("dbto") == "pmc") and db.get("links"):
                     pmcid = str((db.get("links") or [])[0])
-                    # Fetch PMC HTML and strip
-                    pmc_url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/"
-                    html = _fetch_article_text_from_url(pmc_url)
-                    if html and len(html) > 2000:
-                        return (html, "full_text", "pmc", {"resolved_pmcid": pmcid, "resolved_source": "pmc"})
+
+                    # Try multiple PMC formats for better content extraction
+                    pmc_attempts = [
+                        f"https://www.ncbi.nlm.nih.gov/pmc/articles/PMC{pmcid}/pdf/main.pdf",  # PDF first
+                        f"https://www.ncbi.nlm.nih.gov/pmc/articles/PMC{pmcid}/",  # HTML
+                        f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/",  # Alternative format
+                    ]
+
+                    for pmc_url in pmc_attempts:
+                        try:
+                            html = _fetch_article_text_from_url(pmc_url)
+                            if html and len(html) > 2000 and not _is_garbled_text(html):
+                                source_type = "pmc_pdf" if "pdf" in pmc_url else "pmc"
+                                return (html, "full_text", source_type, {
+                                    "resolved_pmcid": pmcid,
+                                    "resolved_source": source_type,
+                                    "content_url": pmc_url
+                                })
+                        except Exception:
+                            continue
     except Exception:
         pass
-    # 2) Unpaywall via DOI
+    # 2) Enhanced Unpaywall via DOI with quality validation
     try:
         doi = (doi_hint or _extract_doi_from_html(landing_html)).strip()
         if not doi and pmid:
@@ -8464,13 +8585,29 @@ def _resolve_oa_fulltext(pmid: Optional[str], landing_html: str, doi_hint: Optio
         if doi and email:
             up = _fetch_json(f"https://api.unpaywall.org/v2/{urllib.parse.quote(doi)}?email={urllib.parse.quote(email)}")
             best = up.get("best_oa_location") or {}
-            for key in ("url_for_pdf", "url"):
-                u = best.get(key) or ""
-                if u:
-                    txt = _fetch_article_text_from_url(u)
-                    if txt and len(txt) > 1000:
-                        src = "publisher" if "publisher" in (best.get("host_type") or "") else "repository"
-                        return (txt, "full_text", src, {"resolved_doi": doi, "license": best.get("license"), "resolved_source": src})
+
+            # Try all available OA locations, prioritizing PDFs
+            oa_locations = up.get("oa_locations", [])
+            if best:
+                oa_locations = [best] + [loc for loc in oa_locations if loc != best]
+
+            for location in oa_locations:
+                for key in ("url_for_pdf", "url"):
+                    u = location.get(key) or ""
+                    if u:
+                        try:
+                            txt = _fetch_article_text_from_url(u)
+                            if txt and len(txt) > 1000 and not _is_garbled_text(txt):
+                                src = "publisher" if "publisher" in (location.get("host_type") or "") else "repository"
+                                return (txt, "full_text", src, {
+                                    "resolved_doi": doi,
+                                    "license": location.get("license"),
+                                    "resolved_source": src,
+                                    "content_url": u,
+                                    "host_type": location.get("host_type")
+                                })
+                        except Exception:
+                            continue
     except Exception:
         pass
     # 2b) Europe PMC fallback
