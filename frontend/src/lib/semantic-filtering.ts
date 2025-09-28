@@ -12,6 +12,10 @@ export interface SemanticFilter {
 }
 
 export interface PaperFeatures {
+  // Basic identifiers
+  pmid: string;
+  title: string;
+
   // Content-based features
   abstract_embedding?: number[];
   title_embedding?: number[];
@@ -19,19 +23,20 @@ export interface PaperFeatures {
   mesh_terms: string[];
   research_domain: string;
   methodology_type: string;
-  
+
   // Collaborative features
   citation_count: number;
   author_h_index?: number;
   journal_impact_factor?: number;
-  
+
   // Temporal features
   publication_year: number;
   recency_score: number;
-  
+
   // User interaction features
   user_relevance_score?: number;
   user_domain_affinity?: number;
+  similarity_score?: number;
 }
 
 export interface FilterCriteria {
