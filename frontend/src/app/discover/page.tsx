@@ -6,13 +6,23 @@ import { useRouter } from 'next/navigation';
 import { MobileResponsiveLayout } from '@/components/ui/MobileResponsiveLayout';
 import { SpotifyCleanSection } from '@/components/ui/SpotifyCleanSection';
 import { LoadingSpinner, ErrorAlert } from '@/components/ui';
-import { 
-  MusicalNoteIcon, 
-  FireIcon, 
-  BeakerIcon, 
+import {
+  MusicalNoteIcon,
+  FireIcon,
+  BeakerIcon,
   LightBulbIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  FunnelIcon,
+  MagnifyingGlassIcon,
+  SparklesIcon,
+  GlobeAltIcon
 } from '@heroicons/react/24/outline';
+
+// Import semantic systems
+import { SemanticPaperFilter, FilterCriteria } from '@/lib/semantic-filtering';
+import { SemanticSearchEngine, SemanticSearchQuery } from '@/lib/semantic-search';
+import { PersonalizedRecommendationEngine, RecommendationContext } from '@/lib/recommendation-engine';
+import { CrossDomainDiscoveryEngine } from '@/lib/cross-domain-discovery';
 
 interface WeeklyRecommendations {
   status: string;
@@ -43,6 +53,19 @@ export default function DiscoverPage() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
+
+  // Enhanced semantic discovery state
+  const [activeDiscoveryMode, setActiveDiscoveryMode] = useState<'recommendations' | 'semantic_search' | 'cross_domain' | 'smart_filters'>('recommendations');
+  const [semanticQuery, setSemanticQuery] = useState('');
+  const [filterCriteria, setFilterCriteria] = useState<FilterCriteria>({});
+  const [crossDomainOpportunities, setCrossDomainOpportunities] = useState<any[]>([]);
+  const [semanticResults, setSemanticResults] = useState<any[]>([]);
+
+  // Initialize semantic engines
+  const [semanticFilter] = useState(() => new SemanticPaperFilter());
+  const [semanticSearch] = useState(() => new SemanticSearchEngine());
+  const [recommendationEngine] = useState(() => new PersonalizedRecommendationEngine());
+  const [crossDomainEngine] = useState(() => new CrossDomainDiscoveryEngine());
 
   useEffect(() => {
     if (!user) {
