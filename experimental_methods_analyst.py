@@ -123,7 +123,8 @@ def _controls_hints(text: str) -> str:
 
 
 def analyze_experimental_methods(full_article_text: str, user_initial_objective: str, llm) -> List[Dict[str, object]]:
-    safe_text = (full_article_text or "")[:12000]
+    # Increased token limit to handle enhanced content extraction (70K+ chars)
+    safe_text = (full_article_text or "")[:25000]
     chain = LLMChain(llm=llm, prompt=EXPERIMENTAL_METHODS_PROMPT)
     raw = chain.invoke({"objective": (user_initial_objective or "")[:400], "full_text": safe_text})
     text = raw.get("text", raw) if isinstance(raw, dict) else str(raw)

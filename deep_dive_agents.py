@@ -210,7 +210,9 @@ def _harvest_tables_from_jats(jats_xml: str) -> List[Dict[str, str]]:
 # Sub-agent pipelines
 
 def run_methods_pipeline(full_text: str, objective: str, llm) -> List[Dict[str, Any]]:
-    safe_text = (full_text or "")[:12000]
+    # Increased token limit to handle enhanced content extraction (70K+ chars)
+    # Focus on methods sections for better analysis
+    safe_text = _extract_methods_section(full_text or "", max_chars=25000)
     base = LLMChain(llm=llm, prompt=METHODS_BASE_PROMPT).invoke({"objective": objective[:400], "full_text": safe_text})
     try:
         import json
@@ -250,7 +252,9 @@ def run_methods_pipeline(full_text: str, objective: str, llm) -> List[Dict[str, 
     return out
 
 def run_results_pipeline(full_text: str, objective: str, llm, pmcid: str | None) -> Dict[str, Any]:
-    safe_text = (full_text or "")[:12000]
+    # Increased token limit to handle enhanced content extraction (70K+ chars)
+    # Focus on results sections for better analysis
+    safe_text = _extract_results_section(full_text or "", max_chars=25000)
     base = LLMChain(llm=llm, prompt=RESULTS_BASE_PROMPT).invoke({"objective": objective[:400], "full_text": safe_text})
     try:
         import json
@@ -286,7 +290,6 @@ def run_results_pipeline(full_text: str, objective: str, llm, pmcid: str | None)
     if not isinstance(obj["limitations_biases_in_results"], list):
         obj["limitations_biases_in_results"] = []
 
-    return obj
     # Heuristic harvest when sparse
     if len(obj["key_results"]) == 0:
         # HTML-based quick harvest
@@ -385,7 +388,9 @@ def _extract_statistical_metrics(text: str) -> List[Dict[str, str]]:
 # Enhanced pipeline functions
 def run_enhanced_model_pipeline(full_text: str, objective: str, llm) -> Dict[str, Any]:
     """Enhanced model analysis pipeline with comprehensive experimental design evaluation"""
-    safe_text = (full_text or "")[:15000]
+    # Increased token limit to handle enhanced content extraction (70K+ chars)
+    # Focus on model/experimental design sections for better analysis
+    safe_text = _extract_model_section(full_text or "", max_chars=30000)
 
     try:
         base = LLMChain(llm=llm, prompt=MODEL_ANALYSIS_PROMPT).invoke({
@@ -438,3 +443,104 @@ def run_enhanced_model_pipeline(full_text: str, objective: str, llm) -> Dict[str
         "randomization_blinding": result.get("randomization_blinding", "Not specified"),
         "fact_anchors": result.get("fact_anchors", [])
     }
+
+# Intelligent content extraction functions for enhanced analysis
+def _extract_methods_section(full_text: str, max_chars: int = 25000) -> str:
+    """Extract methods section with intelligent prioritization"""
+    if not full_text:
+        return ""
+
+    # If text is short enough, return as-is
+    if len(full_text) <= max_chars:
+        return full_text
+
+    # Look for methods section markers
+    methods_patterns = [
+        r"(?i)(methods?|methodology|experimental\s+procedures?|materials?\s+and\s+methods?)",
+        r"(?i)(protocol|procedure|approach|technique)",
+        r"(?i)(statistical\s+analysis|data\s+analysis)"
+    ]
+
+    # Try to find methods section
+    methods_start = -1
+    for pattern in methods_patterns:
+        match = re.search(pattern, full_text)
+        if match:
+            methods_start = max(0, match.start() - 500)  # Include some context
+            break
+
+    if methods_start >= 0:
+        # Extract methods section with some buffer
+        methods_end = min(len(full_text), methods_start + max_chars)
+        return full_text[methods_start:methods_end]
+
+    # Fallback: take first portion (likely contains methods)
+    return full_text[:max_chars]
+
+def _extract_results_section(full_text: str, max_chars: int = 25000) -> str:
+    """Extract results section with intelligent prioritization"""
+    if not full_text:
+        return ""
+
+    # If text is short enough, return as-is
+    if len(full_text) <= max_chars:
+        return full_text
+
+    # Look for results section markers
+    results_patterns = [
+        r"(?i)(results?|findings?|outcomes?)",
+        r"(?i)(statistical\s+analysis|data\s+analysis|analysis)",
+        r"(?i)(figure|table|supplementary)",
+        r"(?i)(p\s*[<>=]\s*0\.\d+|significant|correlation)"
+    ]
+
+    # Try to find results section
+    results_start = -1
+    for pattern in results_patterns:
+        match = re.search(pattern, full_text)
+        if match:
+            results_start = max(0, match.start() - 500)  # Include some context
+            break
+
+    if results_start >= 0:
+        # Extract results section with some buffer
+        results_end = min(len(full_text), results_start + max_chars)
+        return full_text[results_start:results_end]
+
+    # Fallback: take middle portion (likely contains results)
+    start_pos = len(full_text) // 3
+    return full_text[start_pos:start_pos + max_chars]
+
+def _extract_model_section(full_text: str, max_chars: int = 30000) -> str:
+    """Extract model/experimental design section with intelligent prioritization"""
+    if not full_text:
+        return ""
+
+    # If text is short enough, return as-is
+    if len(full_text) <= max_chars:
+        return full_text
+
+    # Look for model/design section markers
+    model_patterns = [
+        r"(?i)(experimental\s+design|study\s+design|model|approach)",
+        r"(?i)(methods?|methodology|protocol|procedure)",
+        r"(?i)(participants?|subjects?|samples?|population)",
+        r"(?i)(in\s+vitro|in\s+vivo|clinical|computational)",
+        r"(?i)(randomiz|blind|control|treatment)"
+    ]
+
+    # Try to find model/design section (usually early in paper)
+    model_start = -1
+    for pattern in model_patterns:
+        match = re.search(pattern, full_text)
+        if match:
+            model_start = max(0, match.start() - 1000)  # Include more context for design
+            break
+
+    if model_start >= 0:
+        # Extract model section with buffer
+        model_end = min(len(full_text), model_start + max_chars)
+        return full_text[model_start:model_end]
+
+    # Fallback: take first portion (likely contains introduction + methods)
+    return full_text[:max_chars]
