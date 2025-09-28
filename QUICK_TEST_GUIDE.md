@@ -31,8 +31,11 @@ Expected Logs:
 🔍 Semantic search initiated with query: machine learning drug discovery
 🎯 Search options: {semantic_expansion: true, similarity_threshold: 0.8, ...}
 📊 Executing semantic search with query object: {...}
-📊 Search results: X papers found
+📊 Search results: 5+ papers found (should be > 0)
 ✅ Semantic search completed
+
+✅ FIXED: PubMed API endpoint now supports POST requests
+✅ WORKING: Smart Recommendations section should populate with results
 ```
 
 **✅ Verification Checklist:**

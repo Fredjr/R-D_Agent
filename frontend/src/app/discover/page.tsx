@@ -58,12 +58,23 @@ function DiscoverPageContent() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
 
-  // Enhanced semantic discovery state
-  const [activeDiscoveryMode, setActiveDiscoveryMode] = useState<'recommendations' | 'semantic_search' | 'cross_domain' | 'smart_filters'>('recommendations');
+  // Enhanced semantic discovery state with 3 recommendation types
+  const [activeDiscoveryMode, setActiveDiscoveryMode] = useState<'recommendations' | 'semantic_search' | 'cross_domain' | 'smart_filters' | 'trending' | 'for_you' | 'cross_domain_discoveries'>('recommendations');
   const [semanticQuery, setSemanticQuery] = useState('');
   const [filterCriteria, setFilterCriteria] = useState<FilterCriteria>({});
   const [crossDomainOpportunities, setCrossDomainOpportunities] = useState<any[]>([]);
   const [semanticResults, setSemanticResults] = useState<any[]>([]);
+
+  // Separate states for the 3 recommendation types from Home page
+  const [recommendationSections, setRecommendationSections] = useState<{
+    trending: { papers: any[], loading: boolean, error: string | null };
+    forYou: { papers: any[], loading: boolean, error: string | null };
+    crossDomain: { papers: any[], loading: boolean, error: string | null };
+  }>({
+    trending: { papers: [], loading: false, error: null },
+    forYou: { papers: [], loading: false, error: null },
+    crossDomain: { papers: [], loading: false, error: null }
+  });
 
   // Initialize semantic engines
   const [semanticFilter] = useState(() => new SemanticPaperFilter());
@@ -112,6 +123,20 @@ function DiscoverPageContent() {
         category,
         source: 'home_page_recommendations'
       });
+    }
+
+    // Handle specific recommendation section navigation from Home page
+    if (category) {
+      if (category === 'trending') {
+        setActiveDiscoveryMode('trending');
+        loadTrendingRecommendations();
+      } else if (category === 'for_you') {
+        setActiveDiscoveryMode('for_you');
+        loadForYouRecommendations();
+      } else if (category === 'cross_domain_discoveries') {
+        setActiveDiscoveryMode('cross_domain_discoveries');
+        loadCrossDomainRecommendations();
+      }
     }
   }, [searchParams]);
 
@@ -458,6 +483,157 @@ function DiscoverPageContent() {
     }
   };
 
+  // Dedicated functions for the 3 recommendation types from Home page
+  const loadTrendingRecommendations = async () => {
+    if (!user) return;
+
+    setRecommendationSections(prev => ({
+      ...prev,
+      trending: { ...prev.trending, loading: true, error: null }
+    }));
+
+    try {
+      console.log('🔥 Loading trending recommendations for user:', user.email);
+
+      const response = await fetch(`/api/proxy/recommendations/trending/${user.email}`, {
+        headers: {
+          'User-ID': user.email,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch trending recommendations: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('🔥 Trending recommendations loaded:', data);
+
+      setRecommendationSections(prev => ({
+        ...prev,
+        trending: {
+          papers: data.papers || data.recommendations || [],
+          loading: false,
+          error: null
+        }
+      }));
+
+      // Track the interaction
+      trackRecommendationInteraction('view', 'trending_section', 'discover_page');
+
+    } catch (error) {
+      console.error('❌ Failed to load trending recommendations:', error);
+      setRecommendationSections(prev => ({
+        ...prev,
+        trending: {
+          papers: [],
+          loading: false,
+          error: error instanceof Error ? error.message : 'Failed to load trending recommendations'
+        }
+      }));
+    }
+  };
+
+  const loadForYouRecommendations = async () => {
+    if (!user) return;
+
+    setRecommendationSections(prev => ({
+      ...prev,
+      forYou: { ...prev.forYou, loading: true, error: null }
+    }));
+
+    try {
+      console.log('💡 Loading personalized recommendations for user:', user.email);
+
+      const response = await fetch(`/api/proxy/recommendations/papers-for-you/${user.email}`, {
+        headers: {
+          'User-ID': user.email,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch personalized recommendations: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('💡 Personalized recommendations loaded:', data);
+
+      setRecommendationSections(prev => ({
+        ...prev,
+        forYou: {
+          papers: data.papers || data.recommendations || [],
+          loading: false,
+          error: null
+        }
+      }));
+
+      // Track the interaction
+      trackRecommendationInteraction('view', 'for_you_section', 'discover_page');
+
+    } catch (error) {
+      console.error('❌ Failed to load personalized recommendations:', error);
+      setRecommendationSections(prev => ({
+        ...prev,
+        forYou: {
+          papers: [],
+          loading: false,
+          error: error instanceof Error ? error.message : 'Failed to load personalized recommendations'
+        }
+      }));
+    }
+  };
+
+  const loadCrossDomainRecommendations = async () => {
+    if (!user) return;
+
+    setRecommendationSections(prev => ({
+      ...prev,
+      crossDomain: { ...prev.crossDomain, loading: true, error: null }
+    }));
+
+    try {
+      console.log('🌐 Loading cross-domain recommendations for user:', user.email);
+
+      const response = await fetch(`/api/proxy/recommendations/cross-pollination/${user.email}`, {
+        headers: {
+          'User-ID': user.email,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch cross-domain recommendations: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('🌐 Cross-domain recommendations loaded:', data);
+
+      setRecommendationSections(prev => ({
+        ...prev,
+        crossDomain: {
+          papers: data.papers || data.recommendations || [],
+          loading: false,
+          error: null
+        }
+      }));
+
+      // Track the interaction
+      trackRecommendationInteraction('view', 'cross_domain_section', 'discover_page');
+
+    } catch (error) {
+      console.error('❌ Failed to load cross-domain recommendations:', error);
+      setRecommendationSections(prev => ({
+        ...prev,
+        crossDomain: {
+          papers: [],
+          loading: false,
+          error: error instanceof Error ? error.message : 'Failed to load cross-domain recommendations'
+        }
+      }));
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--spotify-black)] flex items-center justify-center">
@@ -766,6 +942,113 @@ function DiscoverPageContent() {
               return null;
             }
           })()}
+
+          {/* Trending Now Section */}
+          {activeDiscoveryMode === 'trending' && recommendationSections.trending.papers.length > 0 && (
+            <SpotifyCleanSection
+              section={{
+                title: "Trending Now",
+                description: "Hot papers trending in your research field",
+                papers: recommendationSections.trending.papers,
+                updated: new Date().toISOString(),
+                icon: BeakerIcon,
+                color: '#ef4444',
+                category: 'trending'
+              }}
+              onPlay={handlePlayPaper}
+              onSave={handleSavePaper}
+              onShare={handleSharePaper}
+              onClick={(paper) => {
+                if (paper.pmid) {
+                  window.open(`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`, '_blank');
+                }
+              }}
+              onSeeAll={handleSeeAll}
+            />
+          )}
+
+          {/* For You Section */}
+          {activeDiscoveryMode === 'for_you' && recommendationSections.forYou.papers.length > 0 && (
+            <SpotifyCleanSection
+              section={{
+                title: "For You",
+                description: "Personalized recommendations based on your search history",
+                papers: recommendationSections.forYou.papers,
+                updated: new Date().toISOString(),
+                icon: LightBulbIcon,
+                color: '#16a34a',
+                category: 'for_you'
+              }}
+              onPlay={handlePlayPaper}
+              onSave={handleSavePaper}
+              onShare={handleSharePaper}
+              onClick={(paper) => {
+                if (paper.pmid) {
+                  window.open(`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`, '_blank');
+                }
+              }}
+              onSeeAll={handleSeeAll}
+            />
+          )}
+
+          {/* Cross-Domain Discoveries Section */}
+          {activeDiscoveryMode === 'cross_domain_discoveries' && recommendationSections.crossDomain.papers.length > 0 && (
+            <SpotifyCleanSection
+              section={{
+                title: "Cross-Domain Discoveries",
+                description: "Interdisciplinary research opportunities",
+                papers: recommendationSections.crossDomain.papers,
+                updated: new Date().toISOString(),
+                icon: ArrowPathIcon,
+                color: '#6366f1',
+                category: 'cross_domain_discoveries'
+              }}
+              onPlay={handlePlayPaper}
+              onSave={handleSavePaper}
+              onShare={handleSharePaper}
+              onClick={(paper) => {
+                if (paper.pmid) {
+                  window.open(`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`, '_blank');
+                }
+              }}
+              onSeeAll={handleSeeAll}
+            />
+          )}
+
+          {/* Loading states for recommendation sections */}
+          {activeDiscoveryMode === 'trending' && recommendationSections.trending.loading && (
+            <div className="text-center py-12">
+              <LoadingSpinner size="lg" />
+              <p className="text-[var(--spotify-light-text)] mt-4">Loading trending recommendations...</p>
+            </div>
+          )}
+
+          {activeDiscoveryMode === 'for_you' && recommendationSections.forYou.loading && (
+            <div className="text-center py-12">
+              <LoadingSpinner size="lg" />
+              <p className="text-[var(--spotify-light-text)] mt-4">Loading personalized recommendations...</p>
+            </div>
+          )}
+
+          {activeDiscoveryMode === 'cross_domain_discoveries' && recommendationSections.crossDomain.loading && (
+            <div className="text-center py-12">
+              <LoadingSpinner size="lg" />
+              <p className="text-[var(--spotify-light-text)] mt-4">Loading cross-domain discoveries...</p>
+            </div>
+          )}
+
+          {/* Error states for recommendation sections */}
+          {activeDiscoveryMode === 'trending' && recommendationSections.trending.error && (
+            <ErrorAlert>{recommendationSections.trending.error}</ErrorAlert>
+          )}
+
+          {activeDiscoveryMode === 'for_you' && recommendationSections.forYou.error && (
+            <ErrorAlert>{recommendationSections.forYou.error}</ErrorAlert>
+          )}
+
+          {activeDiscoveryMode === 'cross_domain_discoveries' && recommendationSections.crossDomain.error && (
+            <ErrorAlert>{recommendationSections.crossDomain.error}</ErrorAlert>
+          )}
         </div>
 
         {/* Next Update Info */}

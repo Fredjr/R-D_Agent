@@ -9,7 +9,7 @@ import SemanticDiscoveryInterface from '@/components/SemanticDiscoveryInterface'
 import SpotifyStyleRecommendationCard from '@/components/SpotifyStyleRecommendationCard';
 
 export default function TestSemanticEnhancedPage() {
-  const [activeMode, setActiveMode] = useState<'recommendations' | 'semantic_search' | 'cross_domain' | 'smart_filters'>('recommendations');
+  const [activeMode, setActiveMode] = useState<'recommendations' | 'semantic_search' | 'cross_domain' | 'smart_filters' | 'trending' | 'for_you' | 'cross_domain_discoveries'>('recommendations');
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [testResults, setTestResults] = useState<string[]>([]);
