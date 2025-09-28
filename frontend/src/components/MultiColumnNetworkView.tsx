@@ -102,6 +102,80 @@ export default function MultiColumnNetworkView({
     }
   }, []);
 
+  // Handle main network navigation changes
+  const handleMainNavigationChange = useCallback((mode: string, newSourceId: string) => {
+    console.log('🧭 Main navigation change:', { mode, newSourceId });
+
+    // Create a placeholder paper node for the navigation
+    const placeholderPaper: NetworkNode = {
+      id: newSourceId,
+      label: `${mode.charAt(0).toUpperCase() + mode.slice(1)} Work`,
+      size: 50,
+      color: '#2196F3',
+      metadata: {
+        pmid: newSourceId,
+        title: `${mode.charAt(0).toUpperCase() + mode.slice(1)} Work`,
+        authors: [],
+        journal: '',
+        year: new Date().getFullYear(),
+        citation_count: 0,
+        url: `https://pubmed.ncbi.nlm.nih.gov/${newSourceId}/`
+      }
+    };
+
+    // Create a new column for the navigation
+    const newColumn: PaperColumn = {
+      id: `nav-${Date.now()}`,
+      paper: placeholderPaper,
+      sourceType: 'article',
+      sourceId: newSourceId,
+      title: `${mode.charAt(0).toUpperCase() + mode.slice(1)} Work`,
+      selectedNode: null,
+      networkViewRef: React.createRef(),
+      networkType: 'citations',
+      explorationMode: 'focused'
+    };
+
+    setColumns(prev => [...prev, newColumn]);
+  }, []);
+
+  // Handle column navigation changes
+  const handleColumnNavigationChange = useCallback((columnId: string, mode: string, newSourceId: string) => {
+    console.log('🧭 Column navigation change:', { columnId, mode, newSourceId });
+
+    // Create a placeholder paper node for the navigation
+    const placeholderPaper: NetworkNode = {
+      id: newSourceId,
+      label: `${mode.charAt(0).toUpperCase() + mode.slice(1)} Work`,
+      size: 50,
+      color: '#2196F3',
+      metadata: {
+        pmid: newSourceId,
+        title: `${mode.charAt(0).toUpperCase() + mode.slice(1)} Work`,
+        authors: [],
+        journal: '',
+        year: new Date().getFullYear(),
+        citation_count: 0,
+        url: `https://pubmed.ncbi.nlm.nih.gov/${newSourceId}/`
+      }
+    };
+
+    // Create a new column for the navigation
+    const newColumn: PaperColumn = {
+      id: `nav-${columnId}-${Date.now()}`,
+      paper: placeholderPaper,
+      sourceType: 'article',
+      sourceId: newSourceId,
+      title: `${mode.charAt(0).toUpperCase() + mode.slice(1)} Work`,
+      selectedNode: null,
+      networkViewRef: React.createRef(),
+      networkType: 'citations',
+      explorationMode: 'focused'
+    };
+
+    setColumns(prev => [...prev, newColumn]);
+  }, []);
+
   // Handle creating a new column for a selected paper
   const handleCreatePaperColumn = useCallback((paper: NetworkNode) => {
     console.log('🎯 Creating new paper column for:', paper.metadata.title);
@@ -362,6 +436,7 @@ export default function MultiColumnNetworkView({
                 sourceType={sourceType}
                 sourceId={sourceId}
                 onNodeSelect={handleMainNodeSelect}
+                onNavigationChange={handleMainNavigationChange}
                 className="h-full"
                 disableInternalSidebar={true}
                 projectId={projectId}
@@ -526,6 +601,7 @@ export default function MultiColumnNetworkView({
                     sourceType={column.sourceType}
                     sourceId={column.sourceId}
                     onNodeSelect={(node) => handleColumnNodeSelect(column.id, node)}
+                    onNavigationChange={(mode, newSourceId) => handleColumnNavigationChange(column.id, mode, newSourceId)}
                     className="h-full"
                     forceNetworkType={column.networkType}
                     projectId={projectId}
