@@ -46,6 +46,7 @@ export default function NetworkViewWithSidebar({
 }: NetworkViewWithSidebarProps) {
   const { user } = useAuth();
   const [selectedNode, setSelectedNode] = useState<NetworkNode | null>(null);
+  const [navigationMode, setNavigationMode] = useState<'default' | 'similar' | 'earlier' | 'later' | 'authors' | 'timeline'>('default');
   const networkViewRef = useRef<any>(null);
 
   console.log('🔍 NetworkViewWithSidebar rendered with:', { sourceType, sourceId, projectId });
@@ -151,6 +152,28 @@ export default function NetworkViewWithSidebar({
     alert(`Save to Collection feature coming soon!\n\nArticle: ${title}\nPMID: ${pmid}`);
     onArticleSaved?.();
   }, [onArticleSaved]);
+
+  const onNavigationChange = useCallback((mode: string, sourceId: string) => {
+    console.log('🔍 Navigation mode changed:', { mode, sourceId });
+    setNavigationMode(mode as any);
+  }, []);
+
+  const onExploreCluster = useCallback((pmid: string, title: string) => {
+    console.log('🔍 Explore cluster triggered:', { pmid, title });
+    alert(`Explore Cluster feature coming soon!\n\nArticle: ${title}\nPMID: ${pmid}`);
+  }, []);
+
+  const handleNodeSelect = useCallback((node: NetworkNode | null) => {
+    setSelectedNode(node);
+  }, []);
+
+  const handleCloseSidebar = useCallback(() => {
+    setSelectedNode(null);
+  }, []);
+
+  // Optional props that may be undefined
+  const forceNetworkType = undefined;
+  const articleMetadata = undefined;
 
   return (
     <div className={`flex h-full ${className}`}>
