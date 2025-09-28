@@ -102,7 +102,8 @@ def _harvest_quant(text: str) -> List[Dict[str, str]]:
 
 
 def analyze_results_interpretation(full_article_text: str, user_initial_objective: str, llm) -> Dict[str, object]:
-    safe_text = (full_article_text or "")[:12000]
+    # Increased token limit to handle enhanced content extraction (70K+ chars)
+    safe_text = (full_article_text or "")[:25000]
     chain = LLMChain(llm=llm, prompt=RESULTS_INTERPRETATION_PROMPT)
     raw = chain.invoke({"objective": (user_initial_objective or "")[:400], "full_text": safe_text})
     text = raw.get("text", raw) if isinstance(raw, dict) else str(raw)
