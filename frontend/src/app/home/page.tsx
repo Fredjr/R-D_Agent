@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
+import { SemanticSearchEngine } from '@/lib/semantic-search';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ErrorAlert } from '@/components/ui/Alert';
 import { SpotifyRecommendations } from '@/components/ui/SpotifyRecommendations';
@@ -69,7 +70,82 @@ export default function HomePage() {
   // Initialize real-time analytics
   const { trackEvent, trackRecommendationInteraction } = useRealTimeAnalytics('home');
 
-  // Removed recommendations state - now handled by Discover page
+  // Semantic recommendations state
+  const [semanticRecommendations, setSemanticRecommendations] = useState({
+    crossDomain: [],
+    trending: [],
+    personalized: [],
+    loading: true,
+    error: null
+  });
+
+  // Initialize semantic search engine
+  const semanticEngine = new SemanticSearchEngine();
+
+  // Fetch semantic recommendations on component mount
+  useEffect(() => {
+    const fetchSemanticRecommendations = async () => {
+      try {
+        console.log('🏠 HOME: Fetching semantic recommendations...');
+
+        // Fetch cross-domain recommendations
+        const crossDomainResults = await semanticEngine.performSemanticSearch({
+          query: 'machine learning biomedical research drug discovery',
+          semantic_expansion: true,
+          domain_focus: ['machine learning', 'biomedical research'],
+          similarity_threshold: 0.3,
+          include_related_concepts: true,
+          max_results: 6
+        });
+
+        // Fetch trending recommendations
+        const trendingResults = await semanticEngine.performSemanticSearch({
+          query: 'diabetes pharmacology clinical trials recent advances',
+          semantic_expansion: true,
+          domain_focus: ['diabetes', 'pharmacology'],
+          similarity_threshold: 0.3,
+          include_related_concepts: true,
+          max_results: 6
+        });
+
+        // Fetch personalized recommendations
+        const personalizedResults = await semanticEngine.performSemanticSearch({
+          query: 'clinical medicine nephrology kidney disease treatment',
+          semantic_expansion: true,
+          domain_focus: ['clinical medicine', 'nephrology'],
+          similarity_threshold: 0.3,
+          include_related_concepts: true,
+          max_results: 6
+        });
+
+        console.log('🏠 HOME: Semantic recommendations fetched:', {
+          crossDomain: crossDomainResults.length,
+          trending: trendingResults.length,
+          personalized: personalizedResults.length
+        });
+
+        setSemanticRecommendations({
+          crossDomain: crossDomainResults.slice(0, 3), // Show top 3
+          trending: trendingResults.slice(0, 3),
+          personalized: personalizedResults.slice(0, 3),
+          loading: false,
+          error: null
+        });
+
+      } catch (error) {
+        console.error('🏠 HOME: Error fetching semantic recommendations:', error);
+        setSemanticRecommendations(prev => ({
+          ...prev,
+          loading: false,
+          error: 'Failed to load recommendations'
+        }));
+      }
+    };
+
+    if (user) {
+      fetchSemanticRecommendations();
+    }
+  }, [user]);
 
   const quickActions: QuickAction[] = [
     {
@@ -305,70 +381,113 @@ export default function HomePage() {
               Explore More →
             </Button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Cross-Domain Suggestions */}
-            <div
-              className="bg-gradient-to-br from-purple-600/20 to-blue-600/20 rounded-lg p-4 sm:p-6 border border-purple-500/30 cursor-pointer hover:border-purple-400/50 transition-colors"
-              onClick={() => {
-                trackEvent('cross_domain_click', { source: 'home_recommendations' });
-                router.push('/discover?mode=cross_domain&query=machine learning biomedical research');
-              }}
-            >
-              <div className="flex items-center mb-3">
-                <GlobeAltIcon className="w-5 h-5 mr-2 text-purple-400" />
-                <h3 className="text-white font-medium">Cross-Domain</h3>
-              </div>
-              <p className="text-[var(--spotify-light-text)] text-sm mb-3">
-                Discover connections between machine learning and biomedical research
-              </p>
-              <div className="flex items-center justify-between">
-                <span className="bg-purple-500/20 px-2 py-1 rounded text-xs text-purple-300">12 new papers</span>
-                <span className="text-xs text-purple-400 hover:text-purple-300">Click to explore →</span>
+          {semanticRecommendations.loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--spotify-green)] mx-auto mb-4"></div>
+                <p className="text-[var(--spotify-light-text)]">Loading semantic recommendations...</p>
               </div>
             </div>
+          ) : semanticRecommendations.error ? (
+            <div className="text-center py-12">
+              <p className="text-red-400">{semanticRecommendations.error}</p>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {/* Cross-Domain Recommendations */}
+              <div>
+                <div className="flex items-center mb-4">
+                  <GlobeAltIcon className="w-5 h-5 mr-2 text-purple-400" />
+                  <h3 className="text-lg font-semibold text-white">Cross-Domain Discoveries</h3>
+                  <span className="ml-2 bg-purple-500/20 px-2 py-1 rounded text-xs text-purple-300">
+                    {semanticRecommendations.crossDomain.length} papers
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {semanticRecommendations.crossDomain.map((paper, index) => (
+                    <div
+                      key={`cross-${index}`}
+                      className="bg-gradient-to-br from-purple-600/10 to-blue-600/10 rounded-lg p-4 border border-purple-500/20 hover:border-purple-400/40 transition-colors cursor-pointer"
+                      onClick={() => window.open(`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}`, '_blank')}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-1 rounded">🧠 AI</span>
+                        <span className="text-xs text-purple-400">{paper.year}</span>
+                      </div>
+                      <h4 className="text-white text-sm font-medium mb-2 line-clamp-2">{paper.title}</h4>
+                      <p className="text-[var(--spotify-light-text)] text-xs mb-2 line-clamp-2">{paper.abstract?.substring(0, 120)}...</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-purple-400">{paper.journal}</span>
+                        <span className="text-xs text-purple-300">Score: {(paper.relevance_score * 100).toFixed(0)}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-            {/* Trending in Your Field */}
-            <div
-              className="bg-gradient-to-br from-orange-600/20 to-red-600/20 rounded-lg p-4 sm:p-6 border border-orange-500/30 cursor-pointer hover:border-orange-400/50 transition-colors"
-              onClick={() => {
-                trackEvent('trending_click', { source: 'home_recommendations' });
-                router.push('/discover?mode=trending&query=diabetes pharmacology');
-              }}
-            >
-              <div className="flex items-center mb-3">
-                <FireIcon className="w-5 h-5 mr-2 text-orange-400" />
-                <h3 className="text-white font-medium">Trending Now</h3>
+              {/* Trending Recommendations */}
+              <div>
+                <div className="flex items-center mb-4">
+                  <FireIcon className="w-5 h-5 mr-2 text-orange-400" />
+                  <h3 className="text-lg font-semibold text-white">Trending Now</h3>
+                  <span className="ml-2 bg-orange-500/20 px-2 py-1 rounded text-xs text-orange-300">
+                    {semanticRecommendations.trending.length} papers
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {semanticRecommendations.trending.map((paper, index) => (
+                    <div
+                      key={`trending-${index}`}
+                      className="bg-gradient-to-br from-orange-600/10 to-red-600/10 rounded-lg p-4 border border-orange-500/20 hover:border-orange-400/40 transition-colors cursor-pointer"
+                      onClick={() => window.open(`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}`, '_blank')}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <span className="text-xs bg-orange-500/20 text-orange-300 px-2 py-1 rounded">🔥 Hot</span>
+                        <span className="text-xs text-orange-400">{paper.year}</span>
+                      </div>
+                      <h4 className="text-white text-sm font-medium mb-2 line-clamp-2">{paper.title}</h4>
+                      <p className="text-[var(--spotify-light-text)] text-xs mb-2 line-clamp-2">{paper.abstract?.substring(0, 120)}...</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-orange-400">{paper.journal}</span>
+                        <span className="text-xs text-orange-300">Score: {(paper.relevance_score * 100).toFixed(0)}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <p className="text-[var(--spotify-light-text)] text-sm mb-3">
-                Hot topics in your research domains with semantic similarity
-              </p>
-              <div className="flex items-center justify-between">
-                <span className="bg-orange-500/20 px-2 py-1 rounded text-xs text-orange-300">8 trending papers</span>
-                <span className="text-xs text-orange-400 hover:text-orange-300">Click to explore →</span>
-              </div>
-            </div>
 
-            {/* Personalized Picks */}
-            <div
-              className="bg-gradient-to-br from-green-600/20 to-teal-600/20 rounded-lg p-4 sm:p-6 border border-green-500/30 cursor-pointer hover:border-green-400/50 transition-colors"
-              onClick={() => {
-                trackEvent('personalized_click', { source: 'home_recommendations' });
-                router.push('/discover?mode=personalized&query=clinical medicine nephrology');
-              }}
-            >
-              <div className="flex items-center mb-3">
-                <LightBulbIcon className="w-5 h-5 mr-2 text-green-400" />
-                <h3 className="text-white font-medium">For You</h3>
-              </div>
-              <p className="text-[var(--spotify-light-text)] text-sm mb-3">
-                Curated based on your reading history and semantic preferences
-              </p>
-              <div className="flex items-center justify-between">
-                <span className="bg-green-500/20 px-2 py-1 rounded text-xs text-green-300">15 personalized</span>
-                <span className="text-xs text-green-400 hover:text-green-300">Click to explore →</span>
+              {/* Personalized Recommendations */}
+              <div>
+                <div className="flex items-center mb-4">
+                  <LightBulbIcon className="w-5 h-5 mr-2 text-green-400" />
+                  <h3 className="text-lg font-semibold text-white">For You</h3>
+                  <span className="ml-2 bg-green-500/20 px-2 py-1 rounded text-xs text-green-300">
+                    {semanticRecommendations.personalized.length} papers
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {semanticRecommendations.personalized.map((paper, index) => (
+                    <div
+                      key={`personalized-${index}`}
+                      className="bg-gradient-to-br from-green-600/10 to-teal-600/10 rounded-lg p-4 border border-green-500/20 hover:border-green-400/40 transition-colors cursor-pointer"
+                      onClick={() => window.open(`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}`, '_blank')}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <span className="text-xs bg-green-500/20 text-green-300 px-2 py-1 rounded">💡 You</span>
+                        <span className="text-xs text-green-400">{paper.year}</span>
+                      </div>
+                      <h4 className="text-white text-sm font-medium mb-2 line-clamp-2">{paper.title}</h4>
+                      <p className="text-[var(--spotify-light-text)] text-xs mb-2 line-clamp-2">{paper.abstract?.substring(0, 120)}...</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-green-400">{paper.journal}</span>
+                        <span className="text-xs text-green-300">Score: {(paper.relevance_score * 100).toFixed(0)}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </section>
 
         {/* Recent Activity Preview */}
