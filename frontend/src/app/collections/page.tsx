@@ -32,6 +32,7 @@ export default function CollectionsPage() {
   const router = useRouter();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
@@ -90,6 +91,8 @@ export default function CollectionsPage() {
   const fetchCollections = async () => {
     try {
       console.log('🔄 Fetching all collections from all projects...');
+      console.log('🔐 Current user:', user);
+      console.log('🔐 User email:', user?.email);
 
       // First, get all user projects
       const projectsResponse = await fetch(`/api/proxy/projects?user_id=${user?.email}`, {
@@ -99,11 +102,12 @@ export default function CollectionsPage() {
         },
       });
 
+      console.log('📊 Projects response status:', projectsResponse.status);
+
       if (!projectsResponse.ok) {
-        console.warn('⚠️ Failed to fetch projects, using demo collections');
-        setCollections(demoCollections);
-        setIsLoading(false);
-        return;
+        const errorText = await projectsResponse.text();
+        console.error('❌ Failed to fetch projects:', projectsResponse.status, errorText);
+        throw new Error(`Projects fetch failed: ${projectsResponse.status}`);
       }
 
       const projectsData = await projectsResponse.json();
@@ -115,12 +119,16 @@ export default function CollectionsPage() {
 
       for (const project of projects) {
         try {
+          console.log(`🔄 Fetching collections for project: ${project.project_name} (${project.project_id})`);
+
           const collectionsResponse = await fetch(`/api/proxy/projects/${project.project_id}/collections`, {
             headers: {
               'User-ID': user?.email || 'default_user',
               'Content-Type': 'application/json',
             },
           });
+
+          console.log(`📊 Collections response for ${project.project_name}:`, collectionsResponse.status);
 
           if (collectionsResponse.ok) {
             const projectCollections = await collectionsResponse.json();
@@ -143,7 +151,12 @@ export default function CollectionsPage() {
             allCollections.push(...transformedCollections);
             console.log(`✅ Found ${transformedCollections.length} collections in project: ${project.project_name}`);
           } else {
-            console.warn(`⚠️ Failed to fetch collections for project ${project.project_name}: ${collectionsResponse.status}`);
+            const errorText = await collectionsResponse.text();
+            console.error(`❌ Failed to fetch collections for project ${project.project_name}:`, {
+              status: collectionsResponse.status,
+              statusText: collectionsResponse.statusText,
+              error: errorText
+            });
           }
         } catch (error) {
           console.warn(`⚠️ Failed to fetch collections for project ${project.project_name}:`, error);
@@ -151,18 +164,12 @@ export default function CollectionsPage() {
       }
 
       console.log('✅ Total collections loaded:', allCollections.length);
+      setCollections(allCollections);
 
-      // If no collections found, use demo collections
-      if (allCollections.length === 0) {
-        console.log('📚 No backend collections found, using demo collections');
-        setCollections(demoCollections);
-      } else {
-        setCollections(allCollections);
-      }
     } catch (error) {
       console.error('❌ Failed to fetch collections:', error);
-      console.log('📚 Using demo collections as fallback');
-      setCollections(demoCollections);
+      // Don't use demo collections - show the real error
+      setError(`Failed to load collections: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }
@@ -234,9 +241,40 @@ export default function CollectionsPage() {
           </div>
         </div>
 
+        {/* Error Display */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-900/20 border border-red-500/30 rounded-lg">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-400">Authentication Error</h3>
+                <div className="mt-2 text-sm text-red-300">
+                  <p>{error}</p>
+                  <p className="mt-2">Please try signing out and signing back in with proper credentials.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Loading State */}
+        {isLoading && (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--spotify-green)] mx-auto mb-4"></div>
+              <p className="text-[var(--spotify-light-text)]">Loading your collections...</p>
+            </div>
+          </div>
+        )}
+
         {/* Enhanced Collections Navigation */}
-        <div className="min-h-[600px]">
-          <EnhancedCollectionNavigation
+        {!isLoading && !error && (
+          <div className="min-h-[600px]">
+            <EnhancedCollectionNavigation
             projectId="demo-project"
             onCollectionSelect={(collection) => {
               console.log('Selected collection:', collection);
@@ -255,10 +293,11 @@ export default function CollectionsPage() {
             }}
             className="w-full"
           />
-        </div>
+          </div>
+        )}
 
         {/* Demo Collections Display (if no real collections) */}
-        {collections.length === 0 && (
+        {!isLoading && !error && collections.length === 0 && (
           <div className="mt-8">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-white">Demo Collections</h2>
