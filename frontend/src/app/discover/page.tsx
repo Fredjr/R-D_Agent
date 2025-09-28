@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { MobileResponsiveLayout } from '@/components/ui/MobileResponsiveLayout';
 import { SpotifyCleanSection } from '@/components/ui/SpotifyCleanSection';
 import { LoadingSpinner, ErrorAlert } from '@/components/ui';
@@ -50,6 +50,7 @@ interface WeeklyRecommendations {
 export default function DiscoverPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [recommendations, setRecommendations] = useState<WeeklyRecommendations | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,6 +78,41 @@ export default function DiscoverPage() {
     trackSemanticFeatureUsage,
     trackRecommendationInteraction
   } = useRealTimeAnalytics('discover');
+
+  // Handle URL parameters from Home page navigation
+  useEffect(() => {
+    const mode = searchParams.get('mode');
+    const query = searchParams.get('query');
+    const category = searchParams.get('category');
+
+    console.log('🔍 DISCOVER: URL params detected:', { mode, query, category });
+
+    if (mode && query) {
+      // Set the discovery mode based on URL parameter
+      if (mode === 'semantic_search') {
+        setActiveDiscoveryMode('semantic_search');
+        setSemanticQuery(query);
+
+        // Automatically trigger semantic search
+        handleSemanticSearch(query, category);
+      } else if (mode === 'cross_domain') {
+        setActiveDiscoveryMode('cross_domain');
+        setSemanticQuery(query);
+      } else if (mode === 'trending' || mode === 'personalized') {
+        setActiveDiscoveryMode('semantic_search');
+        setSemanticQuery(query);
+        handleSemanticSearch(query, category);
+      }
+
+      // Track the navigation from Home page
+      trackEvent('home_navigation', {
+        mode,
+        query,
+        category,
+        source: 'home_page_recommendations'
+      });
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!user) {
@@ -303,22 +339,49 @@ export default function DiscoverPage() {
   };
 
   // Semantic discovery handlers
-  const handleSemanticSearch = async (query: string, options: any) => {
+  const handleSemanticSearch = async (query: string, options: any = {}, category?: string) => {
     console.log('🔍 Semantic search initiated with query:', query);
     console.log('🎯 Search options:', options);
+    console.log('📂 Category context:', category);
+
     try {
       setLoading(true);
 
+      // Configure search parameters based on category
+      let searchConfig = {
+        semantic_expansion: true,
+        domain_focus: [],
+        similarity_threshold: 0.3,
+        include_related_concepts: true,
+        max_results: 20,
+        ...options
+      };
+
+      // Customize search based on category from Home page
+      if (category === 'cross_domain') {
+        searchConfig.domain_focus = ['machine learning', 'biomedical research', 'drug discovery'];
+        searchConfig.similarity_threshold = 0.25; // Lower threshold for cross-domain
+        console.log('🌐 CROSS-DOMAIN search configuration applied');
+      } else if (category === 'trending') {
+        searchConfig.domain_focus = ['diabetes', 'pharmacology', 'clinical trials'];
+        searchConfig.similarity_threshold = 0.3;
+        console.log('🔥 TRENDING search configuration applied');
+      } else if (category === 'personalized') {
+        searchConfig.domain_focus = ['clinical medicine', 'nephrology', 'kidney disease'];
+        searchConfig.similarity_threshold = 0.3;
+        console.log('💡 PERSONALIZED search configuration applied');
+      }
+
       // Track semantic search usage
-      trackSemanticFeatureUsage('semantic_search', { query, options });
+      trackSemanticFeatureUsage('semantic_search', { query, options: searchConfig, category });
 
       const searchQuery: SemanticSearchQuery = {
         query,
-        semantic_expansion: options.semantic_expansion,
-        domain_focus: options.domain_focus,
-        similarity_threshold: options.similarity_threshold,
-        include_related_concepts: options.include_related_concepts,
-        max_results: 20
+        semantic_expansion: searchConfig.semantic_expansion,
+        domain_focus: searchConfig.domain_focus,
+        similarity_threshold: searchConfig.similarity_threshold,
+        include_related_concepts: searchConfig.include_related_concepts,
+        max_results: searchConfig.max_results
       };
 
       console.log('📊 Executing semantic search with query object:', searchQuery);
