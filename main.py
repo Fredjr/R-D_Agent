@@ -57,6 +57,7 @@ from tools import PubMedSearchTool, WebSearchTool, PatentsSearchTool
 from scientific_model_analyst import analyze_scientific_model
 from experimental_methods_analyst import analyze_experimental_methods
 from results_interpretation_analyst import analyze_results_interpretation
+from deep_dive_agents import run_enhanced_model_pipeline, run_methods_pipeline, run_results_pipeline
 from project_summary_agents import ProjectSummaryOrchestrator
 from langchain.agents import AgentType, initialize_agent
 from scoring import calculate_publication_score
@@ -6316,24 +6317,24 @@ async def process_deep_dive_analysis(analysis: DeepDiveAnalysis, request: DeepDi
 
         # Run three specialist modules in parallel (EXACT SAME AS /deep-dive)
         try:
-            # Module 1 with timeout (EXACT SAME AS /deep-dive)
+            # Module 1 with timeout - Enhanced model analysis (SAME AS /deep-dive)
             md_structured = await _with_timeout(
-                run_in_threadpool(analyze_scientific_model, text, request.objective, get_llm_analyzer()),
-                120.0,  # 2 minutes instead of 12 seconds
+                run_in_threadpool(run_enhanced_model_pipeline, text, request.objective, get_llm_analyzer()),
+                120.0,  # 2 minutes for enhanced analysis
                 "DeepDiveModel",
                 retries=0,
             )
 
-            # Modules 2 and 3 with timeouts (structured) (EXACT SAME AS /deep-dive)
+            # Modules 2 and 3 with enhanced timeouts and processing (SAME AS /deep-dive)
             mth_task = _with_timeout(
-                run_in_threadpool(analyze_experimental_methods, text, request.objective, get_llm_analyzer()),
-                12.0,
+                run_in_threadpool(run_methods_pipeline, text, request.objective, get_llm_analyzer()),
+                120.0,  # Increased to 2 minutes for enhanced content processing
                 "DeepDiveMethods",
                 retries=0,
             )
             res_task = _with_timeout(
-                run_in_threadpool(analyze_results_interpretation, text, request.objective, get_llm_analyzer()),
-                12.0,
+                run_in_threadpool(run_results_pipeline, text, request.objective, get_llm_analyzer()),
+                120.0,  # Increased to 2 minutes for enhanced content processing
                 "DeepDiveResults",
                 retries=0,
             )
@@ -8980,10 +8981,10 @@ async def deep_dive(request: DeepDiveRequest, db: Session = Depends(get_db)):
             meta = {}
         # Run three specialist modules in parallel
         try:
-            # Module 1 with timeout
+            # Module 1 with timeout - Enhanced model analysis
             md_structured = await _with_timeout(
-                run_in_threadpool(analyze_scientific_model, text, request.objective, get_llm_analyzer()),
-                120.0,  # 2 minutes instead of 12 seconds
+                run_in_threadpool(run_enhanced_model_pipeline, text, request.objective, get_llm_analyzer()),
+                120.0,  # 2 minutes for enhanced analysis
                 "DeepDiveModel",
                 retries=0,
             )
@@ -8992,16 +8993,16 @@ async def deep_dive(request: DeepDiveRequest, db: Session = Depends(get_db)):
                 "relevance_justification": "",
                 "fact_anchors": [],
             }
-            # Modules 2 and 3 with timeouts (structured)
+            # Modules 2 and 3 with enhanced timeouts and processing
             mth_task = _with_timeout(
-                run_in_threadpool(analyze_experimental_methods, text, request.objective, get_llm_analyzer()),
-                12.0,
+                run_in_threadpool(run_methods_pipeline, text, request.objective, get_llm_analyzer()),
+                120.0,  # Increased to 2 minutes for enhanced content processing
                 "DeepDiveMethods",
                 retries=0,
             )
             res_task = _with_timeout(
-                run_in_threadpool(analyze_results_interpretation, text, request.objective, get_llm_analyzer()),
-                12.0,
+                run_in_threadpool(run_results_pipeline, text, request.objective, get_llm_analyzer()),
+                120.0,  # Increased to 2 minutes for enhanced content processing
                 "DeepDiveResults",
                 retries=0,
             )
@@ -9151,14 +9152,14 @@ async def deep_dive_upload(objective: str = Form(...), file: UploadFile = File(.
     # Run modules (same as /deep-dive)
     try:
         md_structured = await _with_timeout(
-            run_in_threadpool(analyze_scientific_model, text, objective, get_llm_analyzer()), 12.0, "DeepDiveModel", retries=0
+            run_in_threadpool(run_enhanced_model_pipeline, text, objective, get_llm_analyzer()), 120.0, "DeepDiveModel", retries=0
         )
         md_json = {"summary": md_structured.get("protocol_summary", ""), "relevance_justification": "", "fact_anchors": []}
         mth_task = _with_timeout(
-            run_in_threadpool(analyze_experimental_methods, text, objective, get_llm_analyzer()), 12.0, "DeepDiveMethods", retries=0
+            run_in_threadpool(run_methods_pipeline, text, objective, get_llm_analyzer()), 120.0, "DeepDiveMethods", retries=0
         )
         res_task = _with_timeout(
-            run_in_threadpool(analyze_results_interpretation, text, objective, get_llm_analyzer()), 12.0, "DeepDiveResults", retries=0
+            run_in_threadpool(run_results_pipeline, text, objective, get_llm_analyzer()), 120.0, "DeepDiveResults", retries=0
         )
         mth, res = await asyncio.gather(mth_task, res_task)
     except Exception as e:
