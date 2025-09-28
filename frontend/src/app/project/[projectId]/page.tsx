@@ -11,7 +11,7 @@ import NetworkViewWithSidebar from '@/components/NetworkViewWithSidebar';
 import MultiColumnNetworkView from '@/components/MultiColumnNetworkView';
 import Collections from '@/components/Collections';
 import { useAsyncJob } from '@/hooks/useAsyncJob';
-import { startReviewJob, startDeepDiveJob } from '@/lib/api';
+import { startReviewJob, startDeepDiveJob } from '../../../lib/api';
 import AsyncJobProgress from '@/components/AsyncJobProgress';
 import ClusterExplorationModal from '@/components/ClusterExplorationModal';
 import InlineJobResults from '@/components/InlineJobResults';
@@ -379,7 +379,7 @@ export default function ProjectPage() {
     setCreatingDeepDive(true);
     try {
       // Import the API functions
-      const { fetchDeepDive, detectOpenAccessUrl } = await import('../../lib/api');
+      const { fetchDeepDive, detectOpenAccessUrl } = await import('../../../lib/api');
 
       // Step 1: Detect Open Access URL if PMID provided and no URL given
       let fullTextUrl = deepDiveData.article_url.trim() || null;
@@ -653,7 +653,7 @@ export default function ProjectPage() {
 
     try {
       // Import the API functions
-      const { fetchDeepDive, detectOpenAccessUrl } = await import('../../lib/api');
+      const { fetchDeepDive, detectOpenAccessUrl } = await import('../../../lib/api');
 
       // Step 1: Detect Open Access URL for better analysis
       console.log('🔍 [Project Page] Detecting Open Access URL for PMID:', pmid);
