@@ -416,7 +416,7 @@ export default function HomePage() {
                   <button
                     onClick={() => {
                       trackEvent('cross_domain_explore', { source: 'home_recommendations' });
-                      router.push('/discover?mode=semantic_search&query=machine learning biomedical research drug discovery&category=cross_domain');
+                      router.push('/discover?mode=cross_domain_discoveries&category=cross_domain_discoveries');
                     }}
                     className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
                   >
@@ -458,7 +458,7 @@ export default function HomePage() {
                   <button
                     onClick={() => {
                       trackEvent('trending_explore', { source: 'home_recommendations' });
-                      router.push('/discover?mode=semantic_search&query=diabetes pharmacology clinical trials recent advances&category=trending');
+                      router.push('/discover?mode=trending&category=trending');
                     }}
                     className="text-xs text-orange-400 hover:text-orange-300 transition-colors"
                   >
@@ -500,7 +500,7 @@ export default function HomePage() {
                   <button
                     onClick={() => {
                       trackEvent('personalized_explore', { source: 'home_recommendations' });
-                      router.push('/discover?mode=semantic_search&query=clinical medicine nephrology kidney disease treatment&category=personalized');
+                      router.push('/discover?mode=for_you&category=for_you');
                     }}
                     className="text-xs text-green-400 hover:text-green-300 transition-colors"
                   >

@@ -11,8 +11,8 @@ import {
 } from '@heroicons/react/24/outline';
 
 interface SemanticDiscoveryInterfaceProps {
-  activeMode: 'recommendations' | 'semantic_search' | 'cross_domain' | 'smart_filters';
-  onModeChange: (mode: 'recommendations' | 'semantic_search' | 'cross_domain' | 'smart_filters') => void;
+  activeMode: 'recommendations' | 'semantic_search' | 'cross_domain' | 'smart_filters' | 'trending' | 'for_you' | 'cross_domain_discoveries';
+  onModeChange: (mode: 'recommendations' | 'semantic_search' | 'cross_domain' | 'smart_filters' | 'trending' | 'for_you' | 'cross_domain_discoveries') => void;
   onSemanticSearch: (query: string, options: any) => void;
   onFilterChange: (criteria: any) => void;
   onCrossDomainExplore: (domains: string[]) => void;
@@ -74,6 +74,27 @@ export default function SemanticDiscoveryInterface({
       icon: FunnelIcon,
       description: 'Advanced semantic filtering and ranking',
       color: 'bg-orange-500'
+    },
+    {
+      id: 'trending' as const,
+      name: 'Trending Now',
+      icon: BeakerIcon,
+      description: 'Hot papers trending in your research field',
+      color: 'bg-red-500'
+    },
+    {
+      id: 'for_you' as const,
+      name: 'For You',
+      icon: LightBulbIcon,
+      description: 'Personalized recommendations based on your history',
+      color: 'bg-green-600'
+    },
+    {
+      id: 'cross_domain_discoveries' as const,
+      name: 'Cross-Domain Discoveries',
+      icon: ArrowPathIcon,
+      description: 'Interdisciplinary research opportunities',
+      color: 'bg-indigo-500'
     }
   ];
 
