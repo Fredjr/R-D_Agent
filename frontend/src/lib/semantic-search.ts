@@ -64,17 +64,25 @@ export class SemanticSearchEngine {
     query: SemanticSearchQuery,
     userProfile?: any
   ): Promise<SearchResult[]> {
+    console.log('🧠 SEMANTIC SEARCH ENGINE: Starting search with query:', query);
+
     // Step 1: Expand query semantically
     const expandedQuery = await this.expandQuery(query);
-    
+    console.log('🧠 SEMANTIC SEARCH ENGINE: Expanded query:', expandedQuery);
+
     // Step 2: Execute multi-modal search
     const searchResults = await this.executeMultiModalSearch(expandedQuery, userProfile);
-    
+    console.log('🧠 SEMANTIC SEARCH ENGINE: Multi-modal search results:', searchResults.length, 'papers');
+
     // Step 3: Apply semantic ranking
     const rankedResults = this.applySemanticRanking(searchResults, query, userProfile);
-    
+    console.log('🧠 SEMANTIC SEARCH ENGINE: Ranked results:', rankedResults.length, 'papers');
+
     // Step 4: Apply post-processing filters
-    return this.applyPostProcessingFilters(rankedResults, query);
+    const finalResults = this.applyPostProcessingFilters(rankedResults, query);
+    console.log('🧠 SEMANTIC SEARCH ENGINE: Final filtered results:', finalResults.length, 'papers');
+
+    return finalResults;
   }
 
   /**
@@ -120,25 +128,31 @@ export class SemanticSearchEngine {
 
     for (const query of expandedQueries) {
       try {
+        console.log('🔍 MULTI-MODAL SEARCH: Processing query:', query);
+
         // Traditional keyword search
         const keywordResults = await this.performKeywordSearch(query);
-        
+        console.log('🔍 MULTI-MODAL SEARCH: Keyword results:', keywordResults.length);
+
         // Semantic vector search (if embeddings available)
         const semanticResults = await this.performSemanticVectorSearch(query);
-        
+        console.log('🔍 MULTI-MODAL SEARCH: Vector results:', semanticResults.length);
+
         // Citation-based search
         const citationResults = await this.performCitationBasedSearch(query);
-        
+        console.log('🔍 MULTI-MODAL SEARCH: Citation results:', citationResults.length);
+
         // Merge results with deduplication
         const mergedResults = this.mergeAndDeduplicateResults([
           ...keywordResults,
           ...semanticResults,
           ...citationResults
         ]);
-        
+        console.log('🔍 MULTI-MODAL SEARCH: Merged results for query:', mergedResults.length);
+
         allResults.push(...mergedResults);
       } catch (error) {
-        console.warn(`Search failed for query: ${query}`, error);
+        console.warn(`🔍 MULTI-MODAL SEARCH: Search failed for query: ${query}`, error);
       }
     }
 
@@ -317,6 +331,8 @@ export class SemanticSearchEngine {
    */
   private async performKeywordSearch(query: string): Promise<SearchResult[]> {
     try {
+      console.log('🔍 SEMANTIC SEARCH: Starting PubMed search for query:', query);
+
       // Integrate with PubMed API
       const response = await fetch('/api/proxy/pubmed/search', {
         method: 'POST',
@@ -324,12 +340,25 @@ export class SemanticSearchEngine {
         body: JSON.stringify({ query, max_results: 20 })
       });
 
+      console.log('🔍 SEMANTIC SEARCH: PubMed API response status:', response.status);
+
       if (response.ok) {
         const data = await response.json();
-        return this.convertPubMedResults(data.articles || []);
+        console.log('🔍 SEMANTIC SEARCH: PubMed API returned data:', data);
+        console.log('🔍 SEMANTIC SEARCH: Articles array length:', data.articles?.length || 0);
+
+        const convertedResults = this.convertPubMedResults(data.articles || []);
+        console.log('🔍 SEMANTIC SEARCH: Converted results length:', convertedResults.length);
+        console.log('🔍 SEMANTIC SEARCH: First converted result:', convertedResults[0]);
+
+        return convertedResults;
+      } else {
+        console.warn('🔍 SEMANTIC SEARCH: PubMed API failed with status:', response.status);
+        const errorText = await response.text();
+        console.warn('🔍 SEMANTIC SEARCH: Error details:', errorText);
       }
     } catch (error) {
-      console.warn('PubMed search failed:', error);
+      console.warn('🔍 SEMANTIC SEARCH: PubMed search failed:', error);
     }
 
     return [];

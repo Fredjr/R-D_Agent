@@ -489,6 +489,44 @@ export default function DiscoverPage() {
 
         {/* Recommendation Sections */}
         <div className="space-y-12">
+          {/* Smart Recommendations (Semantic Search Results) */}
+          {semanticResults.length > 0 && (
+            <SpotifyCleanSection
+              section={{
+                title: "Smart Recommendations",
+                description: "AI-powered research discoveries based on your semantic search",
+                papers: semanticResults.map(result => ({
+                  pmid: result.pmid,
+                  title: result.title,
+                  authors: result.authors,
+                  journal: result.journal,
+                  year: result.publication_year,
+                  citation_count: result.citation_count,
+                  relevance_score: result.relevance_score,
+                  reason: `Semantic similarity: ${(result.semantic_similarity * 100).toFixed(0)}%`,
+                  category: result.research_domain,
+                  spotify_style: {
+                    discovery_badge: "🧠",
+                    cover_color: '#1db954'
+                  }
+                })),
+                updated: new Date().toISOString(),
+                icon: SparklesIcon,
+                color: '#1db954',
+                category: 'Smart Recommendations'
+              }}
+              onPlay={handlePlayPaper}
+              onSave={handleSavePaper}
+              onShare={handleSharePaper}
+              onClick={(paper) => {
+                if (paper.pmid) {
+                  window.open(`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`, '_blank');
+                }
+              }}
+              onSeeAll={handleSeeAll}
+            />
+          )}
+
           {/* Papers for You */}
           {(() => {
             // Handle both enhanced API format (direct array) and backend service format (nested under 'papers')
