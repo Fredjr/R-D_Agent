@@ -158,13 +158,12 @@ jobs:
               --cpu-boost \
               --use-http2 \
               --set-env-vars SUPABASE_DATABASE_URL="${{ secrets.SUPABASE_DATABASE_URL }}" \
-              --set-env-vars GOOGLE_GENAI_API_KEY="${{ secrets.GOOGLE_GENAI_API_KEY }}" \
-              --set-env-vars GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}" \
+              --set-env-vars OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
               --set-env-vars GOOGLE_CSE_ID="${{ secrets.GOOGLE_CSE_ID }}" \
               --set-env-vars PINECONE_API_KEY="${{ secrets.PINECONE_API_KEY }}" \
               --set-env-vars UNPAYWALL_EMAIL="${{ secrets.UNPAYWALL_EMAIL }}" \
-              --set-env-vars GEMINI_MAIN_MODEL="gemini-1.5-pro" \
-              --set-env-vars GEMINI_SMALL_MODEL="gemini-1.5-flash" \
+              --set-env-vars OPENAI_MAIN_MODEL="gpt-4o" \
+              --set-env-vars OPENAI_SMALL_MODEL="gpt-4o-mini" \
               --set-env-vars TOTAL_BUDGET_S="300" \
               --set-env-vars HARVEST_BUDGET_S="60" \
               --set-env-vars TRIAGE_BUDGET_S="20" \

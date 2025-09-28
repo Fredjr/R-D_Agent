@@ -161,6 +161,44 @@ export type FetchDeepDiveArgs = {
   projectId?: string | null;
 };
 
+// Utility function to detect Open Access URLs for better deep dive analysis
+export async function detectOpenAccessUrl(pmid: string): Promise<string | null> {
+  if (!pmid) return null;
+
+  try {
+    // First, try to construct PMC URL if it's a PMC paper
+    const pmcResponse = await fetch(`https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/?ids=${pmid}&format=json`);
+    if (pmcResponse.ok) {
+      const pmcData = await pmcResponse.json();
+      const records = pmcData?.records || [];
+      if (records.length > 0 && records[0].pmcid) {
+        const pmcid = records[0].pmcid;
+        return `https://www.ncbi.nlm.nih.gov/pmc/articles/${pmcid}/`;
+      }
+    }
+  } catch (error) {
+    console.warn('PMC detection failed:', error);
+  }
+
+  try {
+    // Fallback: Use Unpaywall API to detect OA URLs
+    const unpaywallResponse = await fetch(`https://api.unpaywall.org/v2/${pmid}?email=research@example.com`);
+    if (unpaywallResponse.ok) {
+      const unpaywallData = await unpaywallResponse.json();
+      if (unpaywallData.is_oa && unpaywallData.best_oa_location?.url_for_pdf) {
+        return unpaywallData.best_oa_location.url_for_pdf;
+      }
+      if (unpaywallData.is_oa && unpaywallData.best_oa_location?.host_type === 'publisher') {
+        return unpaywallData.best_oa_location.url;
+      }
+    }
+  } catch (error) {
+    console.warn('Unpaywall detection failed:', error);
+  }
+
+  return null;
+}
+
 function buildDeepDivePayload({ url, pmid, title, objective, projectId }: FetchDeepDiveArgs) {
   return {
     url: url ?? null,

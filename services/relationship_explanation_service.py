@@ -6,7 +6,7 @@ Provides intelligent explanations for paper relationships in network views
 import logging
 import os
 from typing import Dict, Any, Optional
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
 
 logger = logging.getLogger(__name__)
@@ -23,17 +23,17 @@ class RelationshipExplanationService:
         
         # Initialize LLM
         try:
-            api_key = os.getenv("GOOGLE_API_KEY")
+            api_key = os.getenv("OPENAI_API_KEY")
             if api_key:
-                self.llm = ChatGoogleGenerativeAI(
-                    model="gemini-1.5-flash",
-                    google_api_key=api_key,
+                self.llm = ChatOpenAI(
+                    model="gpt-4o-mini",
+                    openai_api_key=api_key,
                     temperature=0.3,
                     max_tokens=100
                 )
-                logger.info("✅ Relationship explanation service initialized with Gemini")
+                logger.info("✅ Relationship explanation service initialized with OpenAI")
             else:
-                logger.warning("⚠️ GOOGLE_API_KEY not found, relationship explanations disabled")
+                logger.warning("⚠️ OPENAI_API_KEY not found, relationship explanations disabled")
         except Exception as e:
             logger.error(f"❌ Failed to initialize relationship explanation service: {e}")
     

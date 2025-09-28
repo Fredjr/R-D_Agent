@@ -103,32 +103,45 @@ export default function NetworkViewWithSidebar({
     }
 
     try {
-      const response = await fetch(`/api/proxy/projects/${projectId}/deep-dive-analyses`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-ID': user?.user_id || 'default_user',
-        },
-        body: JSON.stringify({
-          article_title: title,
-          article_pmid: pmid,
-          objective: `Deep dive analysis of: ${title}`,
-        }),
+      // Import the API functions
+      const { fetchDeepDive, detectOpenAccessUrl } = await import('../lib/api');
+
+      // Step 1: Detect Open Access URL for better analysis
+      console.log('🔍 Detecting Open Access URL for PMID:', pmid);
+      const fullTextUrl = await detectOpenAccessUrl(pmid);
+      console.log('🔍 Detected OA URL:', fullTextUrl || 'None found');
+
+      // Step 2: Use Research Hub approach (same as ArticleCard.tsx)
+      console.log('🚀 Starting deep dive analysis using Research Hub approach...');
+      const data = await fetchDeepDive({
+        url: fullTextUrl,
+        pmid,
+        title,
+        objective: `Deep dive analysis of: ${title}`,
+        projectId // This will trigger database storage in backend
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to create deep dive analysis');
-      }
-
-      alert('✅ Deep dive analysis started successfully!');
+      console.log('✅ Deep dive analysis completed:', data);
+      alert('✅ Deep dive analysis completed successfully! Check the analysis results.');
       onDeepDiveCreated?.();
-      
-    } catch (error) {
-      console.error('Error creating deep dive:', error);
-      alert('❌ Failed to start deep dive analysis. Please try again.');
+
+    } catch (error: any) {
+      console.error('Error in deep dive analysis:', error);
+      const errorMessage = error?.message || 'Unknown error occurred';
+      alert(`❌ Deep dive analysis failed: ${errorMessage}`);
       throw error;
     }
   }, [projectId, onDeepDiveCreated]);
+
+  const handleGenerateReview = useCallback(async (pmid: string, title: string, fullTextOnly: boolean = false) => {
+    if (onGenerateReview) {
+      console.log('🚀 [NetworkViewWithSidebar] Generate Review triggered:', { pmid, title, fullTextOnly });
+      onGenerateReview(pmid, title, fullTextOnly);
+    } else {
+      console.warn('🚀 [NetworkViewWithSidebar] Generate Review callback not provided');
+      alert('Generate Review functionality not available in this context');
+    }
+  }, [onGenerateReview]);
 
   const handleSaveToCollection = useCallback(async (pmid: string, title: string) => {
     // For now, we'll show a simple alert. In a full implementation,
@@ -164,8 +177,17 @@ export default function NetworkViewWithSidebar({
             ref={networkViewRef}
             sourceType={sourceType}
             sourceId={sourceId}
+            navigationMode={navigationMode}
             onNodeSelect={handleNodeSelect}
+            onNavigationChange={onNavigationChange}
             className="h-full"
+            forceNetworkType={forceNetworkType}
+            articleMetadata={articleMetadata}
+            disableInternalSidebar={true}
+            projectId={projectId}
+            onGenerateReview={handleGenerateReview}
+            onDeepDive={handleDeepDive}
+            onExploreCluster={onExploreCluster}
           />
         </ErrorBoundary>
       </div>
