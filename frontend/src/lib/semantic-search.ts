@@ -316,8 +316,22 @@ export class SemanticSearchEngine {
    * Perform traditional keyword search
    */
   private async performKeywordSearch(query: string): Promise<SearchResult[]> {
-    // This would integrate with PubMed API or other search services
-    // For now, return mock implementation
+    try {
+      // Integrate with PubMed API
+      const response = await fetch('/api/proxy/pubmed/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, max_results: 20 })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return this.convertPubMedResults(data.articles || []);
+      }
+    } catch (error) {
+      console.warn('PubMed search failed:', error);
+    }
+
     return [];
   }
 
@@ -325,9 +339,21 @@ export class SemanticSearchEngine {
    * Perform semantic vector search using embeddings
    */
   private async performSemanticVectorSearch(query: string): Promise<SearchResult[]> {
-    // This would use vector databases like Pinecone, Weaviate, or Chroma
-    // For now, return mock implementation
-    return [];
+    try {
+      // Use vector database for semantic search
+      const { vectorDB } = await import('./vector-database');
+      await vectorDB.initialize();
+
+      const similarResults = await vectorDB.semanticSearch(query, {
+        limit: 20,
+        threshold: 0.6
+      });
+
+      return this.convertVectorResults(similarResults);
+    } catch (error) {
+      console.warn('Vector search failed:', error);
+      return [];
+    }
   }
 
   /**
@@ -381,7 +407,59 @@ export class SemanticSearchEngine {
     this.domainOntologies.set('immunology', [
       'immune', 'antibody', 'antigen', 'lymphocyte', 'cytokine', 'vaccination'
     ]);
-    
+
     // Add more domain ontologies as needed
+  }
+
+  /**
+   * Convert PubMed results to SearchResult format
+   */
+  private convertPubMedResults(articles: any[]): SearchResult[] {
+    return articles.map(article => ({
+      pmid: article.pmid,
+      title: article.title,
+      abstract: article.abstract || '',
+      authors: article.authors || [],
+      journal: article.journal || '',
+      publication_year: article.publication_year || new Date().getFullYear(),
+      citation_count: article.citation_count || 0,
+      mesh_terms: article.mesh_terms || [],
+      keywords: article.keywords || [],
+      relevance_score: 0.8,
+      semantic_similarity: 0.7,
+      domain_relevance: 0.8,
+      temporal_relevance: 0.9,
+      research_domain: article.research_domain || 'Unknown',
+      methodology_type: article.methodology_type || 'Unknown',
+      study_type: article.study_type || 'Unknown',
+      related_concepts: [],
+      cross_domain_connections: []
+    }));
+  }
+
+  /**
+   * Convert vector search results to SearchResult format
+   */
+  private convertVectorResults(results: any[]): SearchResult[] {
+    return results.map(result => ({
+      pmid: result.pmid,
+      title: result.metadata?.title || '',
+      abstract: result.metadata?.abstract || '',
+      authors: result.metadata?.authors || [],
+      journal: result.metadata?.journal || '',
+      publication_year: result.metadata?.publication_year || new Date().getFullYear(),
+      citation_count: 0,
+      mesh_terms: result.metadata?.mesh_terms || [],
+      keywords: result.metadata?.keywords || [],
+      relevance_score: result.similarity_score,
+      semantic_similarity: result.similarity_score,
+      domain_relevance: 0.8,
+      temporal_relevance: 0.8,
+      research_domain: result.metadata?.research_domain || 'Unknown',
+      methodology_type: 'Unknown',
+      study_type: 'Unknown',
+      related_concepts: [],
+      cross_domain_connections: []
+    }));
   }
 }

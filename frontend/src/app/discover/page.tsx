@@ -72,6 +72,26 @@ export default function DiscoverPage() {
       router.push('/auth/signin');
       return;
     }
+
+    // Initialize semantic systems
+    initializeSemanticSystems();
+  }, [user]);
+
+  const initializeSemanticSystems = async () => {
+    try {
+      // Initialize vector database
+      const { vectorDB } = await import('@/lib/vector-database');
+      await vectorDB.initialize();
+
+      // Initialize user profile system
+      const { userProfileSystem } = await import('@/lib/user-profile-system');
+      await userProfileSystem.initialize();
+
+      console.log('Semantic systems initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize semantic systems:', error);
+    }
+  };
     
     fetchWeeklyRecommendations();
   }, [user, selectedProject]);
