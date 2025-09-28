@@ -3,6 +3,7 @@ import { fetchDeepDive } from '@/lib/api';
 import ScientificModelCard from '@/components/ScientificModelCard';
 import ExperimentalMethodsTable from '@/components/ExperimentalMethodsTable';
 import ResultsInterpretationCard from '@/components/ResultsInterpretationCard';
+import ContentQualityIndicator from '@/components/ContentQualityIndicator';
 import AnnotationsFeed from '@/components/AnnotationsFeed';
 import { BookmarkIcon } from '@heroicons/react/24/outline';
 import { BookmarkIcon as BookmarkSolidIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/solid';
@@ -504,7 +505,11 @@ export default function ArticleCard({ item, projectId, onAddToCollection }: Prop
                           : <div className="p-3 rounded border border-yellow-200 bg-yellow-50 text-yellow-900 text-sm">Results interpretation requires full text. Upload PDF or open OA version.</div>
                         )
                   )}
-                  <div className="text-xs text-slate-600">Grounding: {deepDiveData?.diagnostics?.grounding || 'unknown'} {deepDiveData?.diagnostics?.grounding_source ? `· ${deepDiveData.diagnostics.grounding_source}` : ''}</div>
+                  {/* Enhanced Content Quality Indicator */}
+                  <ContentQualityIndicator
+                    data={deepDiveData?.diagnostics || {}}
+                    className="mt-4"
+                  />
                 </div>
               </div>
             )}

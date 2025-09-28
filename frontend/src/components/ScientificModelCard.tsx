@@ -20,15 +20,20 @@ interface ScientificModelData {
   bias_assessment: string;
   strengths: string;
   limitations: string;
-  model_type_taxonomy: string;
-  study_design_taxonomy: string;
-  sample_size: string;
-  arms_groups: string;
-  blinding_randomization: string;
-  control_type: string;
-  collection_timepoints: string;
-  justification: string;
-  link_to_objective: string;
+  // Enhanced fields from new backend
+  translational_relevance?: string;
+  sample_size_power?: string;
+  randomization_blinding?: string;
+  // Legacy fields for backward compatibility
+  model_type_taxonomy?: string;
+  study_design_taxonomy?: string;
+  sample_size?: string;
+  arms_groups?: string;
+  blinding_randomization?: string;
+  control_type?: string;
+  collection_timepoints?: string;
+  justification?: string;
+  link_to_objective?: string;
   fact_anchors: FactAnchor[];
 }
 
@@ -162,6 +167,37 @@ export default function ScientificModelCard({ data, className = '' }: Scientific
             <label className="block text-sm font-medium text-gray-700 mb-2">Model Rationale</label>
             <div className="p-3 bg-purple-50 rounded-lg border-l-4 border-purple-400">
               <p className="text-sm text-gray-900">{data.model_rationale}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Enhanced Fields from New Backend */}
+        {/* Translational Relevance */}
+        {data.translational_relevance && data.translational_relevance !== 'Not evaluated' && (
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Translational Relevance</label>
+            <div className="p-3 bg-indigo-50 rounded-lg border-l-4 border-indigo-400">
+              <p className="text-sm text-gray-900">{data.translational_relevance}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Sample Size & Statistical Power */}
+        {data.sample_size_power && data.sample_size_power !== 'Not reported' && (
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Sample Size & Statistical Power</label>
+            <div className="p-3 bg-yellow-50 rounded-lg">
+              <p className="text-sm text-gray-900">{data.sample_size_power}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Enhanced Randomization & Blinding */}
+        {data.randomization_blinding && data.randomization_blinding !== 'Not specified' && (
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Randomization & Blinding Procedures</label>
+            <div className="p-3 bg-green-50 rounded-lg">
+              <p className="text-sm text-gray-900">{data.randomization_blinding}</p>
             </div>
           </div>
         )}
