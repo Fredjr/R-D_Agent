@@ -7,7 +7,6 @@ Tests basic functionality with a sample query.
 from tools import PubMedSearchTool, WebSearchTool
 from experimental_methods_analyst import analyze_experimental_methods
 from results_interpretation_analyst import analyze_results_interpretation
-from langchain_google_genai import ChatGoogleGenerativeAI
 
 def main():
     """Test both tools with a sample query."""
