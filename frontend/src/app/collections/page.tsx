@@ -100,7 +100,10 @@ export default function CollectionsPage() {
       });
 
       if (!projectsResponse.ok) {
-        throw new Error('Failed to fetch projects');
+        console.warn('⚠️ Failed to fetch projects, using demo collections');
+        setCollections(demoCollections);
+        setIsLoading(false);
+        return;
       }
 
       const projectsData = await projectsResponse.json();
@@ -139,6 +142,8 @@ export default function CollectionsPage() {
 
             allCollections.push(...transformedCollections);
             console.log(`✅ Found ${transformedCollections.length} collections in project: ${project.project_name}`);
+          } else {
+            console.warn(`⚠️ Failed to fetch collections for project ${project.project_name}: ${collectionsResponse.status}`);
           }
         } catch (error) {
           console.warn(`⚠️ Failed to fetch collections for project ${project.project_name}:`, error);
@@ -146,9 +151,18 @@ export default function CollectionsPage() {
       }
 
       console.log('✅ Total collections loaded:', allCollections.length);
-      setCollections(allCollections);
+
+      // If no collections found, use demo collections
+      if (allCollections.length === 0) {
+        console.log('📚 No backend collections found, using demo collections');
+        setCollections(demoCollections);
+      } else {
+        setCollections(allCollections);
+      }
     } catch (error) {
       console.error('❌ Failed to fetch collections:', error);
+      console.log('📚 Using demo collections as fallback');
+      setCollections(demoCollections);
     } finally {
       setIsLoading(false);
     }
