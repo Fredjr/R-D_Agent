@@ -618,22 +618,6 @@ export default function ProjectPage() {
 
         return; // Exit early since we're using async processing
 
-        // Process results immediately (no job polling needed)
-        const arr = Array.isArray(result?.results) ? result.results : [];
-        const enriched = arr.map((it: any) => ({ ...it, _objective: reviewPayload.objective, query: reviewPayload.objective }));
-
-        setReportResults(enriched);
-        setReportDiagnostics(result?.diagnostics ?? null);
-        setReportQueries(Array.isArray(result?.queries) ? result.queries : null);
-        setReportObjective(reviewPayload.objective);
-
-        // Show inline results
-        setInlineResults({
-          show: true,
-          jobType: 'review',
-          result: result
-        });
-
         fetchProjectData(); // Refresh project data
 
       } catch (directError: any) {
