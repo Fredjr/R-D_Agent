@@ -163,10 +163,6 @@ export default function NetworkViewWithSidebar({
     alert(`Explore Cluster feature coming soon!\n\nArticle: ${title}\nPMID: ${pmid}`);
   }, []);
 
-  const handleNodeSelect = useCallback((node: NetworkNode | null) => {
-    setSelectedNode(node);
-  }, []);
-
   const handleCloseSidebar = useCallback(() => {
     setSelectedNode(null);
   }, []);
