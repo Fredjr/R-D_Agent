@@ -1425,6 +1425,7 @@ export default function ProjectPage() {
                       objective={report.objective}
                       status="completed"
                       createdAt={new Date(report.created_at).toLocaleDateString()}
+                      className="bg-[var(--spotify-dark-gray)] border-[var(--spotify-border-gray)] text-[var(--spotify-white)]"
                       onClick={() => window.open(`/report/${report.report_id}`, '_blank')}
                       className="relative"
                     >

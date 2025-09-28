@@ -296,6 +296,7 @@ export default function Dashboard() {
                   setSelectedProject(project);
                   fetchProjectDetails(project.project_id);
                 }}
+                className="bg-[var(--spotify-dark-gray)] border-[var(--spotify-border-gray)] text-[var(--spotify-white)] hover:bg-[var(--spotify-medium-gray)]"
               />
             ))}
           </div>
