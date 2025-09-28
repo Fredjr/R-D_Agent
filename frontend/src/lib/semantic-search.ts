@@ -85,8 +85,12 @@ export class SemanticSearchEngine {
     console.log('🧠 SEMANTIC SEARCH ENGINE: Ranked results:', rankedResults.length, 'papers');
 
     // Step 4: Apply post-processing filters
-    const finalResults = this.applyPostProcessingFilters(rankedResults, cleanedSearchQuery);
-    console.log('🧠 SEMANTIC SEARCH ENGINE: Final filtered results:', finalResults.length, 'papers');
+    const filteredResults = this.applyPostProcessingFilters(rankedResults, cleanedSearchQuery);
+    console.log('🧠 SEMANTIC SEARCH ENGINE: Filtered results:', filteredResults.length, 'papers');
+
+    // Step 5: Clean results from contamination
+    const finalResults = filteredResults.map(result => this.cleanSearchResult(result));
+    console.log('🧠 SEMANTIC SEARCH ENGINE: Final cleaned results:', finalResults.length, 'papers');
 
     return finalResults;
   }
@@ -293,6 +297,30 @@ export class SemanticSearchEngine {
 
     console.log('🧹 QUERY CLEANING:', { original: query, cleaned });
     return cleaned;
+  }
+
+  /**
+   * Clean search result titles and content from contamination
+   */
+  private cleanSearchResult(result: SearchResult): SearchResult {
+    // Clean the title from contamination
+    let cleanedTitle = result.title
+      .replace(/^\d+\.\s*Enter query:\s*["']?/i, '') // Remove "2. Enter query: "
+      .replace(/^Enter query:\s*["']?/i, '')        // Remove "Enter query: "
+      .replace(/^Query:\s*["']?/i, '')              // Remove "Query: "
+      .replace(/^Search:\s*["']?/i, '')             // Remove "Search: "
+      .replace(/["']$/g, '')                        // Remove trailing quotes
+      .trim();
+
+    // If title becomes empty, keep original
+    if (!cleanedTitle || cleanedTitle.length < 10) {
+      cleanedTitle = result.title;
+    }
+
+    return {
+      ...result,
+      title: cleanedTitle
+    };
   }
 
   /**

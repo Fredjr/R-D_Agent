@@ -5,21 +5,21 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const cardVariants = cva(
-  "card-palantir transition-palantir",
+  "",
   {
     variants: {
       variant: {
-        default: "bg-[var(--palantir-card-bg)] border-[var(--palantir-card-border)]",
-        elevated: "bg-[var(--palantir-card-bg)] border-[var(--palantir-card-border)] shadow-palantir-lg",
-        outlined: "bg-transparent border-2 border-[var(--palantir-primary-300)]",
-        filled: "bg-[var(--palantir-primary-50)] border-[var(--palantir-primary-200)]",
-        dark: "bg-[var(--palantir-primary-800)] border-[var(--palantir-primary-600)] text-white",
-        glass: "bg-white/80 backdrop-blur-sm border-[var(--palantir-primary-200)]",
+        default: "card-palantir transition-palantir bg-[var(--palantir-card-bg)] border-[var(--palantir-card-border)]",
+        elevated: "card-palantir transition-palantir bg-[var(--palantir-card-bg)] border-[var(--palantir-card-border)] shadow-palantir-lg",
+        outlined: "card-palantir transition-palantir bg-transparent border-2 border-[var(--palantir-primary-300)]",
+        filled: "card-palantir transition-palantir bg-[var(--palantir-primary-50)] border-[var(--palantir-primary-200)]",
+        dark: "card-palantir transition-palantir bg-[var(--palantir-primary-800)] border-[var(--palantir-primary-600)] text-white",
+        glass: "card-palantir transition-palantir bg-white/80 backdrop-blur-sm border-[var(--palantir-primary-200)]",
 
-        // Spotify-inspired variants
-        spotify: "bg-[var(--spotify-dark-gray)] border-[var(--spotify-border-gray)] text-[var(--spotify-white)] hover:bg-[var(--spotify-medium-gray)] transform hover:-translate-y-1 transition-all duration-200",
-        spotifyElevated: "bg-[var(--spotify-dark-gray)] border-[var(--spotify-border-gray)] text-[var(--spotify-white)] shadow-spotify-lg hover:bg-[var(--spotify-medium-gray)] transform hover:-translate-y-2 transition-all duration-200",
-        spotifyGlass: "bg-[var(--spotify-dark-gray)]/80 backdrop-blur-sm border-[var(--spotify-border-gray)] text-[var(--spotify-white)]",
+        // Spotify-inspired variants - NO palantir classes to avoid conflicts
+        spotify: "rounded-lg border transition-all duration-200 bg-[var(--spotify-dark-gray)] border-[var(--spotify-border-gray)] text-[var(--spotify-white)] hover:bg-[var(--spotify-medium-gray)] transform hover:-translate-y-1",
+        spotifyElevated: "rounded-lg border transition-all duration-200 bg-[var(--spotify-dark-gray)] border-[var(--spotify-border-gray)] text-[var(--spotify-white)] shadow-lg hover:bg-[var(--spotify-medium-gray)] transform hover:-translate-y-2",
+        spotifyGlass: "rounded-lg border transition-all duration-200 bg-[var(--spotify-dark-gray)]/80 backdrop-blur-sm border-[var(--spotify-border-gray)] text-[var(--spotify-white)]",
       },
       padding: {
         none: "p-0",
