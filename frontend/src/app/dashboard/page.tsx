@@ -47,6 +47,8 @@ export default function Dashboard() {
   const [creating, setCreating] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [projectDetails, setProjectDetails] = useState<any>(null);
+
+  console.log('📊 Dashboard page initialized');
   const [loadingDetails, setLoadingDetails] = useState(false);
 
   // Redirect to home if not authenticated
@@ -161,11 +163,13 @@ export default function Dashboard() {
       }
 
       const newProject = await response.json();
+      console.log('✅ Project created successfully with ID:', newProject.project_id);
+      console.log('🎯 Project details:', newProject);
       setProjects(prev => [newProject, ...prev]);
       setShowCreateModal(false);
       setNewProjectName('');
       setNewProjectDescription('');
-      
+
       // Auto-dismiss any success state after a brief moment
       setTimeout(() => setError(null), 100);
     } catch (err) {

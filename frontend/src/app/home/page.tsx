@@ -11,9 +11,9 @@ import { EnhancedHomePage } from '@/components/ui/EnhancedHomePage';
 import { Button } from '@/components/ui/Button';
 import { MobileResponsiveLayout } from '@/components/ui/MobileResponsiveLayout';
 import MeSHAutocompleteSearch from '@/components/MeSHAutocompleteSearch';
-import { 
-  PlusIcon, 
-  FolderIcon, 
+import {
+  PlusIcon,
+  FolderIcon,
   ChartBarIcon,
   MusicalNoteIcon,
   ClockIcon,
@@ -21,6 +21,7 @@ import {
   BeakerIcon,
   LightBulbIcon
 } from '@heroicons/react/24/outline';
+import { useRealTimeAnalytics } from '@/hooks/useRealTimeAnalytics';
 
 interface RecommendationData {
   papers_for_you: any[];
@@ -62,6 +63,10 @@ interface QuickAction {
 export default function HomePage() {
   const { user } = useAuth();
   const router = useRouter();
+
+  // Initialize real-time analytics
+  const { trackEvent, trackRecommendationInteraction } = useRealTimeAnalytics('home');
+
   // Removed recommendations state - now handled by Discover page
 
   const quickActions: QuickAction[] = [
