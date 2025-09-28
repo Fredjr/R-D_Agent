@@ -596,17 +596,27 @@ export default function ProjectPage() {
 
       console.log('🚀 [Project Page] Starting review job with params:', reviewPayload);
 
-      // Test direct API call to debug backend issues
+      // Use the same working logic as dashboard "New Report" button
       try {
-        console.log('🔍 [Project Page] Using synchronous API call (async jobs not working)...');
-        const directResponse = await fetch('/api/proxy/generate-review-sync', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'User-ID': user?.email || 'default_user'
-          },
-          body: JSON.stringify(reviewPayload)
-        });
+        console.log('🔍 [Project Page] Using working dashboard logic (async job system)...');
+
+        // Start async job using the same method as dashboard
+        const jobResponse = await startReviewJob({
+          molecule: reviewPayload.molecule,
+          objective: reviewPayload.objective,
+          projectId: projectId,
+          clinicalMode: reviewPayload.clinicalMode,
+          dagMode: reviewPayload.dagMode,
+          fullTextOnly: fullTextOnly, // Use the toggle value
+          preference: reviewPayload.preference as 'precision' | 'recall'
+        }, user?.email);
+
+        // Start polling for job completion
+        reviewJob.startJob(jobResponse.job_id);
+
+        alert(`🚀 Report generation started!\n\nThis process will continue in the background. Check the Reports section for results.`);
+
+        return; // Exit early since we're using async processing
 
         console.log('🔍 [Project Page] Direct API response status:', directResponse.status);
 

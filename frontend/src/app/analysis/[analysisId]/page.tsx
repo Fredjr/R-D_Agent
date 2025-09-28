@@ -34,6 +34,7 @@ export default function AnalysisDetailPage() {
   // Collection management state
   const [collections, setCollections] = useState<any[]>([]);
   const [showAddToCollectionModal, setShowAddToCollectionModal] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
   useEffect(() => {
     if (!analysisId || !user) return;
@@ -136,6 +137,40 @@ export default function AnalysisDetailPage() {
     } catch (error) {
       console.error('Error adding to collection:', error);
       alert('❌ Failed to add article to collection. Please try again.');
+    }
+  };
+
+  const handleRetryAnalysis = async () => {
+    if (!analysis) return;
+
+    setRetrying(true);
+    try {
+      const response = await fetch('/api/debug/fix-specific-analysis', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user?.email || 'default_user',
+        },
+        body: JSON.stringify({
+          analysisId: analysis.analysis_id,
+          userId: user?.email,
+          action: 'retry'
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert('✅ Analysis retry initiated! The page will refresh to show the updated status.');
+        window.location.reload();
+      } else {
+        alert(`❌ Failed to retry analysis: ${result.message || result.error}`);
+      }
+    } catch (error) {
+      console.error('Error retrying analysis:', error);
+      alert('❌ Failed to retry analysis. Please try again.');
+    } finally {
+      setRetrying(false);
     }
   };
 
@@ -261,7 +296,21 @@ export default function AnalysisDetailPage() {
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-600 mx-auto mb-4"></div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">Processing Analysis</h3>
-              <p className="text-gray-600">Our AI is analyzing this article. This may take several minutes.</p>
+              <p className="text-gray-600 mb-4">Our AI is analyzing this article. This may take several minutes.</p>
+
+              {/* Retry button for stuck analyses */}
+              <div className="mt-6">
+                <p className="text-sm text-gray-500 mb-3">
+                  Analysis taking too long? You can try to restart it.
+                </p>
+                <button
+                  onClick={handleRetryAnalysis}
+                  disabled={retrying}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {retrying ? 'Retrying...' : 'Retry Analysis'}
+                </button>
+              </div>
             </div>
           ) : analysis.processing_status === 'completed' && hasContent ? (
             <div>
