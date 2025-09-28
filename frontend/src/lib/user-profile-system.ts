@@ -1,15 +1,19 @@
 /**
- * User Profile System
- * Manages user preferences, behavior tracking, and personalization
+ * Enhanced User Profile System (Inspired by Spotify's User Profiling)
+ * Advanced behavior tracking, reading pattern analysis, and personalized research discovery
  */
 
 export interface UserBehavior {
-  paper_views: { pmid: string; timestamp: Date; duration: number }[];
-  searches: { query: string; timestamp: Date; results_clicked: string[] }[];
-  bookmarks: { pmid: string; timestamp: Date; tags: string[] }[];
-  likes: { pmid: string; timestamp: Date }[];
-  deep_dives: { pmid: string; timestamp: Date; completion_rate: number }[];
-  domain_interactions: { domain: string; interaction_count: number; last_interaction: Date }[];
+  paper_views: { pmid: string; timestamp: Date; duration: number; scroll_depth: number; return_visit: boolean }[];
+  searches: { query: string; timestamp: Date; results_clicked: string[]; semantic_filters_used: string[] }[];
+  bookmarks: { pmid: string; timestamp: Date; tags: string[]; collection_id?: string }[];
+  likes: { pmid: string; timestamp: Date; context: 'recommendation' | 'search' | 'citation' | 'network' }[];
+  deep_dives: { pmid: string; timestamp: Date; completion_rate: number; sections_viewed: string[]; time_spent_per_section: Record<string, number> }[];
+  domain_interactions: { domain: string; interaction_count: number; last_interaction: Date; engagement_depth: number }[];
+  citation_follows: { from_pmid: string; to_pmid: string; timestamp: Date; follow_depth: number }[];
+  network_explorations: { starting_pmid: string; nodes_explored: string[]; timestamp: Date; exploration_pattern: 'breadth' | 'depth' | 'mixed' }[];
+  semantic_discoveries: { query: string; filters_applied: any; results_interacted: string[]; timestamp: Date }[];
+  collaboration_signals: { co_author_searches: string[]; institution_follows: string[]; similar_user_interactions: string[] }[];
 }
 
 export interface UserPreferences {
@@ -40,7 +44,7 @@ export interface UserProfile {
   // Implicit behavior patterns
   behavior: UserBehavior;
   
-  // Computed insights
+  // Computed insights (Spotify-inspired analytics)
   insights: {
     primary_research_areas: string[];
     expertise_scores: Record<string, number>;
@@ -48,9 +52,27 @@ export interface UserProfile {
       peak_hours: number[];
       preferred_days: string[];
       average_session_duration: number;
+      reading_velocity: number; // Papers per hour during active sessions
+      completion_rate: number; // Percentage of papers fully read
+      return_visit_frequency: number; // How often they revisit papers
+      deep_dive_propensity: number; // Likelihood to do deep analysis
+      citation_follow_rate: number; // How often they follow citations
+      multitasking_tendency: number; // Multiple papers in same session
     };
     collaboration_tendency: number;
     exploration_tendency: number;
+    research_evolution: {
+      domain_shifts: { from: string; to: string; timestamp: Date }[];
+      methodology_preferences: Record<string, number>;
+      novelty_seeking_trend: number[]; // Over time
+      interdisciplinary_growth: number; // Increasing cross-domain work
+    };
+    discovery_patterns: {
+      preferred_discovery_methods: ('search' | 'recommendation' | 'citation' | 'network' | 'semantic')[];
+      serendipity_acceptance: number; // How often they engage with unexpected recommendations
+      filter_usage_patterns: Record<string, number>;
+      exploration_breadth_vs_depth: number; // -1 (depth) to 1 (breadth)
+    };
   };
   
   // Recommendation history
@@ -113,7 +135,9 @@ export class UserProfileSystem {
         profile.behavior.paper_views.push({
           pmid: data.pmid,
           timestamp: new Date(),
-          duration: data.duration || 0
+          duration: data.duration || 0,
+          scroll_depth: data.scroll_depth || 0,
+          return_visit: data.return_visit || false
         });
         break;
         
@@ -121,7 +145,8 @@ export class UserProfileSystem {
         profile.behavior.searches.push({
           query: data.query,
           timestamp: new Date(),
-          results_clicked: data.results_clicked || []
+          results_clicked: data.results_clicked || [],
+          semantic_filters_used: data.semantic_filters_used || []
         });
         break;
         
@@ -129,14 +154,16 @@ export class UserProfileSystem {
         profile.behavior.bookmarks.push({
           pmid: data.pmid,
           timestamp: new Date(),
-          tags: data.tags || []
+          tags: data.tags || [],
+          collection_id: data.collection_id
         });
         break;
         
       case 'like':
         profile.behavior.likes.push({
           pmid: data.pmid,
-          timestamp: new Date()
+          timestamp: new Date(),
+          context: data.context || 'search'
         });
         break;
         
@@ -144,7 +171,9 @@ export class UserProfileSystem {
         profile.behavior.deep_dives.push({
           pmid: data.pmid,
           timestamp: new Date(),
-          completion_rate: data.completion_rate || 0
+          completion_rate: data.completion_rate || 0,
+          sections_viewed: data.sections_viewed || [],
+          time_spent_per_section: data.time_spent_per_section || {}
         });
         break;
         
@@ -155,11 +184,13 @@ export class UserProfileSystem {
         if (existingDomain) {
           existingDomain.interaction_count++;
           existingDomain.last_interaction = new Date();
+          existingDomain.engagement_depth = Math.max(existingDomain.engagement_depth, data.engagement_depth || 1);
         } else {
           profile.behavior.domain_interactions.push({
             domain: data.domain,
             interaction_count: 1,
-            last_interaction: new Date()
+            last_interaction: new Date(),
+            engagement_depth: data.engagement_depth || 1
           });
         }
         break;
@@ -344,7 +375,11 @@ export class UserProfileSystem {
         bookmarks: [],
         likes: [],
         deep_dives: [],
-        domain_interactions: []
+        domain_interactions: [],
+        citation_follows: [],
+        network_explorations: [],
+        semantic_discoveries: [],
+        collaboration_signals: []
       },
       insights: {
         primary_research_areas: [],
@@ -352,10 +387,28 @@ export class UserProfileSystem {
         reading_patterns: {
           peak_hours: [],
           preferred_days: [],
-          average_session_duration: 0
+          average_session_duration: 0,
+          reading_velocity: 0,
+          completion_rate: 0,
+          return_visit_frequency: 0,
+          deep_dive_propensity: 0,
+          citation_follow_rate: 0,
+          multitasking_tendency: 0
         },
         collaboration_tendency: 0.5,
-        exploration_tendency: 0.5
+        exploration_tendency: 0.5,
+        research_evolution: {
+          domain_shifts: [],
+          methodology_preferences: {},
+          novelty_seeking_trend: [],
+          interdisciplinary_growth: 0
+        },
+        discovery_patterns: {
+          preferred_discovery_methods: [],
+          serendipity_acceptance: 0,
+          filter_usage_patterns: {},
+          exploration_breadth_vs_depth: 0
+        }
       },
       recommendation_history: []
     };

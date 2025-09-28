@@ -1,5 +1,14 @@
-import React, { memo, useState, useEffect, useCallback } from 'react';
-import { Bars3Icon, XMarkIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import React, { memo, useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  Bars3Icon,
+  XMarkIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  Squares2X2Icon,
+  ListBulletIcon,
+  ShareIcon,
+  MagnifyingGlassIcon
+} from '@heroicons/react/24/outline';
 
 // Hook for detecting mobile devices and screen sizes
 export const useResponsive = () => {
@@ -466,3 +475,157 @@ export const MobileSearch = memo<MobileSearchProps>(({
 });
 
 MobileSearch.displayName = 'MobileSearch';
+
+// Enhanced Mobile-optimized network view with gesture support
+export function MobileNetworkView({
+  networkData,
+  onNodeSelect,
+  selectedNode,
+  className = ''
+}: {
+  networkData: any;
+  onNodeSelect: (node: any) => void;
+  selectedNode?: any;
+  className?: string;
+}) {
+  const [viewMode, setViewMode] = useState<'graph' | 'list' | 'cards'>('cards');
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [panPosition, setPanPosition] = useState({ x: 0, y: 0 });
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Filter nodes based on search
+  const filteredNodes = useMemo(() => {
+    if (!networkData?.nodes) return [];
+
+    let filtered = networkData.nodes;
+
+    if (searchQuery) {
+      filtered = filtered.filter((node: any) =>
+        node.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        node.authors?.some((author: string) => author.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
+    }
+
+    return filtered;
+  }, [networkData?.nodes, searchQuery]);
+
+  return (
+    <div className={`w-full h-full flex flex-col ${className}`}>
+      {/* Mobile network controls */}
+      <div className="flex-shrink-0 bg-white border-b">
+        {/* Search bar */}
+        <div className="p-4 border-b">
+          <MobileSearch
+            value={searchQuery}
+            onChange={setSearchQuery}
+            onSubmit={() => {}}
+            placeholder="Search network..."
+          />
+        </div>
+
+        {/* View mode controls */}
+        <div className="flex items-center justify-between p-4">
+          <MobileTabs
+            tabs={[
+              { id: 'cards', label: 'Cards', icon: <Squares2X2Icon className="w-4 h-4" /> },
+              { id: 'list', label: 'List', icon: <ListBulletIcon className="w-4 h-4" /> },
+              { id: 'graph', label: 'Graph', icon: <ShareIcon className="w-4 h-4" /> }
+            ]}
+            activeTab={viewMode}
+            onTabChange={(tab) => setViewMode(tab as any)}
+          />
+        </div>
+      </div>
+
+      {/* Network content */}
+      <div className="flex-1 overflow-hidden relative">
+        {viewMode === 'cards' && (
+          <div className="p-4 space-y-4 h-full overflow-y-auto">
+            {filteredNodes.map((node: any) => (
+              <div
+                key={node.id}
+                onClick={() => onNodeSelect(node)}
+                className={`p-4 bg-white rounded-xl border-2 transition-all active:scale-95 ${
+                  selectedNode?.id === node.id
+                    ? 'border-blue-500 shadow-lg ring-2 ring-blue-200'
+                    : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
+                }`}
+              >
+                <h3 className="font-semibold text-gray-900 text-base leading-tight mb-2">
+                  {node.title}
+                </h3>
+                <p className="text-sm text-gray-600 mb-3 line-clamp-2">{node.abstract}</p>
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span>{node.year}</span>
+                  <span>{node.citations} citations</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {viewMode === 'list' && (
+          <div className="h-full overflow-y-auto">
+            {filteredNodes.map((node: any) => (
+              <div
+                key={node.id}
+                onClick={() => onNodeSelect(node)}
+                className={`p-4 border-b border-gray-200 transition-colors ${
+                  selectedNode?.id === node.id ? 'bg-blue-50' : 'hover:bg-gray-50'
+                }`}
+              >
+                <h3 className="font-medium text-gray-900 truncate">{node.title}</h3>
+                <p className="text-sm text-gray-600 mt-1">{node.authors?.join(', ')}</p>
+                <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                  <span>{node.year}</span>
+                  <span>{node.citations} citations</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {viewMode === 'graph' && (
+          <div className="relative w-full h-full bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden">
+            <div
+              className="absolute inset-0 transition-transform duration-200"
+              style={{
+                transform: `scale(${zoomLevel}) translate(${panPosition.x}px, ${panPosition.y}px)`,
+                transformOrigin: 'center center'
+              }}
+            >
+              <svg className="w-full h-full">
+                {filteredNodes.map((node: any, index: number) => {
+                  const x = 150 + (index % 5) * 100;
+                  const y = 150 + Math.floor(index / 5) * 100;
+                  const isSelected = selectedNode?.id === node.id;
+
+                  return (
+                    <circle
+                      key={node.id}
+                      cx={x}
+                      cy={y}
+                      r={isSelected ? 12 : 8}
+                      fill={isSelected ? '#3b82f6' : '#6b7280'}
+                      onClick={() => onNodeSelect(node)}
+                      className="cursor-pointer"
+                    />
+                  );
+                })}
+              </svg>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Results count */}
+      <div className="flex-shrink-0 px-4 py-2 bg-gray-50 border-t text-center">
+        <span className="text-sm text-gray-600">
+          Showing {filteredNodes.length} of {networkData?.nodes?.length || 0} papers
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// All components are already exported individually above
