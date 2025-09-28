@@ -158,8 +158,8 @@ export const createQuickActions = (handlers: {
   },
   {
     id: 'deep-dive',
-    label: 'Deep Dive Analysis',
-    description: 'Comprehensive research analysis',
+    label: '🧠 AI Deep Dive Analysis',
+    description: 'Semantic analysis with cross-domain insights',
     icon: BeakerIcon,
     color: '#8b5cf6',
     onClick: handlers.onDeepDive
@@ -174,8 +174,8 @@ export const createQuickActions = (handlers: {
   },
   {
     id: 'comprehensive',
-    label: 'Comprehensive Analysis',
-    description: 'Full project analysis with insights',
+    label: '🌐 Comprehensive Analysis',
+    description: 'Full semantic project analysis with AI insights',
     icon: ChartBarIcon,
     color: '#8b5cf6',
     onClick: handlers.onComprehensiveAnalysis,
