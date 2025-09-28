@@ -618,17 +618,6 @@ export default function ProjectPage() {
 
         return; // Exit early since we're using async processing
 
-        console.log('🔍 [Project Page] Direct API response status:', directResponse.status);
-
-        if (!directResponse.ok) {
-          const errorText = await directResponse.text();
-          console.error('🔍 [Project Page] Direct API error response:', errorText);
-          throw new Error(`Direct API call failed: ${directResponse.status} - ${errorText}`);
-        }
-
-        const result = await directResponse.json();
-        console.log('🔍 [Project Page] Synchronous API success response:', result);
-
         // Process results immediately (no job polling needed)
         const arr = Array.isArray(result?.results) ? result.results : [];
         const enriched = arr.map((it: any) => ({ ...it, _objective: reviewPayload.objective, query: reviewPayload.objective }));
