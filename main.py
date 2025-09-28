@@ -8173,48 +8173,221 @@ def _fetch_article_text_from_url_direct(url: str, timeout: float = 20.0) -> str:
         return ""
 
 
-def _is_garbled_text(text: str) -> bool:
-    """Check if extracted text appears to be garbled or low quality"""
+def _calculate_content_quality_score(text: str) -> dict:
+    """Calculate comprehensive content quality score for extracted text"""
     try:
         if not text or len(text) < 100:
-            return True
+            return {"score": 0, "quality": "empty", "issues": ["Text too short or empty"]}
 
-        # Check for excessive non-ASCII characters
+        issues = []
+        score = 100  # Start with perfect score and deduct points
+
+        # 1. Length assessment
+        if len(text) < 500:
+            score -= 20
+            issues.append("Text too short for meaningful analysis")
+        elif len(text) > 50000:
+            score += 10  # Bonus for comprehensive content
+
+        # 2. Character quality assessment
         non_ascii_ratio = sum(1 for c in text if ord(c) > 127) / len(text)
         if non_ascii_ratio > 0.3:
-            return True
+            score -= 30
+            issues.append("High non-ASCII character ratio")
 
-        # Check for excessive special characters
+        # 3. Special character assessment
         special_chars = sum(1 for c in text if c in "!@#$%^&*()_+=[]{}|;:,.<>?")
         special_ratio = special_chars / len(text)
         if special_ratio > 0.2:
-            return True
+            score -= 25
+            issues.append("Excessive special characters")
 
-        # Check for reasonable word structure
+        # 4. Word structure assessment
         words = text.split()
-        if len(words) < 50:  # Too few words
-            return True
+        if len(words) < 50:
+            score -= 30
+            issues.append("Too few words for analysis")
 
-        # Check average word length (should be reasonable for scientific text)
-        avg_word_len = sum(len(w) for w in words[:100]) / min(100, len(words))
-        if avg_word_len < 2 or avg_word_len > 15:
-            return True
+        # 5. Scientific content indicators (bonus points)
+        scientific_terms = ['method', 'result', 'conclusion', 'analysis', 'study', 'research',
+                           'experiment', 'data', 'significant', 'hypothesis', 'abstract', 'introduction']
+        scientific_count = sum(1 for term in scientific_terms if term.lower() in text.lower())
+        if scientific_count >= 5:
+            score += 15
+        elif scientific_count >= 3:
+            score += 10
+        elif scientific_count < 2:
+            score -= 15
+            issues.append("Lacks scientific terminology")
 
-        return False
+        # 6. Template/generic content detection
+        template_indicators = ['lorem ipsum', 'placeholder', 'example text', 'sample content',
+                              'test data', 'dummy text', 'N/A', 'not available']
+        template_count = sum(1 for indicator in template_indicators if indicator.lower() in text.lower())
+        if template_count > 0:
+            score -= 40
+            issues.append("Contains template or placeholder content")
+
+        # 7. Repetition assessment
+        sentences = text.split('.')
+        if len(sentences) > 10:
+            unique_sentences = len(set(s.strip().lower() for s in sentences if len(s.strip()) > 10))
+            repetition_ratio = unique_sentences / len(sentences)
+            if repetition_ratio < 0.7:
+                score -= 20
+                issues.append("High content repetition")
+
+        # 8. Average word length assessment
+        if words:
+            avg_word_len = sum(len(w) for w in words[:100]) / min(100, len(words))
+            if avg_word_len < 2 or avg_word_len > 15:
+                score -= 15
+                issues.append("Unusual word length distribution")
+
+        # Normalize score
+        score = max(0, min(100, score))
+
+        # Determine quality level
+        if score >= 80:
+            quality = "excellent"
+        elif score >= 60:
+            quality = "good"
+        elif score >= 40:
+            quality = "fair"
+        elif score >= 20:
+            quality = "poor"
+        else:
+            quality = "unusable"
+
+        return {
+            "score": score,
+            "quality": quality,
+            "issues": issues,
+            "word_count": len(words),
+            "char_count": len(text),
+            "scientific_terms": scientific_count
+        }
+    except Exception:
+        return {"score": 0, "quality": "error", "issues": ["Error calculating quality"]}
+
+def _is_garbled_text(text: str) -> bool:
+    """Enhanced garbled text detection using quality scoring"""
+    try:
+        quality_info = _calculate_content_quality_score(text)
+        return quality_info["score"] < 30  # Threshold for garbled text
     except Exception:
         return True
 
-def _extract_pmc_article_content(html_text: str) -> str:
-    """Enhanced extraction of PMC article content"""
+def _extract_via_pmc_oai(pmid: str) -> tuple[str, dict]:
+    """Extract full-text content via PMC OAI service"""
     try:
-        # PMC articles have specific structure - extract main content areas
+        # First, get PMC ID from PMID
+        elink_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi?dbfrom=pubmed&id={pmid}&db=pmc&retmode=json"
+        elink_data = _fetch_json(elink_url)
+
+        links = (((elink_data.get("linksets") or [])[0] or {}).get("linksetdbs") or [])
+        for db in links:
+            if (db.get("dbto") == "pmc") and db.get("links"):
+                pmcid = str((db.get("links") or [])[0])
+
+                # Try PMC OAI service for full-text XML
+                oai_url = f"https://www.ncbi.nlm.nih.gov/pmc/oai/oai.cgi?verb=GetRecord&identifier=oai:pubmedcentral.nih.gov:{pmcid}&metadataPrefix=pmc"
+
+                try:
+                    xml_content = _fetch_url_raw_text(oai_url)
+                    if xml_content and len(xml_content) > 1000:
+                        # Extract text from PMC XML
+                        extracted_text = _parse_pmc_xml(xml_content)
+                        if extracted_text and len(extracted_text) > 2000:
+                            return (extracted_text, {
+                                "resolved_pmcid": pmcid,
+                                "resolved_source": "pmc_oai",
+                                "content_url": oai_url
+                            })
+                except Exception:
+                    continue
+
+        return ("", {})
+    except Exception:
+        return ("", {})
+
+def _parse_pmc_xml(xml_content: str) -> str:
+    """Parse PMC XML content to extract meaningful text"""
+    try:
+        # Remove XML declarations and namespaces for easier parsing
+        xml_content = re.sub(r'<\?xml[^>]*\?>', '', xml_content)
+        xml_content = re.sub(r'xmlns[^=]*="[^"]*"', '', xml_content)
+
+        # Extract key sections from PMC XML
+        sections = []
+
+        # Extract abstract
+        abstract_match = re.search(r'<abstract[^>]*>(.*?)</abstract>', xml_content, re.DOTALL | re.IGNORECASE)
+        if abstract_match:
+            abstract_text = _strip_html(abstract_match.group(1)).strip()
+            if abstract_text:
+                sections.append(f"ABSTRACT:\n{abstract_text}")
+
+        # Extract body sections
+        body_match = re.search(r'<body[^>]*>(.*?)</body>', xml_content, re.DOTALL | re.IGNORECASE)
+        if body_match:
+            body_content = body_match.group(1)
+
+            # Extract sections within body
+            section_matches = re.findall(r'<sec[^>]*>(.*?)</sec>', body_content, re.DOTALL | re.IGNORECASE)
+            for section in section_matches:
+                section_text = _strip_html(section).strip()
+                if len(section_text) > 100:  # Meaningful content
+                    sections.append(section_text)
+
+        # Extract methods, results, discussion sections specifically
+        for section_name in ['methods', 'results', 'discussion', 'conclusion']:
+            pattern = f'<sec[^>]*sec-type="{section_name}"[^>]*>(.*?)</sec>'
+            matches = re.findall(pattern, xml_content, re.DOTALL | re.IGNORECASE)
+            for match in matches:
+                section_text = _strip_html(match).strip()
+                if len(section_text) > 100:
+                    sections.append(f"{section_name.upper()}:\n{section_text}")
+
+        if sections:
+            combined = "\n\n".join(sections)
+            # Clean up excessive whitespace
+            combined = re.sub(r'\n\s*\n\s*\n', '\n\n', combined)
+            return combined[:200000]
+
+        return ""
+    except Exception:
+        return ""
+
+def _extract_pmc_xml_content(url: str) -> str:
+    """Extract content from PMC XML format URLs"""
+    try:
+        xml_content = _fetch_url_raw_text(url)
+        if xml_content and len(xml_content) > 1000:
+            return _parse_pmc_xml(xml_content)
+        return ""
+    except Exception:
+        return ""
+
+def _extract_pmc_article_content(html_text: str) -> str:
+    """Enhanced extraction of PMC article content with advanced patterns"""
+    try:
+        # Enhanced PMC-specific content patterns
         content_patterns = [
+            # Main content areas
             r'<div[^>]*class="[^"]*article-content[^"]*"[^>]*>(.*?)</div>',
             r'<div[^>]*class="[^"]*main-content[^"]*"[^>]*>(.*?)</div>',
+            r'<div[^>]*class="[^"]*content[^"]*"[^>]*>(.*?)</div>',
             r'<article[^>]*>(.*?)</article>',
+
+            # PMC-specific sections
+            r'<div[^>]*class="[^"]*abstract[^"]*"[^>]*>(.*?)</div>',
+            r'<div[^>]*class="[^"]*body[^"]*"[^>]*>(.*?)</div>',
+            r'<section[^>]*class="[^"]*sec[^"]*"[^>]*>(.*?)</section>',
+
+            # Fallback patterns
+            r'<div[^>]*id="[^"]*article[^"]*"[^>]*>(.*?)</div>',
             r'<div[^>]*id="[^"]*content[^"]*"[^>]*>(.*?)</div>',
-            r'<section[^>]*class="[^"]*abstract[^"]*"[^>]*>(.*?)</section>',
-            r'<section[^>]*class="[^"]*body[^"]*"[^>]*>(.*?)</section>',
         ]
 
         extracted_content = []
@@ -8224,16 +8397,23 @@ def _extract_pmc_article_content(html_text: str) -> str:
             for match in matches:
                 clean_text = _strip_html(match).strip()
                 if len(clean_text) > 200:  # Meaningful content
-                    extracted_content.append(clean_text)
+                    # Remove duplicate content
+                    if not any(clean_text[:100] in existing[:100] for existing in extracted_content):
+                        extracted_content.append(clean_text)
 
         if extracted_content:
             combined = "\n\n".join(extracted_content)
-            # Remove excessive whitespace
+            # Remove excessive whitespace and clean up
             combined = re.sub(r'\n\s*\n\s*\n', '\n\n', combined)
+            combined = re.sub(r'\s+', ' ', combined)  # Normalize spaces
             return combined[:200000]
 
-        # Fallback to general HTML stripping
-        return _strip_html(html_text)[:200000]
+        # Enhanced fallback: try to extract any meaningful text
+        fallback_text = _strip_html(html_text)
+        if len(fallback_text) > 1000:
+            return fallback_text[:200000]
+
+        return ""
     except Exception:
         return _strip_html(html_text)[:200000]
 
@@ -8540,40 +8720,55 @@ def _verify_source_match(req_title: Optional[str], req_pmid: Optional[str], meta
 
 
 def _resolve_oa_fulltext(pmid: Optional[str], landing_html: str, doi_hint: Optional[str] = None) -> tuple[str, str, str, dict]:
-    """Attempt to resolve open full text via PMC or Unpaywall.
+    """Enhanced open access resolution with advanced PMC API integration and intelligent fallbacks.
 
     Returns: (text, grounding, source, meta) where grounding in {full_text, abstract_only, none},
     source hints e.g. pmc|publisher|repository|pubmed_abstract|europe_pmc|none; meta carries resolved identifiers.
     """
-    # 1) Enhanced PMC via ELink with multiple format attempts
+    # 1) Advanced PMC API Integration with multiple extraction methods
     try:
         if pmid:
+            # First, try PMC OAI service for full-text XML
+            pmc_text, pmc_meta = _extract_via_pmc_oai(pmid)
+            if pmc_text and len(pmc_text) > 2000:
+                return (pmc_text, "full_text", "pmc_oai", pmc_meta)
+
+            # Fallback to ELink with enhanced extraction
             elink = _fetch_json(f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi?dbfrom=pubmed&id={urllib.parse.quote(pmid)}&db=pmc&retmode=json")
             links = (((elink.get("linksets") or [])[0] or {}).get("linksetdbs") or [])
             for db in links:
                 if (db.get("dbto") == "pmc") and db.get("links"):
                     pmcid = str((db.get("links") or [])[0])
 
-                    # Try multiple PMC formats for better content extraction
-                    pmc_attempts = [
-                        f"https://www.ncbi.nlm.nih.gov/pmc/articles/PMC{pmcid}/pdf/main.pdf",  # PDF first
-                        f"https://www.ncbi.nlm.nih.gov/pmc/articles/PMC{pmcid}/",  # HTML
-                        f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/",  # Alternative format
+                    # Enhanced PMC extraction with multiple strategies
+                    pmc_strategies = [
+                        ("pdf", f"https://www.ncbi.nlm.nih.gov/pmc/articles/PMC{pmcid}/pdf/main.pdf"),
+                        ("xml", f"https://www.ncbi.nlm.nih.gov/pmc/articles/PMC{pmcid}/?report=classic"),
+                        ("html", f"https://www.ncbi.nlm.nih.gov/pmc/articles/PMC{pmcid}/"),
+                        ("alt", f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/"),
                     ]
 
-                    for pmc_url in pmc_attempts:
+                    for strategy, pmc_url in pmc_strategies:
                         try:
-                            html = _fetch_article_text_from_url(pmc_url)
-                            if html and len(html) > 2000 and not _is_garbled_text(html):
-                                source_type = "pmc_pdf" if "pdf" in pmc_url else "pmc"
-                                return (html, "full_text", source_type, {
+                            if strategy == "xml":
+                                # Special handling for PMC XML format
+                                content = _extract_pmc_xml_content(pmc_url)
+                            else:
+                                content = _fetch_article_text_from_url(pmc_url)
+
+                            if content and len(content) > 2000 and not _is_garbled_text(content):
+                                source_type = f"pmc_{strategy}"
+                                return (content, "full_text", source_type, {
                                     "resolved_pmcid": pmcid,
                                     "resolved_source": source_type,
-                                    "content_url": pmc_url
+                                    "content_url": pmc_url,
+                                    "extraction_strategy": strategy
                                 })
-                        except Exception:
+                        except Exception as e:
+                            print(f"PMC strategy {strategy} failed: {e}")
                             continue
-    except Exception:
+    except Exception as e:
+        print(f"PMC resolution failed: {e}")
         pass
     # 2) Enhanced Unpaywall via DOI with quality validation
     try:

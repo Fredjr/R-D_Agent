@@ -8,21 +8,84 @@ from typing import List, Dict, Any
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 
-# Base prompts (focused) for smaller, task-specific extractions
+# Enhanced prompts for sophisticated scientific analysis
 METHODS_BASE_PROMPT = PromptTemplate(
     template=(
-        "Using ONLY the provided full article text, list key experimental techniques.\n"
-        "Return ONLY a JSON array of objects with: technique, measurement, role_in_study, parameters.\n\n"
-        "User Objective: {objective}\nFull Text: {full_text}"
+        "As an expert scientific analyst, extract and analyze experimental methodologies from this research article.\n\n"
+        "ANALYSIS REQUIREMENTS:\n"
+        "1. Identify ALL experimental techniques, assays, and analytical methods\n"
+        "2. Extract specific parameters, conditions, and protocols\n"
+        "3. Assess methodological rigor and potential limitations\n"
+        "4. Identify controls, validation approaches, and reproducibility measures\n\n"
+        "Return a JSON array of objects with these fields:\n"
+        "- technique: Method name and type\n"
+        "- measurement: What is being measured/detected\n"
+        "- role_in_study: Purpose and context within the research\n"
+        "- parameters: Specific conditions, concentrations, timepoints\n"
+        "- controls_validation: Control experiments and validation approaches\n"
+        "- limitations_reproducibility: Potential limitations and reproducibility concerns\n"
+        "- validation: Statistical or technical validation methods\n"
+        "- accession_ids: Any database accession numbers or identifiers\n\n"
+        "Focus on: {objective}\n\n"
+        "Article Text: {full_text}"
     ),
     input_variables=["objective", "full_text"],
 )
 
 RESULTS_BASE_PROMPT = PromptTemplate(
     template=(
-        "Using ONLY the article full text, summarize main outcomes and provide an initial quantitative list if present.\n"
-        "Return ONLY one JSON object with keys: hypothesis_alignment (string), key_results (array of {metric,value,unit,effect_size,p_value,fdr,ci,direction,figure_table_ref}).\n\n"
-        "User Objective: {objective}\nFull Text: {full_text}"
+        "As an expert data analyst, perform comprehensive analysis of research findings and outcomes.\n\n"
+        "ANALYSIS REQUIREMENTS:\n"
+        "1. Evaluate hypothesis alignment and research question fulfillment\n"
+        "2. Extract ALL quantitative results with statistical significance\n"
+        "3. Assess effect sizes, confidence intervals, and statistical power\n"
+        "4. Identify potential biases, limitations, and confounding factors\n"
+        "5. Evaluate clinical or practical significance of findings\n\n"
+        "Return a JSON object with these fields:\n"
+        "- hypothesis_alignment: How results align with stated hypotheses (support/refute/mixed)\n"
+        "- key_results: Array of quantitative findings with:\n"
+        "  * metric: What was measured\n"
+        "  * value: Numerical result\n"
+        "  * unit: Units of measurement\n"
+        "  * effect_size: Cohen's d, odds ratio, or other effect size measure\n"
+        "  * p_value: Statistical significance\n"
+        "  * fdr: False discovery rate if applicable\n"
+        "  * ci: Confidence interval\n"
+        "  * direction: positive/negative/neutral effect\n"
+        "  * figure_table_ref: Reference to source figure/table\n"
+        "- limitations_biases_in_results: Critical assessment of study limitations\n"
+        "- clinical_significance: Practical implications and real-world relevance\n"
+        "- reproducibility_assessment: Likelihood of result reproducibility\n\n"
+        "Focus on: {objective}\n\n"
+        "Article Text: {full_text}"
+    ),
+    input_variables=["objective", "full_text"],
+)
+
+# New enhanced model analysis prompt
+MODEL_ANALYSIS_PROMPT = PromptTemplate(
+    template=(
+        "As an expert in experimental design, analyze the research model and study design comprehensively.\n\n"
+        "ANALYSIS REQUIREMENTS:\n"
+        "1. Characterize the experimental model (in vitro, in vivo, computational, clinical)\n"
+        "2. Evaluate study design rigor and appropriateness\n"
+        "3. Assess population characteristics and representativeness\n"
+        "4. Identify potential biases and confounding factors\n"
+        "5. Evaluate model validity and translational relevance\n\n"
+        "Return a JSON object with these fields:\n"
+        "- model_type: Type of experimental system\n"
+        "- study_design: Design methodology and approach\n"
+        "- population_description: Detailed characteristics of study subjects/samples\n"
+        "- protocol_summary: Key procedural elements\n"
+        "- model_rationale: Justification for model choice\n"
+        "- bias_assessment: Potential sources of bias\n"
+        "- strengths: Model and design strengths\n"
+        "- limitations: Model and design limitations\n"
+        "- translational_relevance: Applicability to real-world scenarios\n"
+        "- sample_size_power: Sample size adequacy and statistical power\n"
+        "- randomization_blinding: Randomization and blinding procedures\n\n"
+        "Focus on: {objective}\n\n"
+        "Article Text: {full_text}"
     ),
     input_variables=["objective", "full_text"],
 )
@@ -240,3 +303,138 @@ def run_results_pipeline(full_text: str, objective: str, llm, pmcid: str | None)
             obj["key_results"] += _harvest_quant_from_jats(jats)
             obj["key_results"] += _harvest_tables_from_jats(jats)
     return obj
+
+# Enhanced helper functions for improved analysis
+def _enhanced_controls_detection(text: str) -> str:
+    """Enhanced detection of experimental controls and validation approaches"""
+    controls = []
+
+    # Standard controls
+    if re.search(r"isotype control", text, flags=re.I):
+        controls.append("isotype control")
+    if re.search(r"negative control", text, flags=re.I):
+        controls.append("negative control")
+    if re.search(r"positive control", text, flags=re.I):
+        controls.append("positive control")
+    if re.search(r"vehicle control", text, flags=re.I):
+        controls.append("vehicle control")
+    if re.search(r"sham control", text, flags=re.I):
+        controls.append("sham control")
+
+    # Validation approaches
+    if re.search(r"replicate", text, flags=re.I):
+        controls.append("biological/technical replicates")
+    if re.search(r"validation", text, flags=re.I):
+        controls.append("validation experiments")
+    if re.search(r"reproducib", text, flags=re.I):
+        controls.append("reproducibility testing")
+    if re.search(r"cross-validation", text, flags=re.I):
+        controls.append("cross-validation")
+
+    # Statistical controls
+    if re.search(r"multiple testing", text, flags=re.I):
+        controls.append("multiple testing correction")
+    if re.search(r"bonferroni", text, flags=re.I):
+        controls.append("Bonferroni correction")
+    if re.search(r"fdr|false discovery", text, flags=re.I):
+        controls.append("FDR correction")
+
+    return "; ".join(controls) if controls else "Not specified"
+
+def _extract_statistical_metrics(text: str) -> List[Dict[str, str]]:
+    """Extract statistical metrics and quantitative results from text"""
+    metrics = []
+
+    # P-values
+    p_values = re.findall(r"p\s*[<>=]\s*0\.?\d+", text, re.I)
+    for p_val in p_values[:5]:  # Limit to avoid spam
+        metrics.append({
+            "metric": "Statistical significance",
+            "value": p_val,
+            "type": "p_value"
+        })
+
+    # Effect sizes
+    effect_patterns = [
+        r"cohen'?s?\s+d\s*[=:]\s*[\d\.]+",
+        r"effect\s+size\s*[=:]\s*[\d\.]+",
+        r"odds\s+ratio\s*[=:]\s*[\d\.]+",
+        r"hazard\s+ratio\s*[=:]\s*[\d\.]+",
+    ]
+
+    for pattern in effect_patterns:
+        matches = re.findall(pattern, text, re.I)
+        for match in matches[:3]:
+            metrics.append({
+                "metric": "Effect size",
+                "value": match,
+                "type": "effect_size"
+            })
+
+    # Confidence intervals
+    ci_matches = re.findall(r"(95%\s*ci|confidence\s+interval)\s*[:\(]?\s*[\d\.-]+\s*[-,to]\s*[\d\.-]+", text, re.I)
+    for ci in ci_matches[:3]:
+        metrics.append({
+            "metric": "Confidence interval",
+            "value": ci,
+            "type": "confidence_interval"
+        })
+
+    return metrics
+
+# Enhanced pipeline functions
+def run_enhanced_model_pipeline(full_text: str, objective: str, llm) -> Dict[str, Any]:
+    """Enhanced model analysis pipeline with comprehensive experimental design evaluation"""
+    safe_text = (full_text or "")[:15000]
+
+    try:
+        base = LLMChain(llm=llm, prompt=MODEL_ANALYSIS_PROMPT).invoke({
+            "objective": objective[:400],
+            "full_text": safe_text
+        })
+
+        import json
+        raw_text = base.get("text", base) if isinstance(base, dict) else str(base)
+
+        # Clean JSON response
+        if "```json" in raw_text:
+            raw_text = raw_text.split("```json")[1].split("```")[0]
+        elif "```" in raw_text:
+            raw_text = raw_text.split("```")[1].split("```")[0]
+
+        result = json.loads(raw_text)
+        if not isinstance(result, dict):
+            result = {}
+
+    except Exception as e:
+        print(f"Model analysis error: {e}")
+        result = {}
+
+    # Enhanced model analysis with heuristic enrichment
+    model_type = result.get("model_type", "Unknown")
+
+    # Detect model type from text if not provided
+    if model_type == "Unknown":
+        if any(term in safe_text.lower() for term in ["cell culture", "in vitro", "cultured cells"]):
+            model_type = "in vitro"
+        elif any(term in safe_text.lower() for term in ["mouse", "mice", "rat", "animal", "in vivo"]):
+            model_type = "in vivo"
+        elif any(term in safe_text.lower() for term in ["patient", "clinical", "human", "cohort"]):
+            model_type = "clinical"
+        elif any(term in safe_text.lower() for term in ["computational", "simulation", "modeling"]):
+            model_type = "computational"
+
+    return {
+        "model_type": model_type,
+        "study_design": result.get("study_design", "Not specified"),
+        "population_description": result.get("population_description", "Not specified"),
+        "protocol_summary": result.get("protocol_summary", "Not available"),
+        "model_rationale": result.get("model_rationale", "Not provided"),
+        "bias_assessment": result.get("bias_assessment", "Not assessed"),
+        "strengths": result.get("strengths", "Not identified"),
+        "limitations": result.get("limitations", "Not identified"),
+        "translational_relevance": result.get("translational_relevance", "Not evaluated"),
+        "sample_size_power": result.get("sample_size_power", "Not reported"),
+        "randomization_blinding": result.get("randomization_blinding", "Not specified"),
+        "fact_anchors": result.get("fact_anchors", [])
+    }
