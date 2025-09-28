@@ -207,9 +207,22 @@ export class SemanticSearchEngine {
         weightSum += 0.1;
       }
 
+      const finalScore = weightSum > 0 ? totalScore / weightSum : textSimilarity;
+
+      // Debug logging for first few results
+      if (results.indexOf(result) < 3) {
+        console.log(`🔍 RANKING DEBUG: Paper "${result.title.substring(0, 50)}..."`, {
+          textSimilarity,
+          totalScore,
+          weightSum,
+          finalScore,
+          originalScore: result.relevance_score
+        });
+      }
+
       return {
         ...result,
-        relevance_score: weightSum > 0 ? totalScore / weightSum : textSimilarity
+        relevance_score: finalScore
       };
     }).sort((a, b) => b.relevance_score - a.relevance_score);
   }
@@ -221,13 +234,22 @@ export class SemanticSearchEngine {
     results: SearchResult[],
     query: SemanticSearchQuery
   ): SearchResult[] {
+    console.log('🔍 POST-PROCESSING: Starting with', results.length, 'results');
+    console.log('🔍 POST-PROCESSING: Similarity threshold:', query.similarity_threshold);
+
     let filteredResults = results;
 
     // Similarity threshold filter
     if (query.similarity_threshold) {
+      const beforeCount = filteredResults.length;
+      const scores = filteredResults.map(r => r.relevance_score);
+      console.log('🔍 POST-PROCESSING: Relevance scores:', scores.slice(0, 5), '...');
+
       filteredResults = filteredResults.filter(
         result => result.relevance_score >= query.similarity_threshold!
       );
+
+      console.log(`🔍 POST-PROCESSING: Similarity filter: ${beforeCount} → ${filteredResults.length} papers`);
     }
 
     // Methodology filter
