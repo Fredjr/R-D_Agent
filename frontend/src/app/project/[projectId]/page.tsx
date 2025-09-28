@@ -378,23 +378,28 @@ export default function ProjectPage() {
 
     setCreatingDeepDive(true);
     try {
-      const response = await fetch(`/api/proxy/projects/${projectId}/deep-dive-analyses`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-ID': user?.email || 'default_user',
-        },
-        body: JSON.stringify({
-          article_title: deepDiveData.article_title.trim(),
-          objective: deepDiveData.objective.trim(),
-          article_pmid: deepDiveData.article_pmid.trim() || null,
-          article_url: deepDiveData.article_url.trim() || null,
-        }),
+      // Import the API functions
+      const { fetchDeepDive, detectOpenAccessUrl } = await import('../../lib/api');
+
+      // Step 1: Detect Open Access URL if PMID provided and no URL given
+      let fullTextUrl = deepDiveData.article_url.trim() || null;
+      if (!fullTextUrl && deepDiveData.article_pmid.trim()) {
+        console.log('🔍 [Project Page] Detecting Open Access URL for PMID:', deepDiveData.article_pmid);
+        fullTextUrl = await detectOpenAccessUrl(deepDiveData.article_pmid.trim());
+        console.log('🔍 [Project Page] Detected OA URL:', fullTextUrl || 'None found');
+      }
+
+      // Step 2: Use Research Hub approach (same as ArticleCard.tsx)
+      console.log('🔍 [Project Page] Starting manual deep dive analysis using Research Hub approach...');
+      const data = await fetchDeepDive({
+        url: fullTextUrl,
+        pmid: deepDiveData.article_pmid.trim() || null,
+        title: deepDiveData.article_title.trim(),
+        objective: deepDiveData.objective.trim() || `Deep dive analysis of: ${deepDiveData.article_title.trim()}`,
+        projectId // This will trigger database storage in backend
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to create deep dive analysis');
-      }
+      console.log('✅ [Project Page] Manual deep dive analysis completed:', data);
 
       // Reset form and close modal
       setDeepDiveData({
@@ -404,11 +409,15 @@ export default function ProjectPage() {
         objective: ''
       });
       setShowDeepDiveModal(false);
-      
-      // Note: The ActivityFeed component will automatically update via WebSocket
-    } catch (err) {
+
+      // Refresh project data to show new analysis
+      fetchProjectData();
+
+      alert('✅ Deep dive analysis completed successfully!');
+    } catch (err: any) {
       console.error('Error creating deep dive analysis:', err);
-      alert('Failed to start deep dive analysis. Please try again.');
+      const errorMessage = err?.message || 'Unknown error occurred';
+      alert(`❌ Deep dive analysis failed: ${errorMessage}`);
     } finally {
       setCreatingDeepDive(false);
     }
@@ -643,78 +652,34 @@ export default function ProjectPage() {
     });
 
     try {
-      // Enhanced payload with OA/Full-Text option
-      const deepDivePayload = {
-        pmid: pmid,
-        title: title,
+      // Import the API functions
+      const { fetchDeepDive, detectOpenAccessUrl } = await import('../../lib/api');
+
+      // Step 1: Detect Open Access URL for better analysis
+      console.log('🔍 [Project Page] Detecting Open Access URL for PMID:', pmid);
+      const fullTextUrl = await detectOpenAccessUrl(pmid);
+      console.log('🔍 [Project Page] Detected OA URL:', fullTextUrl || 'None found');
+
+      // Step 2: Use Research Hub approach (same as ArticleCard.tsx)
+      console.log('🔍 [Project Page] Starting deep dive analysis using Research Hub approach...');
+      const data = await fetchDeepDive({
+        url: fullTextUrl,
+        pmid,
+        title,
         objective: `Deep dive analysis of: ${title}`,
-        projectId: projectId,
-        // Add abstract and DOI if available (we'll fetch from PubMed)
-        abstract: `Please analyze the paper titled "${title}" with PMID ${pmid}. Use available abstract and metadata.`,
-        doi: null,
-        // Request analysis mode based on toggle
-        analysis_mode: fullTextOnly ? 'full_text_preferred' : 'abstract_based',
-        full_text_url: null, // We don't have full text URLs
-        fullTextOnly: fullTextOnly // Pass the toggle value to backend
-      };
+        projectId // This will trigger database storage in backend
+      });
 
-      console.log('🔍 [Project Page] Starting deep dive job with params:', deepDivePayload);
+      console.log('✅ [Project Page] Deep dive analysis completed:', data);
 
-      // Test direct API call to debug backend issues
-      try {
-        console.log('🔍 [Project Page] Using synchronous deep dive API call...');
-        const directResponse = await fetch('/api/proxy/deep-dive-sync', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'User-ID': user?.email || 'default_user'
-          },
-          body: JSON.stringify(deepDivePayload)
-        });
+      // Show inline results immediately
+      setInlineResults({
+        show: true,
+        jobType: 'deep-dive',
+        result: data
+      });
 
-        console.log('🔍 [Project Page] Direct deep dive API response status:', directResponse.status);
-
-        if (!directResponse.ok) {
-          const errorText = await directResponse.text();
-          console.error('🔍 [Project Page] Direct deep dive API error response:', errorText);
-          throw new Error(`Direct deep dive API call failed: ${directResponse.status} - ${errorText}`);
-        }
-
-        const result = await directResponse.json();
-        console.log('🔍 [Project Page] Synchronous deep dive API response:', result);
-
-        // Check if the result contains an error
-        if (result.error) {
-          console.error('❌ [Project Page] Deep dive failed with error:', result.error);
-
-          // Show error message to user
-          alert(`Deep Dive Failed: ${result.error}\n\nSuggestion: Try using the dashboard deep dive with a full-text URL or PDF upload for better results.`);
-
-          return;
-        }
-
-        // Check if result has actual analysis content
-        if (!result.sections && !result.analysis && !result.content) {
-          console.error('❌ [Project Page] Deep dive returned empty result:', result);
-
-          alert('Deep Dive Failed: No analysis content returned.\n\nThis may be because the article is behind a paywall. Try using the dashboard deep dive with a full-text URL or PDF upload.');
-
-          return;
-        }
-
-        // Show inline results immediately
-        setInlineResults({
-          show: true,
-          jobType: 'deep-dive',
-          result: result
-        });
-
-        fetchProjectData(); // Refresh project data
-
-      } catch (directError: any) {
-        console.error('🔍 [Project Page] Synchronous deep dive API call failed:', directError);
-        throw directError; // Re-throw to be caught by outer try-catch
-      }
+      fetchProjectData(); // Refresh project data
 
       console.log('✅ [Project Page] Deep dive completed successfully from network sidebar');
 

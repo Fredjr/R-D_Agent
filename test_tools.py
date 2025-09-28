@@ -46,16 +46,17 @@ def main():
     # Optional schema smoke tests for deep-dive analysts if key present
     try:
         import os
-        key = os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_GENAI_API_KEY")
+        key = os.getenv("OPENAI_API_KEY")
         if key:
-            llm = ChatGoogleGenerativeAI(model=os.getenv("GEMINI_SMALL_MODEL", os.getenv("GEMINI_MODEL", "gemini-1.5-pro")), google_api_key=key)
+            from langchain_openai import ChatOpenAI
+            llm = ChatOpenAI(model=os.getenv("OPENAI_SMALL_MODEL", os.getenv("OPENAI_MODEL", "gpt-4o-mini")), openai_api_key=key)
             methods = analyze_experimental_methods("Methods: We used Western Blot and ELISA to quantify proteins and cytokines.", "objective", llm)
             assert isinstance(methods, list)
             results = analyze_results_interpretation("Results: Compound X reduced NF-kB. Discussion: supports hypothesis.", "objective", llm)
             assert isinstance(results, dict)
             print("✅ Deep-dive analyst smoke tests passed.")
         else:
-            print("ℹ️ Skipping deep-dive analyst smoke tests (no GOOGLE_API_KEY).")
+            print("ℹ️ Skipping deep-dive analyst smoke tests (no OPENAI_API_KEY).")
     except Exception as e:
         print(f"❌ Deep-dive analyst smoke test failure: {e}")
 

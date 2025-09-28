@@ -6,7 +6,7 @@ from fastapi import UploadFile, File, Form
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field, validator, field_validator, model_validator
 import re
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 import os
 from dotenv import load_dotenv
 import time
@@ -649,7 +649,7 @@ app.add_middleware(
 # Enable CORS for frontend dev
 
 # Lazy initialization of LLM models to prevent blocking during startup
-_GENAI_KEY = os.getenv("GOOGLE_GENAI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+_OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 _llm = None
 _llm_analyzer = None
 _llm_summary = None
@@ -658,14 +658,14 @@ _llm_critic = None
 def get_llm():
     global _llm
     if _llm is None:
-        if not _GENAI_KEY:
-            print("⚠️ Google GenAI API key not found - LLM features disabled")
+        if not _OPENAI_KEY:
+            print("⚠️ OpenAI API key not found - LLM features disabled")
             return None
         try:
-            _llm = ChatGoogleGenerativeAI(
-                model=os.getenv("GEMINI_MODEL", "gemini-1.5-pro"),
-                convert_system_message_to_human=True,
-                google_api_key=_GENAI_KEY,
+            _llm = ChatOpenAI(
+                model=os.getenv("OPENAI_MODEL", "gpt-4o"),
+                openai_api_key=_OPENAI_KEY,
+                temperature=0.3,
             )
         except Exception as e:
             print(f"⚠️ Failed to initialize LLM: {e}")
@@ -675,14 +675,13 @@ def get_llm():
 def get_llm_analyzer():
     global _llm_analyzer
     if _llm_analyzer is None:
-        if not _GENAI_KEY:
-            print("⚠️ Google GenAI API key not found - LLM features disabled")
+        if not _OPENAI_KEY:
+            print("⚠️ OpenAI API key not found - LLM features disabled")
             return None
         try:
-            _llm_analyzer = ChatGoogleGenerativeAI(
-                model=os.getenv("GEMINI_SMALL_MODEL", os.getenv("GEMINI_MODEL", "gemini-1.5-pro")),
-                convert_system_message_to_human=True,
-                google_api_key=_GENAI_KEY,
+            _llm_analyzer = ChatOpenAI(
+                model=os.getenv("OPENAI_SMALL_MODEL", os.getenv("OPENAI_MODEL", "gpt-4o-mini")),
+                openai_api_key=_OPENAI_KEY,
                 temperature=0.2,
             )
         except Exception as e:
@@ -693,14 +692,13 @@ def get_llm_analyzer():
 def get_llm_summary():
     global _llm_summary
     if _llm_summary is None:
-        if not _GENAI_KEY:
-            print("⚠️ Google GenAI API key not found - LLM features disabled")
+        if not _OPENAI_KEY:
+            print("⚠️ OpenAI API key not found - LLM features disabled")
             return None
         try:
-            _llm_summary = ChatGoogleGenerativeAI(
-                model=os.getenv("GEMINI_MAIN_MODEL", os.getenv("GEMINI_MODEL", "gemini-1.5-pro")),
-                convert_system_message_to_human=True,
-                google_api_key=_GENAI_KEY,
+            _llm_summary = ChatOpenAI(
+                model=os.getenv("OPENAI_MAIN_MODEL", os.getenv("OPENAI_MODEL", "gpt-4o")),
+                openai_api_key=_OPENAI_KEY,
                 temperature=0.5,
             )
         except Exception as e:
@@ -711,14 +709,13 @@ def get_llm_summary():
 def get_llm_critic():
     global _llm_critic
     if _llm_critic is None:
-        if not _GENAI_KEY:
-            print("⚠️ Google GenAI API key not found - LLM features disabled")
+        if not _OPENAI_KEY:
+            print("⚠️ OpenAI API key not found - LLM features disabled")
             return None
         try:
-            _llm_critic = ChatGoogleGenerativeAI(
-                model=os.getenv("GEMINI_SMALL_MODEL", os.getenv("GEMINI_MODEL", "gemini-1.5-pro")),
-                convert_system_message_to_human=True,
-                google_api_key=_GENAI_KEY,
+            _llm_critic = ChatOpenAI(
+                model=os.getenv("OPENAI_SMALL_MODEL", os.getenv("OPENAI_MODEL", "gpt-4o-mini")),
+                openai_api_key=_OPENAI_KEY,
                 temperature=0.1,
             )
         except Exception as e:

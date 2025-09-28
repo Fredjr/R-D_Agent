@@ -30,7 +30,7 @@ from sqlalchemy import func, desc, and_, or_, text
 # Import AI agents for enhanced recommendations
 try:
     from recommendation_agents import RecommendationOrchestrator
-    from langchain_google_genai import ChatGoogleGenerativeAI
+    from langchain_openai import ChatOpenAI
     AI_AGENTS_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"AI agents not available: {e}")
@@ -68,17 +68,17 @@ class SpotifyInspiredRecommendationsService:
         if AI_AGENTS_AVAILABLE:
             try:
                 # Initialize LLM for AI agents
-                api_key = os.getenv("GOOGLE_API_KEY")
+                api_key = os.getenv("OPENAI_API_KEY")
                 if api_key:
-                    llm = ChatGoogleGenerativeAI(
-                        model="gemini-1.5-flash",
-                        google_api_key=api_key,
+                    llm = ChatOpenAI(
+                        model="gpt-4o-mini",
+                        openai_api_key=api_key,
                         temperature=0.3
                     )
                     self.ai_orchestrator = RecommendationOrchestrator(llm)
                     logger.info("✅ AI recommendation agents initialized successfully")
                 else:
-                    logger.warning("⚠️ GOOGLE_API_KEY not found, AI agents disabled")
+                    logger.warning("⚠️ OPENAI_API_KEY not found, AI agents disabled")
             except Exception as e:
                 logger.error(f"❌ Failed to initialize AI agents: {e}")
                 self.ai_orchestrator = None
