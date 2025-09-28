@@ -86,36 +86,39 @@ export default function HomePage() {
   useEffect(() => {
     const fetchSemanticRecommendations = async () => {
       try {
-        console.log('🏠 HOME: Fetching semantic recommendations...');
+        console.log('🏠 HOME: Fetching dynamic semantic recommendations...');
 
-        // Fetch cross-domain recommendations
+        // Add timestamp to make queries dynamic
+        const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+
+        // Fetch cross-domain recommendations with dynamic query
         const crossDomainResults = await semanticEngine.performSemanticSearch({
-          query: 'machine learning biomedical research drug discovery',
+          query: `machine learning biomedical research drug discovery ${timestamp}`,
           semantic_expansion: true,
           domain_focus: ['machine learning', 'biomedical research'],
           similarity_threshold: 0.3,
           include_related_concepts: true,
-          max_results: 6
+          max_results: 12 // Fetch more to show dynamic count
         });
 
-        // Fetch trending recommendations
+        // Fetch trending recommendations with dynamic query
         const trendingResults = await semanticEngine.performSemanticSearch({
-          query: 'diabetes pharmacology clinical trials recent advances',
+          query: `diabetes pharmacology clinical trials recent advances ${timestamp}`,
           semantic_expansion: true,
           domain_focus: ['diabetes', 'pharmacology'],
           similarity_threshold: 0.3,
           include_related_concepts: true,
-          max_results: 6
+          max_results: 10 // Fetch more to show dynamic count
         });
 
-        // Fetch personalized recommendations
+        // Fetch personalized recommendations with dynamic query
         const personalizedResults = await semanticEngine.performSemanticSearch({
-          query: 'clinical medicine nephrology kidney disease treatment',
+          query: `clinical medicine nephrology kidney disease treatment ${timestamp}`,
           semantic_expansion: true,
           domain_focus: ['clinical medicine', 'nephrology'],
           similarity_threshold: 0.3,
           include_related_concepts: true,
-          max_results: 6
+          max_results: 15 // Fetch more to show dynamic count
         });
 
         console.log('🏠 HOME: Semantic recommendations fetched:', {
@@ -125,9 +128,9 @@ export default function HomePage() {
         });
 
         setSemanticRecommendations({
-          crossDomain: crossDomainResults.slice(0, 3), // Show top 3
-          trending: trendingResults.slice(0, 3),
-          personalized: personalizedResults.slice(0, 3),
+          crossDomain: crossDomainResults, // Keep all results for dynamic count
+          trending: trendingResults,
+          personalized: personalizedResults,
           loading: false,
           error: null
         });
@@ -396,15 +399,26 @@ export default function HomePage() {
             <div className="space-y-8">
               {/* Cross-Domain Recommendations */}
               <div>
-                <div className="flex items-center mb-4">
-                  <GlobeAltIcon className="w-5 h-5 mr-2 text-purple-400" />
-                  <h3 className="text-lg font-semibold text-white">Cross-Domain Discoveries</h3>
-                  <span className="ml-2 bg-purple-500/20 px-2 py-1 rounded text-xs text-purple-300">
-                    {semanticRecommendations.crossDomain.length} papers
-                  </span>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center">
+                    <GlobeAltIcon className="w-5 h-5 mr-2 text-purple-400" />
+                    <h3 className="text-lg font-semibold text-white">Cross-Domain Discoveries</h3>
+                    <span className="ml-2 bg-purple-500/20 px-2 py-1 rounded text-xs text-purple-300">
+                      {semanticRecommendations.crossDomain.length} papers
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      trackEvent('cross_domain_explore', { source: 'home_recommendations' });
+                      router.push('/discover?mode=semantic_search&query=machine learning biomedical research drug discovery&category=cross_domain');
+                    }}
+                    className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                  >
+                    Explore All →
+                  </button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {semanticRecommendations.crossDomain.map((paper, index) => (
+                  {semanticRecommendations.crossDomain.slice(0, 3).map((paper, index) => (
                     <div
                       key={`cross-${index}`}
                       className="bg-gradient-to-br from-purple-600/10 to-blue-600/10 rounded-lg p-4 border border-purple-500/20 hover:border-purple-400/40 transition-colors cursor-pointer"
@@ -427,15 +441,26 @@ export default function HomePage() {
 
               {/* Trending Recommendations */}
               <div>
-                <div className="flex items-center mb-4">
-                  <FireIcon className="w-5 h-5 mr-2 text-orange-400" />
-                  <h3 className="text-lg font-semibold text-white">Trending Now</h3>
-                  <span className="ml-2 bg-orange-500/20 px-2 py-1 rounded text-xs text-orange-300">
-                    {semanticRecommendations.trending.length} papers
-                  </span>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center">
+                    <FireIcon className="w-5 h-5 mr-2 text-orange-400" />
+                    <h3 className="text-lg font-semibold text-white">Trending Now</h3>
+                    <span className="ml-2 bg-orange-500/20 px-2 py-1 rounded text-xs text-orange-300">
+                      {semanticRecommendations.trending.length} papers
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      trackEvent('trending_explore', { source: 'home_recommendations' });
+                      router.push('/discover?mode=semantic_search&query=diabetes pharmacology clinical trials recent advances&category=trending');
+                    }}
+                    className="text-xs text-orange-400 hover:text-orange-300 transition-colors"
+                  >
+                    Explore All →
+                  </button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {semanticRecommendations.trending.map((paper, index) => (
+                  {semanticRecommendations.trending.slice(0, 3).map((paper, index) => (
                     <div
                       key={`trending-${index}`}
                       className="bg-gradient-to-br from-orange-600/10 to-red-600/10 rounded-lg p-4 border border-orange-500/20 hover:border-orange-400/40 transition-colors cursor-pointer"
@@ -458,15 +483,26 @@ export default function HomePage() {
 
               {/* Personalized Recommendations */}
               <div>
-                <div className="flex items-center mb-4">
-                  <LightBulbIcon className="w-5 h-5 mr-2 text-green-400" />
-                  <h3 className="text-lg font-semibold text-white">For You</h3>
-                  <span className="ml-2 bg-green-500/20 px-2 py-1 rounded text-xs text-green-300">
-                    {semanticRecommendations.personalized.length} papers
-                  </span>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center">
+                    <LightBulbIcon className="w-5 h-5 mr-2 text-green-400" />
+                    <h3 className="text-lg font-semibold text-white">For You</h3>
+                    <span className="ml-2 bg-green-500/20 px-2 py-1 rounded text-xs text-green-300">
+                      {semanticRecommendations.personalized.length} papers
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      trackEvent('personalized_explore', { source: 'home_recommendations' });
+                      router.push('/discover?mode=semantic_search&query=clinical medicine nephrology kidney disease treatment&category=personalized');
+                    }}
+                    className="text-xs text-green-400 hover:text-green-300 transition-colors"
+                  >
+                    Explore All →
+                  </button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {semanticRecommendations.personalized.map((paper, index) => (
+                  {semanticRecommendations.personalized.slice(0, 3).map((paper, index) => (
                     <div
                       key={`personalized-${index}`}
                       className="bg-gradient-to-br from-green-600/10 to-teal-600/10 rounded-lg p-4 border border-green-500/20 hover:border-green-400/40 transition-colors cursor-pointer"
