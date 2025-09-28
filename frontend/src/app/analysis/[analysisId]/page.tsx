@@ -22,6 +22,19 @@ interface Analysis {
   scientific_model_analysis?: any;
   experimental_methods_analysis?: any;
   results_interpretation_analysis?: any;
+  // Enhanced content quality fields
+  content_quality?: string;
+  grounding_source?: string;
+  grounding?: string;
+  user_notice?: string;
+  diagnostics?: {
+    content_quality?: string;
+    grounding_source?: string;
+    grounding?: string;
+    user_notice?: string;
+    content_quality_score?: number;
+    quality_issues?: string[];
+  };
 }
 
 export default function AnalysisDetailPage() {
@@ -370,10 +383,12 @@ export default function AnalysisDetailPage() {
               <div className="mt-6 pt-4 border-t border-gray-200">
                 <ContentQualityIndicator
                   data={{
-                    content_quality: analysis.content_quality,
-                    grounding_source: analysis.grounding_source,
-                    grounding: analysis.grounding,
-                    user_notice: analysis.user_notice
+                    content_quality: analysis.content_quality || analysis.diagnostics?.content_quality,
+                    grounding_source: analysis.grounding_source || analysis.diagnostics?.grounding_source,
+                    grounding: analysis.grounding || analysis.diagnostics?.grounding,
+                    user_notice: analysis.user_notice || analysis.diagnostics?.user_notice,
+                    content_quality_score: analysis.diagnostics?.content_quality_score,
+                    quality_issues: analysis.diagnostics?.quality_issues
                   }}
                 />
               </div>
