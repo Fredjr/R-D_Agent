@@ -19,7 +19,9 @@ import {
   ClockIcon,
   FireIcon,
   BeakerIcon,
-  LightBulbIcon
+  LightBulbIcon,
+  SparklesIcon,
+  GlobeAltIcon
 } from '@heroicons/react/24/outline';
 import { useRealTimeAnalytics } from '@/hooks/useRealTimeAnalytics';
 
@@ -277,6 +279,72 @@ export default function HomePage() {
                   <input type="checkbox" className="mr-2 rounded" />
                   Review articles
                 </label>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Semantic Recommendations Preview */}
+        <section className="mt-12 sm:mt-16">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 sm:mb-6">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center">
+                <SparklesIcon className="w-6 h-6 mr-2 text-[var(--spotify-green)]" />
+                AI-Powered Recommendations
+              </h2>
+              <p className="text-[var(--spotify-light-text)] text-sm mt-1">
+                Semantic analysis of your research interests
+              </p>
+            </div>
+            <Button
+              onClick={() => router.push('/discover')}
+              variant="outline"
+              size="sm"
+              className="text-[var(--spotify-light-text)] hover:text-white self-start sm:self-auto"
+            >
+              Explore More →
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Cross-Domain Suggestions */}
+            <div className="bg-gradient-to-br from-purple-600/20 to-blue-600/20 rounded-lg p-4 sm:p-6 border border-purple-500/30">
+              <div className="flex items-center mb-3">
+                <GlobeAltIcon className="w-5 h-5 mr-2 text-purple-400" />
+                <h3 className="text-white font-medium">Cross-Domain</h3>
+              </div>
+              <p className="text-[var(--spotify-light-text)] text-sm mb-3">
+                Discover connections between machine learning and biomedical research
+              </p>
+              <div className="flex items-center text-xs text-purple-300">
+                <span className="bg-purple-500/20 px-2 py-1 rounded">12 new papers</span>
+              </div>
+            </div>
+
+            {/* Trending in Your Field */}
+            <div className="bg-gradient-to-br from-orange-600/20 to-red-600/20 rounded-lg p-4 sm:p-6 border border-orange-500/30">
+              <div className="flex items-center mb-3">
+                <FireIcon className="w-5 h-5 mr-2 text-orange-400" />
+                <h3 className="text-white font-medium">Trending Now</h3>
+              </div>
+              <p className="text-[var(--spotify-light-text)] text-sm mb-3">
+                Hot topics in your research domains with semantic similarity
+              </p>
+              <div className="flex items-center text-xs text-orange-300">
+                <span className="bg-orange-500/20 px-2 py-1 rounded">8 trending papers</span>
+              </div>
+            </div>
+
+            {/* Personalized Picks */}
+            <div className="bg-gradient-to-br from-green-600/20 to-teal-600/20 rounded-lg p-4 sm:p-6 border border-green-500/30">
+              <div className="flex items-center mb-3">
+                <LightBulbIcon className="w-5 h-5 mr-2 text-green-400" />
+                <h3 className="text-white font-medium">For You</h3>
+              </div>
+              <p className="text-[var(--spotify-light-text)] text-sm mb-3">
+                Curated based on your reading history and semantic preferences
+              </p>
+              <div className="flex items-center text-xs text-green-300">
+                <span className="bg-green-500/20 px-2 py-1 rounded">15 personalized</span>
               </div>
             </div>
           </div>

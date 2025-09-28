@@ -42,6 +42,49 @@ export default function CollectionsPage() {
     fetchCollections();
   }, []);
 
+  // Demo collections for testing semantic features
+  const demoCollections: Collection[] = [
+    {
+      id: 'demo-1',
+      name: 'Machine Learning in Drug Discovery',
+      description: 'Semantic analysis of ML applications in pharmaceutical research',
+      color: '#3B82F6',
+      icon: '🧠',
+      articleCount: 24,
+      projectName: 'AI Research Project',
+      projectId: 'project-1',
+      createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date().toISOString(),
+      isShared: false
+    },
+    {
+      id: 'demo-2',
+      name: 'Cross-Domain Biomedical Research',
+      description: 'Interdisciplinary papers with semantic connections',
+      color: '#10B981',
+      icon: '🌐',
+      articleCount: 18,
+      projectName: 'Cross-Domain Analysis',
+      projectId: 'project-2',
+      createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      isShared: true
+    },
+    {
+      id: 'demo-3',
+      name: 'Semantic Literature Review',
+      description: 'AI-curated papers for systematic review',
+      color: '#8B5CF6',
+      icon: '📚',
+      articleCount: 31,
+      projectName: 'Literature Analysis',
+      projectId: 'project-3',
+      createdAt: new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+      isShared: false
+    }
+  ];
+
   const fetchCollections = async () => {
     try {
       console.log('🔄 Fetching all collections from all projects...');
@@ -178,6 +221,7 @@ export default function CollectionsPage() {
         {/* Enhanced Collections Navigation */}
         <div className="min-h-[600px]">
           <EnhancedCollectionNavigation
+            projectId="demo-project"
             onCollectionSelect={(collection) => {
               console.log('Selected collection:', collection);
               trackCollectionAction('view', collection.collection_id);
@@ -196,6 +240,47 @@ export default function CollectionsPage() {
             className="w-full"
           />
         </div>
+
+        {/* Demo Collections Display (if no real collections) */}
+        {collections.length === 0 && (
+          <div className="mt-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-white">Demo Collections</h2>
+              <span className="text-sm text-gray-400">Semantic features preview</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {demoCollections.map((collection) => (
+                <div
+                  key={collection.id}
+                  className="bg-[var(--spotify-dark-gray)] rounded-lg p-6 border border-[var(--spotify-border-gray)] hover:border-[var(--spotify-green)] transition-colors cursor-pointer"
+                  onClick={() => trackCollectionAction('view', collection.id)}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-3">
+                      <span className="text-2xl">{collection.icon}</span>
+                      <div>
+                        <h3 className="text-white font-medium">{collection.name}</h3>
+                        <p className="text-sm text-gray-400">{collection.articleCount} articles</p>
+                      </div>
+                    </div>
+                    {collection.isShared && (
+                      <span className="px-2 py-1 bg-[var(--spotify-green)] text-black text-xs rounded-full">
+                        Shared
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-300 mb-4">{collection.description}</p>
+                  <div className="flex items-center justify-between text-xs text-gray-400">
+                    <span>Updated {new Date(collection.updatedAt).toLocaleDateString()}</span>
+                    <span className="px-2 py-1 bg-[var(--spotify-medium-gray)] rounded">
+                      {collection.projectName}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </MobileResponsiveLayout>
   );
