@@ -125,10 +125,18 @@ export class UserProfileSystem {
   }
 
   /**
-   * Track user behavior
+   * Track user behavior with real analytics integration
    */
   async trackBehavior(userId: string, action: string, data: any): Promise<void> {
-    const profile = await this.getUserProfile(userId);
+    try {
+      // Get user profile
+      const profile = await this.getUserProfile(userId);
+
+      // Send to analytics service first (async)
+      this.sendToAnalyticsService(userId, action, data);
+
+      // Store locally for immediate access
+      this.storeBehaviorLocally(userId, action, data);
     
     switch (action) {
       case 'paper_view':
@@ -203,8 +211,12 @@ export class UserProfileSystem {
     
     // Update insights
     await this.updateInsights(profile);
-    
+
     await this.saveProfile(profile);
+
+    } catch (error) {
+      console.warn('Behavior tracking failed:', error);
+    }
   }
 
   /**
@@ -519,6 +531,152 @@ export class UserProfileSystem {
     if (typeof window !== 'undefined') {
       localStorage.setItem(`user_profile_${profile.user_id}`, JSON.stringify(profile));
     }
+  }
+
+  /**
+   * Send behavior data to analytics service
+   */
+  private async sendToAnalyticsService(userId: string, action: string, data: any): Promise<void> {
+    try {
+      // Send to backend analytics endpoint
+      await fetch('/api/analytics/track-behavior', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          action,
+          data,
+          timestamp: new Date().toISOString(),
+          session_id: this.getSessionId(),
+          user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+          screen_resolution: typeof screen !== 'undefined' ? `${screen.width}x${screen.height}` : '',
+          timezone: typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : ''
+        }),
+      });
+    } catch (error) {
+      // Fail silently for analytics - don't disrupt user experience
+      console.warn('Analytics service unavailable:', error);
+    }
+  }
+
+  /**
+   * Store behavior data locally for immediate access
+   */
+  private storeBehaviorLocally(userId: string, action: string, data: any): void {
+    if (typeof window === 'undefined') return;
+
+    const key = `user_behavior_${userId}`;
+    const existingData = localStorage.getItem(key);
+    const behaviors = existingData ? JSON.parse(existingData) : [];
+
+    behaviors.push({
+      action,
+      data,
+      timestamp: new Date().toISOString()
+    });
+
+    // Keep only last 1000 events to prevent storage bloat
+    if (behaviors.length > 1000) {
+      behaviors.splice(0, behaviors.length - 1000);
+    }
+
+    localStorage.setItem(key, JSON.stringify(behaviors));
+  }
+
+  /**
+   * Get or generate session ID
+   */
+  private getSessionId(): string {
+    if (typeof window === 'undefined') return 'server-session';
+
+    let sessionId = sessionStorage.getItem('session_id');
+
+    if (!sessionId) {
+      sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      sessionStorage.setItem('session_id', sessionId);
+    }
+
+    return sessionId;
+  }
+
+  /**
+   * Get real-time user behavior analytics
+   */
+  async getRealTimeAnalytics(userId: string): Promise<{
+    session_duration: number;
+    papers_viewed_today: number;
+    search_queries_today: number;
+    engagement_score: number;
+    active_research_domains: string[];
+  }> {
+    if (typeof window === 'undefined') {
+      return {
+        session_duration: 0,
+        papers_viewed_today: 0,
+        search_queries_today: 0,
+        engagement_score: 0,
+        active_research_domains: []
+      };
+    }
+
+    const key = `user_behavior_${userId}`;
+    const data = localStorage.getItem(key);
+
+    if (!data) {
+      return {
+        session_duration: 0,
+        papers_viewed_today: 0,
+        search_queries_today: 0,
+        engagement_score: 0,
+        active_research_domains: []
+      };
+    }
+
+    const behaviors = JSON.parse(data);
+    const today = new Date().toDateString();
+    const todayBehaviors = behaviors.filter((b: any) =>
+      new Date(b.timestamp).toDateString() === today
+    );
+
+    const papersViewed = todayBehaviors.filter((b: any) => b.action === 'paper_view').length;
+    const searchQueries = todayBehaviors.filter((b: any) => b.action === 'search').length;
+
+    // Calculate engagement score based on various factors
+    const engagementScore = Math.min(
+      (papersViewed * 0.3 + searchQueries * 0.2 + todayBehaviors.length * 0.1) / 10,
+      1.0
+    );
+
+    // Extract active research domains
+    const domains = todayBehaviors
+      .filter((b: any) => b.data?.research_domain)
+      .map((b: any) => b.data.research_domain as string);
+    const activeDomains = [...new Set(domains)] as string[];
+
+    return {
+      session_duration: this.calculateSessionDuration(),
+      papers_viewed_today: papersViewed,
+      search_queries_today: searchQueries,
+      engagement_score: engagementScore,
+      active_research_domains: activeDomains
+    };
+  }
+
+  /**
+   * Calculate current session duration
+   */
+  private calculateSessionDuration(): number {
+    if (typeof window === 'undefined') return 0;
+
+    const sessionStart = sessionStorage.getItem('session_start');
+    if (!sessionStart) {
+      sessionStorage.setItem('session_start', Date.now().toString());
+      return 0;
+    }
+
+    return (Date.now() - parseInt(sessionStart)) / 1000 / 60; // Minutes
   }
 }
 
