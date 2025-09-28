@@ -6333,7 +6333,7 @@ async def process_deep_dive_analysis(analysis: DeepDiveAnalysis, request: DeepDi
                 retries=0,
             )
             res_task = _with_timeout(
-                run_in_threadpool(run_results_pipeline, text, request.objective, get_llm_analyzer()),
+                run_in_threadpool(run_results_pipeline, text, request.objective, get_llm_analyzer(), request.pmid),
                 120.0,  # Increased to 2 minutes for enhanced content processing
                 "DeepDiveResults",
                 retries=0,
@@ -9001,7 +9001,7 @@ async def deep_dive(request: DeepDiveRequest, db: Session = Depends(get_db)):
                 retries=0,
             )
             res_task = _with_timeout(
-                run_in_threadpool(run_results_pipeline, text, request.objective, get_llm_analyzer()),
+                run_in_threadpool(run_results_pipeline, text, request.objective, get_llm_analyzer(), request.pmid),
                 120.0,  # Increased to 2 minutes for enhanced content processing
                 "DeepDiveResults",
                 retries=0,
@@ -9159,7 +9159,7 @@ async def deep_dive_upload(objective: str = Form(...), file: UploadFile = File(.
             run_in_threadpool(run_methods_pipeline, text, objective, get_llm_analyzer()), 120.0, "DeepDiveMethods", retries=0
         )
         res_task = _with_timeout(
-            run_in_threadpool(run_results_pipeline, text, objective, get_llm_analyzer()), 120.0, "DeepDiveResults", retries=0
+            run_in_threadpool(run_results_pipeline, text, objective, get_llm_analyzer(), None), 120.0, "DeepDiveResults", retries=0
         )
         mth, res = await asyncio.gather(mth_task, res_task)
     except Exception as e:
