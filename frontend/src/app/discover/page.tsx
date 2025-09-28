@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { MobileResponsiveLayout } from '@/components/ui/MobileResponsiveLayout';
@@ -47,7 +47,8 @@ interface WeeklyRecommendations {
   next_update: string;
 }
 
-export default function DiscoverPage() {
+// Component that uses useSearchParams - needs to be wrapped in Suspense
+function DiscoverPageContent() {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -780,5 +781,23 @@ export default function DiscoverPage() {
         </div>
       </div>
     </MobileResponsiveLayout>
+  );
+}
+
+// Main component with Suspense boundary
+export default function DiscoverPage() {
+  return (
+    <Suspense fallback={
+      <MobileResponsiveLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--spotify-green)] mx-auto mb-4"></div>
+            <p className="text-[var(--spotify-light-text)]">Loading Discover page...</p>
+          </div>
+        </div>
+      </MobileResponsiveLayout>
+    }>
+      <DiscoverPageContent />
+    </Suspense>
   );
 }
