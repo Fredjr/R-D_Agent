@@ -9,6 +9,7 @@ import { SpotifyCollectionCard } from '@/components/ui/SpotifyCard';
 import { SpotifyTopBar, SpotifyTabs } from '@/components/ui/SpotifyNavigation';
 import { MobileResponsiveLayout } from '@/components/ui/MobileResponsiveLayout';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
 import EnhancedCollectionNavigation from '@/components/EnhancedCollectionNavigation';
 import { useRealTimeAnalytics } from '@/hooks/useRealTimeAnalytics';
 
@@ -28,6 +29,7 @@ interface Collection {
 
 export default function CollectionsPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -253,7 +255,11 @@ export default function CollectionsPage() {
                 <div
                   key={collection.id}
                   className="bg-[var(--spotify-dark-gray)] rounded-lg p-6 border border-[var(--spotify-border-gray)] hover:border-[var(--spotify-green)] transition-colors cursor-pointer"
-                  onClick={() => trackCollectionAction('view', collection.id)}
+                  onClick={() => {
+                    trackCollectionAction('view', collection.id);
+                    // Navigate to discover page with semantic search for demo collections
+                    router.push(`/discover?mode=semantic_search&query=${encodeURIComponent(collection.name)}&collection_demo=${collection.id}`);
+                  }}
                 >
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-3">

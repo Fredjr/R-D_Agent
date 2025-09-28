@@ -1180,14 +1180,18 @@ export default function ProjectPage() {
                     />
                   </div>
                 </div>
-                <div className="bg-purple-50 p-4 rounded-lg">
-                  <p className="text-sm text-purple-700">
-                    <strong>Deep Dive Analysis</strong> will perform comprehensive analysis including:
-                  </p>
+                <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg border border-purple-200">
+                  <div className="flex items-center mb-2">
+                    <span className="text-lg mr-2">🧠</span>
+                    <p className="text-sm text-purple-700 font-medium">
+                      <strong>AI-Powered Deep Dive Analysis</strong> with semantic understanding
+                    </p>
+                  </div>
                   <ul className="text-sm text-purple-600 mt-2 ml-4 list-disc">
-                    <li>Scientific model evaluation</li>
-                    <li>Experimental methods assessment</li>
-                    <li>Results interpretation analysis</li>
+                    <li>🔍 Semantic model evaluation with context analysis</li>
+                    <li>⚗️ Experimental methods assessment with cross-domain insights</li>
+                    <li>📊 Results interpretation with AI-powered analysis</li>
+                    <li>🌐 Cross-domain connections and semantic relationships</li>
                   </ul>
                 </div>
                 <div className="flex justify-end gap-3 pt-4">
