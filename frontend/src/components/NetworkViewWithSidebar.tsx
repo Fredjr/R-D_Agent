@@ -163,10 +163,6 @@ export default function NetworkViewWithSidebar({
     alert(`Explore Cluster feature coming soon!\n\nArticle: ${title}\nPMID: ${pmid}`);
   }, []);
 
-  const handleCloseSidebar = useCallback(() => {
-    setSelectedNode(null);
-  }, []);
-
   // Optional props that may be undefined
   const forceNetworkType = undefined;
   const articleMetadata = undefined;
