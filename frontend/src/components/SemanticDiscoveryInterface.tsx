@@ -32,12 +32,12 @@ export default function SemanticDiscoveryInterface({
   const [searchOptions, setSearchOptions] = useState({
     semantic_expansion: true,
     domain_focus: [],
-    similarity_threshold: 0.7,
+    similarity_threshold: 0.3, // Lowered from 0.7 to 0.3 for better results
     include_related_concepts: true
   });
   
   const [filterCriteria, setFilterCriteria] = useState({
-    min_similarity_score: 0.6,
+    min_similarity_score: 0.3, // Lowered from 0.6 to 0.3 for better results
     preferred_domains: [],
     min_citation_count: 5,
     publication_year_range: [2020, 2024],
