@@ -27,6 +27,7 @@ export default function SemanticDiscoveryInterface({
   onCrossDomainExplore,
   loading = false
 }: SemanticDiscoveryInterfaceProps) {
+  console.log('🔍 SemanticDiscoveryInterface rendering with activeMode:', activeMode);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOptions, setSearchOptions] = useState({
     semantic_expansion: true,
@@ -98,10 +99,10 @@ export default function SemanticDiscoveryInterface({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+    <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden" style={{ minHeight: '200px' }}>
       {/* Mode Selection Header */}
       <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-6">
-        <h2 className="text-2xl font-bold text-white mb-4">Semantic Discovery</h2>
+        <h2 className="text-2xl font-bold text-white mb-4">🔍 Semantic Discovery</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {discoveryModes.map((mode) => (
             <button

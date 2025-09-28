@@ -23,6 +23,8 @@ import { SemanticPaperFilter, FilterCriteria } from '@/lib/semantic-filtering';
 import { SemanticSearchEngine, SemanticSearchQuery } from '@/lib/semantic-search';
 import { PersonalizedRecommendationEngine, RecommendationContext } from '@/lib/recommendation-engine';
 import { CrossDomainDiscoveryEngine } from '@/lib/cross-domain-discovery';
+import SemanticDiscoveryInterface from '@/components/SemanticDiscoveryInterface';
+import { useRealTimeAnalytics } from '@/hooks/useRealTimeAnalytics';
 
 interface WeeklyRecommendations {
   status: string;
@@ -66,6 +68,15 @@ export default function DiscoverPage() {
   const [semanticSearch] = useState(() => new SemanticSearchEngine());
   const [recommendationEngine] = useState(() => new PersonalizedRecommendationEngine());
   const [crossDomainEngine] = useState(() => new CrossDomainDiscoveryEngine());
+
+  // Initialize real-time analytics
+  const {
+    trackEvent,
+    trackPaperView,
+    trackSearch,
+    trackSemanticFeatureUsage,
+    trackRecommendationInteraction
+  } = useRealTimeAnalytics('discover');
 
   useEffect(() => {
     if (!user) {
@@ -243,6 +254,10 @@ export default function DiscoverPage() {
   };
 
   const handlePlayPaper = (paper: any) => {
+    // Track paper view
+    trackPaperView(paper.pmid, paper.title);
+    trackRecommendationInteraction('click', paper.pmid, paper.category || 'unknown');
+
     // Navigate to paper details or open in new tab
     if (paper.pmid) {
       window.open(`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`, '_blank');
@@ -250,16 +265,22 @@ export default function DiscoverPage() {
   };
 
   const handleSavePaper = async (paper: any) => {
+    // Track save action
+    trackRecommendationInteraction('save', paper.pmid, paper.category || 'unknown');
+
     // TODO: Implement save to collection functionality
     console.log('Save paper:', paper);
   };
 
   const handleSharePaper = (paper: any) => {
+    // Track share action
+    trackRecommendationInteraction('share', paper.pmid, paper.category || 'unknown');
+
     // Copy paper URL to clipboard
-    const url = paper.pmid 
+    const url = paper.pmid
       ? `https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`
       : '#';
-    
+
     navigator.clipboard.writeText(url).then(() => {
       // TODO: Show toast notification
       console.log('Paper URL copied to clipboard');
@@ -274,10 +295,102 @@ export default function DiscoverPage() {
       'Cross-pollination': 'cross-pollination',
       'Citation Opportunities': 'citation-opportunities'
     };
-    
+
     const route = categoryMap[category];
     if (route) {
       router.push(`/discover/${route}`);
+    }
+  };
+
+  // Semantic discovery handlers
+  const handleSemanticSearch = async (query: string, options: any) => {
+    console.log('🔍 Semantic search initiated with query:', query);
+    console.log('🎯 Search options:', options);
+    try {
+      setLoading(true);
+
+      // Track semantic search usage
+      trackSemanticFeatureUsage('semantic_search', { query, options });
+
+      const searchQuery: SemanticSearchQuery = {
+        query,
+        semantic_expansion: options.semantic_expansion,
+        domain_focus: options.domain_focus,
+        similarity_threshold: options.similarity_threshold,
+        include_related_concepts: options.include_related_concepts,
+        max_results: 20
+      };
+
+      console.log('📊 Executing semantic search with query object:', searchQuery);
+      const results = await semanticSearch.performSemanticSearch(searchQuery, user);
+      setSemanticResults(results);
+
+      // Track search completion
+      trackSearch(query, results.length, Object.keys(options).filter(key => options[key]));
+
+      console.log('📊 Search results:', results.length, 'papers found');
+      console.log('🎯 First result sample:', results[0]);
+    } catch (error) {
+      console.error('❌ Semantic search failed:', error);
+      setError('Semantic search failed. Please try again.');
+    } finally {
+      setLoading(false);
+      console.log('✅ Semantic search completed');
+    }
+  };
+
+  const handleFilterChange = async (criteria: FilterCriteria) => {
+    try {
+      setFilterCriteria(criteria);
+
+      // Track semantic filter usage
+      trackSemanticFeatureUsage('smart_filters', { criteria });
+
+      // Apply filters to current recommendations
+      if (recommendations) {
+        const allPapers = [
+          ...(Array.isArray(recommendations.recommendations.papers_for_you)
+            ? recommendations.recommendations.papers_for_you
+            : recommendations.recommendations.papers_for_you?.papers || []),
+          ...(Array.isArray(recommendations.recommendations.trending_in_field)
+            ? recommendations.recommendations.trending_in_field
+            : recommendations.recommendations.trending_in_field?.papers || []),
+          ...(Array.isArray(recommendations.recommendations.cross_pollination)
+            ? recommendations.recommendations.cross_pollination
+            : recommendations.recommendations.cross_pollination?.papers || []),
+          ...(Array.isArray(recommendations.recommendations.citation_opportunities)
+            ? recommendations.recommendations.citation_opportunities
+            : recommendations.recommendations.citation_opportunities?.papers || [])
+        ];
+
+        const filteredPapers = semanticFilter.filterPapers(allPapers, criteria);
+        setSemanticResults(filteredPapers);
+        console.log('🎯 Filtered papers:', filteredPapers);
+      }
+    } catch (error) {
+      console.error('Filter application failed:', error);
+    }
+  };
+
+  const handleCrossDomainExplore = async (domains: string[]) => {
+    try {
+      setLoading(true);
+
+      // Track cross-domain exploration usage
+      trackSemanticFeatureUsage('cross_domain_discovery', { domains });
+
+      const opportunities = await crossDomainEngine.discoverCrossDomainOpportunities(
+        domains,
+        ['research', 'discovery'], // Default interests
+        2
+      );
+      setCrossDomainOpportunities(opportunities);
+      console.log('🌐 Cross-domain opportunities:', opportunities);
+    } catch (error) {
+      console.error('Cross-domain exploration failed:', error);
+      setError('Cross-domain exploration failed. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -328,27 +441,40 @@ export default function DiscoverPage() {
       <div className="w-full max-w-none py-6 sm:py-8">
         {/* Mobile-friendly header */}
         <div className="mb-6 sm:mb-8 px-4 sm:px-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-[var(--spotify-white)] mb-2">Discover</h1>
-          <p className="text-[var(--spotify-light-text)] text-sm sm:text-base">
-            Personalized research recommendations for you
-          </p>
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-[var(--spotify-white)] mb-2">Discover</h1>
+              <p className="text-[var(--spotify-light-text)] text-sm sm:text-base">
+                Personalized research recommendations for you
+              </p>
+            </div>
 
-          {/* Refresh Button */}
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="mt-4 flex items-center space-x-2 px-4 py-2 bg-[var(--spotify-green)] text-black rounded-full font-medium hover:scale-105 transition-transform disabled:opacity-50"
-          >
-            <ArrowPathIcon className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
-          </button>
+            {/* Refresh Button */}
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="flex items-center space-x-2 px-4 py-2 bg-[var(--spotify-green)] text-black rounded-full font-medium hover:scale-105 transition-transform disabled:opacity-50"
+            >
+              <ArrowPathIcon className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{refreshing ? 'Refreshing...' : 'Refresh'}</span>
+            </button>
+          </div>
         </div>
 
-        {/* Duplicate section removed - using single section below */}
+        {/* Semantic Discovery Interface */}
+        <div className="mb-8 px-4 sm:px-6">
+          <SemanticDiscoveryInterface
+            activeMode={activeDiscoveryMode}
+            onModeChange={setActiveDiscoveryMode}
+            onSemanticSearch={handleSemanticSearch}
+            onFilterChange={handleFilterChange}
+            onCrossDomainExplore={handleCrossDomainExplore}
+            loading={loading}
+          />
+        </div>
 
-
-        {/* Refresh Button */}
-        <div className="flex justify-between items-center mb-8">
+        {/* Section Header */}
+        <div className="mb-8 px-4 sm:px-6">
           <div className="flex items-center gap-4">
             <h2 className="text-xl font-semibold text-white">
               Your Research Discovery
@@ -359,15 +485,6 @@ export default function DiscoverPage() {
               </span>
             )}
           </div>
-          
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="flex items-center gap-2 px-4 py-2 bg-[var(--spotify-dark-gray)] text-white rounded-lg hover:bg-[var(--spotify-medium-gray)] transition-colors disabled:opacity-50"
-          >
-            <ArrowPathIcon className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            {refreshing ? 'Refreshing...' : 'Refresh'}
-          </button>
         </div>
 
         {/* Recommendation Sections */}
