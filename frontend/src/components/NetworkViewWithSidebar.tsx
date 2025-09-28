@@ -30,6 +30,7 @@ interface NetworkViewWithSidebarProps {
   projectId?: string; // For deep dive and collection actions
   onDeepDiveCreated?: () => void;
   onArticleSaved?: () => void;
+  onGenerateReview?: (pmid: string, title: string, fullTextOnly?: boolean) => void;
   onBack?: () => void;
   className?: string;
 }
@@ -40,6 +41,7 @@ export default function NetworkViewWithSidebar({
   projectId,
   onDeepDiveCreated,
   onArticleSaved,
+  onGenerateReview,
   className = ''
 }: NetworkViewWithSidebarProps) {
   const { user } = useAuth();
