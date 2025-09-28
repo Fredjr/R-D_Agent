@@ -29,7 +29,7 @@ import {
   CardDescription,
   ProjectNavigation,
   PageHeader,
-  ReportCard
+  SpotifyReportCard
 } from '@/components/ui';
 
 interface Project {
@@ -1419,13 +1419,13 @@ export default function ProjectPage() {
               {project.reports && project.reports.length > 0 ? (
                 <div className="space-y-3">
                   {project.reports.map((report) => (
-                    <ReportCard
+                    <SpotifyReportCard
                       key={report.report_id}
                       title={report.title}
                       objective={report.objective}
                       status="completed"
                       createdAt={new Date(report.created_at).toLocaleDateString()}
-                      className="relative bg-[var(--spotify-dark-gray)] border-[var(--spotify-border-gray)] text-[var(--spotify-white)]"
+                      className="relative"
                       onClick={() => window.open(`/report/${report.report_id}`, '_blank')}
                     >
                       <div className="absolute top-3 right-3 flex gap-2">
@@ -1456,7 +1456,7 @@ export default function ProjectPage() {
                           View
                         </Button>
                       </div>
-                    </ReportCard>
+                    </SpotifyReportCard>
                   ))}
                 </div>
               ) : (
