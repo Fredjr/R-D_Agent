@@ -148,6 +148,19 @@ async def test_semantic_endpoint():
         "timestamp": datetime.now().isoformat()
     }
 
+# =============================================================================
+# Relationship Explanation Endpoints
+# =============================================================================
+
+# Import relationship explanation service
+try:
+    from services.relationship_explanation_service import get_relationship_explanation_service
+    RELATIONSHIP_EXPLANATION_AVAILABLE = True
+    print("✅ Relationship explanation service imported successfully")
+except ImportError as e:
+    print(f"❌ Relationship explanation service import failed: {e}")
+    RELATIONSHIP_EXPLANATION_AVAILABLE = False
+
 class PaperAnalysisRequest(BaseModel):
     """Request model for paper analysis"""
     title: str = Field(..., description="Paper title")
@@ -165,6 +178,16 @@ class SemanticFeaturesResponse(BaseModel):
     confidence_scores: Dict[str, float]
     embedding_dimensions: int
     analysis_metadata: Dict[str, Any]
+
+class RelationshipExplanationRequest(BaseModel):
+    """Request model for relationship explanation"""
+    paper_a_pmid: str = Field(..., description="PMID of first paper")
+    paper_a_title: str = Field(..., description="Title of first paper")
+    paper_a_abstract: Optional[str] = Field(None, description="Abstract of first paper")
+    paper_b_pmid: str = Field(..., description="PMID of second paper")
+    paper_b_title: str = Field(..., description="Title of second paper")
+    paper_b_abstract: Optional[str] = Field(None, description="Abstract of second paper")
+    relationship_type: str = Field(default="unknown", description="Type of relationship")
 
 @app.post("/api/semantic/analyze-paper")
 async def analyze_paper(request: PaperAnalysisRequest):
@@ -406,6 +429,75 @@ async def test_semantic_analysis():
     except Exception as e:
         print(f"❌ Error in test analysis: {e}")
         raise HTTPException(status_code=500, detail=f"Test analysis failed: {str(e)}")
+
+# =============================================================================
+# RELATIONSHIP EXPLANATION ENDPOINTS
+# =============================================================================
+
+@app.post("/relationships/explain")
+async def explain_paper_relationship(request: RelationshipExplanationRequest):
+    """Generate LLM-powered explanation for paper relationships"""
+    if not RELATIONSHIP_EXPLANATION_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Relationship explanation service not available")
+
+    try:
+        logger.info(f"🔍 Explaining relationship between {request.paper_a_pmid} and {request.paper_b_pmid}")
+
+        explanation_service = get_relationship_explanation_service()
+
+        paper_a = {
+            "pmid": request.paper_a_pmid,
+            "title": request.paper_a_title,
+            "abstract": request.paper_a_abstract
+        }
+
+        paper_b = {
+            "pmid": request.paper_b_pmid,
+            "title": request.paper_b_title,
+            "abstract": request.paper_b_abstract
+        }
+
+        explanation = await explanation_service.explain_relationship(
+            paper_a, paper_b, request.relationship_type
+        )
+
+        return {
+            "explanation": explanation,
+            "relationship_type": request.relationship_type,
+            "paper_a_pmid": request.paper_a_pmid,
+            "paper_b_pmid": request.paper_b_pmid
+        }
+
+    except Exception as e:
+        logger.error(f"Error explaining relationship: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to explain relationship: {str(e)}")
+
+@app.get("/relationships/service-status")
+async def get_relationship_service_status():
+    """Get relationship explanation service status"""
+    try:
+        if not RELATIONSHIP_EXPLANATION_AVAILABLE:
+            return {
+                "service_name": "Relationship Explanation Service",
+                "is_available": False,
+                "error": "Service not available - import failed"
+            }
+
+        explanation_service = get_relationship_explanation_service()
+
+        return {
+            "service_name": "Relationship Explanation Service",
+            "is_available": True,
+            "llm_available": explanation_service.llm is not None,
+            "cache_size": len(explanation_service.explanation_cache),
+            "supported_relationship_types": [
+                "citation", "similarity", "co-citation", "unknown"
+            ]
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting relationship service status: {e}")
+        raise HTTPException(status_code=500, detail=f"Service status check failed: {str(e)}")
 
 # =============================================================================
 # AUTHOR NETWORK ENDPOINTS - Phase 4 ResearchRabbit Feature Parity

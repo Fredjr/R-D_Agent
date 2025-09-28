@@ -26,6 +26,7 @@ export default function ReportDetailPage() {
   // Collection management state
   const [collections, setCollections] = useState<any[]>([]);
   const [showAddToCollectionModal, setShowAddToCollectionModal] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const [selectedArticleForCollection, setSelectedArticleForCollection] = useState<{
     pmid?: string;
     title: string;
@@ -368,10 +369,31 @@ export default function ReportDetailPage() {
           ) : (
             <div className="bg-white rounded-lg shadow p-6">
               <div className="text-center py-8">
-                <p className="text-gray-500">No content available for this report.</p>
-                <p className="text-sm text-gray-400 mt-2">
-                  The report may still be processing or there was an issue generating content.
-                </p>
+                <div className="mb-6">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Content Available</h3>
+                  <p className="text-gray-500 mb-2">This report appears to be empty or incomplete.</p>
+                  <p className="text-sm text-gray-400 mb-6">
+                    The report may have failed to generate properly or the content was not saved.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={handleRegenerateContent}
+                    disabled={regenerating}
+                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors font-medium"
+                  >
+                    {regenerating ? 'Regenerating Report...' : 'Generate Report Content'}
+                  </button>
+                  <p className="text-xs text-gray-400">
+                    This will attempt to regenerate the report content using the original parameters.
+                  </p>
+                </div>
               </div>
             </div>
           )}

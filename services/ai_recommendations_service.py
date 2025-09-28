@@ -200,13 +200,17 @@ class SpotifyInspiredRecommendationsService:
                     "citation_opportunities": await self._generate_fallback_recommendations(db, "citation_opportunities")
                 }
 
-            # Generate Papers for You based on user's domains
+            # Generate Papers for You based on user's domains (filter out invalid metadata)
             papers_for_you = []
             for domain in research_domains[:3]:  # Top 3 domains
                 domain_papers = [
                     article for article in all_articles
-                    if domain.lower() in (article.title or "").lower() or
-                       domain.lower() in (article.abstract or "").lower()
+                    if (article.title and
+                        article.title.strip() and
+                        not article.title.startswith("Citation Article") and
+                        not article.title.startswith("Reference Article") and
+                        (domain.lower() in article.title.lower() or
+                         domain.lower() in (article.abstract or "").lower()))
                 ][:8]  # 8 papers per domain
 
                 for paper in domain_papers:
@@ -222,8 +226,15 @@ class SpotifyInspiredRecommendationsService:
                         "category": "papers_for_you"
                     })
 
-            # Generate Trending in Field
-            trending_papers = sorted(all_articles, key=lambda x: x.citation_count or 0, reverse=True)[:15]
+            # Generate Trending in Field (filter out invalid metadata)
+            valid_articles = [
+                article for article in all_articles
+                if (article.title and
+                    article.title.strip() and
+                    not article.title.startswith("Citation Article") and
+                    not article.title.startswith("Reference Article"))
+            ]
+            trending_papers = sorted(valid_articles, key=lambda x: x.citation_count or 0, reverse=True)[:15]
             trending_in_field = []
             for paper in trending_papers:
                 trending_in_field.append({
@@ -238,13 +249,17 @@ class SpotifyInspiredRecommendationsService:
                     "category": "trending_in_field"
                 })
 
-            # Generate Cross-pollination (papers from different domains)
+            # Generate Cross-pollination (papers from different domains, filter out invalid metadata)
             cross_pollination = []
             other_domains = ['machine learning', 'artificial intelligence', 'bioinformatics', 'genetics']
             for domain in other_domains:
                 domain_papers = [
                     article for article in all_articles
-                    if domain.lower() in (article.title or "").lower()
+                    if (article.title and
+                        article.title.strip() and
+                        not article.title.startswith("Citation Article") and
+                        not article.title.startswith("Reference Article") and
+                        domain.lower() in article.title.lower())
                 ][:5]  # 5 papers per cross-domain
 
                 for paper in domain_papers:
@@ -260,13 +275,22 @@ class SpotifyInspiredRecommendationsService:
                         "category": "cross_pollination"
                     })
 
-            # Generate Citation Opportunities (recent papers with moderate citations)
+            # Generate Citation Opportunities (recent papers with moderate citations, filter out invalid metadata)
             citation_opportunities = []
-            recent_papers = [
-                article for article in all_articles
-                if (article.publication_year or 0) >= 2020 and
-                   10 <= (article.citation_count or 0) <= 100
-            ][:15]
+            # Try different citation ranges to get more opportunities
+            for min_citations, max_citations in [(5, 50), (10, 100), (1, 200), (0, 500)]:
+                recent_papers = [
+                    article for article in all_articles
+                    if ((article.publication_year or 0) >= 2018 and  # Expanded date range
+                        min_citations <= (article.citation_count or 0) <= max_citations and
+                        article.title and
+                        article.title.strip() and
+                        not article.title.startswith("Citation Article") and
+                        not article.title.startswith("Reference Article"))
+                ][:15]
+
+                if len(recent_papers) >= 8:  # If we have enough papers, break
+                    break
 
             for paper in recent_papers:
                 citation_opportunities.append({
@@ -806,26 +830,38 @@ class SpotifyInspiredRecommendationsService:
             # Try multiple fallback strategies to ensure we always have recommendations
             recent_papers = []
 
-            # Strategy 1: Popular recent papers (last 2 years, >10 citations)
+            # Strategy 1: Popular recent papers (last 2 years, >10 citations) with valid metadata
             recent_papers = db.query(Article).filter(
                 Article.publication_year >= datetime.now(timezone.utc).year - 2,
                 Article.citation_count.isnot(None),
-                Article.citation_count > 10
+                Article.citation_count > 10,
+                Article.title.isnot(None),
+                Article.title != "",
+                ~Article.title.like("Citation Article%"),
+                ~Article.title.like("Reference Article%")
             ).order_by(desc(Article.citation_count)).limit(20).all()
 
-            # Strategy 2: If not enough, try recent papers with any citations
+            # Strategy 2: If not enough, try recent papers with any citations and valid metadata
             if len(recent_papers) < 15:
                 additional_papers = db.query(Article).filter(
                     Article.publication_year >= datetime.now(timezone.utc).year - 3,
                     Article.citation_count.isnot(None),
-                    Article.citation_count > 0
+                    Article.citation_count > 0,
+                    Article.title.isnot(None),
+                    Article.title != "",
+                    ~Article.title.like("Citation Article%"),
+                    ~Article.title.like("Reference Article%")
                 ).order_by(desc(Article.citation_count)).limit(25).all()
                 recent_papers.extend(additional_papers)
 
-            # Strategy 3: If still not enough, get any recent papers
+            # Strategy 3: If still not enough, get any recent papers with valid metadata
             if len(recent_papers) < 15:
                 any_papers = db.query(Article).filter(
-                    Article.publication_year >= datetime.now(timezone.utc).year - 5
+                    Article.publication_year >= datetime.now(timezone.utc).year - 5,
+                    Article.title.isnot(None),
+                    Article.title != "",
+                    ~Article.title.like("Citation Article%"),
+                    ~Article.title.like("Reference Article%")
                 ).order_by(desc(Article.created_at)).limit(30).all()
                 recent_papers.extend(any_papers)
 
@@ -884,14 +920,18 @@ class SpotifyInspiredRecommendationsService:
             if user_profile.get("is_fallback", False):
                 return await self._generate_fallback_recommendations(db, "papers_for_you")
 
-            # Get papers based on user's research domains with personalization
+            # Get papers based on user's research domains with personalization and valid metadata
             for domain in primary_domains[:3]:  # Top 3 domains
                 domain_papers = db.query(Article).filter(
                     or_(
                         Article.title.ilike(f'%{domain}%'),
                         Article.abstract.ilike(f'%{domain}%')
                     ),
-                    Article.publication_year >= datetime.now(timezone.utc).year - 3  # Recent papers
+                    Article.publication_year >= datetime.now(timezone.utc).year - 3,  # Recent papers
+                    Article.title.isnot(None),
+                    Article.title != "",
+                    ~Article.title.like("Citation Article%"),
+                    ~Article.title.like("Reference Article%")
                 ).order_by(desc(Article.citation_count)).limit(15).all()
 
                 for paper in domain_papers:
@@ -939,7 +979,7 @@ class SpotifyInspiredRecommendationsService:
                 # Try recent papers first (last 3 years), then expand if needed
                 trending_papers = []
 
-                # Try last 3 years first
+                # Try last 3 years first with valid metadata
                 for years_back in [3, 5, 10]:
                     trending_papers = db.query(Article).filter(
                         or_(
@@ -947,7 +987,11 @@ class SpotifyInspiredRecommendationsService:
                             Article.abstract.ilike(f'%{domain}%')
                         ),
                         Article.publication_year >= datetime.now(timezone.utc).year - years_back,
-                        Article.citation_count > 5  # Some traction
+                        Article.citation_count > 5,  # Some traction
+                        Article.title.isnot(None),
+                        Article.title != "",
+                        ~Article.title.like("Citation Article%"),
+                        ~Article.title.like("Reference Article%")
                     ).order_by(desc(Article.citation_count)).limit(15).all()
 
                     if trending_papers:
@@ -1108,7 +1152,7 @@ class SpotifyInspiredRecommendationsService:
                 # Get recent papers with flexible date range
                 recent_papers = []
 
-                # Try different time ranges to find suitable papers
+                # Try different time ranges to find suitable papers with valid metadata
                 for years_back in [1, 2, 3, 5]:
                     recent_papers = db.query(Article).filter(
                         or_(
@@ -1116,20 +1160,28 @@ class SpotifyInspiredRecommendationsService:
                             Article.abstract.ilike(f'%{domain}%')
                         ),
                         Article.publication_year >= datetime.now(timezone.utc).year - years_back,
-                        Article.citation_count < 100  # Papers that could use more citations
+                        Article.citation_count < 100,  # Papers that could use more citations
+                        Article.title.isnot(None),
+                        Article.title != "",
+                        ~Article.title.like("Citation Article%"),
+                        ~Article.title.like("Reference Article%")
                     ).order_by(desc(Article.publication_year), desc(Article.citation_count)).limit(15).all()
 
                     if recent_papers:
                         break
 
-                # If still no results, get any papers in the domain with moderate citations
+                # If still no results, get any papers in the domain with moderate citations and valid metadata
                 if not recent_papers:
                     recent_papers = db.query(Article).filter(
                         or_(
                             Article.title.ilike(f'%{domain}%'),
                             Article.abstract.ilike(f'%{domain}%')
                         ),
-                        Article.citation_count < 100
+                        Article.citation_count < 100,
+                        Article.title.isnot(None),
+                        Article.title != "",
+                        ~Article.title.like("Citation Article%"),
+                        ~Article.title.like("Reference Article%")
                     ).order_by(desc(Article.publication_year), desc(Article.citation_count)).limit(15).all()
 
                 for paper in recent_papers:
@@ -1449,15 +1501,63 @@ class SpotifyInspiredRecommendationsService:
         if not papers:
             return papers
 
-        # For now, return all papers - we can add sophisticated filtering later
-        # This is where we could implement:
-        # - Complexity matching based on user expertise
-        # - Methodology preference filtering
-        # - Domain-specific ranking
-        # - Novelty preference matching
+        # Apply semantic-enhanced scoring to each paper
+        scored_papers = []
+        for paper in papers:
+            semantic_score = self._calculate_semantic_relevance_score(paper, user_preferences)
+            paper_with_score = paper.copy()
+            paper_with_score['semantic_relevance_score'] = semantic_score
+            scored_papers.append(paper_with_score)
 
-        logger.info(f"🎯 Applied semantic filtering to {len(papers)} papers")
-        return papers
+        # Sort by semantic relevance score
+        scored_papers.sort(key=lambda p: p.get('semantic_relevance_score', 0.0), reverse=True)
+
+        logger.info(f"🎯 Applied semantic filtering to {len(papers)} papers, top score: {scored_papers[0].get('semantic_relevance_score', 0.0):.3f}")
+        return scored_papers
+
+    def _calculate_semantic_relevance_score(self, paper: Dict[str, Any], user_preferences: Dict[str, Any]) -> float:
+        """Calculate semantic-enhanced relevance score for a paper"""
+        semantic_analysis = paper.get('semantic_analysis', {})
+        if not semantic_analysis:
+            return 0.5  # Default score for papers without semantic analysis
+
+        score = 0.0
+
+        # Methodology preference matching (25%)
+        preferred_methodologies = dict(user_preferences.get('preferred_methodologies', []))
+        paper_methodology = semantic_analysis.get('methodology')
+        if paper_methodology in preferred_methodologies:
+            methodology_score = preferred_methodologies[paper_methodology] / sum(preferred_methodologies.values())
+            score += methodology_score * 0.25
+
+        # Complexity preference matching (20%)
+        user_complexity_pref = user_preferences.get('complexity_preference', 0.5)
+        paper_complexity = semantic_analysis.get('complexity_score', 0.5)
+        complexity_diff = abs(user_complexity_pref - paper_complexity)
+        complexity_score = max(0, 1 - complexity_diff * 2)  # Closer = higher score
+        score += complexity_score * 0.20
+
+        # Novelty preference (15%)
+        novelty_distribution = user_preferences.get('novelty_distribution', {})
+        paper_novelty = semantic_analysis.get('novelty_classification', {}).get('value') if isinstance(semantic_analysis.get('novelty_classification'), dict) else semantic_analysis.get('novelty_classification')
+        if paper_novelty in novelty_distribution:
+            novelty_score = novelty_distribution[paper_novelty] / sum(novelty_distribution.values())
+            score += novelty_score * 0.15
+
+        # Domain relevance (25%)
+        user_domains = dict(user_preferences.get('semantic_domains', []))
+        paper_domains = semantic_analysis.get('research_domains', [])
+        domain_score = 0
+        for domain in paper_domains:
+            if domain in user_domains:
+                domain_score += user_domains[domain] / sum(user_domains.values())
+        score += min(domain_score, 1.0) * 0.25
+
+        # Base relevance (15%)
+        base_score = paper.get('relevance_score', 0.5)
+        score += base_score * 0.15
+
+        return min(score, 1.0)
 
 # Global service instance
 _spotify_recommendations_service = None
