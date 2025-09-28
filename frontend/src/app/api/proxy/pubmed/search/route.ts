@@ -214,7 +214,7 @@ function buildOptimizedQuery(query: string, meshTerms?: any[], suggestedQueries?
 }
 
 /**
- * Main API endpoint handler
+ * Handle GET requests with query parameters
  */
 export async function GET(request: NextRequest) {
   try {
@@ -224,9 +224,56 @@ export async function GET(request: NextRequest) {
     const meshTerms = searchParams.get('mesh_terms');
     const suggestedQueries = searchParams.get('suggested_queries');
 
+    return await handlePubMedSearch(query, limit, meshTerms, suggestedQueries);
+  } catch (error) {
+    console.error('PubMed search GET error:', error);
+    return NextResponse.json(
+      {
+        error: 'Failed to search PubMed',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Handle POST requests with JSON body
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { query, max_results, mesh_terms, suggested_queries } = body;
+
+    console.log('🔍 PubMed POST request:', { query, max_results });
+
+    return await handlePubMedSearch(query, max_results || 20, mesh_terms, suggested_queries);
+  } catch (error) {
+    console.error('PubMed search POST error:', error);
+    return NextResponse.json(
+      {
+        error: 'Failed to search PubMed',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Shared handler for both GET and POST requests
+ */
+async function handlePubMedSearch(
+  query: string | null,
+  limit: number,
+  meshTerms: string | null,
+  suggestedQueries: string | null
+) {
+  try {
+
     if (!query) {
       return NextResponse.json(
-        { error: 'Query parameter "q" is required' },
+        { error: 'Query parameter is required' },
         { status: 400 }
       );
     }
@@ -271,9 +318,9 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('PubMed search API error:', error);
+    console.error('PubMed search handler error:', error);
     return NextResponse.json(
-      { 
+      {
         error: 'Failed to search PubMed',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
