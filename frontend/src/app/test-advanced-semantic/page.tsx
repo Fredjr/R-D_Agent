@@ -80,7 +80,7 @@ export default function TestAdvancedSemanticPage() {
           paper.abstract,
           paper.fullText || undefined,
           {
-            include_embeddings: false,
+            include_embeddings: true, // Test real embeddings
             analyze_full_text: false,
             extract_statistical_methods: true,
             calculate_novelty: true,
@@ -119,7 +119,13 @@ export default function TestAdvancedSemanticPage() {
 
     try {
       const samplePaperIds = ['29622564', '12345678', '87654321', '11111111', '22222222'];
-      
+
+      // Test real citation data fetching
+      updateTestResult('Citation Network Intelligence', 'pending', 'Testing real citation API integration...');
+
+      const realCitationData = await citationNetworkIntelligence.fetchRealCitationData('29622564');
+      const citationApiStatus = realCitationData ? 'Real citation data retrieved' : 'Using mock data';
+
       const networkAnalysis = await citationNetworkIntelligence.analyzeCitationNetwork(samplePaperIds);
       
       const recommendations = await citationNetworkIntelligence.getPersonalizedCitationRecommendations(
@@ -157,10 +163,10 @@ export default function TestAdvancedSemanticPage() {
 
       const duration = Date.now() - startTime;
       updateTestResult(
-        'Citation Network Intelligence', 
-        'success', 
-        `Analyzed network with ${networkAnalysis.nodes.length} nodes, ${networkAnalysis.edges.length} edges`, 
-        { networkAnalysis, recommendations, trends, breakthroughs },
+        'Citation Network Intelligence',
+        'success',
+        `Analyzed network with ${networkAnalysis.nodes.length} nodes, ${networkAnalysis.edges.length} edges. ${citationApiStatus}`,
+        { networkAnalysis, recommendations, trends, breakthroughs, realCitationData, citationApiStatus },
         duration
       );
 
@@ -187,21 +193,30 @@ export default function TestAdvancedSemanticPage() {
       const testUserId = 'test-user-123';
       const userProfile = await userProfileSystem.getUserProfile(testUserId, 'test@example.com');
 
-      // Simulate user behavior
+      // Test real analytics integration
+      updateTestResult('User Behavior Modeling', 'pending', 'Testing real analytics integration...');
+
+      // Simulate user behavior with real analytics tracking
       await userProfileSystem.trackBehavior(testUserId, 'paper_view', {
         pmid: '29622564',
-        duration: 300
+        duration: 300,
+        research_domain: 'machine_learning'
       });
 
       await userProfileSystem.trackBehavior(testUserId, 'search', {
         query: 'machine learning drug discovery',
-        results_clicked: ['29622564', '12345678']
+        results_clicked: ['29622564', '12345678'],
+        semantic_filters_used: ['complexity_high', 'novelty_medium']
       });
 
       await userProfileSystem.trackBehavior(testUserId, 'deep_dive', {
         pmid: '29622564',
-        completion_rate: 0.85
+        completion_rate: 0.85,
+        sections_viewed: ['methods', 'results', 'discussion']
       });
+
+      // Test real-time analytics
+      const realTimeAnalytics = await userProfileSystem.getRealTimeAnalytics(testUserId);
 
       // Update preferences
       await userProfileSystem.updatePreferences(testUserId, {
@@ -221,10 +236,10 @@ export default function TestAdvancedSemanticPage() {
 
       const duration = Date.now() - startTime;
       updateTestResult(
-        'User Behavior Modeling', 
-        'success', 
-        `User profile created and behavior tracked successfully`, 
-        { userProfile, recommendationContext, similarUsers, trajectory },
+        'User Behavior Modeling',
+        'success',
+        `User profile created and behavior tracked successfully. Real-time analytics: ${realTimeAnalytics.papers_viewed_today} papers viewed today`,
+        { userProfile, recommendationContext, similarUsers, trajectory, realTimeAnalytics },
         duration
       );
 

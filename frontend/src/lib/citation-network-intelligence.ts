@@ -469,6 +469,187 @@ export class CitationNetworkIntelligence {
       node.citation_velocity = age > 0 ? node.citation_count / age : node.citation_count;
     }
   }
+
+  /**
+   * Fetch real citation data from external APIs (Semantic Scholar, CrossRef)
+   */
+  async fetchRealCitationData(pmid: string): Promise<CitationNode | null> {
+    try {
+      // Try Semantic Scholar API first
+      const semanticScholarData = await this.fetchSemanticScholarData(pmid);
+      if (semanticScholarData) {
+        return semanticScholarData;
+      }
+
+      // Fallback to CrossRef API
+      const crossRefData = await this.fetchCrossRefData(pmid);
+      if (crossRefData) {
+        return crossRefData;
+      }
+
+      return null;
+    } catch (error) {
+      console.warn('Citation data fetch failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Fetch data from Semantic Scholar API
+   */
+  private async fetchSemanticScholarData(pmid: string): Promise<CitationNode | null> {
+    try {
+      const response = await fetch(`https://api.semanticscholar.org/graph/v1/paper/PMID:${pmid}?fields=citationCount,referenceCount,influentialCitationCount,citations,references,authors,year,venue,title`);
+
+      if (response.ok) {
+        const data = await response.json();
+
+        return {
+          pmid,
+          title: data.title || '',
+          authors: (data.authors || []).map((a: any) => a.name),
+          journal: data.venue || '',
+          year: data.year || 0,
+          citation_count: data.citationCount || 0,
+          h_index_contribution: this.calculateHIndexContribution(data.citationCount),
+
+          // Network properties (calculated)
+          in_degree: data.citationCount || 0,
+          out_degree: data.referenceCount || 0,
+          betweenness_centrality: 0, // Would be calculated from full network
+          closeness_centrality: 0,
+          pagerank_score: 0,
+
+          // Temporal properties
+          citation_velocity: this.calculateCitationVelocity(data.citationCount, data.year),
+          peak_citation_year: data.year || 0,
+          citation_half_life: 5, // Default estimate
+
+          // Quality indicators
+          journal_impact_factor: this.estimateJournalImpact(data.venue),
+          author_reputation_score: this.calculateAuthorReputation(data.authors),
+          institutional_prestige: 0.5, // Default
+
+          // Semantic properties
+          research_domains: this.extractResearchDomains(data.title),
+          methodology_type: this.inferMethodologyType(data.title),
+          novelty_score: data.influentialCitationCount / Math.max(data.citationCount, 1),
+          interdisciplinary_score: 0.5 // Default
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.warn('Semantic Scholar API error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Fetch data from CrossRef API
+   */
+  private async fetchCrossRefData(pmid: string): Promise<CitationNode | null> {
+    try {
+      // CrossRef doesn't directly support PMID, so this is a simplified implementation
+      const response = await fetch(`https://api.crossref.org/works?query=${pmid}&rows=1`);
+
+      if (response.ok) {
+        const data = await response.json();
+        const work = data.message?.items?.[0];
+
+        if (work) {
+          return {
+            pmid,
+            title: work.title?.[0] || '',
+            authors: (work.author || []).map((a: any) => `${a.given} ${a.family}`),
+            journal: work['container-title']?.[0] || '',
+            year: work.published?.['date-parts']?.[0]?.[0] || 0,
+            citation_count: work['is-referenced-by-count'] || 0,
+            h_index_contribution: this.calculateHIndexContribution(work['is-referenced-by-count']),
+
+            // Network properties
+            in_degree: work['is-referenced-by-count'] || 0,
+            out_degree: work['references-count'] || 0,
+            betweenness_centrality: 0,
+            closeness_centrality: 0,
+            pagerank_score: 0,
+
+            // Temporal properties
+            citation_velocity: this.calculateCitationVelocity(work['is-referenced-by-count'], work.published?.['date-parts']?.[0]?.[0]),
+            peak_citation_year: work.published?.['date-parts']?.[0]?.[0] || 0,
+            citation_half_life: 5,
+
+            // Quality indicators
+            journal_impact_factor: this.estimateJournalImpact(work['container-title']?.[0]),
+            author_reputation_score: 0.5,
+            institutional_prestige: 0.5,
+
+            // Semantic properties
+            research_domains: this.extractResearchDomains(work.title?.[0]),
+            methodology_type: this.inferMethodologyType(work.title?.[0]),
+            novelty_score: 0.5,
+            interdisciplinary_score: 0.5
+          };
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.warn('CrossRef API error:', error);
+      return null;
+    }
+  }
+
+  // Helper methods for data processing
+  private calculateHIndexContribution(citations: number): number {
+    return Math.min(citations, 100) / 100; // Normalize to 0-1
+  }
+
+  private calculateCitationVelocity(citations: number, year: number): number {
+    const currentYear = new Date().getFullYear();
+    const yearsOld = Math.max(currentYear - year, 1);
+    return citations / yearsOld;
+  }
+
+  private estimateJournalImpact(journal: string): number {
+    // Simplified journal impact estimation
+    const highImpactJournals = ['nature', 'science', 'cell', 'nejm', 'lancet'];
+    const journalLower = journal?.toLowerCase() || '';
+
+    if (highImpactJournals.some(j => journalLower.includes(j))) {
+      return 0.9;
+    }
+    return 0.5; // Default impact factor
+  }
+
+  private calculateAuthorReputation(authors: any[]): number {
+    // Simplified author reputation calculation
+    return Math.min(authors.length * 0.1, 1.0);
+  }
+
+  private extractResearchDomains(title: string): string[] {
+    const domains = [];
+    const titleLower = title?.toLowerCase() || '';
+
+    if (titleLower.includes('cancer') || titleLower.includes('tumor')) domains.push('oncology');
+    if (titleLower.includes('neural') || titleLower.includes('brain')) domains.push('neuroscience');
+    if (titleLower.includes('genetic') || titleLower.includes('dna')) domains.push('genetics');
+    if (titleLower.includes('immune') || titleLower.includes('antibody')) domains.push('immunology');
+
+    return domains.length > 0 ? domains : ['general'];
+  }
+
+  private inferMethodologyType(title: string): string {
+    const titleLower = title?.toLowerCase() || '';
+
+    if (titleLower.includes('meta-analysis')) return 'meta-analysis';
+    if (titleLower.includes('review')) return 'review';
+    if (titleLower.includes('clinical trial')) return 'clinical-trial';
+    if (titleLower.includes('in vitro')) return 'in-vitro';
+    if (titleLower.includes('in vivo')) return 'in-vivo';
+
+    return 'experimental';
+  }
 }
 
 // Singleton instance
