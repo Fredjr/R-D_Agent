@@ -85,7 +85,11 @@ export default function TestSemanticEnhancedPage() {
         similarity_score: Math.random(),
         citation_count: Math.floor(Math.random() * 100),
         publication_year: 2020 + Math.floor(Math.random() * 4),
-        research_domain: ['Oncology', 'Cardiology', 'Neuroscience'][Math.floor(Math.random() * 3)]
+        research_domain: ['Oncology', 'Cardiology', 'Neuroscience'][Math.floor(Math.random() * 3)],
+        keywords: ['test', 'research'],
+        mesh_terms: ['Test Term'],
+        methodology_type: 'experimental',
+        recency_score: Math.random()
       }));
 
       const filteredResults = await semanticFilter.filterPapers(mockPapers, filterCriteria);
@@ -172,8 +176,8 @@ export default function TestSemanticEnhancedPage() {
       // Test 3: Semantic Filter
       addTestResult('Testing SemanticPaperFilter...');
       const mockPapers = [
-        { pmid: '1', title: 'Test Paper 1', similarity_score: 0.8, citation_count: 50, publication_year: 2023, research_domain: 'Oncology' },
-        { pmid: '2', title: 'Test Paper 2', similarity_score: 0.6, citation_count: 20, publication_year: 2022, research_domain: 'Cardiology' }
+        { pmid: '1', title: 'Test Paper 1', similarity_score: 0.8, citation_count: 50, publication_year: 2023, research_domain: 'Oncology', keywords: ['test'], mesh_terms: ['Test'], methodology_type: 'experimental', recency_score: 0.9 },
+        { pmid: '2', title: 'Test Paper 2', similarity_score: 0.6, citation_count: 20, publication_year: 2022, research_domain: 'Cardiology', keywords: ['test'], mesh_terms: ['Test'], methodology_type: 'observational', recency_score: 0.7 }
       ];
       const filterCriteria: FilterCriteria = { min_similarity_score: 0.7, min_citation_count: 30 };
       const filtered = await semanticFilter.filterPapers(mockPapers, filterCriteria);

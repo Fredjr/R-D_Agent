@@ -75,7 +75,10 @@ export default function DiscoverPage() {
 
     // Initialize semantic systems
     initializeSemanticSystems();
-  }, [user]);
+
+    // Fetch recommendations
+    fetchWeeklyRecommendations();
+  }, [user, selectedProject]);
 
   const initializeSemanticSystems = async () => {
     try {
@@ -92,9 +95,6 @@ export default function DiscoverPage() {
       console.error('Failed to initialize semantic systems:', error);
     }
   };
-    
-    fetchWeeklyRecommendations();
-  }, [user, selectedProject]);
 
   const fetchWeeklyRecommendations = async () => {
     if (!user) return;
