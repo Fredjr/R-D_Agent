@@ -102,13 +102,14 @@ export async function GET(
   { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
+    const startTime = Date.now();
     const resolvedParams = await params;
     const { userId } = resolvedParams;
-    console.log('🎵 Processing weekly recommendations request for user:', userId);
+    console.log('🎵 [WEEKLY-RECS] 🚀 Processing request for user:', userId);
 
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('project_id');
-    
+
     // Build backend URL
     let backendUrl = `${BACKEND_BASE}/recommendations/weekly/${userId}`;
     if (projectId) {
@@ -118,48 +119,90 @@ export async function GET(
     // Forward headers
     const headers = new Headers();
     headers.set('Content-Type', 'application/json');
-    
+
     // Forward User-ID header if present
     const userIdHeader = request.headers.get('User-ID');
     if (userIdHeader) {
       headers.set('User-ID', userIdHeader);
     }
 
-    console.log('🎵 Forwarding to backend:', backendUrl);
+    console.log('🎵 [WEEKLY-RECS] 🔗 Forwarding to backend:', backendUrl);
 
+    const fetchStartTime = Date.now();
     const response = await fetch(backendUrl, {
       method: 'GET',
       headers,
     });
+    const fetchTime = Date.now() - fetchStartTime;
+
+    console.log(`🎵 [WEEKLY-RECS] ⏱️ Backend fetch took: ${fetchTime}ms`);
 
     if (!response.ok) {
-      console.error('❌ Backend weekly recommendations failed:', response.status);
+      console.error('❌ [WEEKLY-RECS] Backend failed:', response.status);
       return await handleProxyError(response, 'Weekly recommendations', BACKEND_BASE);
     }
 
     const data = await response.json();
-    console.log('✅ Weekly recommendations successful for user:', userId);
+    console.log('✅ [WEEKLY-RECS] Backend response received for user:', userId);
 
     // Always use backend data when available - the backend service has been updated
-    console.log('✅ Using real backend recommendations data directly');
+    console.log('✅ [WEEKLY-RECS] Using real backend recommendations data directly');
 
     // Check if backend returned empty recommendations and enhance for better UX
     const recommendations = data.recommendations || {};
-    const totalRecommendations =
-      (recommendations.papers_for_you || []).length +
-      (recommendations.trending_in_field || []).length +
-      (recommendations.cross_pollination || []).length +
-      (recommendations.citation_opportunities || []).length;
+    const sectionCounts = {
+      papers_for_you: (recommendations.papers_for_you || []).length,
+      trending_in_field: (recommendations.trending_in_field || []).length,
+      cross_pollination: (recommendations.cross_pollination || []).length,
+      citation_opportunities: (recommendations.citation_opportunities || []).length
+    };
+
+    const totalRecommendations = Object.values(sectionCounts).reduce((sum, count) => sum + count, 0);
+
+    console.log('📊 [WEEKLY-RECS] Section counts:', sectionCounts);
+    console.log(`📊 [WEEKLY-RECS] Total recommendations: ${totalRecommendations}`);
+
+    // Deduplication Analysis
+    const allPmids: string[] = [];
+    Object.entries(recommendations).forEach(([section, papers]) => {
+      if (Array.isArray(papers)) {
+        const pmids = papers.map((p: any) => p.pmid).filter(Boolean);
+        allPmids.push(...pmids);
+        console.log(`🔍 [WEEKLY-RECS] ${section}: ${pmids.length} papers, PMIDs: ${pmids.slice(0, 3).join(', ')}${pmids.length > 3 ? '...' : ''}`);
+      }
+    });
+
+    const uniquePmids = [...new Set(allPmids)];
+    const duplicateCount = allPmids.length - uniquePmids.length;
+
+    console.log(`🔄 [WEEKLY-RECS] DEDUPLICATION ANALYSIS:`);
+    console.log(`  📈 Total papers: ${allPmids.length}`);
+    console.log(`  🎯 Unique papers: ${uniquePmids.length}`);
+    console.log(`  🔄 Duplicates: ${duplicateCount}`);
+
+    if (duplicateCount === 0) {
+      console.log(`✅ [WEEKLY-RECS] DEDUPLICATION SUCCESS: No duplicates found`);
+    } else {
+      console.log(`⚠️ [WEEKLY-RECS] DEDUPLICATION ISSUE: ${duplicateCount} duplicates detected`);
+      // Log duplicate PMIDs for debugging
+      const pmidCounts = allPmids.reduce((acc: any, pmid) => {
+        acc[pmid] = (acc[pmid] || 0) + 1;
+        return acc;
+      }, {});
+      const duplicates = Object.entries(pmidCounts).filter(([_, count]) => (count as number) > 1);
+      console.log(`🔍 [WEEKLY-RECS] Duplicate PMIDs:`, duplicates);
+    }
 
     // Only generate fallback if backend is completely empty AND user has no data
     if (totalRecommendations === 0 && (!data.user_insights || Object.keys(data.user_insights).length === 0)) {
-      console.log('📝 Backend returned completely empty data, using minimal fallback...');
+      console.log('📝 [WEEKLY-RECS] Backend returned completely empty data, using minimal fallback...');
       // Return empty recommendations - let the backend service provide real data
       // The backend has been updated to return real recommendations
     }
 
     // 🧠 Phase 2A.2: Add Semantic Analysis to All Papers
-    console.log('🧠 SEMANTIC: Starting semantic analysis integration...');
+    console.log('🧠 [WEEKLY-RECS] SEMANTIC: Starting semantic analysis integration...');
+    const semanticStartTime = Date.now();
 
     try {
       const recommendations = data.recommendations || {};
@@ -175,23 +218,29 @@ export async function GET(
       // Update the data with enhanced recommendations
       data.recommendations = enhancedRecommendations;
 
-      console.log('✅ SEMANTIC: Successfully integrated semantic analysis into all recommendation categories');
-      console.log(`📊 SEMANTIC: Enhanced ${
+      const semanticTime = Date.now() - semanticStartTime;
+      const totalEnhanced =
         enhancedRecommendations.papers_for_you.length +
         enhancedRecommendations.trending_in_field.length +
         enhancedRecommendations.cross_pollination.length +
-        enhancedRecommendations.citation_opportunities.length
-      } total papers with semantic analysis`);
+        enhancedRecommendations.citation_opportunities.length;
+
+      console.log(`✅ [WEEKLY-RECS] SEMANTIC: Successfully integrated semantic analysis (${semanticTime}ms)`);
+      console.log(`📊 [WEEKLY-RECS] SEMANTIC: Enhanced ${totalEnhanced} total papers with semantic analysis`);
 
     } catch (error) {
-      console.error('❌ SEMANTIC: Failed to add semantic analysis, proceeding without it:', error);
+      console.error('❌ [WEEKLY-RECS] SEMANTIC: Failed to add semantic analysis, proceeding without it:', error);
       // Continue without semantic analysis if it fails
     }
+
+    const totalTime = Date.now() - startTime;
+    console.log(`🎉 [WEEKLY-RECS] ✅ Request completed successfully for user: ${userId} (${totalTime}ms total)`);
 
     return NextResponse.json(data);
 
   } catch (error) {
-    console.error('❌ Weekly recommendations proxy exception:', error);
+    const totalTime = Date.now() - startTime;
+    console.error(`❌ [WEEKLY-RECS] Proxy exception after ${totalTime}ms:`, error);
     return handleProxyException(error, 'Weekly recommendations', BACKEND_BASE);
   }
 }

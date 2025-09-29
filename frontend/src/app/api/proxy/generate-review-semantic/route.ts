@@ -3,10 +3,20 @@ import { SemanticGenerateReviewEngine, SemanticReviewRequest } from '@/lib/seman
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('🧠 [Semantic Generate Review] Starting semantic-enhanced review generation...');
-    
+    const startTime = Date.now();
+    console.log('🧠 [SEMANTIC-GEN-REVIEW] 🚀 Starting semantic-enhanced review generation...');
+
     const body = await request.json();
     const userId = request.headers.get('User-ID') || body.userId || 'default_user';
+
+    console.log('🧠 [SEMANTIC-GEN-REVIEW] 📝 Request details:', {
+      molecule: body.molecule?.substring(0, 50) + (body.molecule?.length > 50 ? '...' : ''),
+      userId: userId,
+      semantic_expansion: body.semantic_expansion,
+      domain_focus: body.domain_focus,
+      cross_domain_exploration: body.cross_domain_exploration,
+      fullTextOnly: body.fullTextOnly
+    });
     
     // Validate required fields
     if (!body.molecule) {

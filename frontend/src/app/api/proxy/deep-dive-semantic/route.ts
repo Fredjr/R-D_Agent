@@ -3,10 +3,20 @@ import { SemanticDeepDiveEngine, SemanticDeepDiveRequest } from '@/lib/semantic-
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('🔬 [Semantic Deep Dive] Starting semantic-enhanced deep dive analysis...');
-    
+    const startTime = Date.now();
+    console.log('🔬 [SEMANTIC-DEEP-DIVE] 🚀 Starting semantic-enhanced deep dive analysis...');
+
     const body = await request.json();
     const userId = request.headers.get('User-ID') || body.userId || 'default_user';
+
+    console.log('🔬 [SEMANTIC-DEEP-DIVE] 📝 Request details:', {
+      pmid: body.pmid,
+      title: body.title?.substring(0, 50) + (body.title?.length > 50 ? '...' : ''),
+      userId: userId,
+      semantic_context: body.semantic_context,
+      find_related_papers: body.find_related_papers,
+      cross_domain_analysis: body.cross_domain_analysis
+    });
     
     // Validate required fields
     if (!body.pmid && !body.title && !body.url) {
