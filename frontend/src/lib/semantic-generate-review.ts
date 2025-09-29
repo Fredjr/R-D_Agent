@@ -255,19 +255,51 @@ export class SemanticGenerateReviewEngine {
     // Call the backend generate-review endpoint directly
     const backendUrl = 'https://r-dagent-production.up.railway.app/generate-review';
 
-    const response = await fetch(backendUrl, {
+    console.log('🧠 [SEMANTIC-LIB] 🚀 Calling backend generate-review directly:', {
+      url: backendUrl,
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
+      payloadKeys: Object.keys(payload),
+      molecule: payload.molecule?.substring(0, 50) + '...'
     });
 
-    if (!response.ok) {
-      throw new Error(`Generate-review failed: ${response.status} ${response.statusText}`);
-    }
+    try {
+      const response = await fetch(backendUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
 
-    return await response.json();
+      console.log('🧠 [SEMANTIC-LIB] 📡 Backend response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('🧠 [SEMANTIC-LIB] ❌ Backend error response:', errorText);
+        throw new Error(`Generate-review failed: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('🧠 [SEMANTIC-LIB] ✅ Backend response parsed successfully:', {
+        hasResults: !!result?.results,
+        hasQueries: !!result?.queries,
+        resultCount: result?.results?.length || 0
+      });
+
+      return result;
+    } catch (error) {
+      console.error('🧠 [SEMANTIC-LIB] ❌ executeTraditionalReview error:', {
+        error: error.message,
+        stack: error.stack,
+        backendUrl: backendUrl
+      });
+      throw error;
+    }
   }
 
   /**
