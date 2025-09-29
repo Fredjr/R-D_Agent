@@ -350,6 +350,33 @@ class ArticleCollection(Base):
         Index('idx_unique_article_collection', 'collection_id', 'article_pmid', 'article_url', unique=True),
     )
 
+class BackgroundJob(Base):
+    """Background job tracking for long-running processes"""
+    __tablename__ = "background_jobs"
+
+    job_id = Column(String, primary_key=True)  # UUID
+    job_type = Column(String, nullable=False)  # 'generate_review', 'deep_dive'
+    user_id = Column(String, ForeignKey("users.user_id"), nullable=False)
+    project_id = Column(String, ForeignKey("projects.project_id"), nullable=False)
+    status = Column(String, nullable=False, default="pending")  # pending, processing, completed, failed
+    input_data = Column(JSON, nullable=False)  # Original request parameters
+    result_id = Column(String, nullable=True)  # ID of the created result (report_id or analysis_id)
+    error_message = Column(Text, nullable=True)
+    progress_percentage = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    user = relationship("User")
+    project = relationship("Project")
+
+    # Indexes
+    __table_args__ = (
+        Index('ix_background_jobs_user_status', 'user_id', 'status'),
+        Index('ix_background_jobs_project_status', 'project_id', 'status'),
+    )
+
 class Article(Base):
     """Centralized article storage with citation relationships"""
     __tablename__ = "articles"
