@@ -394,18 +394,30 @@ class SpotifyInspiredRecommendationsService:
                         user_profile, available_papers
                     )
 
-                    # Use AI recommendations if successful
-                    raw_recommendations = {
-                        "papers_for_you": ai_result.get("papers_for_you", []),
-                        "trending_in_field": ai_result.get("trending", []),
-                        "cross_pollination": ai_result.get("cross_pollination", []),
-                        "citation_opportunities": ai_result.get("citation_opportunities", [])
-                    }
+                    # Check if AI agents actually returned useful results
+                    total_ai_papers = (
+                        len(ai_result.get("papers_for_you", [])) +
+                        len(ai_result.get("trending", [])) +
+                        len(ai_result.get("cross_pollination", [])) +
+                        len(ai_result.get("citation_opportunities", []))
+                    )
 
-                    # Apply global deduplication across all recommendation types
-                    recommendations = self._apply_global_deduplication(raw_recommendations)
+                    if total_ai_papers > 0:
+                        # Use AI recommendations if successful
+                        raw_recommendations = {
+                            "papers_for_you": ai_result.get("papers_for_you", []),
+                            "trending_in_field": ai_result.get("trending", []),
+                            "cross_pollination": ai_result.get("cross_pollination", []),
+                            "citation_opportunities": ai_result.get("citation_opportunities", [])
+                        }
 
-                    logger.info(f"✅ AI-enhanced recommendations generated for user {user_id}")
+                        # Apply global deduplication across all recommendation types
+                        recommendations = self._apply_global_deduplication(raw_recommendations)
+
+                        logger.info(f"✅ AI-enhanced recommendations generated for user {user_id} ({total_ai_papers} total papers)")
+                    else:
+                        logger.warning(f"⚠️ AI agents returned empty results, falling back to traditional methods")
+                        raise Exception("AI agents returned no papers, using fallback")
 
                     # 🧠 SEMANTIC ANALYSIS ENHANCEMENT FOR AI RECOMMENDATIONS
                     logger.info("🧠 Enhancing AI recommendations with semantic analysis...")
@@ -435,13 +447,26 @@ class SpotifyInspiredRecommendationsService:
 
                 except Exception as e:
                     logger.warning(f"⚠️ AI agents failed, falling back to traditional method: {e}")
-                    # Fallback to traditional methods
-                    recommendations = {
+                    # Fallback to traditional methods with proper structure extraction
+                    raw_method_results = {
                         "papers_for_you": await self._generate_papers_for_you(user_profile, db),
                         "trending_in_field": await self._generate_trending_in_field(user_profile, db),
                         "cross_pollination": await self._generate_cross_pollination(user_profile, db),
                         "citation_opportunities": await self._generate_citation_opportunities(user_profile, db)
                     }
+
+                    # Extract papers arrays from method results (methods return {title, papers, updated})
+                    raw_recommendations = {}
+                    for category, method_result in raw_method_results.items():
+                        if isinstance(method_result, dict) and "papers" in method_result:
+                            raw_recommendations[category] = method_result["papers"]
+                            logger.info(f"📄 {category}: Extracted {len(method_result['papers'])} papers from fallback method result")
+                        else:
+                            raw_recommendations[category] = []
+                            logger.warning(f"⚠️ {category}: Fallback method result has unexpected structure: {type(method_result)}")
+
+                    # Apply global deduplication across all recommendation types
+                    recommendations = self._apply_global_deduplication(raw_recommendations)
             else:
                 # Traditional recommendation methods
                 raw_method_results = {
