@@ -101,8 +101,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
 ) {
+  const startTime = Date.now();
   try {
-    const startTime = Date.now();
     const resolvedParams = await params;
     const { userId } = resolvedParams;
     console.log('🎵 [WEEKLY-RECS] 🚀 Processing request for user:', userId);
