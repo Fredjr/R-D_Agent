@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { NotificationCenter } from "@/components/NotificationCenter";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -33,6 +34,10 @@ export default function RootLayout({
       >
         <AuthProvider>
           {children}
+          {/* Global Notification Center - positioned fixed */}
+          <div className="fixed top-4 right-4 z-50">
+            <NotificationCenter />
+          </div>
         </AuthProvider>
       </body>
     </html>
