@@ -1142,8 +1142,9 @@ class SpotifyInspiredRecommendationsService:
             # NEVER use fallback - always generate personalized recommendations
             # If no primary domains, use intelligent defaults based on user context
             if not primary_domains or primary_domains == ["general research"]:
-                primary_domains = ["medicine", "biology", "pharmacology", "machine learning"]
-                logger.info(f"💡 Using intelligent default domains: {primary_domains}")
+                # PAPERS FOR YOU: Focus on diverse, high-quality recent research
+                primary_domains = ["medicine", "biology", "neuroscience", "genetics"]
+                logger.info(f"💡 Papers-for-You: Using personalized default domains: {primary_domains}")
 
             # Enhanced domain keyword mapping for better personalization
             domain_keywords = {
@@ -1167,15 +1168,15 @@ class SpotifyInspiredRecommendationsService:
                 keywords = domain_keywords.get(domain.lower(), [domain])
                 logger.info(f"💡 Processing domain '{domain}' with keywords: {keywords}")
 
-                # Strategy 1: Recent high-quality papers in domain
+                # Strategy 1: PERSONALIZED - High-quality established papers (last 4 years)
                 for keyword in keywords[:3]:
                     domain_papers = db.query(Article).filter(
                         or_(
                             Article.title.ilike(f'%{keyword}%'),
                             Article.abstract.ilike(f'%{keyword}%')
                         ),
-                        Article.publication_year >= datetime.now(timezone.utc).year - 3,  # Recent papers
-                        Article.citation_count > 5,  # Quality threshold
+                        Article.publication_year >= datetime.now(timezone.utc).year - 4,  # Slightly older for quality
+                        Article.citation_count > 20,  # Higher quality threshold
                         Article.title.isnot(None),
                         Article.title != "",
                         ~Article.title.like("Citation Article%"),
@@ -1343,8 +1344,9 @@ class SpotifyInspiredRecommendationsService:
 
             # If no primary domains, use fallback domains
             if not primary_domains or primary_domains == ["general research"]:
-                primary_domains = ["medicine", "biology", "pharmacology", "machine learning"]
-                logger.info(f"🔥 Using fallback domains for trending: {primary_domains}")
+                # TRENDING: Focus on hot topics and emerging fields
+                primary_domains = ["artificial intelligence", "immunology", "cancer research", "climate science"]
+                logger.info(f"🔥 Trending: Using hot topic domains: {primary_domains}")
 
             # Enhanced domain keyword mapping for better search
             domain_keywords = {
@@ -1370,15 +1372,15 @@ class SpotifyInspiredRecommendationsService:
 
                 logger.info(f"🔥 Processing domain '{domain}' with keywords: {keywords}")
 
-                # Strategy 1: Recent high-citation papers (last 3 years)
+                # Strategy 1: TRENDING - Very recent papers (last 2 years) with good citation velocity
                 for keyword in keywords[:3]:  # Try top 3 keywords
                     trending_papers = db.query(Article).filter(
                         or_(
                             Article.title.ilike(f'%{keyword}%'),
                             Article.abstract.ilike(f'%{keyword}%')
                         ),
-                        Article.publication_year >= datetime.now(timezone.utc).year - 3,
-                        Article.citation_count > 10,  # Higher threshold for recent papers
+                        Article.publication_year >= datetime.now(timezone.utc).year - 2,  # More recent for trending
+                        Article.citation_count > 5,  # Lower threshold but more recent
                         Article.title.isnot(None),
                         Article.title != "",
                         ~Article.title.like("Citation Article%"),
@@ -1535,8 +1537,9 @@ class SpotifyInspiredRecommendationsService:
 
             # If no primary domains, use fallback domains for cross-pollination
             if not primary_domains or primary_domains == ["general research"]:
-                primary_domains = ["medicine", "biology", "pharmacology"]
-                logger.info(f"🔬 Using fallback domains for cross-pollination: {primary_domains}")
+                # CROSS-POLLINATION: Focus on interdisciplinary connections
+                primary_domains = ["bioengineering", "computational biology", "digital health"]
+                logger.info(f"🔬 Cross-pollination: Using interdisciplinary domains: {primary_domains}")
 
             # Find papers at the intersection of user's domains and adjacent fields
             for primary_domain in primary_domains[:3]:  # Increased from 2 to 3
