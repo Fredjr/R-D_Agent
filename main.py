@@ -4377,7 +4377,9 @@ async def health_check():
         "status": "healthy",
         "service": "R&D Agent Backend",
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "1.0"
+        "version": "1.1-enhanced-limits",
+        "deployment_date": "2025-09-29",
+        "features": ["increased_recommendation_limits", "author_fixes", "citation_opportunities"]
     }
 
 @app.get("/debug/llm-status")
