@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
         saveHeaders['User-ID'] = userId;
       }
 
-      const saveResponse = await fetch(`${BACKEND_URL.replace('r-dagent-production.up.railway.app', 'frontend-psi-seven-85.vercel.app')}/api/proxy/generate-review-analyses`, {
+      const saveResponse = await fetch(`${BACKEND_URL}/generate-review-analyses`, {
         method: 'POST',
         headers: saveHeaders,
         body: JSON.stringify(analysisData),

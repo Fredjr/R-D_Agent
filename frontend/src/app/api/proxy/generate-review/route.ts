@@ -83,11 +83,8 @@ async function forwardGenerateReviewRequest(req: Request) {
         fullTextOnly: requestBody.fullTextOnly
       };
 
-      // Save to database via the new generate-review-analyses endpoint
-      const baseUrl = req.url.split('/api/proxy/generate-review')[0];
-      const saveUrl = `${baseUrl}/api/proxy/generate-review-analyses`;
-
-      const saveResponse = await fetch(saveUrl, {
+      // Save to database via the backend generate-review-analyses endpoint
+      const saveResponse = await fetch(`${BACKEND_BASE}/generate-review-analyses`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
