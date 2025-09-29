@@ -8,7 +8,7 @@ import os
 import sys
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.orm import sessionmaker
-from database import Base, User, Project, Dossier, DeepDiveAnalysis, Annotation, Report, ProjectCollaborator
+from database import Base, User, Project, DeepDiveAnalysis, Annotation, Report, ProjectCollaborator, BackgroundJob
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -96,7 +96,7 @@ def verify_database_schema(engine):
     inspector = inspect(engine)
     
     # Check required tables
-    required_tables = ["users", "projects", "dossiers", "deep_dive_analyses", "annotations", "reports"]
+    required_tables = ["users", "projects", "deep_dive_analyses", "annotations", "reports", "background_jobs"]
     
     print("\n📋 Database Schema Verification:")
     print("=" * 50)
