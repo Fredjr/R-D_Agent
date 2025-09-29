@@ -12729,6 +12729,333 @@ async def test_semantic_analysis():
         raise HTTPException(status_code=500, detail=f"Test analysis failed: {str(e)}")
 
 # =============================================================================
+# PERSISTENCE LAYER ENDPOINTS - GLOBAL ANALYSES ACCESS
+# =============================================================================
+
+@app.get("/deep-dive-analyses")
+async def get_all_deep_dive_analyses(
+    user_id: str = Query(..., description="User ID to filter analyses"),
+    limit: int = Query(50, ge=1, le=200, description="Maximum number of analyses to return"),
+    offset: int = Query(0, ge=0, description="Number of analyses to skip"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all deep dive analyses for a user across all projects
+    """
+    try:
+        logger.info(f"🔍 [Global Deep Dive Analyses] Fetching analyses for user: {user_id}")
+
+        # Query all deep dive analyses for the user
+        analyses = db.query(DeepDiveAnalysis).filter(
+            DeepDiveAnalysis.created_by == user_id
+        ).order_by(
+            DeepDiveAnalysis.created_at.desc()
+        ).offset(offset).limit(limit).all()
+
+        # Convert to response format
+        analyses_data = []
+        for analysis in analyses:
+            analysis_data = {
+                "analysis_id": analysis.id,
+                "id": analysis.id,
+                "pmid": analysis.pmid,
+                "title": analysis.title,
+                "objective": analysis.objective,
+                "project_id": analysis.project_id,
+                "created_by": analysis.created_by,
+                "created_at": analysis.created_at.isoformat() if analysis.created_at else None,
+                "updated_at": analysis.updated_at.isoformat() if analysis.updated_at else None,
+                "processing_status": analysis.processing_status,
+                "has_results": bool(analysis.results),
+                "results_summary": {
+                    "has_model_analysis": bool(analysis.results and "model_analysis" in str(analysis.results)),
+                    "has_methods_analysis": bool(analysis.results and "methods_analysis" in str(analysis.results)),
+                    "has_results_analysis": bool(analysis.results and "results_analysis" in str(analysis.results))
+                } if analysis.results else None
+            }
+            analyses_data.append(analysis_data)
+
+        logger.info(f"🔍 [Global Deep Dive Analyses] Found {len(analyses_data)} analyses for user: {user_id}")
+
+        return {
+            "analyses": analyses_data,
+            "total": len(analyses_data),
+            "limit": limit,
+            "offset": offset,
+            "user_id": user_id
+        }
+
+    except Exception as e:
+        logger.error(f"🔍 [Global Deep Dive Analyses] Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch deep dive analyses: {str(e)}")
+
+@app.post("/deep-dive-analyses")
+async def create_global_deep_dive_analysis(
+    analysis_data: dict,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new deep dive analysis (global endpoint)
+    """
+    try:
+        logger.info(f"🔍 [Global Deep Dive Analyses] Creating analysis for user: {user_id}")
+
+        # Create new analysis record
+        analysis = DeepDiveAnalysis(
+            id=str(uuid.uuid4()),
+            pmid=analysis_data.get("pmid"),
+            title=analysis_data.get("title"),
+            objective=analysis_data.get("objective"),
+            project_id=analysis_data.get("project_id", "default"),
+            created_by=user_id,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+            processing_status="completed",
+            results=analysis_data.get("results")
+        )
+
+        db.add(analysis)
+        db.commit()
+        db.refresh(analysis)
+
+        logger.info(f"🔍 [Global Deep Dive Analyses] Created analysis: {analysis.id}")
+
+        return {
+            "analysis_id": analysis.id,
+            "id": analysis.id,
+            "pmid": analysis.pmid,
+            "title": analysis.title,
+            "objective": analysis.objective,
+            "project_id": analysis.project_id,
+            "created_by": analysis.created_by,
+            "created_at": analysis.created_at.isoformat(),
+            "processing_status": analysis.processing_status,
+            "saved_to_database": True
+        }
+
+    except Exception as e:
+        logger.error(f"🔍 [Global Deep Dive Analyses] Error creating analysis: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create deep dive analysis: {str(e)}")
+
+@app.get("/generate-review-analyses")
+async def get_all_generate_review_analyses(
+    user_id: str = Query(..., description="User ID to filter analyses"),
+    limit: int = Query(50, ge=1, le=200, description="Maximum number of analyses to return"),
+    offset: int = Query(0, ge=0, description="Number of analyses to skip"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all generate review analyses for a user across all projects
+    """
+    try:
+        logger.info(f"📝 [Global Generate Review Analyses] Fetching analyses for user: {user_id}")
+
+        # Query all reports (generate review analyses) for the user
+        reports = db.query(Report).filter(
+            Report.created_by == user_id
+        ).order_by(
+            Report.created_at.desc()
+        ).offset(offset).limit(limit).all()
+
+        # Convert to response format
+        analyses_data = []
+        for report in reports:
+            analysis_data = {
+                "analysis_id": report.id,
+                "id": report.id,
+                "review_id": report.id,
+                "molecule": report.molecule,
+                "objective": report.objective,
+                "project_id": report.project_id,
+                "created_by": report.created_by,
+                "created_at": report.created_at.isoformat() if report.created_at else None,
+                "updated_at": report.updated_at.isoformat() if report.updated_at else None,
+                "processing_status": report.processing_status,
+                "has_results": bool(report.content),
+                "results_summary": {
+                    "has_content": bool(report.content),
+                    "content_length": len(str(report.content)) if report.content else 0,
+                    "has_papers": bool(report.content and "papers" in str(report.content))
+                } if report.content else None
+            }
+            analyses_data.append(analysis_data)
+
+        logger.info(f"📝 [Global Generate Review Analyses] Found {len(analyses_data)} analyses for user: {user_id}")
+
+        return {
+            "analyses": analyses_data,
+            "total": len(analyses_data),
+            "limit": limit,
+            "offset": offset,
+            "user_id": user_id
+        }
+
+    except Exception as e:
+        logger.error(f"📝 [Global Generate Review Analyses] Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch generate review analyses: {str(e)}")
+
+@app.post("/generate-review-analyses")
+async def create_global_generate_review_analysis(
+    analysis_data: dict,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new generate review analysis (global endpoint)
+    """
+    try:
+        logger.info(f"📝 [Global Generate Review Analyses] Creating analysis for user: {user_id}")
+
+        # Create new report record
+        report = Report(
+            id=str(uuid.uuid4()),
+            molecule=analysis_data.get("molecule"),
+            objective=analysis_data.get("objective"),
+            project_id=analysis_data.get("project_id", "default"),
+            created_by=user_id,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+            processing_status="completed",
+            content=analysis_data.get("results") or analysis_data.get("content")
+        )
+
+        db.add(report)
+        db.commit()
+        db.refresh(report)
+
+        logger.info(f"📝 [Global Generate Review Analyses] Created analysis: {report.id}")
+
+        return {
+            "analysis_id": report.id,
+            "id": report.id,
+            "review_id": report.id,
+            "molecule": report.molecule,
+            "objective": report.objective,
+            "project_id": report.project_id,
+            "created_by": report.created_by,
+            "created_at": report.created_at.isoformat(),
+            "processing_status": report.processing_status,
+            "saved_to_database": True
+        }
+
+    except Exception as e:
+        logger.error(f"📝 [Global Generate Review Analyses] Error creating analysis: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create generate review analysis: {str(e)}")
+
+@app.get("/pubmed/details/{pmid}")
+async def get_pubmed_paper_details(
+    pmid: str,
+    user_id: str = Header(..., alias="User-ID")
+):
+    """
+    Get detailed information about a PubMed paper by PMID
+    """
+    try:
+        logger.info(f"📄 [PubMed Details] Fetching details for PMID: {pmid}")
+
+        # Use the existing PubMed search tool to get paper details
+        pubmed_tool = PubMedSearchTool()
+
+        # Search for the specific PMID
+        search_results = pubmed_tool._run(f"PMID:{pmid}")
+
+        if not search_results or "No results found" in search_results:
+            raise HTTPException(status_code=404, detail=f"Paper with PMID {pmid} not found")
+
+        # Parse the results to extract paper details
+        paper_details = {
+            "pmid": pmid,
+            "title": "Unknown",
+            "abstract": "Not available",
+            "authors": [],
+            "journal": "Unknown",
+            "publication_date": None,
+            "doi": None,
+            "raw_data": search_results
+        }
+
+        # Try to extract structured information from the search results
+        if isinstance(search_results, str):
+            lines = search_results.split('\n')
+            for line in lines:
+                if line.startswith('Title:'):
+                    paper_details["title"] = line.replace('Title:', '').strip()
+                elif line.startswith('Abstract:'):
+                    paper_details["abstract"] = line.replace('Abstract:', '').strip()
+                elif line.startswith('Authors:'):
+                    authors_str = line.replace('Authors:', '').strip()
+                    paper_details["authors"] = [author.strip() for author in authors_str.split(',')]
+                elif line.startswith('Journal:'):
+                    paper_details["journal"] = line.replace('Journal:', '').strip()
+                elif line.startswith('DOI:'):
+                    paper_details["doi"] = line.replace('DOI:', '').strip()
+
+        logger.info(f"📄 [PubMed Details] Successfully fetched details for PMID: {pmid}")
+
+        return {
+            "pmid": pmid,
+            "paper_details": paper_details,
+            "status": "success",
+            "user_id": user_id
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"📄 [PubMed Details] Error fetching PMID {pmid}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch PubMed details: {str(e)}")
+
+@app.post("/pubmed/details/{pmid}")
+async def get_enhanced_pubmed_paper_details(
+    pmid: str,
+    request_data: dict,
+    user_id: str = Header(..., alias="User-ID")
+):
+    """
+    Get enhanced detailed information about a PubMed paper with additional options
+    """
+    try:
+        logger.info(f"📄 [Enhanced PubMed Details] Fetching enhanced details for PMID: {pmid}")
+
+        # Get basic details first
+        basic_response = await get_pubmed_paper_details(pmid, user_id)
+
+        # Add enhanced features based on request options
+        enhanced_details = basic_response["paper_details"]
+
+        if request_data.get("include_citations", False):
+            enhanced_details["citations_note"] = "Citation data would be fetched from external APIs"
+
+        if request_data.get("include_references", False):
+            enhanced_details["references_note"] = "Reference data would be fetched from external APIs"
+
+        if request_data.get("validate_title_pmid", False):
+            # Validate that the title matches the PMID
+            expected_title = request_data.get("expected_title", "")
+            actual_title = enhanced_details.get("title", "")
+            enhanced_details["title_validation"] = {
+                "expected": expected_title,
+                "actual": actual_title,
+                "matches": expected_title.lower() in actual_title.lower() if expected_title else True
+            }
+
+        logger.info(f"📄 [Enhanced PubMed Details] Successfully fetched enhanced details for PMID: {pmid}")
+
+        return {
+            "pmid": pmid,
+            "paper_details": enhanced_details,
+            "status": "success",
+            "enhanced": True,
+            "user_id": user_id,
+            "request_options": request_data
+        }
+
+    except Exception as e:
+        logger.error(f"📄 [Enhanced PubMed Details] Error fetching PMID {pmid}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch enhanced PubMed details: {str(e)}")
+
+# =============================================================================
 # MESH AUTOCOMPLETE ENDPOINTS
 # =============================================================================
 
