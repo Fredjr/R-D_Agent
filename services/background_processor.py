@@ -63,23 +63,28 @@ class BackgroundProcessor:
         job_id = str(uuid.uuid4())
         
         # Create job record in database
-        with next(get_db()) as db:
-            job_record = BackgroundJob(
-                job_id=job_id,
-                job_type=JobType.GENERATE_REVIEW.value,
-                user_id=user_id,
-                project_id=project_id,
-                status=JobStatus.PENDING.value,
-                input_data={
-                    "molecule": molecule,
-                    "objective": objective,
-                    "max_results": max_results,
-                    **kwargs
-                },
-                created_at=datetime.utcnow()
-            )
-            db.add(job_record)
-            db.commit()
+        try:
+            with next(get_db()) as db:
+                job_record = BackgroundJob(
+                    job_id=job_id,
+                    job_type=JobType.GENERATE_REVIEW.value,
+                    user_id=user_id,
+                    project_id=project_id,
+                    status=JobStatus.PENDING.value,
+                    input_data={
+                        "molecule": molecule,
+                        "objective": objective,
+                        "max_results": max_results,
+                        **kwargs
+                    },
+                    created_at=datetime.utcnow()
+                )
+                db.add(job_record)
+                db.commit()
+                logger.info(f"Created database record for job {job_id}")
+        except Exception as e:
+            logger.warning(f"Failed to create database record for job {job_id}: {e}")
+            # Continue without database record for now
         
         # Start background task
         task = asyncio.create_task(
@@ -109,22 +114,27 @@ class BackgroundProcessor:
         job_id = str(uuid.uuid4())
         
         # Create job record in database
-        with next(get_db()) as db:
-            job_record = BackgroundJob(
-                job_id=job_id,
-                job_type=JobType.DEEP_DIVE.value,
-                user_id=user_id,
-                project_id=project_id,
-                status=JobStatus.PENDING.value,
-                input_data={
-                    "pmid": pmid,
-                    "article_title": article_title,
-                    **kwargs
-                },
-                created_at=datetime.utcnow()
-            )
-            db.add(job_record)
-            db.commit()
+        try:
+            with next(get_db()) as db:
+                job_record = BackgroundJob(
+                    job_id=job_id,
+                    job_type=JobType.DEEP_DIVE.value,
+                    user_id=user_id,
+                    project_id=project_id,
+                    status=JobStatus.PENDING.value,
+                    input_data={
+                        "pmid": pmid,
+                        "article_title": article_title,
+                        **kwargs
+                    },
+                    created_at=datetime.utcnow()
+                )
+                db.add(job_record)
+                db.commit()
+                logger.info(f"Created database record for job {job_id}")
+        except Exception as e:
+            logger.warning(f"Failed to create database record for job {job_id}: {e}")
+            # Continue without database record for now
         
         # Start background task
         task = asyncio.create_task(
