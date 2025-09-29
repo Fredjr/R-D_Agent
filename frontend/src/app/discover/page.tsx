@@ -332,11 +332,11 @@ function DiscoverPageContent() {
     setRefreshing(false);
   };
 
-  // Fetch semantic recommendations for the 3 sections
+  // Fetch semantic recommendations for the 3 sections using real APIs
   const fetchSemanticRecommendations = async () => {
     if (!user?.email) return;
 
-    console.log('🧠 Fetching semantic recommendations...');
+    console.log('🧠 Fetching real semantic recommendations for user:', user.email);
 
     // Set loading states
     setSemanticRecommendations(prev => ({
@@ -345,56 +345,80 @@ function DiscoverPageContent() {
       personalized: { ...prev.personalized, loading: true }
     }));
 
+    // Fetch all three types in parallel using real recommendation APIs
     try {
-      // For now, use demo data until semantic API endpoints are ready
-      const demoSemanticPapers = [
-        {
-          pmid: "semantic_001",
-          title: "Cross-Domain Applications of Machine Learning in Biological Systems",
-          authors: ["Chen, L.", "Rodriguez, M.", "Kim, S."],
-          journal: "Nature Machine Intelligence",
-          year: 2024,
-          citation_count: 89,
-          relevance_score: 0.88,
-          reason: "Bridges machine learning and biology domains",
-          category: "Cross-Domain",
-          semantic_analysis: {
-            methodology: 'computational',
-            complexity_score: 0.75,
-            novelty_type: 'breakthrough',
-            research_domains: ['machine_learning', 'biology', 'computer_science'],
-            technical_terms: ['neural networks', 'protein folding', 'deep learning']
-          }
-        }
-      ];
+      const [crossDomainResponse, trendingResponse, personalizedResponse] = await Promise.allSettled([
+        // Cross-Domain: Use cross-pollination API (integrates with search history)
+        fetch(`/api/proxy/recommendations/cross-pollination/${user.email}`, {
+          headers: { 'User-ID': user.email, 'Content-Type': 'application/json' }
+        }),
+        // Trending: Use trending API (integrates with search history)
+        fetch(`/api/proxy/recommendations/trending/${user.email}`, {
+          headers: { 'User-ID': user.email, 'Content-Type': 'application/json' }
+        }),
+        // Personalized: Use papers-for-you API (integrates with search history)
+        fetch(`/api/proxy/recommendations/papers-for-you/${user.email}`, {
+          headers: { 'User-ID': user.email, 'Content-Type': 'application/json' }
+        })
+      ]);
+
+      // Process cross-domain results
+      let crossDomainPapers = [];
+      if (crossDomainResponse.status === 'fulfilled' && crossDomainResponse.value.ok) {
+        const crossDomainData = await crossDomainResponse.value.json();
+        crossDomainPapers = crossDomainData.papers || crossDomainData.recommendations || [];
+        console.log('✅ Cross-domain recommendations loaded:', crossDomainPapers.length);
+      } else {
+        console.warn('⚠️ Cross-domain recommendations failed, using fallback');
+      }
+
+      // Process trending results
+      let trendingPapers = [];
+      if (trendingResponse.status === 'fulfilled' && trendingResponse.value.ok) {
+        const trendingData = await trendingResponse.value.json();
+        trendingPapers = trendingData.papers || trendingData.recommendations || [];
+        console.log('✅ Trending recommendations loaded:', trendingPapers.length);
+      } else {
+        console.warn('⚠️ Trending recommendations failed, using fallback');
+      }
+
+      // Process personalized results
+      let personalizedPapers = [];
+      if (personalizedResponse.status === 'fulfilled' && personalizedResponse.value.ok) {
+        const personalizedData = await personalizedResponse.value.json();
+        personalizedPapers = personalizedData.papers || personalizedData.recommendations || [];
+        console.log('✅ Personalized recommendations loaded:', personalizedPapers.length);
+      } else {
+        console.warn('⚠️ Personalized recommendations failed, using fallback');
+      }
 
       setSemanticRecommendations({
         crossDomain: {
-          papers: demoSemanticPapers,
+          papers: crossDomainPapers,
           loading: false,
-          error: null
+          error: crossDomainPapers.length === 0 ? 'No cross-domain recommendations available' : null
         },
         trending: {
-          papers: demoSemanticPapers,
+          papers: trendingPapers,
           loading: false,
-          error: null
+          error: trendingPapers.length === 0 ? 'No trending recommendations available' : null
         },
         personalized: {
-          papers: demoSemanticPapers,
+          papers: personalizedPapers,
           loading: false,
-          error: null
+          error: personalizedPapers.length === 0 ? 'No personalized recommendations available' : null
         }
       });
 
-      console.log('✅ Semantic recommendations loaded (demo data)');
+      console.log('✅ All semantic recommendations loaded with real APIs');
 
     } catch (error) {
       console.error('❌ Error fetching semantic recommendations:', error);
 
       setSemanticRecommendations(prev => ({
-        crossDomain: { ...prev.crossDomain, loading: false, error: 'Failed to load' },
-        trending: { ...prev.trending, loading: false, error: 'Failed to load' },
-        personalized: { ...prev.personalized, loading: false, error: 'Failed to load' }
+        crossDomain: { ...prev.crossDomain, loading: false, error: 'Failed to load cross-domain recommendations' },
+        trending: { ...prev.trending, loading: false, error: 'Failed to load trending recommendations' },
+        personalized: { ...prev.personalized, loading: false, error: 'Failed to load personalized recommendations' }
       }));
     }
   };
@@ -788,7 +812,8 @@ function DiscoverPageContent() {
           </div>
         </div>
 
-        {/* Semantic Discovery Interface */}
+        {/* Semantic Discovery Interface - REMOVED: Redundant with dedicated sections below */}
+        {/*
         <div className="mb-8 px-4 sm:px-6">
           <SemanticDiscoveryInterface
             activeMode={activeDiscoveryMode}
@@ -799,6 +824,7 @@ function DiscoverPageContent() {
             loading={loading}
           />
         </div>
+        */}
 
         {/* NEW: Semantic Recommendation Sections */}
         <div className="mb-8 px-4 sm:px-6">

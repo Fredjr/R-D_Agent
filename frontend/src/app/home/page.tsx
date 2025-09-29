@@ -95,43 +95,49 @@ export default function HomePage() {
   // Fetch semantic recommendations on component mount
   useEffect(() => {
     const fetchSemanticRecommendations = async () => {
+      if (!user?.email) return;
+
       try {
-        console.log('🏠 HOME: Fetching dynamic semantic recommendations...');
+        console.log('🏠 HOME: Fetching real semantic recommendations for user:', user.email);
 
-        // Add timestamp to make queries dynamic
-        const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+        // Fetch all three types in parallel using real recommendation APIs
+        const [crossDomainResponse, trendingResponse, personalizedResponse] = await Promise.allSettled([
+          // Cross-Domain: Use cross-pollination API (integrates with search history)
+          fetch(`/api/proxy/recommendations/cross-pollination/${user.email}`, {
+            headers: { 'User-ID': user.email, 'Content-Type': 'application/json' }
+          }),
+          // Trending: Use trending API (integrates with search history)
+          fetch(`/api/proxy/recommendations/trending/${user.email}`, {
+            headers: { 'User-ID': user.email, 'Content-Type': 'application/json' }
+          }),
+          // Personalized: Use papers-for-you API (integrates with search history)
+          fetch(`/api/proxy/recommendations/papers-for-you/${user.email}`, {
+            headers: { 'User-ID': user.email, 'Content-Type': 'application/json' }
+          })
+        ]);
 
-        // Fetch cross-domain recommendations with dynamic query
-        const crossDomainResults = await semanticEngine.performSemanticSearch({
-          query: `machine learning biomedical research drug discovery ${timestamp}`,
-          semantic_expansion: true,
-          domain_focus: ['machine learning', 'biomedical research'],
-          similarity_threshold: 0.3,
-          include_related_concepts: true,
-          max_results: 12 // Fetch more to show dynamic count
-        });
+        // Process cross-domain results
+        let crossDomainResults = [];
+        if (crossDomainResponse.status === 'fulfilled' && crossDomainResponse.value.ok) {
+          const crossDomainData = await crossDomainResponse.value.json();
+          crossDomainResults = crossDomainData.papers || crossDomainData.recommendations || [];
+        }
 
-        // Fetch trending recommendations with dynamic query
-        const trendingResults = await semanticEngine.performSemanticSearch({
-          query: `diabetes pharmacology clinical trials recent advances ${timestamp}`,
-          semantic_expansion: true,
-          domain_focus: ['diabetes', 'pharmacology'],
-          similarity_threshold: 0.3,
-          include_related_concepts: true,
-          max_results: 10 // Fetch more to show dynamic count
-        });
+        // Process trending results
+        let trendingResults = [];
+        if (trendingResponse.status === 'fulfilled' && trendingResponse.value.ok) {
+          const trendingData = await trendingResponse.value.json();
+          trendingResults = trendingData.papers || trendingData.recommendations || [];
+        }
 
-        // Fetch personalized recommendations with dynamic query
-        const personalizedResults = await semanticEngine.performSemanticSearch({
-          query: `clinical medicine nephrology kidney disease treatment ${timestamp}`,
-          semantic_expansion: true,
-          domain_focus: ['clinical medicine', 'nephrology'],
-          similarity_threshold: 0.3,
-          include_related_concepts: true,
-          max_results: 15 // Fetch more to show dynamic count
-        });
+        // Process personalized results
+        let personalizedResults = [];
+        if (personalizedResponse.status === 'fulfilled' && personalizedResponse.value.ok) {
+          const personalizedData = await personalizedResponse.value.json();
+          personalizedResults = personalizedData.papers || personalizedData.recommendations || [];
+        }
 
-        console.log('🏠 HOME: Semantic recommendations fetched:', {
+        console.log('🏠 HOME: Real semantic recommendations fetched:', {
           crossDomain: crossDomainResults.length,
           trending: trendingResults.length,
           personalized: personalizedResults.length
@@ -155,7 +161,7 @@ export default function HomePage() {
       }
     };
 
-    if (user) {
+    if (user?.email) {
       fetchSemanticRecommendations();
     }
   }, [user]);
