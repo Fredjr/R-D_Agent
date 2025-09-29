@@ -382,12 +382,15 @@ class SpotifyInspiredRecommendationsService:
                     )
 
                     # Use AI recommendations if successful
-                    recommendations = {
+                    raw_recommendations = {
                         "papers_for_you": ai_result.get("papers_for_you", []),
                         "trending_in_field": ai_result.get("trending", []),
                         "cross_pollination": ai_result.get("cross_pollination", []),
                         "citation_opportunities": ai_result.get("citation_opportunities", [])
                     }
+
+                    # Apply global deduplication across all recommendation types
+                    recommendations = self._apply_global_deduplication(raw_recommendations)
 
                     logger.info(f"✅ AI-enhanced recommendations generated for user {user_id}")
 
@@ -428,12 +431,15 @@ class SpotifyInspiredRecommendationsService:
                     }
             else:
                 # Traditional recommendation methods
-                recommendations = {
+                raw_recommendations = {
                     "papers_for_you": await self._generate_papers_for_you(user_profile, db),
                     "trending_in_field": await self._generate_trending_in_field(user_profile, db),
                     "cross_pollination": await self._generate_cross_pollination(user_profile, db),
                     "citation_opportunities": await self._generate_citation_opportunities(user_profile, db)
                 }
+
+                # Apply global deduplication across all recommendation types
+                recommendations = self._apply_global_deduplication(raw_recommendations)
 
             # 🧠 SEMANTIC ANALYSIS ENHANCEMENT
             logger.info("🧠 Enhancing recommendations with semantic analysis...")
@@ -1950,6 +1956,68 @@ class SpotifyInspiredRecommendationsService:
         score += base_score * 0.15
 
         return min(score, 1.0)
+
+    def _apply_global_deduplication(self, recommendations: Dict[str, Any]) -> Dict[str, Any]:
+        """Apply global deduplication across all recommendation types"""
+        try:
+            # Track seen PMIDs globally across all recommendation types
+            seen_pmids = set()
+            deduplicated = {}
+
+            # Process in priority order: Cross-pollination > Trending > Papers-for-you > Citation opportunities
+            # This ensures the most diverse content appears first
+            priority_order = ['cross_pollination', 'trending', 'papers_for_you', 'citation_opportunities']
+
+            for rec_type in priority_order:
+                if rec_type in recommendations and 'papers' in recommendations[rec_type]:
+                    original_papers = recommendations[rec_type]['papers']
+                    deduplicated_papers = []
+
+                    for paper in original_papers:
+                        pmid = paper.get('pmid')
+                        if pmid and pmid not in seen_pmids:
+                            deduplicated_papers.append(paper)
+                            seen_pmids.add(pmid)
+
+                    # Preserve the original structure but with deduplicated papers
+                    deduplicated[rec_type] = {
+                        **recommendations[rec_type],
+                        'papers': deduplicated_papers
+                    }
+                else:
+                    deduplicated[rec_type] = recommendations.get(rec_type, {'papers': []})
+
+            logger.info(f"🔄 Global deduplication completed. Removed {len([p for rec in recommendations.values() if 'papers' in rec for p in rec['papers']]) - len(seen_pmids)} duplicates")
+
+            return deduplicated
+
+        except Exception as e:
+            logger.error(f"Error in global deduplication: {e}")
+            return recommendations  # Return original if deduplication fails
+
+    def _get_deduplication_stats(self, original: Dict[str, Any], deduplicated: Dict[str, Any]) -> Dict[str, Any]:
+        """Get statistics about the deduplication process"""
+        try:
+            original_counts = {}
+            deduplicated_counts = {}
+
+            for rec_type in ['cross_pollination', 'trending', 'papers_for_you', 'citation_opportunities']:
+                original_counts[rec_type] = len(original.get(rec_type, {}).get('papers', []))
+                deduplicated_counts[rec_type] = len(deduplicated.get(rec_type, {}).get('papers', []))
+
+            total_original = sum(original_counts.values())
+            total_deduplicated = sum(deduplicated_counts.values())
+
+            return {
+                'original_counts': original_counts,
+                'deduplicated_counts': deduplicated_counts,
+                'total_duplicates_removed': total_original - total_deduplicated,
+                'deduplication_rate': (total_original - total_deduplicated) / total_original if total_original > 0 else 0
+            }
+
+        except Exception as e:
+            logger.error(f"Error calculating deduplication stats: {e}")
+            return {}
 
 # Global service instance
 _spotify_recommendations_service = None

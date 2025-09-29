@@ -180,6 +180,11 @@ export const useWeeklyMixIntegration = () => {
     trackDeepDive,
     trackBookmark,
 
+    // Weekly Mix Utilities
+    getLastUpdateTime: useCallback((queryType: string) => {
+      return weeklyMixAutomation.getLastUpdateTime(queryType);
+    }, []),
+
     // State
     isUserLoggedIn: !!user?.email
   };

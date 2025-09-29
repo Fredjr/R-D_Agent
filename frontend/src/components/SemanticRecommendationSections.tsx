@@ -39,22 +39,34 @@ interface SemanticSectionProps {
   onSeeAll?: (queryType: string) => void;
 }
 
-function SemanticSection({ 
-  title, 
-  description, 
-  icon: Icon, 
-  papers, 
-  queryType, 
+function SemanticSection({
+  title,
+  description,
+  icon: Icon,
+  papers,
+  queryType,
   loading = false,
   onPaperClick,
-  onSeeAll 
+  onSeeAll
 }: SemanticSectionProps) {
-  const { trackSemanticDiscovery, trackPaperView } = useWeeklyMixIntegration();
+  const { trackSemanticDiscovery, trackPaperView, getLastUpdateTime } = useWeeklyMixIntegration();
+  const [lastUpdated, setLastUpdated] = useState<string>('');
+
+  // Get last update time for this section type
+  useEffect(() => {
+    const updateTime = getLastUpdateTime(queryType);
+    if (updateTime) {
+      const timeAgo = formatTimeAgo(updateTime);
+      setLastUpdated(timeAgo);
+    } else {
+      setLastUpdated('Just now');
+    }
+  }, [queryType, getLastUpdateTime]);
 
   const handlePaperClick = (paper: SemanticPaper) => {
     // Track paper view for weekly mix
     trackPaperView(paper.pmid, paper.title, 'semantic_discovery', { queryType });
-    
+
     if (onPaperClick) {
       onPaperClick(paper);
     }
@@ -66,6 +78,22 @@ function SemanticSection({
 
     if (onSeeAll) {
       onSeeAll(queryType);
+    }
+  };
+
+  // Helper function to format time ago
+  const formatTimeAgo = (date: Date): string => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffDays > 0) {
+      return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    } else if (diffHours > 0) {
+      return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    } else {
+      return 'Just now';
     }
   };
 
@@ -105,6 +133,13 @@ function SemanticSection({
           <div>
             <h3 className="text-xl font-semibold text-gray-900">{title}</h3>
             <p className="text-sm text-gray-600">{description}</p>
+            {/* Weekly Mix Update Status */}
+            <div className="flex items-center space-x-2 mt-1">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-xs text-gray-500">
+                Updated {lastUpdated} • Weekly Mix Active
+              </span>
+            </div>
           </div>
         </div>
         
@@ -199,6 +234,66 @@ export default function SemanticRecommendationSections({
 }: SemanticRecommendationSectionsProps) {
   const { user } = useAuth();
   const [isInitialized, setIsInitialized] = useState(false);
+  const [deduplicatedSections, setDeduplicatedSections] = useState({
+    crossDomain: [] as SemanticPaper[],
+    trending: [] as SemanticPaper[],
+    personalized: [] as SemanticPaper[]
+  });
+
+  // Deduplicate papers across all sections to prevent duplicates
+  useEffect(() => {
+    const allPapers = [
+      ...crossDomainPapers.map(p => ({ ...p, originalSection: 'crossDomain' })),
+      ...trendingPapers.map(p => ({ ...p, originalSection: 'trending' })),
+      ...personalizedPapers.map(p => ({ ...p, originalSection: 'personalized' }))
+    ];
+
+    // Track seen PMIDs globally across all sections
+    const seenPmids = new Set<string>();
+    const deduplicatedCrossDomain: SemanticPaper[] = [];
+    const deduplicatedTrending: SemanticPaper[] = [];
+    const deduplicatedPersonalized: SemanticPaper[] = [];
+
+    // Process papers in priority order: Cross-Domain > Trending > Personalized
+    // This ensures the most diverse content appears first
+
+    // 1. Process Cross-Domain papers first (highest priority for diversity)
+    crossDomainPapers.forEach(paper => {
+      if (paper.pmid && !seenPmids.has(paper.pmid)) {
+        deduplicatedCrossDomain.push(paper);
+        seenPmids.add(paper.pmid);
+      }
+    });
+
+    // 2. Process Trending papers (medium priority)
+    trendingPapers.forEach(paper => {
+      if (paper.pmid && !seenPmids.has(paper.pmid)) {
+        deduplicatedTrending.push(paper);
+        seenPmids.add(paper.pmid);
+      }
+    });
+
+    // 3. Process Personalized papers (lowest priority, but still important)
+    personalizedPapers.forEach(paper => {
+      if (paper.pmid && !seenPmids.has(paper.pmid)) {
+        deduplicatedPersonalized.push(paper);
+        seenPmids.add(paper.pmid);
+      }
+    });
+
+    setDeduplicatedSections({
+      crossDomain: deduplicatedCrossDomain,
+      trending: deduplicatedTrending,
+      personalized: deduplicatedPersonalized
+    });
+
+    console.log('🔄 Deduplication Results:', {
+      original: { crossDomain: crossDomainPapers.length, trending: trendingPapers.length, personalized: personalizedPapers.length },
+      deduplicated: { crossDomain: deduplicatedCrossDomain.length, trending: deduplicatedTrending.length, personalized: deduplicatedPersonalized.length },
+      totalDuplicatesRemoved: allPapers.length - (deduplicatedCrossDomain.length + deduplicatedTrending.length + deduplicatedPersonalized.length)
+    });
+
+  }, [crossDomainPapers, trendingPapers, personalizedPapers]);
 
   useEffect(() => {
     // Initialize sections after component mount
@@ -216,7 +311,7 @@ export default function SemanticRecommendationSections({
         title="🌐 Cross-Domain Insights"
         description="Discover unexpected connections across research fields"
         icon={GlobeAltIcon}
-        papers={crossDomainPapers}
+        papers={deduplicatedSections.crossDomain}
         queryType="cross_domain"
         loading={loading}
         onPaperClick={onPaperClick}
@@ -228,7 +323,7 @@ export default function SemanticRecommendationSections({
         title="🔥 Trending Discoveries"
         description="Hot papers emerging in related research areas"
         icon={FireIcon}
-        papers={trendingPapers}
+        papers={deduplicatedSections.trending}
         queryType="trending_semantic"
         loading={loading}
         onPaperClick={onPaperClick}
@@ -240,7 +335,7 @@ export default function SemanticRecommendationSections({
         title="🎯 Semantic Matches"
         description="Papers semantically similar to your research interests"
         icon={SparklesIcon}
-        papers={personalizedPapers}
+        papers={deduplicatedSections.personalized}
         queryType="semantic_personalized"
         loading={loading}
         onPaperClick={onPaperClick}
