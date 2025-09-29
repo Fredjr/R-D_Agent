@@ -1932,6 +1932,11 @@ class SpotifyInspiredRecommendationsService:
                         if len(recommendations) >= 5:
                             break
 
+            # Debug: Log final results
+            logger.info(f"🔬 Cross-pollination: Final result - {len(recommendations)} papers")
+            if len(recommendations) < 3:
+                logger.warning(f"🔬 Cross-pollination: Low paper count. User domains: {primary_domains}, Used PMIDs: {len(global_used_pmids) if 'global_used_pmids' in locals() else 'unknown'}")
+
             return {
                 "title": "Cross-pollination",
                 "description": "Interdisciplinary discoveries at the intersection of your research",
@@ -2029,6 +2034,10 @@ class SpotifyInspiredRecommendationsService:
             recommendations.sort(key=lambda x: x["opportunity_score"], reverse=True)
 
             logger.info(f"💡 Citation Opportunities: Generated {len(recommendations)} recommendations with PMIDs: {[r['pmid'] for r in recommendations[:5]]}{'...' if len(recommendations) > 5 else ''}")
+
+            # Debug: Log why we might have few results
+            if len(recommendations) < 3:
+                logger.warning(f"💡 Citation Opportunities: Only {len(recommendations)} papers found. User domains: {primary_domains}, Used PMIDs: {len(global_used_pmids)}")
 
             return {
                 "title": "Citation Opportunities",
