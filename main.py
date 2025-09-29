@@ -12865,8 +12865,8 @@ async def get_all_generate_review_analyses(
                 "analysis_id": report.report_id,
                 "id": report.report_id,
                 "review_id": report.report_id,
-                "molecule": getattr(report, 'molecule', 'Unknown'),
-                "objective": getattr(report, 'objective', 'Generate review analysis'),
+                "molecule": report.title,
+                "objective": report.objective,
                 "project_id": report.project_id,
                 "created_by": report.created_by,
                 "created_at": report.created_at.isoformat() if report.created_at else None,
@@ -12911,7 +12911,7 @@ async def create_global_generate_review_analysis(
         report = Report(
             report_id=str(uuid.uuid4()),
             title=analysis_data.get("molecule", "Generate Review Analysis"),
-            query=analysis_data.get("objective", "Generate review analysis"),
+            objective=analysis_data.get("objective", "Generate review analysis"),
             project_id=analysis_data.get("project_id", "default"),
             created_by=user_id,
             created_at=datetime.utcnow(),
@@ -12930,7 +12930,7 @@ async def create_global_generate_review_analysis(
             "id": report.report_id,
             "review_id": report.report_id,
             "molecule": report.title,
-            "objective": report.query,
+            "objective": report.objective,
             "project_id": report.project_id,
             "created_by": report.created_by,
             "created_at": report.created_at.isoformat(),
@@ -13093,6 +13093,46 @@ async def get_project_generate_review_analyses(
     except Exception as e:
         logger.error(f"📝 [Project Generate Review] Error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch project generate review analyses: {str(e)}")
+
+@app.get("/projects/{project_id}/deep-dive-analyses")
+async def get_project_deep_dive_analyses_global(
+    project_id: str,
+    user_id: str = Header(..., alias="User-ID"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db)
+):
+    """Get deep dive analyses for a specific project (global endpoint)"""
+    try:
+        logger.info(f"🔬 [Project Deep Dive] Fetching analyses for project: {project_id}")
+
+        analyses = db.query(DeepDiveAnalysis).filter(
+            DeepDiveAnalysis.project_id == project_id,
+            DeepDiveAnalysis.created_by == user_id
+        ).order_by(DeepDiveAnalysis.created_at.desc()).offset(offset).limit(limit).all()
+
+        analyses_data = []
+        for analysis in analyses:
+            analysis_data = {
+                "analysis_id": analysis.analysis_id,
+                "id": analysis.analysis_id,
+                "pmid": analysis.article_pmid,
+                "title": analysis.article_title,
+                "objective": "Deep dive analysis",
+                "project_id": analysis.project_id,
+                "created_by": analysis.created_by,
+                "created_at": analysis.created_at.isoformat() if analysis.created_at else None,
+                "updated_at": analysis.updated_at.isoformat() if analysis.updated_at else None,
+                "processing_status": analysis.processing_status,
+                "has_results": bool(analysis.scientific_model_analysis or analysis.experimental_methods_analysis or analysis.results_interpretation_analysis)
+            }
+            analyses_data.append(analysis_data)
+
+        return {"analyses": analyses_data, "total": len(analyses_data), "project_id": project_id}
+
+    except Exception as e:
+        logger.error(f"🔬 [Project Deep Dive] Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch project deep dive analyses: {str(e)}")
 
 @app.get("/collections/{collection_id}/generate-review-analyses")
 async def get_collection_generate_review_analyses(
