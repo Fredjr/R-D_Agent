@@ -85,8 +85,9 @@ export async function POST(request: NextRequest) {
     console.log('🧠 [SEMANTIC-GEN-REVIEW] ✅ generateSemanticReview completed successfully');
     console.log('🧠 [SEMANTIC-GEN-REVIEW] 📊 Response structure:', {
       hasResults: !!semanticResponse?.results,
-      hasAnalysis: !!semanticResponse?.analysis,
-      hasSemanticEnhancements: !!semanticResponse?.semantic_enhancements,
+      hasSemanticAnalysis: !!semanticResponse?.semantic_analysis,
+      hasPersonalization: !!semanticResponse?.personalization,
+      hasContentQuality: !!semanticResponse?.content_quality,
       resultCount: semanticResponse?.results?.length || 0,
       responseKeys: Object.keys(semanticResponse || {})
     });
