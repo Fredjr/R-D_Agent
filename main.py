@@ -146,10 +146,11 @@ async def test_app():
 # WebSocket and Background Processing Endpoints
 # =============================================================================
 
-@app.websocket("/ws/{user_id}")
-async def websocket_notifications(websocket: WebSocket, user_id: str):
-    """WebSocket endpoint for real-time notifications"""
-    await websocket_endpoint(websocket, user_id)
+# TEMPORARILY DISABLED - Background processing WebSocket
+# @app.websocket("/ws/{user_id}")
+# async def websocket_notifications(websocket: WebSocket, user_id: str):
+#     """WebSocket endpoint for real-time notifications"""
+#     await websocket_endpoint(websocket, user_id)
 
 @app.post("/background-jobs/generate-review")
 async def start_background_generate_review(
