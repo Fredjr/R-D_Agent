@@ -144,8 +144,31 @@ class SpotifyInspiredRecommendationsService:
                     logger.info("📊 No subject area found, generating intelligent general recommendations")
                     return None  # This will trigger the normal fallback flow
 
-            # Extract research domains from user's articles
+            # Extract research domains from BOTH collection names AND article titles
             research_domains = set()
+
+            # PRIORITY 1: Analyze collection names (more reliable for domain detection)
+            logger.info(f"🔍 ANALYZING COLLECTION NAMES for domain detection...")
+            for collection in user_collections:
+                collection_text = f"{collection.collection_name} {collection.description or ''}".lower()
+                logger.info(f"🔍 Analyzing collection: '{collection.collection_name}'")
+
+                # Detect research domains from collection names
+                if any(term in collection_text for term in ['kidney', 'renal', 'nephrology', 'albuminuria']):
+                    research_domains.add('nephrology')
+                    logger.info(f"✅ DETECTED: nephrology from collection '{collection.collection_name}'")
+                if any(term in collection_text for term in ['diabetes', 'diabetic', 'glucose', 'insulin']):
+                    research_domains.add('diabetes')
+                    logger.info(f"✅ DETECTED: diabetes from collection '{collection.collection_name}'")
+                if any(term in collection_text for term in ['cardiovascular', 'heart', 'cardiac']):
+                    research_domains.add('cardiovascular')
+                    logger.info(f"✅ DETECTED: cardiovascular from collection '{collection.collection_name}'")
+                if any(term in collection_text for term in ['finerenone', 'mineralocorticoid', 'pharmacology']):
+                    research_domains.add('pharmacology')
+                    logger.info(f"✅ DETECTED: pharmacology from collection '{collection.collection_name}'")
+
+            # PRIORITY 2: Also analyze article titles (supplementary)
+            logger.info(f"🔍 ANALYZING ARTICLE TITLES for additional domains...")
             for article in user_articles:
                 title_lower = (article.article_title or "").lower()
 
@@ -164,7 +187,7 @@ class SpotifyInspiredRecommendationsService:
                     research_domains.add('clinical_medicine')
 
             research_domains = list(research_domains)
-            logger.info(f"🔬 Detected research domains: {research_domains}")
+            logger.info(f"🎯 FINAL DETECTED DOMAINS: {research_domains} (from collections + articles)")
 
             # Generate recommendations based on detected domains
             raw_recommendations = await self._generate_domain_based_recommendations(research_domains, db)
