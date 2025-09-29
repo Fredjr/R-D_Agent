@@ -13,7 +13,7 @@ from dataclasses import dataclass, asdict
 import logging
 from sqlalchemy.orm import Session
 from database import get_db, DeepDiveAnalysis, Report, BackgroundJob
-from services.ai_recommendations_service import AIRecommendationsService
+from services.ai_recommendations_service import SpotifyInspiredRecommendationsService
 from services.deep_dive_service import DeepDiveService
 
 logger = logging.getLogger(__name__)
@@ -158,7 +158,7 @@ class BackgroundProcessor:
             await self._update_job_status(job_id, JobStatus.PROCESSING)
             
             # Initialize AI service
-            ai_service = AIRecommendationsService()
+            ai_service = SpotifyInspiredRecommendationsService()
             
             # Process the review (this is the long-running operation)
             result = await ai_service.generate_comprehensive_review(

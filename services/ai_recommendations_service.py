@@ -407,6 +407,91 @@ class SpotifyInspiredRecommendationsService:
                 "citation_opportunities": await self._generate_fallback_recommendations(db, "citation_opportunities")
             }
 
+    async def generate_comprehensive_review(self, molecule: str, objective: str, max_results: int = 10, user_id: str = None, **kwargs) -> Dict[str, Any]:
+        """
+        Generate comprehensive review for background processing
+        This method provides compatibility with the background processor
+        """
+        try:
+            logger.info(f"🔬 Generating comprehensive review for molecule: {molecule}, objective: {objective}")
+
+            # Use the existing weekly recommendations system as a base
+            # but customize it for the specific molecule/objective
+            db_gen = get_db()
+            db = next(db_gen)
+
+            try:
+                # Build a custom user profile based on the molecule/objective
+                custom_profile = {
+                    "primary_domains": [molecule.lower(), objective.lower()],
+                    "topic_preferences": {molecule.lower(): 1.0, objective.lower(): 0.9},
+                    "activity_level": "high",
+                    "discovery_preference": "comprehensive",
+                    "collaboration_score": 0.8
+                }
+
+                # Generate recommendations using existing methods
+                used_pmids = set()
+
+                # Generate papers focused on the molecule/objective
+                papers_for_review = await self._generate_papers_for_you(custom_profile, db, used_pmids)
+                trending_papers = await self._generate_trending_in_field(custom_profile, db, used_pmids)
+                cross_domain_papers = await self._generate_cross_pollination(custom_profile, db, used_pmids)
+                citation_papers = await self._generate_citation_opportunities(custom_profile, db, used_pmids)
+
+                # Combine all papers into a comprehensive review
+                all_papers = []
+                if papers_for_review.get("papers"):
+                    all_papers.extend(papers_for_review["papers"][:max_results//4])
+                if trending_papers.get("papers"):
+                    all_papers.extend(trending_papers["papers"][:max_results//4])
+                if cross_domain_papers.get("papers"):
+                    all_papers.extend(cross_domain_papers["papers"][:max_results//4])
+                if citation_papers.get("papers"):
+                    all_papers.extend(citation_papers["papers"][:max_results//4])
+
+                # Limit to max_results
+                all_papers = all_papers[:max_results]
+
+                # Create comprehensive review structure
+                review_result = {
+                    "status": "success",
+                    "molecule": molecule,
+                    "objective": objective,
+                    "total_papers": len(all_papers),
+                    "papers": all_papers,
+                    "sections": {
+                        "primary_research": papers_for_review.get("papers", [])[:max_results//4],
+                        "trending_topics": trending_papers.get("papers", [])[:max_results//4],
+                        "cross_domain_insights": cross_domain_papers.get("papers", [])[:max_results//4],
+                        "citation_opportunities": citation_papers.get("papers", [])[:max_results//4]
+                    },
+                    "summary": {
+                        "research_focus": molecule,
+                        "objective": objective,
+                        "domains_covered": custom_profile["primary_domains"],
+                        "total_papers_analyzed": len(all_papers)
+                    },
+                    "generated_at": datetime.now(timezone.utc).isoformat(),
+                    "user_id": user_id
+                }
+
+                logger.info(f"✅ Generated comprehensive review with {len(all_papers)} papers")
+                return review_result
+
+            finally:
+                db.close()
+
+        except Exception as e:
+            logger.error(f"❌ Error generating comprehensive review: {e}")
+            return {
+                "status": "error",
+                "error": str(e),
+                "molecule": molecule,
+                "objective": objective,
+                "generated_at": datetime.now(timezone.utc).isoformat()
+            }
+
     async def get_weekly_recommendations(self, user_id: str, project_id: Optional[str] = None, force_refresh: bool = False) -> Dict[str, Any]:
         """
         Generate Spotify-style weekly recommendations with 4 main categories
