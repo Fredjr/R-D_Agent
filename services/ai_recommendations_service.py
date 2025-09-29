@@ -447,13 +447,25 @@ class SpotifyInspiredRecommendationsService:
 
                 except Exception as e:
                     logger.warning(f"⚠️ AI agents failed, falling back to traditional method: {e}")
-                    # Fallback to traditional methods with proper structure extraction
-                    raw_method_results = {
-                        "papers_for_you": await self._generate_papers_for_you(user_profile, db),
-                        "trending_in_field": await self._generate_trending_in_field(user_profile, db),
-                        "cross_pollination": await self._generate_cross_pollination(user_profile, db),
-                        "citation_opportunities": await self._generate_citation_opportunities(user_profile, db)
-                    }
+                    # Fallback to traditional methods with proper structure extraction and global deduplication
+                    used_pmids = set()
+
+                    raw_method_results = {}
+
+                    # Generate papers in priority order to ensure diversity
+                    raw_method_results["papers_for_you"] = await self._generate_papers_for_you(user_profile, db, used_pmids)
+                    if raw_method_results["papers_for_you"].get("papers"):
+                        used_pmids.update(p.get("pmid") for p in raw_method_results["papers_for_you"]["papers"] if p.get("pmid"))
+
+                    raw_method_results["trending_in_field"] = await self._generate_trending_in_field(user_profile, db, used_pmids)
+                    if raw_method_results["trending_in_field"].get("papers"):
+                        used_pmids.update(p.get("pmid") for p in raw_method_results["trending_in_field"]["papers"] if p.get("pmid"))
+
+                    raw_method_results["cross_pollination"] = await self._generate_cross_pollination(user_profile, db, used_pmids)
+                    if raw_method_results["cross_pollination"].get("papers"):
+                        used_pmids.update(p.get("pmid") for p in raw_method_results["cross_pollination"]["papers"] if p.get("pmid"))
+
+                    raw_method_results["citation_opportunities"] = await self._generate_citation_opportunities(user_profile, db, used_pmids)
 
                     # Extract papers arrays from method results (methods return {title, papers, updated})
                     raw_recommendations = {}
@@ -465,16 +477,40 @@ class SpotifyInspiredRecommendationsService:
                             raw_recommendations[category] = []
                             logger.warning(f"⚠️ {category}: Fallback method result has unexpected structure: {type(method_result)}")
 
-                    # Apply global deduplication across all recommendation types
-                    recommendations = self._apply_global_deduplication(raw_recommendations)
+                    # Global deduplication already applied at algorithm level
+                    recommendations = raw_recommendations
             else:
-                # Traditional recommendation methods
-                raw_method_results = {
-                    "papers_for_you": await self._generate_papers_for_you(user_profile, db),
-                    "trending_in_field": await self._generate_trending_in_field(user_profile, db),
-                    "cross_pollination": await self._generate_cross_pollination(user_profile, db),
-                    "citation_opportunities": await self._generate_citation_opportunities(user_profile, db)
-                }
+                # Traditional recommendation methods with global deduplication
+                # Track used PMIDs across all methods to ensure diversity
+                used_pmids = set()
+
+                raw_method_results = {}
+
+                # Generate papers in priority order to ensure diversity
+                logger.info(f"🔄 Starting global deduplication with empty used_pmids: {len(used_pmids)}")
+
+                raw_method_results["papers_for_you"] = await self._generate_papers_for_you(user_profile, db, used_pmids)
+                # Add papers from papers_for_you to used set
+                if raw_method_results["papers_for_you"].get("papers"):
+                    new_pmids = [p.get("pmid") for p in raw_method_results["papers_for_you"]["papers"] if p.get("pmid")]
+                    used_pmids.update(new_pmids)
+                    logger.info(f"📄 Papers for You added PMIDs: {new_pmids}, total used: {len(used_pmids)}")
+
+                raw_method_results["trending_in_field"] = await self._generate_trending_in_field(user_profile, db, used_pmids)
+                # Add papers from trending to used set
+                if raw_method_results["trending_in_field"].get("papers"):
+                    new_pmids = [p.get("pmid") for p in raw_method_results["trending_in_field"]["papers"] if p.get("pmid")]
+                    used_pmids.update(new_pmids)
+                    logger.info(f"🔥 Trending added PMIDs: {new_pmids}, total used: {len(used_pmids)}")
+
+                raw_method_results["cross_pollination"] = await self._generate_cross_pollination(user_profile, db, used_pmids)
+                # Add papers from cross_pollination to used set
+                if raw_method_results["cross_pollination"].get("papers"):
+                    new_pmids = [p.get("pmid") for p in raw_method_results["cross_pollination"]["papers"] if p.get("pmid")]
+                    used_pmids.update(new_pmids)
+                    logger.info(f"🔬 Cross-pollination added PMIDs: {new_pmids}, total used: {len(used_pmids)}")
+
+                raw_method_results["citation_opportunities"] = await self._generate_citation_opportunities(user_profile, db, used_pmids)
 
                 # Extract papers arrays from method results (methods return {title, papers, updated})
                 raw_recommendations = {}
@@ -486,8 +522,8 @@ class SpotifyInspiredRecommendationsService:
                         raw_recommendations[category] = []
                         logger.warning(f"⚠️ {category}: Method result has unexpected structure: {type(method_result)}")
 
-                # Apply global deduplication across all recommendation types
-                recommendations = self._apply_global_deduplication(raw_recommendations)
+                # Global deduplication already applied at algorithm level
+                recommendations = raw_recommendations
 
                 # Debug: Check what we got from deduplication
                 logger.info(f"🔍 After deduplication, recommendations type: {type(recommendations)}")
@@ -1129,7 +1165,7 @@ class SpotifyInspiredRecommendationsService:
                 "error": str(e)
             }
     
-    async def _generate_papers_for_you(self, user_profile: Dict, db: Session) -> Dict[str, Any]:
+    async def _generate_papers_for_you(self, user_profile: Dict, db: Session, used_pmids: set = None) -> Dict[str, Any]:
         """Generate personalized 'Papers for You' recommendations"""
         try:
             recommendations = []
@@ -1162,6 +1198,10 @@ class SpotifyInspiredRecommendationsService:
 
             # Track seen PMIDs to avoid duplicates within this method
             seen_pmids = set()
+            # Also avoid PMIDs already used by other methods
+            if used_pmids is None:
+                used_pmids = set()
+            global_used_pmids = used_pmids.copy()
 
             # Get papers based on user's research domains with multiple strategies
             for domain in primary_domains[:3]:  # Top 3 domains
@@ -1231,8 +1271,8 @@ class SpotifyInspiredRecommendationsService:
 
                 # Process found papers (with deduplication)
                 for paper in domain_papers:
-                    # Skip if we've already seen this paper
-                    if paper.pmid in seen_pmids:
+                    # Skip if we've already seen this paper OR if it's used by other methods
+                    if paper.pmid in seen_pmids or paper.pmid in global_used_pmids:
                         continue
 
                     seen_pmids.add(paper.pmid)
@@ -1334,7 +1374,7 @@ class SpotifyInspiredRecommendationsService:
         except Exception as e:
             return f"Recommended for your {domain} research"
     
-    async def _generate_trending_in_field(self, user_profile: Dict, db: Session) -> Dict[str, Any]:
+    async def _generate_trending_in_field(self, user_profile: Dict, db: Session, used_pmids: set = None) -> Dict[str, Any]:
         """Generate 'Trending in Your Field' recommendations"""
         try:
             recommendations = []
@@ -1364,6 +1404,10 @@ class SpotifyInspiredRecommendationsService:
 
             # Track seen PMIDs to avoid duplicates within this method
             seen_pmids = set()
+            # Also avoid PMIDs already used by other methods
+            if used_pmids is None:
+                used_pmids = set()
+            global_used_pmids = used_pmids.copy()
 
             # Get trending papers in user's research fields with multiple strategies
             for domain in primary_domains[:3]:  # Increased from 2 to 3
@@ -1435,8 +1479,8 @@ class SpotifyInspiredRecommendationsService:
                     logger.info(f"🔥 Strategy 4 (high-citation papers): Found {len(trending_papers)} papers")
 
                 for paper in trending_papers:
-                    # Skip if we've already seen this paper
-                    if paper.pmid in seen_pmids:
+                    # Skip if we've already seen this paper OR if it's used by other methods
+                    if paper.pmid in seen_pmids or paper.pmid in global_used_pmids:
                         continue
 
                     seen_pmids.add(paper.pmid)
@@ -1509,7 +1553,7 @@ class SpotifyInspiredRecommendationsService:
             logger.error(f"Error generating Trending in Field: {e}")
             return {"title": "Trending in Your Field", "papers": [], "error": str(e)}
     
-    async def _generate_cross_pollination(self, user_profile: Dict, db: Session) -> Dict[str, Any]:
+    async def _generate_cross_pollination(self, user_profile: Dict, db: Session, used_pmids: set = None) -> Dict[str, Any]:
         """Generate 'Cross-pollination' interdisciplinary discovery recommendations"""
         try:
             recommendations = []
@@ -1540,6 +1584,13 @@ class SpotifyInspiredRecommendationsService:
                 # CROSS-POLLINATION: Focus on interdisciplinary connections
                 primary_domains = ["bioengineering", "computational biology", "digital health"]
                 logger.info(f"🔬 Cross-pollination: Using interdisciplinary domains: {primary_domains}")
+
+            # Track seen PMIDs to avoid duplicates within this method
+            seen_pmids = set()
+            # Also avoid PMIDs already used by other methods
+            if used_pmids is None:
+                used_pmids = set()
+            global_used_pmids = used_pmids.copy()
 
             # Find papers at the intersection of user's domains and adjacent fields
             for primary_domain in primary_domains[:3]:  # Increased from 2 to 3
@@ -1643,6 +1694,12 @@ class SpotifyInspiredRecommendationsService:
                         logger.info(f"🔬 Strategy 4 (high-quality papers): Found {len(cross_papers)} papers")
 
                     for paper in cross_papers:
+                        # Skip if we've already seen this paper OR if it's used by other methods
+                        if paper.pmid in seen_pmids or paper.pmid in global_used_pmids:
+                            continue
+
+                        seen_pmids.add(paper.pmid)
+
                         cross_pollination_score = self._calculate_interdisciplinary_score(
                             paper, primary_domain, adjacent_field
                         )
@@ -1710,7 +1767,7 @@ class SpotifyInspiredRecommendationsService:
             logger.error(f"Error generating Cross-pollination: {e}")
             return {"title": "Cross-pollination", "papers": [], "error": str(e)}
     
-    async def _generate_citation_opportunities(self, user_profile: Dict, db: Session) -> Dict[str, Any]:
+    async def _generate_citation_opportunities(self, user_profile: Dict, db: Session, used_pmids: set = None) -> Dict[str, Any]:
         """Generate 'Citation Opportunities' - papers that could cite user's work"""
         try:
             recommendations = []
