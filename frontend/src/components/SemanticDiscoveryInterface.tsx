@@ -9,6 +9,7 @@ import {
   LightBulbIcon,
   ArrowPathIcon
 } from '@heroicons/react/24/outline';
+import { useWeeklyMixIntegration } from '@/hooks/useWeeklyMixIntegration';
 
 interface SemanticDiscoveryInterfaceProps {
   activeMode: 'recommendations' | 'semantic_search' | 'cross_domain' | 'smart_filters' | 'trending' | 'for_you' | 'cross_domain_discoveries';
@@ -29,6 +30,9 @@ export default function SemanticDiscoveryInterface({
 }: SemanticDiscoveryInterfaceProps) {
   console.log('🔍 SemanticDiscoveryInterface rendering with activeMode:', activeMode);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Initialize weekly mix integration
+  const { trackSemanticSearch, trackSemanticDiscovery } = useWeeklyMixIntegration();
   const [searchOptions, setSearchOptions] = useState({
     semantic_expansion: true,
     domain_focus: [],
@@ -105,6 +109,9 @@ export default function SemanticDiscoveryInterface({
 
   const handleSemanticSearch = () => {
     if (searchQuery.trim()) {
+      // Track semantic search for weekly mix
+      trackSemanticSearch(searchQuery, searchOptions.domain_focus);
+
       onSemanticSearch(searchQuery, searchOptions);
     }
   };
@@ -115,6 +122,9 @@ export default function SemanticDiscoveryInterface({
 
   const handleCrossDomainExplore = () => {
     if (selectedDomains.length > 0) {
+      // Track cross-domain exploration for weekly mix
+      trackSemanticDiscovery('', 'Cross-domain exploration', 'cross_domain');
+
       onCrossDomainExplore(selectedDomains);
     }
   };

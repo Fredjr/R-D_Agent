@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/ui/Navigation';
 import { Button } from '@/components/ui/Button';
 import { MobileResponsiveLayout } from '@/components/ui/MobileResponsiveLayout';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWeeklyMixIntegration } from '@/hooks/useWeeklyMixIntegration';
 
 interface SearchResult {
   id: string;
@@ -31,6 +32,9 @@ function SearchPageContent() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const [query, setQuery] = useState(searchParams?.get('q') || '');
+
+  // Initialize weekly mix integration
+  const { trackSearchPageSearch, trackPaperView } = useWeeklyMixIntegration();
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [filters, setFilters] = useState({
@@ -67,6 +71,13 @@ function SearchPageContent() {
     });
 
     setIsLoading(true);
+
+    // Track search for weekly mix automation
+    trackSearchPageSearch(searchQuery, {
+      meshData,
+      filters,
+      hasAdvancedOptions: !!meshData
+    });
     try {
       // Build API URL with parameters
       const params = new URLSearchParams({

@@ -333,6 +333,65 @@ class WeeklyMixAutomationSystem {
     setInterval(() => {
       this.checkAllUsersForUpdates();
     }, 60 * 60 * 1000); // 1 hour
+
+    // Setup explicit weekly schedule (every Monday at 6 AM)
+    this.setupWeeklySchedule();
+  }
+
+  /**
+   * Setup explicit weekly schedule for Monday morning updates
+   */
+  private setupWeeklySchedule(): void {
+    const scheduleWeeklyUpdate = () => {
+      const now = new Date();
+      const nextMonday = new Date();
+
+      // Calculate next Monday at 6 AM
+      const daysUntilMonday = (1 + 7 - now.getDay()) % 7;
+      nextMonday.setDate(now.getDate() + (daysUntilMonday === 0 ? 7 : daysUntilMonday));
+      nextMonday.setHours(6, 0, 0, 0);
+
+      // If it's already past 6 AM on Monday, schedule for next Monday
+      if (now.getDay() === 1 && now.getHours() >= 6) {
+        nextMonday.setDate(nextMonday.getDate() + 7);
+      }
+
+      const timeUntilMonday = nextMonday.getTime() - now.getTime();
+
+      console.log(`🎵 Weekly Mix: Next update scheduled for ${nextMonday.toLocaleString()}`);
+
+      setTimeout(() => {
+        console.log('🎵 Weekly Mix: Triggering weekly update for all users');
+        this.triggerWeeklyUpdateForAllUsers();
+        scheduleWeeklyUpdate(); // Schedule next week
+      }, timeUntilMonday);
+    };
+
+    scheduleWeeklyUpdate();
+  }
+
+  /**
+   * Trigger weekly update for all users
+   */
+  private async triggerWeeklyUpdateForAllUsers(): Promise<void> {
+    const userIds = new Set([
+      ...this.searchHistory.keys(),
+      ...this.activityHistory.keys()
+    ]);
+
+    console.log(`🎵 Weekly Mix: Triggering updates for ${userIds.size} users`);
+
+    for (const userId of userIds) {
+      try {
+        await this.forceUpdate(userId);
+        console.log(`🎵 Weekly Mix: Updated recommendations for user ${userId}`);
+
+        // Add delay to avoid overwhelming the API
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (error) {
+        console.error(`🎵 Weekly Mix: Failed to update user ${userId}:`, error);
+      }
+    }
   }
 
   /**
