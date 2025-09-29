@@ -66,40 +66,14 @@ export default function SemanticDiscoveryInterface({
       color: 'bg-blue-500'
     },
     {
-      id: 'cross_domain' as const,
-      name: 'Cross-Domain Discovery',
-      icon: GlobeAltIcon,
-      description: 'Discover connections across research fields',
-      color: 'bg-green-500'
-    },
-    {
       id: 'smart_filters' as const,
       name: 'Smart Filters',
       icon: FunnelIcon,
       description: 'Advanced semantic filtering and ranking',
       color: 'bg-orange-500'
-    },
-    {
-      id: 'trending' as const,
-      name: 'Trending Now',
-      icon: BeakerIcon,
-      description: 'Hot papers trending in your research field',
-      color: 'bg-red-500'
-    },
-    {
-      id: 'for_you' as const,
-      name: 'For You',
-      icon: LightBulbIcon,
-      description: 'Personalized recommendations based on your history',
-      color: 'bg-green-600'
-    },
-    {
-      id: 'cross_domain_discoveries' as const,
-      name: 'Cross-Domain Discoveries',
-      icon: ArrowPathIcon,
-      description: 'Interdisciplinary research opportunities',
-      color: 'bg-indigo-500'
     }
+    // REMOVED: Cross-Domain Discovery, Trending Now, For You buttons
+    // These are now handled by dedicated horizontal sections below
   ];
 
   const researchDomains = [
