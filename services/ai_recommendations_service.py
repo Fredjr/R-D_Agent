@@ -288,7 +288,7 @@ class SpotifyInspiredRecommendationsService:
                 trending_in_field.append({
                     "pmid": paper.pmid,
                     "title": paper.title,
-                    "authors": authors[:3] if authors else [],
+                    "authors": authors[:3] if authors else ["Author information not available"],
                     "journal": paper.journal,
                     "year": paper.publication_year,
                     "citation_count": paper.citation_count or 0,
@@ -1394,7 +1394,7 @@ class SpotifyInspiredRecommendationsService:
                         Article.title != "",
                         ~Article.title.like("Citation Article%"),
                         ~Article.title.like("Reference Article%")
-                    ).order_by(desc(Article.citation_count)).limit(8).all()
+                    ).order_by(desc(Article.citation_count)).limit(12).all()
 
                     if domain_papers:
                         logger.info(f"💡 Strategy 1 ({keyword}): Found {len(domain_papers)} recent papers")
@@ -1411,7 +1411,7 @@ class SpotifyInspiredRecommendationsService:
                             Article.publication_year >= datetime.now(timezone.utc).year - 5,
                             Article.title.isnot(None),
                             Article.title != ""
-                        ).order_by(desc(Article.citation_count)).limit(6).all()
+                        ).order_by(desc(Article.citation_count)).limit(10).all()
 
                         if domain_papers:
                             logger.info(f"💡 Strategy 2 ({keyword}): Found {len(domain_papers)} papers")
@@ -1488,7 +1488,7 @@ class SpotifyInspiredRecommendationsService:
                         recommendations.append({
                             "pmid": paper.pmid,
                             "title": paper.title,
-                            "authors": paper.authors[:3] if paper.authors else [],
+                            "authors": paper.authors[:3] if paper.authors else ["Author information not available"],
                             "journal": paper.journal,
                             "year": paper.publication_year,
                             "citation_count": paper.citation_count or 0,
@@ -1604,7 +1604,7 @@ class SpotifyInspiredRecommendationsService:
                         Article.title != "",
                         ~Article.title.like("Citation Article%"),
                         ~Article.title.like("Reference Article%")
-                    ).order_by(desc(Article.citation_count)).limit(8).all()
+                    ).order_by(desc(Article.citation_count)).limit(12).all()
 
                     if trending_papers:
                         logger.info(f"🔥 Strategy 1 ({keyword}): Found {len(trending_papers)} recent trending papers")
@@ -1622,7 +1622,7 @@ class SpotifyInspiredRecommendationsService:
                             Article.citation_count > 5,  # Lower threshold
                             Article.title.isnot(None),
                             Article.title != ""
-                        ).order_by(desc(Article.citation_count)).limit(8).all()
+                        ).order_by(desc(Article.citation_count)).limit(12).all()
 
                         if trending_papers:
                             logger.info(f"🔥 Strategy 2 ({keyword}): Found {len(trending_papers)} trending papers")
@@ -1638,7 +1638,7 @@ class SpotifyInspiredRecommendationsService:
                             ),
                             Article.title.isnot(None),
                             Article.title != ""
-                        ).order_by(desc(Article.citation_count)).limit(5).all()
+                        ).order_by(desc(Article.citation_count)).limit(8).all()
 
                         if trending_papers:
                             logger.info(f"🔥 Strategy 3 ({keyword}): Found {len(trending_papers)} domain papers")
@@ -1650,7 +1650,7 @@ class SpotifyInspiredRecommendationsService:
                         Article.title.isnot(None),
                         Article.title != "",
                         Article.citation_count > 0
-                    ).order_by(desc(Article.citation_count)).limit(3).all()
+                    ).order_by(desc(Article.citation_count)).limit(6).all()
                     logger.info(f"🔥 Strategy 4 (high-citation papers): Found {len(trending_papers)} papers")
 
                 for paper in trending_papers:
@@ -1667,7 +1667,7 @@ class SpotifyInspiredRecommendationsService:
                     recommendations.append({
                         "pmid": paper.pmid,
                         "title": paper.title,
-                        "authors": paper.authors[:3] if paper.authors else [],
+                        "authors": paper.authors[:3] if paper.authors else ["Author information not available"],
                         "journal": paper.journal,
                         "year": paper.publication_year,
                         "citation_count": paper.citation_count or 0,
@@ -1702,7 +1702,7 @@ class SpotifyInspiredRecommendationsService:
                         recommendations.append({
                             "pmid": paper.pmid,
                             "title": paper.title,
-                            "authors": paper.authors[:3] if paper.authors else [],
+                            "authors": paper.authors[:3] if paper.authors else ["Author information not available"],
                             "journal": paper.journal,
                             "year": paper.publication_year,
                             "citation_count": paper.citation_count or 0,
@@ -1884,7 +1884,7 @@ class SpotifyInspiredRecommendationsService:
                         recommendations.append({
                             "pmid": paper.pmid,
                             "title": paper.title,
-                            "authors": paper.authors[:3] if paper.authors else [],
+                            "authors": paper.authors[:3] if paper.authors else ["Author information not available"],
                             "journal": paper.journal,
                             "year": paper.publication_year,
                             "citation_count": paper.citation_count or 0,
@@ -1916,7 +1916,7 @@ class SpotifyInspiredRecommendationsService:
                         recommendations.append({
                             "pmid": paper.pmid,
                             "title": paper.title,
-                            "authors": paper.authors[:3] if paper.authors else [],
+                            "authors": paper.authors[:3] if paper.authors else ["Author information not available"],
                             "journal": paper.journal,
                             "year": paper.publication_year,
                             "citation_count": paper.citation_count or 0,
@@ -2011,7 +2011,7 @@ class SpotifyInspiredRecommendationsService:
                     recommendations.append({
                         "pmid": paper.pmid,
                         "title": paper.title,
-                        "authors": paper.authors[:3] if paper.authors else [],
+                        "authors": paper.authors[:3] if paper.authors else ["Author information not available"],
                         "journal": paper.journal,
                         "year": paper.publication_year,
                         "citation_count": paper.citation_count or 0,
