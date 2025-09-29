@@ -294,34 +294,28 @@ export default function CollectionsPage() {
                     {projectCollections.map((collection) => (
                       <SpotifyCollectionCard
                         key={collection.id}
-                        collection={{
-                          id: collection.id,
-                          name: collection.name,
-                          description: collection.description,
-                          color: collection.color,
-                          icon: collection.icon,
-                          articleCount: collection.articleCount,
-                          createdAt: collection.createdAt,
-                          updatedAt: collection.updatedAt,
-                          isShared: collection.isShared
-                        }}
-                        onSelect={() => {
+                        title={collection.name}
+                        description={collection.description}
+                        articleCount={collection.articleCount}
+                        lastUpdated={collection.updatedAt}
+                        color={collection.color}
+                        onClick={() => {
                           console.log('Selected collection:', collection);
                           trackCollectionAction('view', collection.id);
                           // Navigate to collection details
                           router.push(`/projects/${collection.projectId}/collections/${collection.id}`);
+                        }}
+                        onExplore={() => {
+                          console.log('Explore collection:', collection);
+                          trackCollectionAction('view', collection.id);
+                          // Navigate to articles list
+                          router.push(`/projects/${collection.projectId}/collections/${collection.id}/articles`);
                         }}
                         onNetworkView={() => {
                           console.log('Network view for collection:', collection);
                           trackCollectionAction('view', collection.id);
                           // Navigate to network view
                           router.push(`/projects/${collection.projectId}/collections/${collection.id}/network`);
-                        }}
-                        onArticlesList={() => {
-                          console.log('Articles list for collection:', collection);
-                          trackCollectionAction('view', collection.id);
-                          // Navigate to articles list
-                          router.push(`/projects/${collection.projectId}/collections/${collection.id}/articles`);
                         }}
                       />
                     ))}
