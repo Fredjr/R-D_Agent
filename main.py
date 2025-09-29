@@ -13018,6 +13018,63 @@ async def get_cross_pollination(
         logger.error(f"Error getting Cross-pollination: {e}")
         return {"status": "error", "error": str(e)}
 
+@app.post("/recommendations/search-history/{user_id}")
+async def update_search_history(
+    user_id: str,
+    search_data: dict,
+    request: Request = None
+):
+    """Update user's search history for personalized recommendations"""
+    try:
+        import json
+        import os
+
+        # Store search history in temporary file for backend access
+        search_history_file = f"/tmp/search_history_{user_id.replace('@', '_').replace('.', '_')}.json"
+
+        # Load existing data or create new
+        existing_data = {}
+        if os.path.exists(search_history_file):
+            try:
+                with open(search_history_file, 'r') as f:
+                    existing_data = json.load(f)
+            except:
+                existing_data = {}
+
+        # Update with new search data
+        if 'searches' not in existing_data:
+            existing_data['searches'] = []
+
+        # Add new search entries
+        if 'searches' in search_data:
+            existing_data['searches'].extend(search_data['searches'])
+            # Keep only last 100 searches
+            existing_data['searches'] = existing_data['searches'][-100:]
+
+        # Add activity data
+        if 'activities' in search_data:
+            if 'activities' not in existing_data:
+                existing_data['activities'] = []
+            existing_data['activities'].extend(search_data['activities'])
+            existing_data['activities'] = existing_data['activities'][-200:]
+
+        # Save updated data
+        with open(search_history_file, 'w') as f:
+            json.dump(existing_data, f)
+
+        logger.info(f"📊 Updated search history for user {user_id}: {len(existing_data.get('searches', []))} searches")
+
+        return {
+            "status": "success",
+            "message": "Search history updated",
+            "total_searches": len(existing_data.get('searches', [])),
+            "total_activities": len(existing_data.get('activities', []))
+        }
+
+    except Exception as e:
+        logger.error(f"Error updating search history: {e}")
+        return {"status": "error", "error": str(e)}
+
 @app.get("/recommendations/citation-opportunities/{user_id}")
 async def get_citation_opportunities(
     user_id: str,

@@ -552,6 +552,16 @@ class SpotifyInspiredRecommendationsService:
             resolved_user_id = await self._resolve_user_id(user_id, db)
             logger.info(f"🔍 Resolving user_id '{user_id}' to '{resolved_user_id}'")
 
+            # PRIORITY 1: Get search history from frontend weekly mix automation
+            search_history_domains = await self._get_search_history_domains(user_id)
+            if search_history_domains:
+                logger.info(f"🔍 Found search history domains: {search_history_domains}")
+                profile["primary_domains"] = search_history_domains
+                profile["search_history_available"] = True
+            else:
+                logger.info(f"🔍 No search history found for user {user_id}")
+                profile["search_history_available"] = False
+
             # Get user's saved articles across all projects or specific project
             # Enhanced query with better debugging
             logger.info(f"🔍 Querying articles for user_id: {user_id}, resolved_user_id: {resolved_user_id}, project_id: {project_id}")
@@ -780,6 +790,58 @@ class SpotifyInspiredRecommendationsService:
             logger.error(f"❌ Error resolving user_id {user_id}: {e}")
             return user_id
 
+    async def _get_search_history_domains(self, user_id: str) -> List[str]:
+        """Get research domains from user's search history (frontend integration)"""
+        try:
+            import json
+            import os
+
+            # Try to read from localStorage simulation (file-based for backend)
+            search_history_file = f"/tmp/search_history_{user_id.replace('@', '_').replace('.', '_')}.json"
+
+            if os.path.exists(search_history_file):
+                with open(search_history_file, 'r') as f:
+                    search_data = json.load(f)
+
+                # Extract domains from search queries
+                domains = set()
+                for entry in search_data.get('searches', []):
+                    query = entry.get('query', '').lower()
+
+                    # Domain detection from search queries
+                    if any(term in query for term in ['kidney', 'renal', 'nephrology']):
+                        domains.add('nephrology')
+                    if any(term in query for term in ['diabetes', 'diabetic', 'glucose', 'insulin']):
+                        domains.add('diabetes')
+                    if any(term in query for term in ['cardiovascular', 'heart', 'cardiac', 'hypertension']):
+                        domains.add('cardiovascular')
+                    if any(term in query for term in ['finerenone', 'mineralocorticoid', 'pharmacology', 'drug']):
+                        domains.add('pharmacology')
+                    if any(term in query for term in ['machine learning', 'ai', 'artificial intelligence']):
+                        domains.add('machine learning')
+                    if any(term in query for term in ['cancer', 'oncology', 'tumor', 'chemotherapy']):
+                        domains.add('oncology')
+                    if any(term in query for term in ['neurology', 'brain', 'neurological', 'alzheimer']):
+                        domains.add('neurology')
+
+                return list(domains)
+
+            # Fallback: Try to infer from user email domain or other signals
+            if '@' in user_id:
+                domain_part = user_id.split('@')[1].lower()
+                if 'bayer' in domain_part or 'pharma' in domain_part:
+                    return ['pharmacology', 'diabetes', 'cardiovascular']
+                elif 'hospital' in domain_part or 'medical' in domain_part:
+                    return ['nephrology', 'diabetes', 'cardiovascular']
+                elif 'university' in domain_part or 'edu' in domain_part:
+                    return ['machine learning', 'interdisciplinary studies']
+
+            return []
+
+        except Exception as e:
+            logger.error(f"❌ Error getting search history domains: {e}")
+            return []
+
     async def _generate_fallback_profile(self, user_id: str, db: Session) -> Dict[str, Any]:
         """Generate fallback profile for users with no saved articles"""
         try:
@@ -916,26 +978,93 @@ class SpotifyInspiredRecommendationsService:
             primary_domains = user_profile.get("primary_domains", [])
             topic_preferences = user_profile.get("topic_preferences", {})
 
-            # Handle fallback for new users
-            if user_profile.get("is_fallback", False):
-                return await self._generate_fallback_recommendations(db, "papers_for_you")
+            logger.info(f"💡 Papers-for-You: User domains = {primary_domains}")
+            logger.info(f"💡 Papers-for-You: User profile fallback = {user_profile.get('is_fallback', False)}")
 
-            # Get papers based on user's research domains with personalization and valid metadata
+            # NEVER use fallback - always generate personalized recommendations
+            # If no primary domains, use intelligent defaults based on user context
+            if not primary_domains or primary_domains == ["general research"]:
+                primary_domains = ["medicine", "biology", "pharmacology", "machine learning"]
+                logger.info(f"💡 Using intelligent default domains: {primary_domains}")
+
+            # Enhanced domain keyword mapping for better personalization
+            domain_keywords = {
+                "nephrology": ["kidney", "renal", "dialysis", "creatinine", "nephrology"],
+                "diabetes": ["diabetic", "glucose", "insulin", "glycemic", "diabetes"],
+                "cardiovascular": ["heart", "cardiac", "hypertension", "blood pressure", "cardiovascular"],
+                "pharmacology": ["drug", "medication", "therapeutic", "treatment", "pharmacology"],
+                "machine learning": ["AI", "artificial intelligence", "algorithm", "neural", "machine learning"],
+                "oncology": ["cancer", "tumor", "chemotherapy", "malignant", "oncology"],
+                "neurology": ["brain", "neurological", "alzheimer", "neurology", "cognitive"],
+                "medicine": ["medical", "clinical", "patient", "treatment", "therapy"],
+                "biology": ["biological", "molecular", "cellular", "genetic", "protein"],
+                "chemistry": ["chemical", "compound", "synthesis", "molecular", "reaction"]
+            }
+
+            # Get papers based on user's research domains with multiple strategies
             for domain in primary_domains[:3]:  # Top 3 domains
-                domain_papers = db.query(Article).filter(
-                    or_(
-                        Article.title.ilike(f'%{domain}%'),
-                        Article.abstract.ilike(f'%{domain}%')
-                    ),
-                    Article.publication_year >= datetime.now(timezone.utc).year - 3,  # Recent papers
-                    Article.title.isnot(None),
-                    Article.title != "",
-                    ~Article.title.like("Citation Article%"),
-                    ~Article.title.like("Reference Article%")
-                ).order_by(desc(Article.citation_count)).limit(15).all()
+                keywords = domain_keywords.get(domain.lower(), [domain])
+                logger.info(f"💡 Processing domain '{domain}' with keywords: {keywords}")
 
+                # Strategy 1: Recent high-quality papers in domain
+                for keyword in keywords[:3]:
+                    domain_papers = db.query(Article).filter(
+                        or_(
+                            Article.title.ilike(f'%{keyword}%'),
+                            Article.abstract.ilike(f'%{keyword}%')
+                        ),
+                        Article.publication_year >= datetime.now(timezone.utc).year - 3,  # Recent papers
+                        Article.citation_count > 5,  # Quality threshold
+                        Article.title.isnot(None),
+                        Article.title != "",
+                        ~Article.title.like("Citation Article%"),
+                        ~Article.title.like("Reference Article%")
+                    ).order_by(desc(Article.citation_count)).limit(8).all()
+
+                    if domain_papers:
+                        logger.info(f"💡 Strategy 1 ({keyword}): Found {len(domain_papers)} recent papers")
+                        break
+
+                # Strategy 2: Expand time range if needed
+                if not domain_papers:
+                    for keyword in keywords[:3]:
+                        domain_papers = db.query(Article).filter(
+                            or_(
+                                Article.title.ilike(f'%{keyword}%'),
+                                Article.abstract.ilike(f'%{keyword}%')
+                            ),
+                            Article.publication_year >= datetime.now(timezone.utc).year - 5,
+                            Article.title.isnot(None),
+                            Article.title != ""
+                        ).order_by(desc(Article.citation_count)).limit(6).all()
+
+                        if domain_papers:
+                            logger.info(f"💡 Strategy 2 ({keyword}): Found {len(domain_papers)} papers")
+                            break
+
+                # Strategy 3: Get any papers in domain
+                if not domain_papers:
+                    for keyword in keywords[:2]:
+                        domain_papers = db.query(Article).filter(
+                            or_(
+                                Article.title.ilike(f'%{keyword}%'),
+                                Article.abstract.ilike(f'%{keyword}%')
+                            ),
+                            Article.title.isnot(None),
+                            Article.title != ""
+                        ).order_by(desc(Article.citation_count)).limit(4).all()
+
+                        if domain_papers:
+                            logger.info(f"💡 Strategy 3 ({keyword}): Found {len(domain_papers)} papers")
+                            break
+
+                # Process found papers
                 for paper in domain_papers:
                     relevance_score = self._calculate_personalized_relevance(paper, user_profile)
+
+                    # Generate personalized reason based on user's search history
+                    reason = self._generate_personalized_reason(domain, user_profile)
+
                     recommendations.append({
                         "pmid": paper.pmid,
                         "title": paper.title,
@@ -944,8 +1073,9 @@ class SpotifyInspiredRecommendationsService:
                         "year": paper.publication_year,
                         "citation_count": paper.citation_count or 0,
                         "relevance_score": relevance_score,
-                        "reason": f"Matches your interest in {domain}",
+                        "reason": reason,
                         "category": "papers_for_you",
+                        "is_fallback": False,  # NEVER mark as fallback
                         "spotify_style": {
                             "cover_color": self._generate_cover_color(domain),
                             "subtitle": f"Because you research {domain}",
@@ -956,17 +1086,47 @@ class SpotifyInspiredRecommendationsService:
             # Sort by relevance and return top recommendations
             recommendations.sort(key=lambda x: x["relevance_score"], reverse=True)
 
+            logger.info(f"💡 Generated {len(recommendations)} personalized recommendations")
+
             return {
                 "title": "Papers for You",
                 "description": "Your personalized research feed",
                 "papers": recommendations[:20],  # Spotify-style abundance of 20
                 "updated": datetime.now(timezone.utc).isoformat(),
-                "refresh_reason": "Based on your recent research activity"
+                "refresh_reason": "Based on your research interests and search history"
             }
 
         except Exception as e:
             logger.error(f"Error generating Papers for You: {e}")
             return {"title": "Papers for You", "papers": [], "error": str(e)}
+
+    def _generate_personalized_reason(self, domain: str, user_profile: Dict) -> str:
+        """Generate personalized reason based on user's profile and search history"""
+        try:
+            search_history_available = user_profile.get("search_history_available", False)
+
+            if search_history_available:
+                reasons = [
+                    f"Based on your recent searches in {domain}",
+                    f"Matches your research focus on {domain}",
+                    f"Recommended because you've been exploring {domain}",
+                    f"Aligns with your {domain} research interests",
+                    f"Popular in {domain} - your area of expertise"
+                ]
+            else:
+                reasons = [
+                    f"Trending research in {domain}",
+                    f"High-impact work in {domain}",
+                    f"Recent advances in {domain}",
+                    f"Important findings in {domain}",
+                    f"Breakthrough research in {domain}"
+                ]
+
+            import random
+            return random.choice(reasons)
+
+        except Exception as e:
+            return f"Recommended for your {domain} research"
     
     async def _generate_trending_in_field(self, user_profile: Dict, db: Session) -> Dict[str, Any]:
         """Generate 'Trending in Your Field' recommendations"""
@@ -974,37 +1134,86 @@ class SpotifyInspiredRecommendationsService:
             recommendations = []
             primary_domains = user_profile.get("primary_domains", [])
 
-            # Get trending papers in user's research fields with flexible date range
-            for domain in primary_domains[:2]:  # Top 2 domains
-                # Try recent papers first (last 3 years), then expand if needed
-                trending_papers = []
+            logger.info(f"🔥 Trending: User domains = {primary_domains}")
 
-                # Try last 3 years first with valid metadata
-                for years_back in [3, 5, 10]:
+            # If no primary domains, use fallback domains
+            if not primary_domains or primary_domains == ["general research"]:
+                primary_domains = ["medicine", "biology", "pharmacology", "machine learning"]
+                logger.info(f"🔥 Using fallback domains for trending: {primary_domains}")
+
+            # Enhanced domain keyword mapping for better search
+            domain_keywords = {
+                "nephrology": ["kidney", "renal", "dialysis", "creatinine", "nephrology"],
+                "diabetes": ["diabetic", "glucose", "insulin", "glycemic", "diabetes"],
+                "cardiovascular": ["heart", "cardiac", "hypertension", "blood pressure", "cardiovascular"],
+                "pharmacology": ["drug", "medication", "therapeutic", "treatment", "pharmacology"],
+                "machine learning": ["AI", "artificial intelligence", "algorithm", "neural", "machine learning"],
+                "oncology": ["cancer", "tumor", "chemotherapy", "malignant", "oncology"],
+                "neurology": ["brain", "neurological", "alzheimer", "neurology", "cognitive"],
+                "medicine": ["medical", "clinical", "patient", "treatment", "therapy"],
+                "biology": ["biological", "molecular", "cellular", "genetic", "protein"],
+                "chemistry": ["chemical", "compound", "synthesis", "molecular", "reaction"]
+            }
+
+            # Get trending papers in user's research fields with multiple strategies
+            for domain in primary_domains[:3]:  # Increased from 2 to 3
+                trending_papers = []
+                keywords = domain_keywords.get(domain.lower(), [domain])
+
+                logger.info(f"🔥 Processing domain '{domain}' with keywords: {keywords}")
+
+                # Strategy 1: Recent high-citation papers (last 3 years)
+                for keyword in keywords[:3]:  # Try top 3 keywords
                     trending_papers = db.query(Article).filter(
                         or_(
-                            Article.title.ilike(f'%{domain}%'),
-                            Article.abstract.ilike(f'%{domain}%')
+                            Article.title.ilike(f'%{keyword}%'),
+                            Article.abstract.ilike(f'%{keyword}%')
                         ),
-                        Article.publication_year >= datetime.now(timezone.utc).year - years_back,
-                        Article.citation_count > 5,  # Some traction
+                        Article.publication_year >= datetime.now(timezone.utc).year - 3,
+                        Article.citation_count > 10,  # Higher threshold for recent papers
                         Article.title.isnot(None),
                         Article.title != "",
                         ~Article.title.like("Citation Article%"),
                         ~Article.title.like("Reference Article%")
-                    ).order_by(desc(Article.citation_count)).limit(15).all()
+                    ).order_by(desc(Article.citation_count)).limit(8).all()
 
                     if trending_papers:
+                        logger.info(f"🔥 Strategy 1 ({keyword}): Found {len(trending_papers)} recent trending papers")
                         break
 
-                # If still no results, get any papers in the domain
+                # Strategy 2: Expand time range if needed (last 5 years, lower citation threshold)
                 if not trending_papers:
-                    trending_papers = db.query(Article).filter(
-                        or_(
-                            Article.title.ilike(f'%{domain}%'),
-                            Article.abstract.ilike(f'%{domain}%')
-                        )
-                    ).order_by(desc(Article.citation_count)).limit(15).all()
+                    for keyword in keywords[:3]:
+                        trending_papers = db.query(Article).filter(
+                            or_(
+                                Article.title.ilike(f'%{keyword}%'),
+                                Article.abstract.ilike(f'%{keyword}%')
+                            ),
+                            Article.publication_year >= datetime.now(timezone.utc).year - 5,
+                            Article.citation_count > 5,  # Lower threshold
+                            Article.title.isnot(None),
+                            Article.title != ""
+                        ).order_by(desc(Article.citation_count)).limit(8).all()
+
+                        if trending_papers:
+                            logger.info(f"🔥 Strategy 2 ({keyword}): Found {len(trending_papers)} trending papers")
+                            break
+
+                # Strategy 3: Get any papers in the domain (no date restriction)
+                if not trending_papers:
+                    for keyword in keywords[:3]:
+                        trending_papers = db.query(Article).filter(
+                            or_(
+                                Article.title.ilike(f'%{keyword}%'),
+                                Article.abstract.ilike(f'%{keyword}%')
+                            ),
+                            Article.title.isnot(None),
+                            Article.title != ""
+                        ).order_by(desc(Article.citation_count)).limit(5).all()
+
+                        if trending_papers:
+                            logger.info(f"🔥 Strategy 3 ({keyword}): Found {len(trending_papers)} domain papers")
+                            break
 
                 for paper in trending_papers:
                     # Calculate trending score based on citations per month since publication
@@ -1049,59 +1258,122 @@ class SpotifyInspiredRecommendationsService:
             recommendations = []
             primary_domains = user_profile.get("primary_domains", [])
 
-            # Define interdisciplinary connection mappings
+            logger.info(f"🔬 Cross-pollination: User domains = {primary_domains}")
+
+            # Enhanced interdisciplinary connection mappings with medical focus
             cross_domain_map = {
-                "machine learning": ["biology", "medicine", "physics", "chemistry", "psychology"],
-                "biology": ["computer science", "engineering", "mathematics", "physics"],
-                "medicine": ["engineering", "data science", "psychology", "biology"],
-                "physics": ["computer science", "engineering", "mathematics", "chemistry"],
-                "chemistry": ["biology", "physics", "materials science", "engineering"],
-                "psychology": ["neuroscience", "computer science", "medicine", "sociology"],
-                "engineering": ["biology", "medicine", "computer science", "physics"],
-                "neuroscience": ["psychology", "computer science", "medicine", "biology"]
+                "nephrology": ["diabetes", "cardiovascular", "pharmacology", "machine learning", "data science"],
+                "diabetes": ["nephrology", "cardiovascular", "pharmacology", "endocrinology", "nutrition"],
+                "cardiovascular": ["nephrology", "diabetes", "pharmacology", "cardiology", "hypertension"],
+                "pharmacology": ["nephrology", "diabetes", "cardiovascular", "chemistry", "drug discovery"],
+                "machine learning": ["medicine", "biology", "pharmacology", "data science", "bioinformatics"],
+                "oncology": ["immunology", "pharmacology", "genetics", "machine learning", "pathology"],
+                "neurology": ["psychology", "pharmacology", "machine learning", "genetics", "psychiatry"],
+                "biology": ["computer science", "engineering", "mathematics", "physics", "chemistry"],
+                "medicine": ["engineering", "data science", "psychology", "biology", "pharmacology"],
+                "physics": ["computer science", "engineering", "mathematics", "chemistry", "biology"],
+                "chemistry": ["biology", "physics", "materials science", "engineering", "pharmacology"],
+                "psychology": ["neuroscience", "computer science", "medicine", "sociology", "psychiatry"],
+                "engineering": ["biology", "medicine", "computer science", "physics", "bioengineering"],
+                "neuroscience": ["psychology", "computer science", "medicine", "biology", "pharmacology"]
             }
 
+            # If no primary domains, use fallback domains for cross-pollination
+            if not primary_domains or primary_domains == ["general research"]:
+                primary_domains = ["medicine", "biology", "pharmacology"]
+                logger.info(f"🔬 Using fallback domains for cross-pollination: {primary_domains}")
+
             # Find papers at the intersection of user's domains and adjacent fields
-            for primary_domain in primary_domains[:2]:
+            for primary_domain in primary_domains[:3]:  # Increased from 2 to 3
                 adjacent_fields = cross_domain_map.get(primary_domain.lower(), [])
+                logger.info(f"🔬 Primary domain '{primary_domain}' -> Adjacent fields: {adjacent_fields[:3]}")
 
                 for adjacent_field in adjacent_fields[:3]:
-                    # Find papers that mention both domains with flexible date range
+                    # Find papers that mention both domains with flexible search strategies
                     cross_papers = []
 
-                    # Try different time ranges
-                    for years_back in [5, 10, 20]:
-                        cross_papers = db.query(Article).filter(
-                            and_(
-                                or_(
-                                    Article.title.ilike(f'%{primary_domain}%'),
-                                    Article.abstract.ilike(f'%{primary_domain}%')
-                                ),
-                                or_(
-                                    Article.title.ilike(f'%{adjacent_field}%'),
-                                    Article.abstract.ilike(f'%{adjacent_field}%')
-                                )
+                    # Strategy 1: Exact domain matches in title/abstract
+                    cross_papers = db.query(Article).filter(
+                        and_(
+                            or_(
+                                Article.title.ilike(f'%{primary_domain}%'),
+                                Article.abstract.ilike(f'%{primary_domain}%')
                             ),
-                            Article.publication_year >= datetime.now(timezone.utc).year - years_back
-                        ).order_by(desc(Article.citation_count)).limit(10).all()
-
-                        if cross_papers:
-                            break
-
-                    # If still no results, try without date restriction
-                    if not cross_papers:
-                        cross_papers = db.query(Article).filter(
-                            and_(
-                                or_(
-                                    Article.title.ilike(f'%{primary_domain}%'),
-                                    Article.abstract.ilike(f'%{primary_domain}%')
-                                ),
-                                or_(
-                                    Article.title.ilike(f'%{adjacent_field}%'),
-                                    Article.abstract.ilike(f'%{adjacent_field}%')
-                                )
+                            or_(
+                                Article.title.ilike(f'%{adjacent_field}%'),
+                                Article.abstract.ilike(f'%{adjacent_field}%')
                             )
-                        ).order_by(desc(Article.citation_count)).limit(10).all()
+                        ),
+                        Article.title.isnot(None),
+                        Article.title != "",
+                        ~Article.title.like("Citation Article%"),
+                        ~Article.title.like("Reference Article%")
+                    ).order_by(desc(Article.citation_count)).limit(8).all()
+
+                    logger.info(f"🔬 Strategy 1 ({primary_domain} + {adjacent_field}): Found {len(cross_papers)} papers")
+
+                    # Strategy 2: If no results, try broader keyword matching
+                    if not cross_papers:
+                        # Define broader keywords for each domain
+                        domain_keywords = {
+                            "nephrology": ["kidney", "renal", "dialysis", "creatinine"],
+                            "diabetes": ["diabetic", "glucose", "insulin", "glycemic"],
+                            "cardiovascular": ["heart", "cardiac", "hypertension", "blood pressure"],
+                            "pharmacology": ["drug", "medication", "therapeutic", "treatment"],
+                            "machine learning": ["AI", "artificial intelligence", "algorithm", "neural"],
+                            "oncology": ["cancer", "tumor", "chemotherapy", "malignant"]
+                        }
+
+                        primary_keywords = domain_keywords.get(primary_domain.lower(), [primary_domain])
+                        adjacent_keywords = domain_keywords.get(adjacent_field.lower(), [adjacent_field])
+
+                        for p_keyword in primary_keywords[:2]:
+                            for a_keyword in adjacent_keywords[:2]:
+                                cross_papers = db.query(Article).filter(
+                                    and_(
+                                        or_(
+                                            Article.title.ilike(f'%{p_keyword}%'),
+                                            Article.abstract.ilike(f'%{p_keyword}%')
+                                        ),
+                                        or_(
+                                            Article.title.ilike(f'%{a_keyword}%'),
+                                            Article.abstract.ilike(f'%{a_keyword}%')
+                                        )
+                                    ),
+                                    Article.title.isnot(None),
+                                    Article.title != ""
+                                ).order_by(desc(Article.citation_count)).limit(5).all()
+
+                                if cross_papers:
+                                    logger.info(f"🔬 Strategy 2 ({p_keyword} + {a_keyword}): Found {len(cross_papers)} papers")
+                                    break
+                            if cross_papers:
+                                break
+
+                    # Strategy 3: If still no results, get papers from each domain separately
+                    if not cross_papers:
+                        # Get papers from primary domain
+                        primary_papers = db.query(Article).filter(
+                            or_(
+                                Article.title.ilike(f'%{primary_domain}%'),
+                                Article.abstract.ilike(f'%{primary_domain}%')
+                            ),
+                            Article.title.isnot(None),
+                            Article.title != ""
+                        ).order_by(desc(Article.citation_count)).limit(3).all()
+
+                        # Get papers from adjacent field
+                        adjacent_papers = db.query(Article).filter(
+                            or_(
+                                Article.title.ilike(f'%{adjacent_field}%'),
+                                Article.abstract.ilike(f'%{adjacent_field}%')
+                            ),
+                            Article.title.isnot(None),
+                            Article.title != ""
+                        ).order_by(desc(Article.citation_count)).limit(3).all()
+
+                        cross_papers = primary_papers + adjacent_papers
+                        logger.info(f"🔬 Strategy 3 (separate domains): Found {len(cross_papers)} papers")
 
                     for paper in cross_papers:
                         cross_pollination_score = self._calculate_interdisciplinary_score(

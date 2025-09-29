@@ -39,6 +39,7 @@ class WeeklyMixAutomationSystem {
   private searchHistory: Map<string, SearchHistoryEntry[]> = new Map();
   private activityHistory: Map<string, ActivityEntry[]> = new Map();
   private lastUpdate: Map<string, Date> = new Map();
+  private lastBackendSync: Map<string, Date> = new Map();
 
   constructor() {
     this.config = {
@@ -78,6 +79,9 @@ class WeeklyMixAutomationSystem {
 
     this.saveToStorage();
     this.triggerRecommendationUpdate(userId);
+
+    // Send search history to backend for personalization
+    this.syncSearchHistoryToBackend(userId);
   }
 
   /**
@@ -98,6 +102,9 @@ class WeeklyMixAutomationSystem {
 
     this.saveToStorage();
     this.triggerRecommendationUpdate(userId);
+
+    // Send activity history to backend for personalization
+    this.syncSearchHistoryToBackend(userId);
   }
 
   /**
@@ -500,4 +507,43 @@ export const integrateWithRealTimeAnalytics = () => {
       });
     }
   };
+
+  /**
+   * Sync search history to backend for personalized recommendations
+   */
+  private async syncSearchHistoryToBackend(userId: string): Promise<void> {
+    try {
+      const searches = this.searchHistory.get(userId) || [];
+      const activities = this.activityHistory.get(userId) || [];
+
+      // Only sync if we have data and it's been more than 1 minute since last sync
+      const lastSync = this.lastBackendSync.get(userId) || new Date(0);
+      const now = new Date();
+
+      if ((searches.length > 0 || activities.length > 0) &&
+          now.getTime() - lastSync.getTime() > 60 * 1000) {
+
+        const response = await fetch(`/api/proxy/recommendations/search-history/${userId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-ID': userId
+          },
+          body: JSON.stringify({
+            searches: searches.slice(-10), // Send last 10 searches
+            activities: activities.slice(-20) // Send last 20 activities
+          })
+        });
+
+        if (response.ok) {
+          this.lastBackendSync.set(userId, now);
+          console.log(`📊 Synced search history to backend for user ${userId}`);
+        } else {
+          console.warn(`⚠️ Failed to sync search history for user ${userId}:`, response.status);
+        }
+      }
+    } catch (error) {
+      console.error(`❌ Error syncing search history for user ${userId}:`, error);
+    }
+  }
 };
