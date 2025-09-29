@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import NetworkView, { NetworkNode } from './NetworkView';
 import NetworkSidebar from './NetworkSidebar';
@@ -53,7 +53,39 @@ export default function MultiColumnNetworkView({
   const { user } = useAuth();
   const [columns, setColumns] = useState<PaperColumn[]>([]);
   const [mainSelectedNode, setMainSelectedNode] = useState<NetworkNode | null>(null);
+  const [collections, setCollections] = useState<any[]>([]);
   const mainNetworkViewRef = useRef<any>(null);
+
+  // Fetch collections for the project
+  const fetchCollections = useCallback(async () => {
+    if (!projectId) return;
+
+    try {
+      console.log('🔍 Fetching collections for project:', projectId);
+      const response = await fetch(`/api/proxy/projects/${projectId}/collections`, {
+        headers: {
+          'User-ID': user?.user_id || 'default_user',
+        },
+      });
+
+      if (response.ok) {
+        const collectionsData = await response.json();
+        console.log('✅ Collections fetched:', collectionsData);
+        setCollections(collectionsData.collections || []);
+      } else {
+        console.warn('⚠️ Failed to fetch collections:', response.status);
+        setCollections([]);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching collections:', error);
+      setCollections([]);
+    }
+  }, [projectId, user]);
+
+  // Fetch collections on mount and when projectId changes
+  useEffect(() => {
+    fetchCollections();
+  }, [fetchCollections]);
 
   // Network type selection state
   const [defaultNetworkType, setDefaultNetworkType] = useState<'citations' | 'similar' | 'references'>('citations');
@@ -481,10 +513,12 @@ export default function MultiColumnNetworkView({
                   }}
                   onAddToCollection={(pmid) => {
                     console.log('Add to collection:', pmid);
+                    // Refresh collections after adding
+                    fetchCollections();
                   }}
                   currentMode="default"
                   projectId={projectId || ''}
-                  collections={[]}
+                  collections={collections}
                   onAddExplorationNodes={handleMainAddExplorationNodes}
                   onCreatePaperColumn={handleCreatePaperColumn}
                   showCreateColumnButton={true}
@@ -650,10 +684,12 @@ export default function MultiColumnNetworkView({
                       }}
                       onAddToCollection={(pmid) => {
                         console.log('Add to collection:', pmid);
+                        // Refresh collections after adding
+                        fetchCollections();
                       }}
                       currentMode="default"
                       projectId={projectId || ''}
-                      collections={[]}
+                      collections={collections}
                       onAddExplorationNodes={(sourceNodeId, explorationResults, relationType) =>
                         handleColumnAddExplorationNodes(column.id, sourceNodeId, explorationResults, relationType)
                       }

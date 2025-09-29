@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { userProfileSystem } from '@/lib/user-profile-system';
+import { weeklyMixAutomation } from '@/lib/weekly-mix-automation';
 
 interface AnalyticsEvent {
   action: string;
@@ -89,22 +90,48 @@ export function useRealTimeAnalytics(pageName: string) {
   };
 
   // Specific tracking functions for common actions
-  const trackPaperView = (pmid: string, title: string, duration?: number) => {
+  const trackPaperView = (pmid: string, title: string, duration?: number, source?: string, context?: any) => {
     trackEvent('paper_view', {
       pmid,
       title,
       duration,
-      research_domain: extractDomainFromTitle(title)
+      research_domain: extractDomainFromTitle(title),
+      source: source || 'unknown'
     });
+
+    // NEW: Integrate with weekly mix automation
+    if (user?.email) {
+      weeklyMixAutomation.trackActivity(user.email, {
+        type: 'paper_view',
+        pmid,
+        title,
+        timestamp: new Date(),
+        source: source || 'unknown',
+        context
+      });
+    }
   };
 
-  const trackSearch = (query: string, resultsCount?: number, filtersUsed?: string[]) => {
+  const trackSearch = (query: string, resultsCount?: number, filtersUsed?: string[], source?: string, context?: any) => {
     trackEvent('search', {
       query,
       results_count: resultsCount,
       filters_used: filtersUsed,
-      search_type: 'semantic'
+      search_type: 'semantic',
+      source: source || 'unknown'
     });
+
+    // NEW: Integrate with weekly mix automation
+    if (user?.email) {
+      weeklyMixAutomation.trackSearch(user.email, {
+        query,
+        timestamp: new Date(),
+        resultsCount: resultsCount || 0,
+        clickedPapers: [],
+        source: (source as any) || 'search',
+        context
+      });
+    }
   };
 
   const trackDeepDive = (pmid: string, completionRate?: number, sectionsViewed?: string[]) => {
@@ -115,11 +142,21 @@ export function useRealTimeAnalytics(pageName: string) {
     });
   };
 
-  const trackCollectionAction = (action: 'create' | 'view' | 'edit' | 'delete', collectionId?: string) => {
+  const trackCollectionAction = (action: 'create' | 'view' | 'edit' | 'delete', collectionId?: string, context?: any) => {
     trackEvent('collection_action', {
       collection_action: action,
       collection_id: collectionId
     });
+
+    // NEW: Integrate with weekly mix automation
+    if (user?.email) {
+      weeklyMixAutomation.trackActivity(user.email, {
+        type: 'collection_add',
+        timestamp: new Date(),
+        source: 'collection_management',
+        context: { action, collectionId, ...context }
+      });
+    }
   };
 
   const trackSemanticFeatureUsage = (feature: string, data?: any) => {

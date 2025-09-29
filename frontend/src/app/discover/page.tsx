@@ -25,6 +25,8 @@ import { PersonalizedRecommendationEngine, RecommendationContext } from '@/lib/r
 import { CrossDomainDiscoveryEngine } from '@/lib/cross-domain-discovery';
 import SemanticDiscoveryInterface from '@/components/SemanticDiscoveryInterface';
 import { useRealTimeAnalytics } from '@/hooks/useRealTimeAnalytics';
+import { weeklyMixAutomation } from '@/lib/weekly-mix-automation';
+import { useWeeklyMixIntegration } from '@/hooks/useWeeklyMixIntegration';
 
 interface WeeklyRecommendations {
   status: string;
@@ -90,6 +92,14 @@ function DiscoverPageContent() {
     trackSemanticFeatureUsage,
     trackRecommendationInteraction
   } = useRealTimeAnalytics('discover');
+
+  // Initialize weekly mix integration
+  const {
+    trackDiscoverSearch,
+    trackSemanticSearch,
+    trackPaperView: trackPaperViewWeeklyMix,
+    forceWeeklyMixUpdate
+  } = useWeeklyMixIntegration();
 
   // Handle URL parameters from Home page navigation
   useEffect(() => {
@@ -311,6 +321,10 @@ function DiscoverPageContent() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
+
+    // NEW: Force update weekly mix with latest user context
+    await forceWeeklyMixUpdate();
+
     await fetchWeeklyRecommendations();
     setRefreshing(false);
   };
@@ -319,6 +333,9 @@ function DiscoverPageContent() {
     // Track paper view
     trackPaperView(paper.pmid, paper.title);
     trackRecommendationInteraction('click', paper.pmid, paper.category || 'unknown');
+
+    // Track for weekly mix automation
+    trackPaperViewWeeklyMix(paper.pmid, paper.title, 'discover', { category: paper.category });
 
     // Navigate to paper details or open in new tab
     if (paper.pmid) {
