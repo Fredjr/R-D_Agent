@@ -189,14 +189,47 @@ class SpotifyInspiredRecommendationsService:
             research_domains = list(research_domains)
             logger.info(f"🎯 FINAL DETECTED DOMAINS: {research_domains} (from collections + articles)")
 
-            # Generate recommendations based on detected domains
-            raw_recommendations = await self._generate_domain_based_recommendations(research_domains, db)
+            # 🚀 CRITICAL FIX: Use the SAME methods as individual API endpoints
+            # Build proper user profile with detected domains
+            user_profile = {
+                "primary_domains": research_domains,
+                "topic_preferences": {domain: 0.9 for domain in research_domains},
+                "activity_level": "active" if len(user_articles) > 5 else "moderate",
+                "discovery_preference": "balanced",
+                "collaboration_score": 0.7,
+                "research_velocity": "active",
+                "recency_bias": 0.8,
+                "total_saved_papers": len(user_articles),
+                "is_collection_based": True
+            }
 
-            # 🚨 CRITICAL: Convert structure for global deduplication compatibility
-            # Direct approach returns {section: [papers]} but deduplication expects {section: {papers: [papers]}}
-            structured_recommendations = {}
-            for section, papers in raw_recommendations.items():
-                structured_recommendations[section] = {"papers": papers}
+            logger.info(f"🎯 DIRECT RECOMMENDATIONS: Using profile with domains {research_domains}")
+
+            # Generate recommendations using the SAME methods as individual APIs
+            papers_for_you_result = await self._generate_papers_for_you(user_profile, db)
+            trending_result = await self._generate_trending_in_field(user_profile, db)
+            cross_pollination_result = await self._generate_cross_pollination(user_profile, db)
+            citation_opportunities_result = await self._generate_citation_opportunities(user_profile, db)
+
+            # Extract papers from results (handle both dict and list formats)
+            papers_for_you_papers = papers_for_you_result.get("papers", []) if isinstance(papers_for_you_result, dict) else papers_for_you_result
+            trending_papers = trending_result.get("papers", []) if isinstance(trending_result, dict) else trending_result
+            cross_pollination_papers = cross_pollination_result.get("papers", []) if isinstance(cross_pollination_result, dict) else cross_pollination_result
+            citation_opportunities_papers = citation_opportunities_result.get("papers", []) if isinstance(citation_opportunities_result, dict) else citation_opportunities_result
+
+            logger.info(f"🎯 DIRECT RECOMMENDATIONS GENERATED:")
+            logger.info(f"   Papers for You: {len(papers_for_you_papers)} papers")
+            logger.info(f"   Trending: {len(trending_papers)} papers")
+            logger.info(f"   Cross-pollination: {len(cross_pollination_papers)} papers")
+            logger.info(f"   Citation Opportunities: {len(citation_opportunities_papers)} papers")
+
+            # Structure for global deduplication
+            structured_recommendations = {
+                "papers_for_you": {"papers": papers_for_you_papers},
+                "trending_in_field": {"papers": trending_papers},
+                "cross_pollination": {"papers": cross_pollination_papers},
+                "citation_opportunities": {"papers": citation_opportunities_papers}
+            }
 
             # 🚨 CRITICAL: Apply global deduplication to direct recommendations
             logger.info("🔄 Applying global deduplication to direct user recommendations...")
