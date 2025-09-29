@@ -44,8 +44,8 @@ export async function POST(request: NextRequest) {
 
     console.log('🚀 [Sync Review] Enhanced payload:', enhancedBody);
 
-    // Call synchronous backend endpoint
-    const response = await fetch(`${BACKEND_URL}/generate-review`, {
+    // Use background job system for reliable processing
+    const response = await fetch(`${BACKEND_URL}/background-jobs/generate-review`, {
       method: 'POST',
       headers,
       body: JSON.stringify(enhancedBody),
@@ -62,12 +62,67 @@ export async function POST(request: NextRequest) {
       }, { status: response.status });
     }
 
-    const result = await response.json();
-    console.log('🚀 [Sync Review] Success:', {
-      resultsCount: result?.results?.length || 0,
-      hasQueries: !!result?.queries,
-      hasDiagnostics: !!result?.diagnostics
+    const jobResult = await response.json();
+    console.log('🚀 [Sync Review] Background job started:', {
+      jobId: jobResult.job_id,
+      status: jobResult.status,
+      success: jobResult.success
     });
+
+    // For sync endpoint, we need to wait for the job to complete
+    // Poll the job status until completion
+    const jobId = jobResult.job_id;
+    let jobStatus = 'pending';
+    let attempts = 0;
+    const maxAttempts = 30; // 2.5 minutes max wait
+    let result = {};
+
+    while (jobStatus === 'pending' && attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+
+      const statusResponse = await fetch(`${BACKEND_URL}/background-jobs/${jobId}/status`, {
+        headers: { 'User-ID': userId || 'default_user' }
+      });
+
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json();
+        jobStatus = statusData.status;
+        console.log(`🚀 [Sync Review] Job ${jobId} status: ${jobStatus} (attempt ${attempts + 1})`);
+
+        if (jobStatus === 'completed') {
+          result = statusData.result || {};
+          result.analysis_id = jobId;
+          result.id = jobId;
+          result.review_id = jobId;
+          result.job_id = jobId;
+
+          console.log('🚀 [Sync Review] Job completed successfully:', {
+            resultsCount: result?.results?.length || 0,
+            hasQueries: !!result?.queries,
+            hasDiagnostics: !!result?.diagnostics
+          });
+          break;
+        } else if (jobStatus === 'failed') {
+          console.error('🚀 [Sync Review] Job failed:', statusData.error);
+          return NextResponse.json({
+            error: 'Background job failed',
+            details: statusData.error,
+            job_id: jobId
+          }, { status: 500 });
+        }
+      }
+
+      attempts++;
+    }
+
+    if (jobStatus === 'pending') {
+      return NextResponse.json({
+        error: 'Job timeout - still processing',
+        job_id: jobId,
+        status: 'timeout',
+        message: 'Job is still running in background. Use job_id to check status later.'
+      }, { status: 202 });
+    }
 
     // Save analysis to database
     try {
