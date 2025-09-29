@@ -243,12 +243,22 @@ class SpotifyInspiredRecommendationsService:
                 ][:8]  # 8 papers per domain
 
                 for paper in domain_papers:
+                    # Properly handle JSON authors field
+                    authors = paper.authors if isinstance(paper.authors, list) else []
+                    if not authors and paper.authors:
+                        # If authors is a string, try to parse it
+                        try:
+                            import json
+                            authors = json.loads(paper.authors) if isinstance(paper.authors, str) else []
+                        except:
+                            authors = [paper.authors] if paper.authors else []
+
                     papers_for_you.append({
                         "pmid": paper.pmid,
                         "title": paper.title,
-                        "authors": paper.authors[:3] if paper.authors else ["Unknown"],  # Handle missing authors
-                        "journal": paper.journal or "Unknown Journal",
-                        "year": paper.publication_year or 2023,
+                        "authors": authors[:3] if authors else [],  # PubMed always has authors, but handle edge cases
+                        "journal": paper.journal,
+                        "year": paper.publication_year,
                         "citation_count": paper.citation_count or 0,
                         "relevance_score": 0.9,
                         "reason": f"Matches your research in {domain}",
@@ -266,12 +276,21 @@ class SpotifyInspiredRecommendationsService:
             trending_papers = sorted(valid_articles, key=lambda x: x.citation_count or 0, reverse=True)[:15]
             trending_in_field = []
             for paper in trending_papers:
+                # Properly handle JSON authors field
+                authors = paper.authors if isinstance(paper.authors, list) else []
+                if not authors and paper.authors:
+                    try:
+                        import json
+                        authors = json.loads(paper.authors) if isinstance(paper.authors, str) else []
+                    except:
+                        authors = [paper.authors] if paper.authors else []
+
                 trending_in_field.append({
                     "pmid": paper.pmid,
                     "title": paper.title,
-                    "authors": paper.authors[:3] if paper.authors else ["Unknown"],  # Handle missing authors
-                    "journal": paper.journal or "Unknown Journal",
-                    "year": paper.publication_year or 2023,
+                    "authors": authors[:3] if authors else [],
+                    "journal": paper.journal,
+                    "year": paper.publication_year,
                     "citation_count": paper.citation_count or 0,
                     "relevance_score": 0.8,
                     "reason": "Highly cited in your field",
@@ -295,12 +314,21 @@ class SpotifyInspiredRecommendationsService:
                 ][:8]  # More papers per cross-domain
 
                 for paper in domain_papers:
+                    # Properly handle JSON authors field
+                    authors = paper.authors if isinstance(paper.authors, list) else []
+                    if not authors and paper.authors:
+                        try:
+                            import json
+                            authors = json.loads(paper.authors) if isinstance(paper.authors, str) else []
+                        except:
+                            authors = [paper.authors] if paper.authors else []
+
                     cross_pollination.append({
                         "pmid": paper.pmid,
                         "title": paper.title,
-                        "authors": paper.authors[:3] if paper.authors else ["Unknown"],  # Handle missing authors
-                        "journal": paper.journal or "Unknown Journal",
-                        "year": paper.publication_year or 2023,
+                        "authors": authors[:3] if authors else [],
+                        "journal": paper.journal,
+                        "year": paper.publication_year,
                         "citation_count": paper.citation_count or 0,
                         "relevance_score": 0.7,
                         "reason": f"Cross-domain insights from {domain}",
@@ -341,12 +369,21 @@ class SpotifyInspiredRecommendationsService:
                 ][:15]
 
             for paper in recent_papers:
+                # Properly handle JSON authors field
+                authors = paper.authors if isinstance(paper.authors, list) else []
+                if not authors and paper.authors:
+                    try:
+                        import json
+                        authors = json.loads(paper.authors) if isinstance(paper.authors, str) else []
+                    except:
+                        authors = [paper.authors] if paper.authors else []
+
                 citation_opportunities.append({
                     "pmid": paper.pmid,
                     "title": paper.title,
-                    "authors": paper.authors[:3] if paper.authors else ["Unknown"],  # Handle missing authors
-                    "journal": paper.journal or "Unknown Journal",
-                    "year": paper.publication_year or 2023,
+                    "authors": authors[:3] if authors else [],
+                    "journal": paper.journal,
+                    "year": paper.publication_year,
                     "citation_count": paper.citation_count or 0,
                     "relevance_score": 0.6,
                     "reason": "Good citation opportunity - recent paper with moderate citations",

@@ -12801,12 +12801,33 @@ async def create_global_deep_dive_analysis(
     try:
         logger.info(f"🔍 [Global Deep Dive Analyses] Creating analysis for user: {user_id}")
 
+        # Get or create a valid project_id
+        project_id = analysis_data.get("project_id")
+        if not project_id or project_id == "default":
+            # Find user's first project or create a default one
+            user_project = db.query(Project).filter(Project.created_by == user_id).first()
+            if user_project:
+                project_id = user_project.project_id
+            else:
+                # Create a default project for the user
+                default_project = Project(
+                    project_id=str(uuid.uuid4()),
+                    name="Default Project",
+                    description="Auto-created default project for analyses",
+                    created_by=user_id,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
+                )
+                db.add(default_project)
+                db.commit()
+                project_id = default_project.project_id
+
         # Create new analysis record
         analysis = DeepDiveAnalysis(
             analysis_id=str(uuid.uuid4()),
             article_pmid=analysis_data.get("pmid") or analysis_data.get("article_pmid"),
             article_title=analysis_data.get("title") or analysis_data.get("article_title"),
-            project_id=analysis_data.get("project_id", "default"),
+            project_id=project_id,
             created_by=user_id,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
@@ -12907,12 +12928,33 @@ async def create_global_generate_review_analysis(
     try:
         logger.info(f"📝 [Global Generate Review Analyses] Creating analysis for user: {user_id}")
 
+        # Get or create a valid project_id
+        project_id = analysis_data.get("project_id")
+        if not project_id or project_id == "default":
+            # Find user's first project or create a default one
+            user_project = db.query(Project).filter(Project.created_by == user_id).first()
+            if user_project:
+                project_id = user_project.project_id
+            else:
+                # Create a default project for the user
+                default_project = Project(
+                    project_id=str(uuid.uuid4()),
+                    name="Default Project",
+                    description="Auto-created default project for analyses",
+                    created_by=user_id,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
+                )
+                db.add(default_project)
+                db.commit()
+                project_id = default_project.project_id
+
         # Create new report record
         report = Report(
             report_id=str(uuid.uuid4()),
             title=analysis_data.get("molecule", "Generate Review Analysis"),
             objective=analysis_data.get("objective", "Generate review analysis"),
-            project_id=analysis_data.get("project_id", "default"),
+            project_id=project_id,
             created_by=user_id,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
