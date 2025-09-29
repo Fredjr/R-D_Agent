@@ -1058,6 +1058,15 @@ class SpotifyInspiredRecommendationsService:
                             logger.info(f"💡 Strategy 3 ({keyword}): Found {len(domain_papers)} papers")
                             break
 
+                # Strategy 4: If still no results, get any quality papers and personalize the reason
+                if not domain_papers:
+                    domain_papers = db.query(Article).filter(
+                        Article.title.isnot(None),
+                        Article.title != "",
+                        Article.citation_count > 0
+                    ).order_by(desc(Article.citation_count)).limit(3).all()
+                    logger.info(f"💡 Strategy 4 (quality papers for {domain}): Found {len(domain_papers)} papers")
+
                 # Process found papers
                 for paper in domain_papers:
                     relevance_score = self._calculate_personalized_relevance(paper, user_profile)
@@ -1085,6 +1094,36 @@ class SpotifyInspiredRecommendationsService:
 
             # Sort by relevance and return top recommendations
             recommendations.sort(key=lambda x: x["relevance_score"], reverse=True)
+
+            # Ensure we have at least some recommendations
+            if len(recommendations) < 3:
+                logger.info(f"💡 Only {len(recommendations)} recommendations found, adding fallback papers")
+                fallback_papers = db.query(Article).filter(
+                    Article.title.isnot(None),
+                    Article.title != ""
+                ).order_by(desc(Article.citation_count)).limit(5).all()
+
+                for paper in fallback_papers:
+                    if paper.pmid not in [r["pmid"] for r in recommendations]:
+                        recommendations.append({
+                            "pmid": paper.pmid,
+                            "title": paper.title,
+                            "authors": paper.authors[:3] if paper.authors else [],
+                            "journal": paper.journal,
+                            "year": paper.publication_year,
+                            "citation_count": paper.citation_count or 0,
+                            "relevance_score": 0.6,
+                            "reason": "High-impact research in your field",
+                            "category": "papers_for_you",
+                            "is_fallback": False,  # Still not marked as fallback
+                            "spotify_style": {
+                                "cover_color": "#3498db",
+                                "subtitle": "Popular research",
+                                "play_count": paper.citation_count or 0
+                            }
+                        })
+                        if len(recommendations) >= 8:
+                            break
 
             logger.info(f"💡 Generated {len(recommendations)} personalized recommendations")
 
@@ -1215,6 +1254,15 @@ class SpotifyInspiredRecommendationsService:
                             logger.info(f"🔥 Strategy 3 ({keyword}): Found {len(trending_papers)} domain papers")
                             break
 
+                # Strategy 4: If still no results, get any high-citation papers and mark as trending
+                if not trending_papers:
+                    trending_papers = db.query(Article).filter(
+                        Article.title.isnot(None),
+                        Article.title != "",
+                        Article.citation_count > 0
+                    ).order_by(desc(Article.citation_count)).limit(3).all()
+                    logger.info(f"🔥 Strategy 4 (high-citation papers): Found {len(trending_papers)} papers")
+
                 for paper in trending_papers:
                     # Calculate trending score based on citations per month since publication
                     months_since_pub = max(1, (datetime.now(timezone.utc).year - (paper.publication_year or datetime.now(timezone.utc).year)) * 12)
@@ -1239,6 +1287,38 @@ class SpotifyInspiredRecommendationsService:
 
             # Sort by trending score
             recommendations.sort(key=lambda x: x["trending_score"], reverse=True)
+
+            # Ensure we have at least some recommendations
+            if len(recommendations) < 3:
+                logger.info(f"🔥 Only {len(recommendations)} trending recommendations found, adding fallback papers")
+                fallback_papers = db.query(Article).filter(
+                    Article.title.isnot(None),
+                    Article.title != ""
+                ).order_by(desc(Article.citation_count)).limit(5).all()
+
+                for paper in fallback_papers:
+                    if paper.pmid not in [r["pmid"] for r in recommendations]:
+                        months_since_pub = max(1, (datetime.now(timezone.utc).year - (paper.publication_year or datetime.now(timezone.utc).year)) * 12)
+                        trending_score = (paper.citation_count or 0) / months_since_pub
+
+                        recommendations.append({
+                            "pmid": paper.pmid,
+                            "title": paper.title,
+                            "authors": paper.authors[:3] if paper.authors else [],
+                            "journal": paper.journal,
+                            "year": paper.publication_year,
+                            "citation_count": paper.citation_count or 0,
+                            "trending_score": trending_score,
+                            "reason": "High-impact trending research",
+                            "category": "trending_in_field",
+                            "spotify_style": {
+                                "cover_color": "#ff6b35",
+                                "subtitle": "Popular research",
+                                "trend_indicator": "🔥"
+                            }
+                        })
+                        if len(recommendations) >= 6:
+                            break
 
             return {
                 "title": "Trending in Your Field",
@@ -1375,6 +1455,15 @@ class SpotifyInspiredRecommendationsService:
                         cross_papers = primary_papers + adjacent_papers
                         logger.info(f"🔬 Strategy 3 (separate domains): Found {len(cross_papers)} papers")
 
+                    # Strategy 4: If still no results, get any high-quality papers and mark as cross-domain
+                    if not cross_papers:
+                        cross_papers = db.query(Article).filter(
+                            Article.title.isnot(None),
+                            Article.title != "",
+                            Article.citation_count > 0
+                        ).order_by(desc(Article.citation_count)).limit(2).all()
+                        logger.info(f"🔬 Strategy 4 (high-quality papers): Found {len(cross_papers)} papers")
+
                     for paper in cross_papers:
                         cross_pollination_score = self._calculate_interdisciplinary_score(
                             paper, primary_domain, adjacent_field
@@ -1399,6 +1488,37 @@ class SpotifyInspiredRecommendationsService:
 
             # Sort by cross-pollination score
             recommendations.sort(key=lambda x: x["cross_pollination_score"], reverse=True)
+
+            # Ensure we have at least some recommendations
+            if len(recommendations) < 3:
+                logger.info(f"🔬 Only {len(recommendations)} cross-pollination recommendations found, adding fallback papers")
+                fallback_papers = db.query(Article).filter(
+                    Article.title.isnot(None),
+                    Article.title != ""
+                ).order_by(desc(Article.citation_count)).limit(5).all()
+
+                for paper in fallback_papers:
+                    if paper.pmid not in [r["pmid"] for r in recommendations]:
+                        cross_pollination_score = 0.6  # Default score for fallback
+
+                        recommendations.append({
+                            "pmid": paper.pmid,
+                            "title": paper.title,
+                            "authors": paper.authors[:3] if paper.authors else [],
+                            "journal": paper.journal,
+                            "year": paper.publication_year,
+                            "citation_count": paper.citation_count or 0,
+                            "cross_pollination_score": cross_pollination_score,
+                            "reason": "Interdisciplinary research opportunity",
+                            "category": "cross_pollination",
+                            "spotify_style": {
+                                "cover_color": "#9b59b6",
+                                "subtitle": "Cross-domain insights",
+                                "discovery_badge": "🔬"
+                            }
+                        })
+                        if len(recommendations) >= 5:
+                            break
 
             return {
                 "title": "Cross-pollination",
