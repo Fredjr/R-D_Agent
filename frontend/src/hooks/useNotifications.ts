@@ -3,7 +3,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useUser } from '@clerk/nextjs';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface NotificationData {
   id: string;
@@ -37,7 +37,7 @@ const WEBSOCKET_URL = process.env.NODE_ENV === 'production'
   : 'ws://localhost:8000/ws';
 
 export function useNotifications(): UseNotificationsReturn {
-  const { user } = useUser();
+  const { user } = useAuth();
   const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
@@ -46,11 +46,11 @@ export function useNotifications(): UseNotificationsReturn {
   const maxReconnectAttempts = 5;
 
   const connect = useCallback(() => {
-    if (!user?.emailAddresses?.[0]?.emailAddress) {
+    if (!user?.email) {
       return;
     }
 
-    const userEmail = user.emailAddresses[0].emailAddress;
+    const userEmail = user.email;
     const wsUrl = `${WEBSOCKET_URL}/${encodeURIComponent(userEmail)}`;
 
     try {
@@ -202,7 +202,7 @@ export function useNotifications(): UseNotificationsReturn {
 
   // Connect/disconnect WebSocket based on user authentication
   useEffect(() => {
-    if (user?.emailAddresses?.[0]?.emailAddress) {
+    if (user?.email) {
       connect();
     } else {
       disconnect();

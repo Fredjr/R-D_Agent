@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { useUser } from '@clerk/nextjs';
+import { useAuth } from '@/contexts/AuthContext';
 import { Loader2, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 
 interface BackgroundJobManagerProps {
@@ -13,12 +13,12 @@ interface BackgroundJobManagerProps {
   className?: string;
 }
 
-export function BackgroundJobManager({ 
-  onJobStarted, 
-  onJobCompleted, 
-  className = '' 
+export function BackgroundJobManager({
+  onJobStarted,
+  onJobCompleted,
+  className = ''
 }: BackgroundJobManagerProps) {
-  const { user } = useUser();
+  const { user } = useAuth();
   const [activeJobs, setActiveJobs] = useState<Map<string, {
     id: string;
     type: 'generate_review' | 'deep_dive';
@@ -33,13 +33,13 @@ export function BackgroundJobManager({
     params: any,
     title: string
   ): Promise<string | null> => {
-    if (!user?.emailAddresses?.[0]?.emailAddress) {
+    if (!user?.email) {
       console.error('User not authenticated');
       return null;
     }
 
     try {
-      const endpoint = type === 'generate_review' 
+      const endpoint = type === 'generate_review'
         ? '/api/proxy/background-jobs/generate-review'
         : '/api/proxy/background-jobs/deep-dive';
 
@@ -47,7 +47,7 @@ export function BackgroundJobManager({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'User-ID': user.emailAddresses[0].emailAddress
+          'User-ID': user.email
         },
         body: JSON.stringify(params)
       });
@@ -88,13 +88,13 @@ export function BackgroundJobManager({
   }, [user, onJobStarted]);
 
   const pollJobStatus = useCallback(async (jobId: string) => {
-    if (!user?.emailAddresses?.[0]?.emailAddress) return;
+    if (!user?.email) return;
 
     const poll = async () => {
       try {
         const response = await fetch(`/api/proxy/background-jobs/${jobId}/status`, {
           headers: {
-            'User-ID': user.emailAddresses[0].emailAddress
+            'User-ID': user.email
           }
         });
 
@@ -276,12 +276,9 @@ export function BackgroundJobManager({
   );
 }
 
-// Export helper functions for use in other components
-export { BackgroundJobManager };
-
 // Hook for easy access to background job functionality
 export function useBackgroundJobs() {
-  const { user } = useUser();
+  const { user } = useAuth();
 
   const startGenerateReview = useCallback(async (params: {
     molecule: string;
@@ -289,7 +286,7 @@ export function useBackgroundJobs() {
     project_id?: string;
     max_results?: number;
   }) => {
-    if (!user?.emailAddresses?.[0]?.emailAddress) {
+    if (!user?.email) {
       throw new Error('User not authenticated');
     }
 
@@ -297,7 +294,7 @@ export function useBackgroundJobs() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'User-ID': user.emailAddresses[0].emailAddress
+        'User-ID': user.email
       },
       body: JSON.stringify(params)
     });
@@ -319,7 +316,7 @@ export function useBackgroundJobs() {
     article_title: string;
     project_id?: string;
   }) => {
-    if (!user?.emailAddresses?.[0]?.emailAddress) {
+    if (!user?.email) {
       throw new Error('User not authenticated');
     }
 
@@ -327,7 +324,7 @@ export function useBackgroundJobs() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'User-ID': user.emailAddresses[0].emailAddress
+        'User-ID': user.email
       },
       body: JSON.stringify(params)
     });

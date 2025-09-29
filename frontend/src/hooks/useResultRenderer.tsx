@@ -3,8 +3,8 @@
  * Fetches and renders results from database without re-processing
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import { useUser } from '@clerk/nextjs';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface ReportResult {
   report_id: string;
@@ -39,12 +39,12 @@ export interface UseResultRendererReturn {
   // Report functions
   getReport: (reportId: string) => Promise<ReportResult | null>;
   getProjectReports: (projectId: string) => Promise<ReportResult[]>;
-  renderReport: (report: ReportResult) => JSX.Element | null;
-  
+  renderReport: (report: ReportResult) => React.JSX.Element | null;
+
   // Deep dive functions
   getDeepDive: (analysisId: string) => Promise<DeepDiveResult | null>;
   getProjectDeepDives: (projectId: string) => Promise<DeepDiveResult[]>;
-  renderDeepDive: (analysis: DeepDiveResult) => JSX.Element | null;
+  renderDeepDive: (analysis: DeepDiveResult) => React.JSX.Element | null;
   
   // Loading states
   isLoading: boolean;
@@ -52,12 +52,12 @@ export interface UseResultRendererReturn {
 }
 
 export function useResultRenderer(): UseResultRendererReturn {
-  const { user } = useUser();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const getUserEmail = useCallback(() => {
-    return user?.emailAddresses?.[0]?.emailAddress;
+    return user?.email;
   }, [user]);
 
   const getReport = useCallback(async (reportId: string): Promise<ReportResult | null> => {
@@ -186,7 +186,7 @@ export function useResultRenderer(): UseResultRendererReturn {
     }
   }, [getUserEmail]);
 
-  const renderReport = useCallback((report: ReportResult): JSX.Element | null => {
+  const renderReport = useCallback((report: ReportResult): React.JSX.Element | null => {
     if (!report.content) return null;
 
     return (
@@ -241,7 +241,7 @@ export function useResultRenderer(): UseResultRendererReturn {
     );
   }, []);
 
-  const renderDeepDive = useCallback((analysis: DeepDiveResult): JSX.Element | null => {
+  const renderDeepDive = useCallback((analysis: DeepDiveResult): React.JSX.Element | null => {
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         {/* Header */}
