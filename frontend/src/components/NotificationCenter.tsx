@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Notification Center Component
  * Displays real-time notifications with clickable actions

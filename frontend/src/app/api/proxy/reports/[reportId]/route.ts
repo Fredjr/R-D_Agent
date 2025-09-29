@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest,
-  context: { params: Promise<{ reportId: string }> }
+  { params }: { params: Promise<{ reportId: string }> }
 ) {
   try {
-    const { reportId } = await context.params;
+    const { reportId } = await params;
     const userID = request.headers.get('User-ID') || 'default_user';
     
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://r-dagent-production.up.railway.app';

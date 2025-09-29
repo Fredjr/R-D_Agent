@@ -1,6 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
+
+// Force dynamic rendering to avoid SSR issues with auth context
+export const dynamic = 'force-dynamic';
 import { 
   UserIcon, 
   BellIcon, 

@@ -3,7 +3,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useUser } from '@clerk/nextjs';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface NetworkNode {
   id: string;
@@ -67,7 +67,7 @@ export interface UseNetworkSessionReturn {
 const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
 
 export function useNetworkSession(collectionId?: string): UseNetworkSessionReturn {
-  const { user } = useUser();
+  const { user } = useAuth();
   const [currentSession, setCurrentSession] = useState<NetworkSession | null>(null);
   const [availableSessions, setAvailableSessions] = useState<NetworkSession[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -76,7 +76,7 @@ export function useNetworkSession(collectionId?: string): UseNetworkSessionRetur
   const lastSavedStateRef = useRef<NetworkState | null>(null);
 
   const getUserEmail = useCallback(() => {
-    return user?.emailAddresses?.[0]?.emailAddress;
+    return user?.email;
   }, [user]);
 
   const createSession = useCallback(async (
