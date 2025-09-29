@@ -10,6 +10,7 @@ import CollectionArticles from './CollectionArticles';
 import { useResponsive, MobileCollectionGrid, MobileTabs, MobileFAB } from './MobileOptimizations';
 import { CollectionLoadingSkeleton, InlineLoading } from './LoadingStates';
 import { SourceBadge } from './DataSourceIndicators';
+import { DeletableCollectionCard } from './ui/DeletableCard';
 
 interface CollectionsProps {
   projectId: string;
@@ -249,55 +250,25 @@ export default function Collections({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {collections.map((collection, index) => (
-            <div
+            <DeletableCollectionCard
               key={collection.collection_id}
-              className="bg-white rounded-lg shadow border hover:shadow-md transition-shadow"
-            >
-              <div className="p-6">
-                <div className="flex items-center gap-3 mb-3">
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center"
-                    style={{ backgroundColor: colors[index % colors.length] }}
-                  >
-                    <FolderIcon className="w-5 h-5 text-white" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 truncate">
-                    {collection.collection_name}
-                  </h3>
-                </div>
-                
-                {collection.description && (
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                    {collection.description}
-                  </p>
-                )}
-                
-                <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
-                  <div className="flex items-center gap-1">
-                    <DocumentTextIcon className="w-4 h-4" />
-                    <span>{collection.article_count} articles</span>
-                  </div>
-                  <span>{new Date(collection.created_at).toLocaleDateString()}</span>
-                </div>
-                
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleViewArticles(collection)}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-sm"
-                  >
-                    <ListBulletIcon className="w-4 h-4" />
-                    Explore Articles
-                  </button>
-                  <button
-                    onClick={() => handleViewNetwork(collection)}
-                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-sm"
-                  >
-                    <EyeIcon className="w-4 h-4" />
-                    Network View
-                  </button>
-                </div>
-              </div>
-            </div>
+              title={collection.collection_name}
+              description={collection.description}
+              articleCount={collection.article_count}
+              lastUpdated={new Date(collection.created_at).toLocaleDateString()}
+              color={colors[index % colors.length]}
+              collectionId={collection.collection_id}
+              projectId={projectId}
+              onClick={() => handleViewArticles(collection)}
+              onExplore={() => handleViewArticles(collection)}
+              onNetworkView={() => handleViewNetwork(collection)}
+              onDelete={() => {
+                // Refresh collections after deletion
+                refreshCollections();
+                broadcastCollectionDeleted(collection.collection_id);
+                onRefresh?.();
+              }}
+            />
           ))}
         </div>
       )}
