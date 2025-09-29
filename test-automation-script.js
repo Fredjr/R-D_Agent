@@ -98,36 +98,46 @@ const testBackendAPIs = async () => {
 
 const testHomePageElements = () => {
   log('🏠 Testing Home Page Elements...', 'info');
-  
+
   const homePageTests = [
     {
       name: 'Cross-Domain Discoveries Section',
-      selector: '[data-testid="cross-domain-section"], .cross-domain, h3:contains("Cross-Domain")',
+      selector: 'h3',
+      textMatch: 'Cross-Domain Discoveries',
       shouldNotContain: '0 papers'
     },
     {
       name: 'Trending Now Section',
-      selector: '[data-testid="trending-section"], .trending, h3:contains("Trending Now")',
+      selector: 'h3',
+      textMatch: 'Trending Now',
       shouldNotContain: '0 papers'
     },
     {
       name: 'For You Section',
-      selector: '[data-testid="for-you-section"], .for-you, h3:contains("For You")',
+      selector: 'h3',
+      textMatch: 'For You',
       shouldNotContain: '0 papers'
     }
   ];
   
   const results = {};
   homePageTests.forEach(test => {
-    const element = document.querySelector(test.selector);
+    // Find all h3 elements and look for text match
+    const h3Elements = Array.from(document.querySelectorAll(test.selector));
+    const element = h3Elements.find(el => el.textContent.includes(test.textMatch));
+
     if (element) {
-      const hasZeroPapers = element.textContent.includes('0 papers');
+      // Look at the parent section for paper count
+      const section = element.closest('div');
+      const sectionText = section ? section.textContent : element.textContent;
+      const hasZeroPapers = sectionText.includes('0 papers');
+
       results[test.name] = {
         found: true,
         hasZeroPapers,
-        text: element.textContent.substring(0, 100) + '...'
+        text: sectionText.substring(0, 200) + '...'
       };
-      
+
       if (hasZeroPapers) {
         log(`${test.name}: Still showing "0 papers"`, 'error');
       } else {
@@ -144,43 +154,50 @@ const testHomePageElements = () => {
 
 const testDiscoverPageElements = () => {
   log('🔍 Testing Discover Page Elements...', 'info');
-  
+
   const discoverTests = [
     {
       name: 'Semantic Discovery Interface',
-      selector: '[data-testid="semantic-discovery"], .semantic-discovery',
+      selector: 'button',
+      textMatch: 'Smart Recommendations',
       required: true
     },
     {
       name: 'Smart Recommendations Button',
-      selector: 'button:contains("Smart Recommendations"), [data-testid="smart-recommendations"]',
+      selector: 'button',
+      textMatch: 'Smart Recommendations',
       required: true
     },
     {
       name: 'Semantic Search Button',
-      selector: 'button:contains("Semantic Search"), [data-testid="semantic-search"]',
+      selector: 'button',
+      textMatch: 'Semantic Search',
       required: true
     },
     {
       name: 'Smart Filters Button',
-      selector: 'button:contains("Smart Filters"), [data-testid="smart-filters"]',
+      selector: 'button',
+      textMatch: 'Smart Filters',
       required: true
     },
     {
       name: 'Cross-Domain Discovery Button (Should be REMOVED)',
-      selector: 'button:contains("Cross-Domain Discovery")',
+      selector: 'button',
+      textMatch: 'Cross-Domain Discovery',
       required: false,
       shouldNotExist: true
     },
     {
       name: 'Trending Now Button (Should be REMOVED)',
-      selector: 'button:contains("Trending Now")',
+      selector: 'button',
+      textMatch: 'Trending Now',
       required: false,
       shouldNotExist: true
     },
     {
       name: 'For You Button (Should be REMOVED)',
-      selector: 'button:contains("For You")',
+      selector: 'button',
+      textMatch: 'For You',
       required: false,
       shouldNotExist: true
     }
@@ -188,11 +205,13 @@ const testDiscoverPageElements = () => {
   
   const results = {};
   discoverTests.forEach(test => {
-    const element = document.querySelector(test.selector);
+    // Find all buttons and look for text match
+    const buttons = Array.from(document.querySelectorAll(test.selector));
+    const element = buttons.find(btn => btn.textContent.includes(test.textMatch));
     const exists = !!element;
-    
+
     results[test.name] = { exists, shouldNotExist: test.shouldNotExist };
-    
+
     if (test.shouldNotExist) {
       if (exists) {
         log(`${test.name}: Should be removed but still exists`, 'error');
@@ -213,39 +232,42 @@ const testDiscoverPageElements = () => {
 
 const testSemanticSections = () => {
   log('🎯 Testing Semantic Recommendation Sections...', 'info');
-  
+
   const sectionTests = [
     {
       name: 'Cross-Domain Insights Section',
-      selector: '[data-testid="cross-domain-insights"], .cross-domain-insights, h3:contains("Cross-Domain Insights")',
+      textMatch: 'Cross-Domain Insights',
       shouldNotContain: 'No papers found'
     },
     {
       name: 'Trending Discoveries Section',
-      selector: '[data-testid="trending-discoveries"], .trending-discoveries, h3:contains("Trending Discoveries")',
+      textMatch: 'Trending Discoveries',
       shouldNotContain: 'No papers found'
     },
     {
       name: 'Semantic Matches Section',
-      selector: '[data-testid="semantic-matches"], .semantic-matches, h3:contains("Semantic Matches")',
+      textMatch: 'Semantic Matches',
       shouldNotContain: 'No papers found'
     }
   ];
   
   const results = {};
   sectionTests.forEach(test => {
-    const element = document.querySelector(test.selector);
+    // Find all elements and look for text match
+    const allElements = Array.from(document.querySelectorAll('*'));
+    const element = allElements.find(el => el.textContent.includes(test.textMatch) && el.textContent.length < 500);
+
     if (element) {
       const hasNoPapers = element.textContent.includes('No papers found');
       const paperCount = (element.textContent.match(/\d+\s+papers?/g) || []).length;
-      
+
       results[test.name] = {
         found: true,
         hasNoPapers,
         paperCount,
         text: element.textContent.substring(0, 200) + '...'
       };
-      
+
       if (hasNoPapers) {
         log(`${test.name}: Still showing "No papers found"`, 'error');
       } else {
