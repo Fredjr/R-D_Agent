@@ -120,21 +120,42 @@ export default function HomePage() {
         let crossDomainResults = [];
         if (crossDomainResponse.status === 'fulfilled' && crossDomainResponse.value.ok) {
           const crossDomainData = await crossDomainResponse.value.json();
-          crossDomainResults = crossDomainData.papers || crossDomainData.recommendations || [];
+          console.log('🏠 Cross-domain API response:', JSON.stringify(crossDomainData, null, 2));
+
+          // Handle different response formats
+          crossDomainResults = crossDomainData.papers ||
+                              crossDomainData.recommendations ||
+                              crossDomainData.cross_pollination ||
+                              (crossDomainData.recommendations?.cross_pollination) ||
+                              [];
         }
 
         // Process trending results
         let trendingResults = [];
         if (trendingResponse.status === 'fulfilled' && trendingResponse.value.ok) {
           const trendingData = await trendingResponse.value.json();
-          trendingResults = trendingData.papers || trendingData.recommendations || [];
+          console.log('🏠 Trending API response:', JSON.stringify(trendingData, null, 2));
+
+          // Handle different response formats
+          trendingResults = trendingData.papers ||
+                           trendingData.recommendations ||
+                           trendingData.trending_in_field ||
+                           (trendingData.recommendations?.trending_in_field) ||
+                           [];
         }
 
         // Process personalized results
         let personalizedResults = [];
         if (personalizedResponse.status === 'fulfilled' && personalizedResponse.value.ok) {
           const personalizedData = await personalizedResponse.value.json();
-          personalizedResults = personalizedData.papers || personalizedData.recommendations || [];
+          console.log('🏠 Personalized API response:', JSON.stringify(personalizedData, null, 2));
+
+          // Handle different response formats
+          personalizedResults = personalizedData.papers ||
+                               personalizedData.recommendations ||
+                               personalizedData.papers_for_you ||
+                               (personalizedData.recommendations?.papers_for_you) ||
+                               [];
         }
 
         console.log('🏠 HOME: Real semantic recommendations fetched:', {

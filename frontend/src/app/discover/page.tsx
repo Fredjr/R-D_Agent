@@ -366,30 +366,51 @@ function DiscoverPageContent() {
       let crossDomainPapers = [];
       if (crossDomainResponse.status === 'fulfilled' && crossDomainResponse.value.ok) {
         const crossDomainData = await crossDomainResponse.value.json();
-        crossDomainPapers = crossDomainData.papers || crossDomainData.recommendations || [];
+        console.log('🔍 Cross-domain API response:', JSON.stringify(crossDomainData, null, 2));
+
+        // Handle different response formats
+        crossDomainPapers = crossDomainData.papers ||
+                           crossDomainData.recommendations ||
+                           crossDomainData.cross_pollination ||
+                           (crossDomainData.recommendations?.cross_pollination) ||
+                           [];
         console.log('✅ Cross-domain recommendations loaded:', crossDomainPapers.length);
       } else {
-        console.warn('⚠️ Cross-domain recommendations failed, using fallback');
+        console.warn('⚠️ Cross-domain recommendations failed:', crossDomainResponse);
       }
 
       // Process trending results
       let trendingPapers = [];
       if (trendingResponse.status === 'fulfilled' && trendingResponse.value.ok) {
         const trendingData = await trendingResponse.value.json();
-        trendingPapers = trendingData.papers || trendingData.recommendations || [];
+        console.log('🔍 Trending API response:', JSON.stringify(trendingData, null, 2));
+
+        // Handle different response formats
+        trendingPapers = trendingData.papers ||
+                        trendingData.recommendations ||
+                        trendingData.trending_in_field ||
+                        (trendingData.recommendations?.trending_in_field) ||
+                        [];
         console.log('✅ Trending recommendations loaded:', trendingPapers.length);
       } else {
-        console.warn('⚠️ Trending recommendations failed, using fallback');
+        console.warn('⚠️ Trending recommendations failed:', trendingResponse);
       }
 
       // Process personalized results
       let personalizedPapers = [];
       if (personalizedResponse.status === 'fulfilled' && personalizedResponse.value.ok) {
         const personalizedData = await personalizedResponse.value.json();
-        personalizedPapers = personalizedData.papers || personalizedData.recommendations || [];
+        console.log('🔍 Personalized API response:', JSON.stringify(personalizedData, null, 2));
+
+        // Handle different response formats
+        personalizedPapers = personalizedData.papers ||
+                            personalizedData.recommendations ||
+                            personalizedData.papers_for_you ||
+                            (personalizedData.recommendations?.papers_for_you) ||
+                            [];
         console.log('✅ Personalized recommendations loaded:', personalizedPapers.length);
       } else {
-        console.warn('⚠️ Personalized recommendations failed, using fallback');
+        console.warn('⚠️ Personalized recommendations failed:', personalizedResponse);
       }
 
       setSemanticRecommendations({
@@ -812,8 +833,7 @@ function DiscoverPageContent() {
           </div>
         </div>
 
-        {/* Semantic Discovery Interface - REMOVED: Redundant with dedicated sections below */}
-        {/*
+        {/* Semantic Discovery Interface - Keep semantic search, remove only redundant buttons */}
         <div className="mb-8 px-4 sm:px-6">
           <SemanticDiscoveryInterface
             activeMode={activeDiscoveryMode}
@@ -824,7 +844,6 @@ function DiscoverPageContent() {
             loading={loading}
           />
         </div>
-        */}
 
         {/* NEW: Semantic Recommendation Sections */}
         <div className="mb-8 px-4 sm:px-6">
