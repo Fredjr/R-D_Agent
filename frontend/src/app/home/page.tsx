@@ -186,6 +186,13 @@ export default function HomePage() {
           citationOpportunities: citationResults.length
         });
 
+        // Debug: Log citation opportunities data
+        if (citationResults.length > 0) {
+          console.log('🎯 Citation Opportunities found:', citationResults.length, 'papers');
+        } else {
+          console.log('⚠️ No Citation Opportunities returned from API');
+        }
+
         setSemanticRecommendations({
           crossDomain: crossDomainResults, // Keep all results for dynamic count
           trending: trendingResults,
