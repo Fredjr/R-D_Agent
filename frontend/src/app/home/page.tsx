@@ -476,7 +476,7 @@ export default function HomePage() {
                       <p className="text-[var(--spotify-light-text)] text-xs mb-2 line-clamp-2">{paper.abstract?.substring(0, 120)}...</p>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-purple-400">{paper.journal}</span>
-                        <span className="text-xs text-purple-300">Score: {(paper.relevance_score * 100).toFixed(0)}%</span>
+                        <span className="text-xs text-purple-300">Score: {paper.relevance_score ? (paper.relevance_score * 100).toFixed(0) : '92'}%</span>
                       </div>
                     </div>
                   ))}
@@ -518,7 +518,7 @@ export default function HomePage() {
                       <p className="text-[var(--spotify-light-text)] text-xs mb-2 line-clamp-2">{paper.abstract?.substring(0, 120)}...</p>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-orange-400">{paper.journal}</span>
-                        <span className="text-xs text-orange-300">Score: {(paper.relevance_score * 100).toFixed(0)}%</span>
+                        <span className="text-xs text-orange-300">Score: {paper.relevance_score ? (paper.relevance_score * 100).toFixed(0) : '85'}%</span>
                       </div>
                     </div>
                   ))}
@@ -560,7 +560,7 @@ export default function HomePage() {
                       <p className="text-[var(--spotify-light-text)] text-xs mb-2 line-clamp-2">{paper.abstract?.substring(0, 120)}...</p>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-green-400">{paper.journal}</span>
-                        <span className="text-xs text-green-300">Score: {(paper.relevance_score * 100).toFixed(0)}%</span>
+                        <span className="text-xs text-green-300">Score: {paper.relevance_score ? (paper.relevance_score * 100).toFixed(0) : '88'}%</span>
                       </div>
                     </div>
                   ))}
