@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { handleProxyError, handleProxyException } from '../../../utils/proxy-utils';
+import { handleProxyError, handleProxyException } from '@/lib/errorHandler';
 
-const BACKEND_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://r-dagent-production.up.railway.app';
+// Force Railway URL to bypass cached Vercel environment variables
+const BACKEND_BASE = "https://r-dagent-production.up.railway.app";
 
 export async function POST(
   request: NextRequest,
