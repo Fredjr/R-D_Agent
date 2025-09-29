@@ -444,12 +444,22 @@ class SpotifyInspiredRecommendationsService:
                     }
             else:
                 # Traditional recommendation methods
-                raw_recommendations = {
+                raw_method_results = {
                     "papers_for_you": await self._generate_papers_for_you(user_profile, db),
                     "trending_in_field": await self._generate_trending_in_field(user_profile, db),
                     "cross_pollination": await self._generate_cross_pollination(user_profile, db),
                     "citation_opportunities": await self._generate_citation_opportunities(user_profile, db)
                 }
+
+                # Extract papers arrays from method results (methods return {title, papers, updated})
+                raw_recommendations = {}
+                for category, method_result in raw_method_results.items():
+                    if isinstance(method_result, dict) and "papers" in method_result:
+                        raw_recommendations[category] = method_result["papers"]
+                        logger.info(f"📄 {category}: Extracted {len(method_result['papers'])} papers from method result")
+                    else:
+                        raw_recommendations[category] = []
+                        logger.warning(f"⚠️ {category}: Method result has unexpected structure: {type(method_result)}")
 
                 # Apply global deduplication across all recommendation types
                 recommendations = self._apply_global_deduplication(raw_recommendations)
@@ -467,29 +477,30 @@ class SpotifyInspiredRecommendationsService:
             try:
                 # Enhance each category with semantic analysis
                 if recommendations and isinstance(recommendations, dict):
-                    if recommendations.get("papers_for_you") and recommendations["papers_for_you"].get("papers"):
+                    # Now recommendations contains arrays directly, not nested in "papers" key
+                    if recommendations.get("papers_for_you") and isinstance(recommendations["papers_for_you"], list):
                         enhanced_papers = await self._enhance_papers_with_semantic_analysis(
-                            recommendations["papers_for_you"]["papers"]
+                            recommendations["papers_for_you"]
                         )
-                        recommendations["papers_for_you"]["papers"] = enhanced_papers
+                        recommendations["papers_for_you"] = enhanced_papers
 
-                    if recommendations.get("trending_in_field") and recommendations["trending_in_field"].get("papers"):
+                    if recommendations.get("trending_in_field") and isinstance(recommendations["trending_in_field"], list):
                         enhanced_papers = await self._enhance_papers_with_semantic_analysis(
-                            recommendations["trending_in_field"]["papers"]
+                            recommendations["trending_in_field"]
                         )
-                        recommendations["trending_in_field"]["papers"] = enhanced_papers
+                        recommendations["trending_in_field"] = enhanced_papers
 
-                    if recommendations.get("cross_pollination") and recommendations["cross_pollination"].get("papers"):
+                    if recommendations.get("cross_pollination") and isinstance(recommendations["cross_pollination"], list):
                         enhanced_papers = await self._enhance_papers_with_semantic_analysis(
-                            recommendations["cross_pollination"]["papers"]
+                            recommendations["cross_pollination"]
                         )
-                        recommendations["cross_pollination"]["papers"] = enhanced_papers
+                        recommendations["cross_pollination"] = enhanced_papers
 
-                    if recommendations.get("citation_opportunities") and recommendations["citation_opportunities"].get("papers"):
+                    if recommendations.get("citation_opportunities") and isinstance(recommendations["citation_opportunities"], list):
                         enhanced_papers = await self._enhance_papers_with_semantic_analysis(
-                            recommendations["citation_opportunities"]["papers"]
+                            recommendations["citation_opportunities"]
                         )
-                        recommendations["citation_opportunities"]["papers"] = enhanced_papers
+                        recommendations["citation_opportunities"] = enhanced_papers
                 else:
                     logger.warning(f"⚠️ Recommendations is not a valid dict: {type(recommendations)}")
 
