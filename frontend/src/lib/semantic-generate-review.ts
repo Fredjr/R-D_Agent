@@ -252,9 +252,22 @@ export class SemanticGenerateReviewEngine {
    * Execute traditional generate-review with enhanced payload
    */
   private async executeTraditionalReview(payload: FetchReviewArgs): Promise<any> {
-    // Import the traditional API function
-    const { fetchReview } = await import('./api');
-    return await fetchReview(payload);
+    // Call the backend generate-review endpoint directly
+    const backendUrl = 'https://r-dagent-production.up.railway.app/generate-review';
+
+    const response = await fetch(backendUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Generate-review failed: ${response.status} ${response.statusText}`);
+    }
+
+    return await response.json();
   }
 
   /**
