@@ -72,6 +72,11 @@ from database import (
 # AI Recommendations Service
 from services.ai_recommendations_service import get_spotify_recommendations_service
 
+# Background Processing Services
+from services.background_processor import background_processor, JobStatus
+from services.notification_service import notification_manager, websocket_endpoint, background_job_notification_callback
+from services.network_session_manager import network_session_manager
+
 # Semantic Analysis Service (Phase 2A.1)
 print("🔧 Attempting to import semantic analysis service...")
 try:
@@ -128,11 +133,276 @@ def verify_password(password: str, hashed: str) -> bool:
 # Initialize FastAPI app
 app = FastAPI(title="R&D Agent API", version="1.0.0")
 
+# Register notification callback with background processor
+background_processor.add_notification_callback(background_job_notification_callback)
+
 # Test endpoint to verify app is working
 @app.get("/api/test-app")
 async def test_app():
     """Simple test endpoint to verify FastAPI app is working"""
     return {"status": "success", "message": "FastAPI app is working"}
+
+# =============================================================================
+# WebSocket and Background Processing Endpoints
+# =============================================================================
+
+@app.websocket("/ws/{user_id}")
+async def websocket_notifications(websocket: WebSocket, user_id: str):
+    """WebSocket endpoint for real-time notifications"""
+    await websocket_endpoint(websocket, user_id)
+
+@app.post("/background-jobs/generate-review")
+async def start_background_generate_review(
+    request: dict,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """Start a background generate-review job"""
+    try:
+        job_id = await background_processor.start_generate_review_job(
+            user_id=user_id,
+            project_id=request.get("project_id", "default"),
+            molecule=request.get("molecule", ""),
+            objective=request.get("objective", ""),
+            max_results=request.get("max_results", 10),
+            **{k: v for k, v in request.items() if k not in ["project_id", "molecule", "objective", "max_results"]}
+        )
+
+        return {
+            "success": True,
+            "job_id": job_id,
+            "message": "Background job started successfully",
+            "status": "pending"
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to start background generate-review job: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Failed to start background job"
+        }
+
+@app.post("/background-jobs/deep-dive")
+async def start_background_deep_dive(
+    request: dict,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """Start a background deep-dive job"""
+    try:
+        job_id = await background_processor.start_deep_dive_job(
+            user_id=user_id,
+            project_id=request.get("project_id", "default"),
+            pmid=request.get("pmid", ""),
+            article_title=request.get("article_title", ""),
+            **{k: v for k, v in request.items() if k not in ["project_id", "pmid", "article_title"]}
+        )
+
+        return {
+            "success": True,
+            "job_id": job_id,
+            "message": "Background job started successfully",
+            "status": "pending"
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to start background deep-dive job: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Failed to start background job"
+        }
+
+@app.get("/background-jobs/{job_id}/status")
+async def get_job_status(
+    job_id: str,
+    user_id: str = Header(..., alias="User-ID")
+):
+    """Get the status of a background job"""
+    job_result = background_processor.get_job_status(job_id)
+
+    if not job_result:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    return {
+        "job_id": job_result.job_id,
+        "status": job_result.status.value,
+        "progress": job_result.progress_percentage,
+        "result_data": job_result.result_data,
+        "error_message": job_result.error_message,
+        "created_at": job_result.created_at.isoformat() if job_result.created_at else None,
+        "completed_at": job_result.completed_at.isoformat() if job_result.completed_at else None
+    }
+
+@app.get("/background-jobs/user/{user_id}")
+async def get_user_jobs(
+    user_id: str,
+    requesting_user_id: str = Header(..., alias="User-ID")
+):
+    """Get all background jobs for a user"""
+    # Only allow users to see their own jobs
+    if user_id != requesting_user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    jobs = background_processor.get_user_jobs(user_id)
+
+    return {
+        "jobs": [
+            {
+                "job_id": job.job_id,
+                "status": job.status.value,
+                "created_at": job.created_at.isoformat() if job.created_at else None,
+                "completed_at": job.completed_at.isoformat() if job.completed_at else None
+            } for job in jobs
+        ]
+    }
+
+# =============================================================================
+# Network Session Management Endpoints
+# =============================================================================
+
+@app.post("/network-sessions")
+async def create_network_session(
+    request: dict,
+    user_id: str = Header(..., alias="User-ID")
+):
+    """Create a new network exploration session"""
+    try:
+        from services.network_session_manager import NetworkState, NetworkNode, NetworkEdge
+
+        # Parse network state from request
+        nodes = [NetworkNode(**node) for node in request.get("nodes", [])]
+        edges = [NetworkEdge(**edge) for edge in request.get("edges", [])]
+
+        network_state = NetworkState(
+            nodes=nodes,
+            edges=edges,
+            center_node=request.get("center_node", ""),
+            zoom_level=request.get("zoom_level", 1.0),
+            pan_x=request.get("pan_x", 0.0),
+            pan_y=request.get("pan_y", 0.0),
+            expanded_nodes=request.get("expanded_nodes", []),
+            selected_node=request.get("selected_node"),
+            filter_settings=request.get("filter_settings", {})
+        )
+
+        session_id = network_session_manager.create_session(
+            collection_id=request.get("collection_id", ""),
+            user_id=user_id,
+            initial_state=network_state,
+            name=request.get("name"),
+            description=request.get("description")
+        )
+
+        return {
+            "success": True,
+            "session_id": session_id,
+            "message": "Network session created successfully"
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to create network session: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Failed to create network session"
+        }
+
+@app.put("/network-sessions/{session_id}")
+async def update_network_session(
+    session_id: str,
+    request: dict,
+    user_id: str = Header(..., alias="User-ID")
+):
+    """Update network session state"""
+    try:
+        from services.network_session_manager import NetworkState, NetworkNode, NetworkEdge
+
+        # Parse network state from request
+        nodes = [NetworkNode(**node) for node in request.get("nodes", [])]
+        edges = [NetworkEdge(**edge) for edge in request.get("edges", [])]
+
+        network_state = NetworkState(
+            nodes=nodes,
+            edges=edges,
+            center_node=request.get("center_node", ""),
+            zoom_level=request.get("zoom_level", 1.0),
+            pan_x=request.get("pan_x", 0.0),
+            pan_y=request.get("pan_y", 0.0),
+            expanded_nodes=request.get("expanded_nodes", []),
+            selected_node=request.get("selected_node"),
+            filter_settings=request.get("filter_settings", {})
+        )
+
+        success = network_session_manager.update_session_state(session_id, network_state)
+
+        if success:
+            return {
+                "success": True,
+                "message": "Network session updated successfully"
+            }
+        else:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+    except Exception as e:
+        logger.error(f"Failed to update network session: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Failed to update network session"
+        }
+
+@app.get("/network-sessions/{session_id}")
+async def get_network_session(
+    session_id: str,
+    user_id: str = Header(..., alias="User-ID")
+):
+    """Get network session by ID"""
+    session = network_session_manager.get_session(session_id)
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if session.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    from dataclasses import asdict
+    return {
+        "success": True,
+        "session": asdict(session)
+    }
+
+@app.get("/network-sessions/collection/{collection_id}")
+async def get_collection_sessions(
+    collection_id: str,
+    user_id: str = Header(..., alias="User-ID"),
+    limit: int = 10
+):
+    """Get recent sessions for a collection"""
+    sessions = network_session_manager.get_collection_sessions(collection_id, user_id, limit)
+
+    from dataclasses import asdict
+    return {
+        "success": True,
+        "sessions": [asdict(session) for session in sessions]
+    }
+
+@app.delete("/network-sessions/{session_id}")
+async def delete_network_session(
+    session_id: str,
+    user_id: str = Header(..., alias="User-ID")
+):
+    """Delete a network session"""
+    success = network_session_manager.delete_session(session_id, user_id)
+
+    if success:
+        return {
+            "success": True,
+            "message": "Network session deleted successfully"
+        }
+    else:
+        raise HTTPException(status_code=404, detail="Session not found or access denied")
 
 # =============================================================================
 # Phase 2A: Semantic Analysis Endpoints (Moved here for proper registration)
