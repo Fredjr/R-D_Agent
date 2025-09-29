@@ -478,35 +478,6 @@ class WeeklyMixAutomationSystem {
     this.lastUpdate.delete(userId);
     this.saveToStorage();
   }
-}
-
-export const weeklyMixAutomation = new WeeklyMixAutomationSystem();
-
-// Integration hooks for existing systems
-export const integrateWithRealTimeAnalytics = () => {
-  // This will be called from useRealTimeAnalytics to sync search history
-  return {
-    trackSearch: (userId: string, query: string, source: string, context?: any) => {
-      weeklyMixAutomation.trackSearch(userId, {
-        query,
-        timestamp: new Date(),
-        resultsCount: 0,
-        clickedPapers: [],
-        source: source as any,
-        context
-      });
-    },
-    trackActivity: (userId: string, type: string, pmid?: string, title?: string, source?: string, context?: any) => {
-      weeklyMixAutomation.trackActivity(userId, {
-        type: type as any,
-        pmid,
-        title,
-        timestamp: new Date(),
-        source: source || 'unknown',
-        context
-      });
-    }
-  };
 
   /**
    * Sync search history to backend for personalized recommendations
@@ -546,4 +517,33 @@ export const integrateWithRealTimeAnalytics = () => {
       console.error(`❌ Error syncing search history for user ${userId}:`, error);
     }
   }
-};
+}
+
+export const weeklyMixAutomation = new WeeklyMixAutomationSystem();
+
+// Integration hooks for existing systems
+export const integrateWithRealTimeAnalytics = () => {
+  // This will be called from useRealTimeAnalytics to sync search history
+  return {
+    trackSearch: (userId: string, query: string, source: string, context?: any) => {
+      weeklyMixAutomation.trackSearch(userId, {
+        query,
+        timestamp: new Date(),
+        resultsCount: 0,
+        clickedPapers: [],
+        source: source as any,
+        context
+      });
+    },
+    trackActivity: (userId: string, type: string, pmid?: string, title?: string, source?: string, context?: any) => {
+      weeklyMixAutomation.trackActivity(userId, {
+        type: type as any,
+        pmid,
+        title,
+        timestamp: new Date(),
+        source: source || 'unknown',
+        context
+      });
+    }
+  };
+}
