@@ -33,7 +33,8 @@ try:
     from langchain_openai import ChatOpenAI
     AI_AGENTS_AVAILABLE = True
 except ImportError as e:
-    logger.warning(f"AI agents not available: {e}")
+    # Logger not yet defined, use print for now
+    print(f"AI agents not available: {e}")
     AI_AGENTS_AVAILABLE = False
 
 # Import semantic analysis service
@@ -41,7 +42,7 @@ try:
     from services.semantic_analysis_service import SemanticAnalysisService
     SEMANTIC_ANALYSIS_AVAILABLE = True
 except ImportError as e:
-    logger.warning(f"Semantic analysis service not available: {e}")
+    print(f"Semantic analysis service not available: {e}")
     SEMANTIC_ANALYSIS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
@@ -136,8 +137,9 @@ class SpotifyInspiredRecommendationsService:
                 ).first()
 
                 if user_record and user_record.subject_area:
-                    logger.info(f"🎓 Using user's subject area: {user_record.subject_area}")
-                    return await self._generate_subject_area_recommendations(user_record.subject_area, db)
+                    logger.info(f"🎓 Found user's subject area: {user_record.subject_area}, will use in profile building")
+                    # Don't return recommendations here, let the normal flow handle it with subject area info
+                    return None  # This will trigger the normal profile building with subject area
                 else:
                     logger.info("📊 No subject area found, generating intelligent general recommendations")
                     return None  # This will trigger the normal fallback flow
@@ -452,35 +454,50 @@ class SpotifyInspiredRecommendationsService:
                 # Apply global deduplication across all recommendation types
                 recommendations = self._apply_global_deduplication(raw_recommendations)
 
+                # Debug: Check what we got from deduplication
+                logger.info(f"🔍 After deduplication, recommendations type: {type(recommendations)}")
+                if isinstance(recommendations, dict):
+                    logger.info(f"🔍 Recommendations keys: {list(recommendations.keys())}")
+                else:
+                    logger.error(f"❌ Deduplication returned non-dict: {recommendations}")
+
             # 🧠 SEMANTIC ANALYSIS ENHANCEMENT
             logger.info("🧠 Enhancing recommendations with semantic analysis...")
 
-            # Enhance each category with semantic analysis
-            if recommendations.get("papers_for_you") and recommendations["papers_for_you"].get("papers"):
-                enhanced_papers = await self._enhance_papers_with_semantic_analysis(
-                    recommendations["papers_for_you"]["papers"]
-                )
-                recommendations["papers_for_you"]["papers"] = enhanced_papers
+            try:
+                # Enhance each category with semantic analysis
+                if recommendations and isinstance(recommendations, dict):
+                    if recommendations.get("papers_for_you") and recommendations["papers_for_you"].get("papers"):
+                        enhanced_papers = await self._enhance_papers_with_semantic_analysis(
+                            recommendations["papers_for_you"]["papers"]
+                        )
+                        recommendations["papers_for_you"]["papers"] = enhanced_papers
 
-            if recommendations.get("trending_in_field") and recommendations["trending_in_field"].get("papers"):
-                enhanced_papers = await self._enhance_papers_with_semantic_analysis(
-                    recommendations["trending_in_field"]["papers"]
-                )
-                recommendations["trending_in_field"]["papers"] = enhanced_papers
+                    if recommendations.get("trending_in_field") and recommendations["trending_in_field"].get("papers"):
+                        enhanced_papers = await self._enhance_papers_with_semantic_analysis(
+                            recommendations["trending_in_field"]["papers"]
+                        )
+                        recommendations["trending_in_field"]["papers"] = enhanced_papers
 
-            if recommendations.get("cross_pollination") and recommendations["cross_pollination"].get("papers"):
-                enhanced_papers = await self._enhance_papers_with_semantic_analysis(
-                    recommendations["cross_pollination"]["papers"]
-                )
-                recommendations["cross_pollination"]["papers"] = enhanced_papers
+                    if recommendations.get("cross_pollination") and recommendations["cross_pollination"].get("papers"):
+                        enhanced_papers = await self._enhance_papers_with_semantic_analysis(
+                            recommendations["cross_pollination"]["papers"]
+                        )
+                        recommendations["cross_pollination"]["papers"] = enhanced_papers
 
-            if recommendations.get("citation_opportunities") and recommendations["citation_opportunities"].get("papers"):
-                enhanced_papers = await self._enhance_papers_with_semantic_analysis(
-                    recommendations["citation_opportunities"]["papers"]
-                )
-                recommendations["citation_opportunities"]["papers"] = enhanced_papers
+                    if recommendations.get("citation_opportunities") and recommendations["citation_opportunities"].get("papers"):
+                        enhanced_papers = await self._enhance_papers_with_semantic_analysis(
+                            recommendations["citation_opportunities"]["papers"]
+                        )
+                        recommendations["citation_opportunities"]["papers"] = enhanced_papers
+                else:
+                    logger.warning(f"⚠️ Recommendations is not a valid dict: {type(recommendations)}")
 
-            logger.info("✅ Semantic analysis enhancement completed")
+                logger.info("✅ Semantic analysis enhancement completed")
+
+            except Exception as e:
+                logger.error(f"❌ Error in semantic analysis enhancement: {e}")
+                # Continue without semantic enhancement
 
             # Add weekly mix metadata
             now = datetime.now(timezone.utc)
@@ -758,8 +775,18 @@ class SpotifyInspiredRecommendationsService:
                             ).first()
 
                             if user_record and user_record.subject_area:
-                                logger.info(f"🎓 Using user's subject area: {user_record.subject_area}")
-                                return await self._generate_subject_area_recommendations(user_record.subject_area, db)
+                                logger.info(f"🎓 Creating profile based on user's subject area: {user_record.subject_area}")
+                                # Create a profile based on subject area
+                                profile["primary_domains"] = [user_record.subject_area.lower()]
+                                profile["topic_preferences"] = {user_record.subject_area.lower(): 0.9}
+                                profile["activity_level"] = "new_user"
+                                profile["discovery_preference"] = "exploratory"
+                                profile["collaboration_score"] = 0.5
+                                profile["research_velocity"] = "getting_started"
+                                profile["recency_bias"] = 0.7
+                                profile["total_saved_papers"] = 0
+                                profile["is_subject_area_based"] = True
+                                logger.info(f"✅ Created subject-area-based profile for {user_record.subject_area}")
                             else:
                                 return await self._generate_fallback_profile(user_id, db)
                     else:
@@ -771,8 +798,18 @@ class SpotifyInspiredRecommendationsService:
                         ).first()
 
                         if user_record and user_record.subject_area:
-                            logger.info(f"🎓 Using user's subject area: {user_record.subject_area}")
-                            return await self._generate_subject_area_recommendations(user_record.subject_area, db)
+                            logger.info(f"🎓 Creating profile based on user's subject area: {user_record.subject_area}")
+                            # Create a profile based on subject area
+                            profile["primary_domains"] = [user_record.subject_area.lower()]
+                            profile["topic_preferences"] = {user_record.subject_area.lower(): 0.9}
+                            profile["activity_level"] = "new_user"
+                            profile["discovery_preference"] = "exploratory"
+                            profile["collaboration_score"] = 0.5
+                            profile["research_velocity"] = "getting_started"
+                            profile["recency_bias"] = 0.7
+                            profile["total_saved_papers"] = 0
+                            profile["is_subject_area_based"] = True
+                            logger.info(f"✅ Created subject-area-based profile for {user_record.subject_area}")
                         else:
                             return await self._generate_fallback_profile(user_id, db)
 
@@ -2043,9 +2080,9 @@ class SpotifyInspiredRecommendationsService:
             seen_pmids = set()
             deduplicated = {}
 
-            # Process in priority order: Cross-pollination > Trending > Papers-for-you > Citation opportunities
-            # This ensures the most diverse content appears first
-            priority_order = ['cross_pollination', 'trending', 'papers_for_you', 'citation_opportunities']
+            # Process in priority order: Papers-for-you > Trending > Cross-pollination > Citation opportunities
+            # This ensures personalized content gets priority, then trending, then diverse content
+            priority_order = ['papers_for_you', 'trending_in_field', 'cross_pollination', 'citation_opportunities']
 
             for rec_type in priority_order:
                 if rec_type in recommendations and 'papers' in recommendations[rec_type]:
@@ -2057,6 +2094,14 @@ class SpotifyInspiredRecommendationsService:
                         if pmid and pmid not in seen_pmids:
                             deduplicated_papers.append(paper)
                             seen_pmids.add(pmid)
+                        elif len(deduplicated_papers) < 2:  # Allow up to 2 duplicates per category for variety
+                            deduplicated_papers.append(paper)
+
+                    # Ensure each category has at least some papers
+                    if len(deduplicated_papers) == 0 and len(original_papers) > 0:
+                        # If all papers were duplicates, take the first 2 anyway
+                        deduplicated_papers = original_papers[:2]
+                        logger.info(f"🔄 {rec_type}: All papers were duplicates, keeping first 2 for variety")
 
                     # Preserve the original structure but with deduplicated papers
                     deduplicated[rec_type] = {
@@ -2118,13 +2163,8 @@ class SpotifyInspiredRecommendationsService:
             # Get keywords for the subject area
             keywords = subject_keywords.get(subject_area.lower(), ["research", "study", "analysis"])
 
-            # Generate recommendations for each category
-            recommendations = {
-                "papers_for_you": [],
-                "trending_in_field": [],
-                "cross_pollination": [],
-                "citation_opportunities": []
-            }
+            # Generate papers for the subject area
+            papers_list = []
 
             # Find papers for each keyword
             for keyword in keywords[:3]:  # Use top 3 keywords
@@ -2139,8 +2179,8 @@ class SpotifyInspiredRecommendationsService:
                 ).order_by(desc(Article.citation_count)).limit(5).all()
 
                 for paper in papers:
-                    if len(recommendations["papers_for_you"]) < 8:
-                        recommendations["papers_for_you"].append({
+                    if len(papers_list) < 8:
+                        papers_list.append({
                             "pmid": paper.pmid,
                             "title": paper.title,
                             "authors": paper.authors[:3] if paper.authors else [],
@@ -2152,16 +2192,54 @@ class SpotifyInspiredRecommendationsService:
                             "category": "papers_for_you"
                         })
 
-            logger.info(f"🎓 Generated {len(recommendations['papers_for_you'])} subject-area recommendations")
-            return recommendations
+            logger.info(f"🎓 Generated {len(papers_list)} subject-area recommendations")
+
+            # Return in the expected format for weekly recommendations
+            return {
+                "papers_for_you": {
+                    "title": "Papers for You",
+                    "description": f"Research papers relevant to your {subject_area} background",
+                    "papers": papers_list,
+                    "updated": datetime.now(timezone.utc).isoformat(),
+                    "refresh_reason": f"Based on your {subject_area} subject area"
+                },
+                "trending_in_field": {
+                    "title": "Trending in Field",
+                    "papers": [],
+                    "updated": datetime.now(timezone.utc).isoformat()
+                },
+                "cross_pollination": {
+                    "title": "Cross-Domain Insights",
+                    "papers": [],
+                    "updated": datetime.now(timezone.utc).isoformat()
+                },
+                "citation_opportunities": {
+                    "title": "Citation Opportunities",
+                    "papers": [],
+                    "updated": datetime.now(timezone.utc).isoformat()
+                }
+            }
 
         except Exception as e:
             logger.error(f"Error generating subject area recommendations: {e}")
             return {
-                "papers_for_you": [],
-                "trending_in_field": [],
-                "cross_pollination": [],
-                "citation_opportunities": []
+                "papers_for_you": {
+                    "title": "Papers for You",
+                    "papers": [],
+                    "error": str(e)
+                },
+                "trending_in_field": {
+                    "title": "Trending in Field",
+                    "papers": []
+                },
+                "cross_pollination": {
+                    "title": "Cross-Domain Insights",
+                    "papers": []
+                },
+                "citation_opportunities": {
+                    "title": "Citation Opportunities",
+                    "papers": []
+                }
             }
 
 # Global service instance
