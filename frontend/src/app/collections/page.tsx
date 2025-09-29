@@ -271,28 +271,64 @@ export default function CollectionsPage() {
           </div>
         )}
 
-        {/* Enhanced Collections Navigation */}
-        {!isLoading && !error && (
+        {/* Enhanced Collections Navigation - Show collections from all projects */}
+        {!isLoading && !error && collections.length > 0 && (
           <div className="min-h-[600px]">
-            <EnhancedCollectionNavigation
-            projectId="demo-project"
-            onCollectionSelect={(collection) => {
-              console.log('Selected collection:', collection);
-              trackCollectionAction('view', collection.collection_id);
-              // Navigate to collection details or handle selection
-            }}
-            onNetworkView={(collection) => {
-              console.log('Network view for collection:', collection);
-              trackCollectionAction('view', collection.collection_id);
-              // Navigate to network view
-            }}
-            onArticlesList={(collection) => {
-              console.log('Articles list for collection:', collection);
-              trackCollectionAction('view', collection.collection_id);
-              // Navigate to articles list
-            }}
-            className="w-full"
-          />
+            <div className="space-y-8">
+              {/* Group collections by project */}
+              {Object.entries(
+                collections.reduce((acc, collection) => {
+                  const projectName = collection.projectName || 'Unknown Project';
+                  if (!acc[projectName]) acc[projectName] = [];
+                  acc[projectName].push(collection);
+                  return acc;
+                }, {} as Record<string, typeof collections>)
+              ).map(([projectName, projectCollections]) => (
+                <div key={projectName} className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-white">{projectName}</h2>
+                    <span className="text-sm text-gray-400">{projectCollections.length} collections</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {projectCollections.map((collection) => (
+                      <SpotifyCollectionCard
+                        key={collection.id}
+                        collection={{
+                          id: collection.id,
+                          name: collection.name,
+                          description: collection.description,
+                          color: collection.color,
+                          icon: collection.icon,
+                          articleCount: collection.articleCount,
+                          createdAt: collection.createdAt,
+                          updatedAt: collection.updatedAt,
+                          isShared: collection.isShared
+                        }}
+                        onSelect={() => {
+                          console.log('Selected collection:', collection);
+                          trackCollectionAction('view', collection.id);
+                          // Navigate to collection details
+                          router.push(`/projects/${collection.projectId}/collections/${collection.id}`);
+                        }}
+                        onNetworkView={() => {
+                          console.log('Network view for collection:', collection);
+                          trackCollectionAction('view', collection.id);
+                          // Navigate to network view
+                          router.push(`/projects/${collection.projectId}/collections/${collection.id}/network`);
+                        }}
+                        onArticlesList={() => {
+                          console.log('Articles list for collection:', collection);
+                          trackCollectionAction('view', collection.id);
+                          // Navigate to articles list
+                          router.push(`/projects/${collection.projectId}/collections/${collection.id}/articles`);
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
