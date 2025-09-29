@@ -449,21 +449,28 @@ class SpotifyInspiredRecommendationsService:
                     logger.warning(f"⚠️ AI agents failed, falling back to traditional method: {e}")
                     # Fallback to traditional methods with proper structure extraction and global deduplication
                     used_pmids = set()
+                    logger.info(f"🔄 AI fallback: Starting global deduplication with empty used_pmids: {len(used_pmids)}")
 
                     raw_method_results = {}
 
                     # Generate papers in priority order to ensure diversity
                     raw_method_results["papers_for_you"] = await self._generate_papers_for_you(user_profile, db, used_pmids)
                     if raw_method_results["papers_for_you"].get("papers"):
-                        used_pmids.update(p.get("pmid") for p in raw_method_results["papers_for_you"]["papers"] if p.get("pmid"))
+                        new_pmids = [p.get("pmid") for p in raw_method_results["papers_for_you"]["papers"] if p.get("pmid")]
+                        used_pmids.update(new_pmids)
+                        logger.info(f"📄 AI fallback Papers for You added PMIDs: {new_pmids}, total used: {len(used_pmids)}")
 
                     raw_method_results["trending_in_field"] = await self._generate_trending_in_field(user_profile, db, used_pmids)
                     if raw_method_results["trending_in_field"].get("papers"):
-                        used_pmids.update(p.get("pmid") for p in raw_method_results["trending_in_field"]["papers"] if p.get("pmid"))
+                        new_pmids = [p.get("pmid") for p in raw_method_results["trending_in_field"]["papers"] if p.get("pmid")]
+                        used_pmids.update(new_pmids)
+                        logger.info(f"🔥 AI fallback Trending added PMIDs: {new_pmids}, total used: {len(used_pmids)}")
 
                     raw_method_results["cross_pollination"] = await self._generate_cross_pollination(user_profile, db, used_pmids)
                     if raw_method_results["cross_pollination"].get("papers"):
-                        used_pmids.update(p.get("pmid") for p in raw_method_results["cross_pollination"]["papers"] if p.get("pmid"))
+                        new_pmids = [p.get("pmid") for p in raw_method_results["cross_pollination"]["papers"] if p.get("pmid")]
+                        used_pmids.update(new_pmids)
+                        logger.info(f"🔬 AI fallback Cross-pollination added PMIDs: {new_pmids}, total used: {len(used_pmids)}")
 
                     raw_method_results["citation_opportunities"] = await self._generate_citation_opportunities(user_profile, db, used_pmids)
 
