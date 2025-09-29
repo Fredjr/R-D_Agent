@@ -169,10 +169,21 @@ class SpotifyInspiredRecommendationsService:
             # Generate recommendations based on detected domains
             raw_recommendations = await self._generate_domain_based_recommendations(research_domains, db)
 
+            # 🚨 CRITICAL: Convert structure for global deduplication compatibility
+            # Direct approach returns {section: [papers]} but deduplication expects {section: {papers: [papers]}}
+            structured_recommendations = {}
+            for section, papers in raw_recommendations.items():
+                structured_recommendations[section] = {"papers": papers}
+
             # 🚨 CRITICAL: Apply global deduplication to direct recommendations
             logger.info("🔄 Applying global deduplication to direct user recommendations...")
-            recommendations = self._apply_global_deduplication(raw_recommendations)
+            deduplicated_structured = self._apply_global_deduplication(structured_recommendations)
             logger.info(f"✅ Global deduplication applied to direct recommendations")
+
+            # Convert back to expected format for direct approach
+            recommendations = {}
+            for section, data in deduplicated_structured.items():
+                recommendations[section] = data.get("papers", [])
 
             return {
                 "recommendations": recommendations,
