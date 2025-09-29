@@ -13054,6 +13054,64 @@ async def get_enhanced_pubmed_paper_details(
         logger.error(f"📄 [Enhanced PubMed Details] Error fetching PMID {pmid}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch enhanced PubMed details: {str(e)}")
 
+@app.get("/debug/recommendation-stats")
+async def get_recommendation_debug_stats(
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """Debug endpoint to check recommendation system state"""
+    try:
+        from datetime import datetime, timezone
+
+        # Get article statistics
+        total_articles = db.query(Article).count()
+        recent_articles = db.query(Article).filter(
+            Article.publication_year >= 2018
+        ).count()
+
+        articles_with_citations = db.query(Article).filter(
+            Article.citation_count > 0
+        ).count()
+
+        articles_with_authors = db.query(Article).filter(
+            Article.authors.isnot(None),
+            Article.authors != "[]"
+        ).count()
+
+        # Check citation opportunity candidates
+        citation_candidates = db.query(Article).filter(
+            Article.publication_year >= 2018,
+            Article.citation_count >= 1,
+            Article.citation_count <= 200,
+            Article.title.isnot(None),
+            Article.title != ""
+        ).count()
+
+        # Check cross-pollination candidates
+        cross_pollination_candidates = db.query(Article).filter(
+            Article.publication_year >= 2015,
+            Article.citation_count >= 10,
+            Article.title.isnot(None)
+        ).count()
+
+        return {
+            "database_stats": {
+                "total_articles": total_articles,
+                "recent_articles_2018_plus": recent_articles,
+                "articles_with_citations": articles_with_citations,
+                "articles_with_authors": articles_with_authors
+            },
+            "recommendation_candidates": {
+                "citation_opportunities": citation_candidates,
+                "cross_pollination": cross_pollination_candidates
+            },
+            "debug_timestamp": datetime.now(timezone.utc).isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"🐛 Debug stats error: {e}")
+        raise HTTPException(status_code=500, detail=f"Debug error: {str(e)}")
+
 @app.get("/projects/{project_id}/generate-review-analyses")
 async def get_project_generate_review_analyses(
     project_id: str,
