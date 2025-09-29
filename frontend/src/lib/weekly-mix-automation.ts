@@ -517,6 +517,58 @@ class WeeklyMixAutomationSystem {
       console.error(`❌ Error syncing search history for user ${userId}:`, error);
     }
   }
+
+  /**
+   * Check if recommendations need to be refreshed
+   */
+  shouldRefreshRecommendations(userId: string): boolean {
+    const lastUpdate = this.lastUpdate.get(userId);
+    if (!lastUpdate) return true;
+
+    const now = new Date();
+    const timeDiff = now.getTime() - lastUpdate.getTime();
+
+    switch (this.config.updateFrequency) {
+      case 'daily':
+        return timeDiff > 24 * 60 * 60 * 1000; // 24 hours
+      case 'weekly':
+        return timeDiff > 7 * 24 * 60 * 60 * 1000; // 7 days
+      case 'bi-weekly':
+        return timeDiff > 14 * 24 * 60 * 60 * 1000; // 14 days
+      default:
+        return timeDiff > 7 * 24 * 60 * 60 * 1000; // Default to weekly
+    }
+  }
+
+  /**
+   * Get the last update time for a specific recommendation type
+   */
+  getLastUpdateTime(queryType: string): Date | null {
+    const userId = this.getCurrentUserId();
+    if (!userId) return null;
+
+    const lastUpdate = this.lastUpdate.get(`${userId}_${queryType}`);
+    return lastUpdate || null;
+  }
+
+  /**
+   * Mark recommendations as updated for a specific type
+   */
+  markRecommendationsUpdated(userId: string, queryType: string): void {
+    const now = new Date();
+    this.lastUpdate.set(`${userId}_${queryType}`, now);
+    this.lastUpdate.set(userId, now); // Also update general timestamp
+    this.saveToStorage();
+  }
+
+  /**
+   * Get current user ID (helper method)
+   */
+  getCurrentUserId(): string | null {
+    // This would typically come from your auth system
+    // For now, return a default or get from localStorage
+    return localStorage.getItem('currentUserId') || 'default_user';
+  }
 }
 
 export const weeklyMixAutomation = new WeeklyMixAutomationSystem();
@@ -544,6 +596,22 @@ export const integrateWithRealTimeAnalytics = () => {
         source: source || 'unknown',
         context
       });
+    },
+    trackPaperView: (pmid: string, title: string, source: string, context?: any) => {
+      const userId = weeklyMixAutomation.getCurrentUserId();
+      if (userId) {
+        weeklyMixAutomation.trackActivity(userId, {
+          type: 'paper_view',
+          pmid,
+          title,
+          timestamp: new Date(),
+          source,
+          context
+        });
+      }
+    },
+    getLastUpdateTime: (queryType: string) => {
+      return weeklyMixAutomation.getLastUpdateTime(queryType);
     }
   };
-}
+};
