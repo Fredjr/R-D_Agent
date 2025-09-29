@@ -374,6 +374,11 @@ function DiscoverPageContent() {
                            crossDomainData.cross_pollination ||
                            (crossDomainData.recommendations?.cross_pollination) ||
                            [];
+
+        // Log if API returns empty results - this indicates a backend issue that needs fixing
+        if (crossDomainPapers.length === 0) {
+          console.warn('⚠️ Cross-domain API returned empty results - backend recommendation system needs investigation');
+        }
         console.log('✅ Cross-domain recommendations loaded:', crossDomainPapers.length);
       } else {
         console.warn('⚠️ Cross-domain recommendations failed:', crossDomainResponse);
@@ -391,6 +396,11 @@ function DiscoverPageContent() {
                         trendingData.trending_in_field ||
                         (trendingData.recommendations?.trending_in_field) ||
                         [];
+
+        // Log if API returns empty results - this indicates a backend issue that needs fixing
+        if (trendingPapers.length === 0) {
+          console.warn('⚠️ Trending API returned empty results - backend recommendation system needs investigation');
+        }
         console.log('✅ Trending recommendations loaded:', trendingPapers.length);
       } else {
         console.warn('⚠️ Trending recommendations failed:', trendingResponse);
@@ -402,7 +412,7 @@ function DiscoverPageContent() {
         const personalizedData = await personalizedResponse.value.json();
         console.log('🔍 Personalized API response:', JSON.stringify(personalizedData, null, 2));
 
-        // Handle different response formats
+        // Handle different response formats - papers-for-you API returns data in 'recommendations' field
         personalizedPapers = personalizedData.papers ||
                             personalizedData.recommendations ||
                             personalizedData.papers_for_you ||
