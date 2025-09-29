@@ -163,19 +163,53 @@ export class SemanticDeepDiveEngine {
       }
     };
 
-    const response = await fetch(backendUrl, {
+    console.log('🔬 [SEMANTIC-LIB] 🚀 Calling backend deep-dive directly:', {
+      url: backendUrl,
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(traditionalRequest),
+      pmid: traditionalRequest.pmid,
+      title: traditionalRequest.title?.substring(0, 50) + '...',
+      hasObjective: !!traditionalRequest.objective
     });
 
-    if (!response.ok) {
-      throw new Error(`Deep-dive failed: ${response.status} ${response.statusText}`);
-    }
+    try {
+      const response = await fetch(backendUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(traditionalRequest),
+      });
 
-    return await response.json();
+      console.log('🔬 [SEMANTIC-LIB] 📡 Backend response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('🔬 [SEMANTIC-LIB] ❌ Backend error response:', errorText);
+        throw new Error(`Deep-dive failed: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('🔬 [SEMANTIC-LIB] ✅ Backend response parsed successfully:', {
+        hasModel: !!result?.model_description_structured,
+        hasMethods: !!result?.methods_structured,
+        hasResults: !!result?.results_structured,
+        responseKeys: Object.keys(result || {})
+      });
+
+      return result;
+    } catch (error) {
+      console.error('🔬 [SEMANTIC-LIB] ❌ executeTraditionalDeepDive error:', {
+        error: error.message,
+        stack: error.stack,
+        backendUrl: backendUrl
+      });
+      throw error;
+    }
   }
 
   /**

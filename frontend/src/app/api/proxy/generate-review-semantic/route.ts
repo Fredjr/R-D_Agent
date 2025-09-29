@@ -15,8 +15,12 @@ export async function POST(request: NextRequest) {
       semantic_expansion: body.semantic_expansion,
       domain_focus: body.domain_focus,
       cross_domain_exploration: body.cross_domain_exploration,
-      fullTextOnly: body.fullTextOnly
+      fullTextOnly: body.fullTextOnly,
+      requestHeaders: Object.fromEntries(request.headers.entries()),
+      bodyKeys: Object.keys(body)
     });
+
+    console.log('🧠 [SEMANTIC-GEN-REVIEW] 🔧 Initializing semantic engine...');
     
     // Validate required fields
     if (!body.molecule) {
@@ -62,19 +66,36 @@ export async function POST(request: NextRequest) {
     });
 
     // Initialize semantic engine
+    console.log('🧠 [SEMANTIC-GEN-REVIEW] 🔧 Creating SemanticGenerateReviewEngine instance...');
     const semanticEngine = new SemanticGenerateReviewEngine();
-    
+    console.log('🧠 [SEMANTIC-GEN-REVIEW] ✅ SemanticGenerateReviewEngine created successfully');
+
     // Generate semantic-enhanced review
+    console.log('🧠 [SEMANTIC-GEN-REVIEW] 🚀 Executing generateSemanticReview...');
+    console.log('🧠 [SEMANTIC-GEN-REVIEW] 📋 Semantic request payload:', {
+      ...semanticRequest,
+      molecule: semanticRequest.molecule?.substring(0, 100) + '...'
+    });
+
     const semanticResponse = await semanticEngine.generateSemanticReview(
       semanticRequest,
       userId
     );
 
+    console.log('🧠 [SEMANTIC-GEN-REVIEW] ✅ generateSemanticReview completed successfully');
+    console.log('🧠 [SEMANTIC-GEN-REVIEW] 📊 Response structure:', {
+      hasResults: !!semanticResponse?.results,
+      hasAnalysis: !!semanticResponse?.analysis,
+      hasSemanticEnhancements: !!semanticResponse?.semantic_enhancements,
+      resultCount: semanticResponse?.results?.length || 0,
+      responseKeys: Object.keys(semanticResponse || {})
+    });
+
     console.log('🧠 [Semantic Generate Review] Success:', {
       results_count: semanticResponse.results?.length || 0,
-      semantic_queries: semanticResponse.semantic_analysis.expanded_queries.length,
-      concept_mappings: Object.keys(semanticResponse.semantic_analysis.concept_mappings).length,
-      user_relevance_scores: Object.keys(semanticResponse.personalization.relevance_scores).length
+      semantic_queries: semanticResponse.semantic_analysis?.expanded_queries?.length || 0,
+      concept_mappings: Object.keys(semanticResponse.semantic_analysis?.concept_mappings || {}).length,
+      user_relevance_scores: Object.keys(semanticResponse.personalization?.relevance_scores || {}).length
     });
 
     // Add metadata for UI

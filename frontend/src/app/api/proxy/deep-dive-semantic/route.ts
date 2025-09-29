@@ -15,8 +15,12 @@ export async function POST(request: NextRequest) {
       userId: userId,
       semantic_context: body.semantic_context,
       find_related_papers: body.find_related_papers,
-      cross_domain_analysis: body.cross_domain_analysis
+      cross_domain_analysis: body.cross_domain_analysis,
+      requestHeaders: Object.fromEntries(request.headers.entries()),
+      bodyKeys: Object.keys(body)
     });
+
+    console.log('🔬 [SEMANTIC-DEEP-DIVE] 🔧 Initializing semantic deep-dive engine...');
     
     // Validate required fields
     if (!body.pmid && !body.title && !body.url) {
@@ -62,22 +66,40 @@ export async function POST(request: NextRequest) {
     });
 
     // Initialize semantic engine
+    console.log('🔬 [SEMANTIC-DEEP-DIVE] 🔧 Creating SemanticDeepDiveEngine instance...');
     const semanticEngine = new SemanticDeepDiveEngine();
-    
+    console.log('🔬 [SEMANTIC-DEEP-DIVE] ✅ SemanticDeepDiveEngine created successfully');
+
     // Perform semantic-enhanced deep dive
+    console.log('🔬 [SEMANTIC-DEEP-DIVE] 🚀 Executing performSemanticDeepDive...');
+    console.log('🔬 [SEMANTIC-DEEP-DIVE] 📋 Semantic request payload:', {
+      ...semanticRequest,
+      title: semanticRequest.title?.substring(0, 100) + '...'
+    });
+
     const semanticResponse = await semanticEngine.performSemanticDeepDive(
       semanticRequest,
       userId
     );
 
+    console.log('🔬 [SEMANTIC-DEEP-DIVE] ✅ performSemanticDeepDive completed successfully');
+    console.log('🔬 [SEMANTIC-DEEP-DIVE] 📊 Response structure:', {
+      hasModelDescription: !!semanticResponse?.model_description_structured,
+      hasMethods: !!semanticResponse?.methods_structured,
+      hasResults: !!semanticResponse?.results_structured,
+      hasSemanticAnalysis: !!semanticResponse?.semantic_analysis,
+      hasRelatedPapers: !!semanticResponse?.related_papers,
+      responseKeys: Object.keys(semanticResponse || {})
+    });
+
     console.log('🔬 [Semantic Deep Dive] Success:', {
       has_model: !!semanticResponse.model_description_structured,
       has_methods: !!semanticResponse.methods_structured,
       has_results: !!semanticResponse.results_structured,
-      paper_concepts: semanticResponse.semantic_analysis.paper_concepts.length,
-      related_papers_categories: Object.keys(semanticResponse.related_papers).length,
-      user_relevance: semanticResponse.user_insights.relevance_to_user,
-      recommendations: semanticResponse.recommendations.next_papers_to_read.length
+      paper_concepts: semanticResponse.semantic_analysis?.paper_concepts?.length || 0,
+      related_papers_categories: Object.keys(semanticResponse.related_papers || {}).length,
+      user_relevance: semanticResponse.user_insights?.relevance_to_user || 'N/A',
+      recommendations: semanticResponse.recommendations?.next_papers_to_read?.length || 0
     });
 
     // Add metadata for UI

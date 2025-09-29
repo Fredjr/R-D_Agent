@@ -2268,17 +2268,24 @@ class SpotifyInspiredRecommendationsService:
 
                     # Then, apply global deduplication
                     global_deduplicated = []
+                    duplicates_found = []
                     for paper in category_deduplicated:
                         pmid = paper.get('pmid')
                         if pmid and pmid not in seen_pmids:
                             global_deduplicated.append(paper)
                             seen_pmids.add(pmid)
+                            logger.debug(f"🔧 {rec_type}: Added unique PMID {pmid}")
+                        elif pmid:
+                            duplicates_found.append(pmid)
+                            logger.debug(f"🔧 {rec_type}: Skipped duplicate PMID {pmid}")
 
-                    # Ensure each category has at least some papers (but not duplicates)
+                    if duplicates_found:
+                        logger.info(f"🔄 {rec_type}: Removed {len(duplicates_found)} global duplicates: {duplicates_found}")
+
+                    # 🚨 STRICT DEDUPLICATION: Do not add duplicates for variety
+                    # This was causing the remaining duplicate issue
                     if len(global_deduplicated) == 0 and len(category_deduplicated) > 0:
-                        # If all papers were global duplicates, take the first unique one anyway
-                        global_deduplicated = category_deduplicated[:1]
-                        logger.info(f"🔄 {rec_type}: All papers were global duplicates, keeping first 1 for variety")
+                        logger.info(f"🔄 {rec_type}: All papers were global duplicates, section will be empty for strict deduplication")
 
                     # Preserve the original structure but with deduplicated papers
                     deduplicated[rec_type] = {

@@ -186,86 +186,298 @@ class ComprehensiveTestSuite {
         }
     }
 
-    // TEST 3: Semantic Integration - Generate Review
+    // TEST 3: Comprehensive Semantic Generate-Review Testing
     async testSemanticGenerateReview() {
         this.log('📝 TESTING SEMANTIC GENERATE-REVIEW INTEGRATION', 'test');
-        
-        const testPayload = {
-            molecule: 'CRISPR gene editing in diabetes treatment',
-            semantic_expansion: true,
-            domain_focus: ['genetics', 'biotechnology', 'diabetes'],
-            cross_domain_exploration: true,
-            user_context: {
-                research_domains: ['genetics', 'medicine'],
-                recent_searches: ['CRISPR', 'diabetes', 'gene therapy']
-            },
-            fullTextOnly: false
-        };
 
-        const { data, error } = await this.makeRequest(
-            '/api/proxy/generate-review-semantic',
+        // Test multiple scenarios for comprehensive coverage
+        const testScenarios = [
             {
-                method: 'POST',
-                body: JSON.stringify(testPayload)
+                name: 'Basic Semantic Enhancement',
+                payload: {
+                    molecule: 'CRISPR gene editing in diabetes treatment',
+                    objective: 'Comprehensive review of CRISPR applications in diabetes therapy',
+                    semantic_expansion: true,
+                    domain_focus: ['genetics', 'biotechnology', 'diabetes'],
+                    cross_domain_exploration: true,
+                    user_context: {
+                        research_domains: ['genetics', 'medicine'],
+                        recent_searches: ['CRISPR', 'diabetes', 'gene therapy'],
+                        saved_papers: ['32887946', '33462507'],
+                        interaction_history: []
+                    },
+                    fullTextOnly: false,
+                    similarity_threshold: 0.3,
+                    include_related_concepts: true,
+                    max_semantic_results: 30
+                }
+            },
+            {
+                name: 'Full-Text Only Mode',
+                payload: {
+                    molecule: 'COVID-19 vaccine effectiveness',
+                    objective: 'Analyze vaccine effectiveness data',
+                    semantic_expansion: true,
+                    domain_focus: ['immunology', 'epidemiology'],
+                    cross_domain_exploration: false,
+                    fullTextOnly: true,
+                    similarity_threshold: 0.4,
+                    max_semantic_results: 20
+                }
+            },
+            {
+                name: 'Cross-Domain Exploration',
+                payload: {
+                    molecule: 'Machine learning in drug discovery',
+                    objective: 'Explore AI applications in pharmaceutical research',
+                    semantic_expansion: true,
+                    domain_focus: ['machine_learning', 'pharmacology'],
+                    cross_domain_exploration: true,
+                    fullTextOnly: false,
+                    similarity_threshold: 0.25,
+                    max_semantic_results: 40
+                }
             }
-        );
+        ];
 
-        if (error) {
-            this.log('❌ Semantic Generate-Review failed', 'error', error);
-            return;
+        for (const scenario of testScenarios) {
+            this.log(`Testing ${scenario.name}`, 'test');
+
+            const startTime = Date.now();
+            const { data, error } = await this.makeRequest(
+                '/api/proxy/generate-review-semantic',
+                {
+                    method: 'POST',
+                    body: JSON.stringify(scenario.payload)
+                }
+            );
+            const responseTime = Date.now() - startTime;
+
+            if (error) {
+                this.log(`❌ ${scenario.name} failed`, 'error', {
+                    error: error,
+                    payload: scenario.payload,
+                    responseTime: responseTime
+                });
+                continue;
+            }
+
+            // Detailed response analysis
+            this.analyzeSemanticGenerateReviewResponse(data, scenario.name, responseTime);
         }
 
+        // Test UI Component Integration
+        await this.testSemanticGenerateReviewUI();
+    }
+
+    analyzeSemanticGenerateReviewResponse(data, scenarioName, responseTime) {
+        this.log(`📊 Analyzing ${scenarioName} Response`, 'info');
+
+        // Check response structure
+        const structure = {
+            hasResults: !!data?.results,
+            hasQueries: !!data?.queries,
+            hasAnalysis: !!data?.analysis,
+            hasPapers: !!data?.papers,
+            hasMetadata: !!data?.metadata,
+            hasSemanticEnhancements: false,
+            hasTextExtraction: false,
+            hasQualityMetrics: false
+        };
+
         // Check for semantic enhancement fields
-        const expectedSemanticFields = [
+        const semanticFields = [
             'semantic_analysis',
             'cross_domain_insights',
             'user_relevance',
-            'related_concepts'
+            'related_concepts',
+            'personalized_insights',
+            'domain_connections',
+            'semantic_keywords',
+            'concept_mapping'
         ];
 
-        const hasSemanticFields = expectedSemanticFields.some(field => 
-            data && (field in data || (data.analysis && field in data.analysis))
+        structure.hasSemanticEnhancements = semanticFields.some(field =>
+            data && (field in data ||
+                    (data.analysis && field in data.analysis) ||
+                    (data.metadata && field in data.metadata))
         );
 
-        if (hasSemanticFields) {
-            this.log('✅ Semantic Generate-Review has enhanced fields', 'success');
-        } else {
-            this.log('⚠️ Semantic Generate-Review may be missing enhanced fields', 'warning', data);
+        // Check text extraction quality
+        if (data?.results && Array.isArray(data.results)) {
+            const textExtractionMetrics = {
+                totalPapers: data.results.length,
+                papersWithFullText: 0,
+                papersWithAbstractOnly: 0,
+                averageContentLength: 0,
+                extractionMethods: new Set(),
+                qualityScores: []
+            };
+
+            data.results.forEach(paper => {
+                if (paper.full_text && paper.full_text.length > 1000) {
+                    textExtractionMetrics.papersWithFullText++;
+                }
+                if (paper.abstract && !paper.full_text) {
+                    textExtractionMetrics.papersWithAbstractOnly++;
+                }
+                if (paper.content_length) {
+                    textExtractionMetrics.averageContentLength += paper.content_length;
+                }
+                if (paper.extraction_method) {
+                    textExtractionMetrics.extractionMethods.add(paper.extraction_method);
+                }
+                if (paper.quality_score) {
+                    textExtractionMetrics.qualityScores.push(paper.quality_score);
+                }
+            });
+
+            textExtractionMetrics.averageContentLength /= textExtractionMetrics.totalPapers;
+            structure.hasTextExtraction = textExtractionMetrics.papersWithFullText > 0;
+
+            this.log(`📄 Text Extraction Analysis for ${scenarioName}:`, 'info', {
+                ...textExtractionMetrics,
+                extractionMethods: Array.from(textExtractionMetrics.extractionMethods),
+                averageQualityScore: textExtractionMetrics.qualityScores.length > 0
+                    ? textExtractionMetrics.qualityScores.reduce((a, b) => a + b, 0) / textExtractionMetrics.qualityScores.length
+                    : 0
+            });
         }
 
-        this.log('Generate-Review response structure:', 'info', {
-            hasAnalysis: !!data?.analysis,
-            hasPapers: !!data?.papers,
-            paperCount: data?.papers?.length || 0,
-            analysisKeys: data?.analysis ? Object.keys(data.analysis) : []
-        });
+        // Check quality metrics
+        structure.hasQualityMetrics = !!(data?.quality_metrics || data?.content_quality || data?.extraction_quality);
+
+        // Performance analysis
+        const performance = {
+            responseTime: responseTime,
+            isAcceptable: responseTime < 30000, // 30 seconds
+            paperCount: data?.results?.length || 0,
+            queryCount: data?.queries?.length || 0
+        };
+
+        this.log(`⚡ Performance Metrics for ${scenarioName}:`, 'info', performance);
+        this.log(`🏗️ Response Structure for ${scenarioName}:`, 'info', structure);
+
+        // Success/failure determination
+        if (structure.hasResults && structure.hasSemanticEnhancements && performance.isAcceptable) {
+            this.log(`✅ ${scenarioName} - Comprehensive Success`, 'success');
+        } else if (structure.hasResults) {
+            this.log(`⚠️ ${scenarioName} - Partial Success (missing enhancements)`, 'warning');
+        } else {
+            this.log(`❌ ${scenarioName} - Failed`, 'error');
+        }
     }
 
-    // TEST 4: Semantic Integration - Deep Dive
+    async testSemanticGenerateReviewUI() {
+        this.log('🎨 TESTING SEMANTIC GENERATE-REVIEW UI COMPONENTS', 'test');
+
+        // Check if SemanticEnhancedResultsCard component exists and is functional
+        const uiTests = [
+            {
+                component: 'SemanticEnhancedResultsCard',
+                selector: '[data-testid="semantic-enhanced-results-card"]',
+                expectedFeatures: [
+                    'content-quality-metrics',
+                    'expandable-semantic-analysis',
+                    'personalized-insights',
+                    'cross-domain-connections'
+                ]
+            }
+        ];
+
+        for (const test of uiTests) {
+            const element = document.querySelector(test.selector);
+            if (element) {
+                this.log(`✅ ${test.component} component found in DOM`, 'success');
+
+                // Test expandable sections
+                const expandableElements = element.querySelectorAll('[data-expandable]');
+                this.log(`📋 Found ${expandableElements.length} expandable sections`, 'info');
+
+                // Test quality metrics visualization
+                const qualityMetrics = element.querySelectorAll('[data-quality-metric]');
+                this.log(`📊 Found ${qualityMetrics.length} quality metric visualizations`, 'info');
+
+            } else {
+                this.log(`⚠️ ${test.component} component not found in current DOM`, 'warning');
+                this.log(`💡 Component may load dynamically when generate-review is executed`, 'info');
+            }
+        }
+    }
+
+    // TEST 4: Comprehensive Semantic Deep-Dive Testing
     async testSemanticDeepDive() {
         this.log('🔬 TESTING SEMANTIC DEEP-DIVE INTEGRATION', 'test');
-        
-        // First get a paper PMID from recommendations
+
+        // Get papers from weekly recommendations for testing
         const { data: weeklyData } = await this.makeRequest(
             `/api/proxy/recommendations/weekly/${encodeURIComponent(this.realUserId)}`
         );
 
-        let testPmid = '32887946'; // fallback PMID
-        if (weeklyData?.recommendations?.papers_for_you?.[0]?.pmid) {
-            testPmid = weeklyData.recommendations.papers_for_you[0].pmid;
+        const availablePapers = [
+            ...(weeklyData?.recommendations?.papers_for_you || []),
+            ...(weeklyData?.recommendations?.trending_in_field || []),
+            ...(weeklyData?.recommendations?.cross_pollination || [])
+        ];
+
+        if (availablePapers.length === 0) {
+            this.log('⚠️ No test papers available for deep-dive', 'warning');
+            return;
         }
 
-        const testPayload = {
-            pmid: testPmid,
-            semantic_context: true,
-            find_related_papers: true,
-            cross_domain_analysis: true,
-            user_context: {
-                research_domains: ['genetics', 'medicine'],
-                current_projects: ['diabetes research', 'gene therapy']
+        // Test multiple deep-dive scenarios
+        const testScenarios = [
+            {
+                name: 'Full Semantic Analysis',
+                paper: availablePapers[0],
+                payload: {
+                    semantic_context: true,
+                    find_related_papers: true,
+                    concept_mapping: true,
+                    cross_domain_analysis: true,
+                    similarity_threshold: 0.3,
+                    max_related_papers: 20,
+                    user_context: {
+                        research_interests: ['genetics', 'medicine', 'biotechnology'],
+                        recent_papers: ['32887946', '33462507'],
+                        saved_collections: ['diabetes_research', 'gene_therapy'],
+                        search_history: ['CRISPR', 'gene therapy', 'diabetes treatment']
+                    }
+                }
+            },
+            {
+                name: 'Cross-Domain Focus',
+                paper: availablePapers[Math.min(1, availablePapers.length - 1)],
+                payload: {
+                    semantic_context: true,
+                    find_related_papers: true,
+                    cross_domain_analysis: true,
+                    user_research_domains: ['machine_learning', 'bioinformatics'],
+                    similarity_threshold: 0.25,
+                    max_related_papers: 15
+                }
             }
+        ];
+
+        for (const scenario of testScenarios) {
+            await this.executeSemanticDeepDiveScenario(scenario);
+        }
+
+        // Test UI Component Integration
+        await this.testSemanticDeepDiveUI();
+    }
+
+    async executeSemanticDeepDiveScenario(scenario) {
+        this.log(`🔬 Testing ${scenario.name}`, 'test');
+
+        const testPayload = {
+            pmid: scenario.paper.pmid,
+            title: scenario.paper.title,
+            objective: `Comprehensive analysis of "${scenario.paper.title}" with focus on ${scenario.name.toLowerCase()}`,
+            ...scenario.payload
         };
 
+        const startTime = Date.now();
         const { data, error } = await this.makeRequest(
             '/api/proxy/deep-dive-semantic',
             {
@@ -273,37 +485,121 @@ class ComprehensiveTestSuite {
                 body: JSON.stringify(testPayload)
             }
         );
+        const responseTime = Date.now() - startTime;
 
         if (error) {
-            this.log('❌ Semantic Deep-Dive failed', 'error', error);
+            this.log(`❌ ${scenario.name} failed`, 'error', {
+                error: error,
+                pmid: scenario.paper.pmid,
+                title: scenario.paper.title,
+                payload: testPayload,
+                responseTime: responseTime
+            });
             return;
         }
 
+        // Detailed response analysis
+        this.analyzeSemanticDeepDiveResponse(data, scenario.name, responseTime, scenario.paper);
+    }
+
+    analyzeSemanticDeepDiveResponse(data, scenarioName, responseTime, testPaper) {
+        this.log(`📊 Analyzing ${scenarioName} Deep-Dive Response`, 'info');
+
+        // Check response structure
+        const structure = {
+            hasAnalysis: !!data?.analysis,
+            hasSections: !!data?.sections,
+            hasRelatedPapers: !!data?.related_papers,
+            hasSemanticContext: !!data?.semantic_context,
+            hasUserRelevance: !!data?.user_relevance_score,
+            hasCrossDomainConnections: !!data?.cross_domain_connections,
+            hasConceptMapping: !!data?.concept_mapping,
+            hasTextExtraction: false,
+            hasQualityMetrics: false
+        };
+
         // Check for semantic enhancement fields
-        const expectedSemanticFields = [
-            'user_relevance_score',
+        const semanticFields = [
+            'semantic_context',
             'related_papers',
-            'cross_domain_applications',
-            'research_recommendations'
+            'cross_domain_connections',
+            'user_relevance_score',
+            'concept_mapping',
+            'research_domain',
+            'methodology_analysis',
+            'personal_research_connections'
         ];
 
-        const hasSemanticFields = expectedSemanticFields.some(field => 
-            data && (field in data || (data.analysis && field in data.analysis))
+        const foundSemanticFields = semanticFields.filter(field =>
+            data && (field in data ||
+                    (data.analysis && field in data.analysis) ||
+                    (data.semantic_enhancements && field in data.semantic_enhancements))
         );
 
-        if (hasSemanticFields) {
-            this.log('✅ Semantic Deep-Dive has enhanced fields', 'success');
-        } else {
-            this.log('⚠️ Semantic Deep-Dive may be missing enhanced fields', 'warning', data);
-        }
+        structure.hasSemanticEnhancements = foundSemanticFields.length > 0;
 
-        this.log('Deep-Dive response structure:', 'info', {
-            pmid: testPmid,
-            hasAnalysis: !!data?.analysis,
-            hasRelatedPapers: !!data?.related_papers,
-            relatedPaperCount: data?.related_papers?.length || 0,
-            analysisKeys: data?.analysis ? Object.keys(data.analysis) : []
-        });
+        // Performance and quality metrics
+        const performance = {
+            responseTime: responseTime,
+            isAcceptable: responseTime < 45000, // 45 seconds for deep-dive
+            pmid: testPaper.pmid,
+            title: testPaper.title.substring(0, 50) + '...',
+            foundSemanticFields: foundSemanticFields
+        };
+
+        this.log(`⚡ Performance Metrics for ${scenarioName}:`, 'info', performance);
+        this.log(`🏗️ Response Structure for ${scenarioName}:`, 'info', structure);
+
+        // Success/failure determination
+        if (structure.hasAnalysis && structure.hasSemanticEnhancements && performance.isAcceptable) {
+            this.log(`✅ ${scenarioName} - Comprehensive Success`, 'success');
+        } else if (structure.hasAnalysis) {
+            this.log(`⚠️ ${scenarioName} - Partial Success (missing enhancements)`, 'warning');
+        } else {
+            this.log(`❌ ${scenarioName} - Failed`, 'error');
+        }
+    }
+
+    async testSemanticDeepDiveUI() {
+        this.log('🎨 TESTING SEMANTIC DEEP-DIVE UI COMPONENTS', 'test');
+
+        // Check if SemanticDeepDiveCard component exists and is functional
+        const uiTests = [
+            {
+                component: 'SemanticDeepDiveCard',
+                selector: '[data-testid="semantic-deep-dive-card"]',
+                expectedFeatures: [
+                    'user-relevance-scoring',
+                    'related-papers-categorization',
+                    'ai-powered-recommendations',
+                    'personal-research-connections',
+                    'interactive-expandable-sections'
+                ]
+            }
+        ];
+
+        for (const test of uiTests) {
+            const element = document.querySelector(test.selector);
+            if (element) {
+                this.log(`✅ ${test.component} component found in DOM`, 'success');
+
+                // Test progress bars for relevance scoring
+                const progressBars = element.querySelectorAll('[data-progress-bar]');
+                this.log(`📊 Found ${progressBars.length} progress bar visualizations`, 'info');
+
+                // Test expandable sections
+                const expandableElements = element.querySelectorAll('[data-expandable]');
+                this.log(`📋 Found ${expandableElements.length} expandable sections`, 'info');
+
+                // Test categorization elements
+                const categoryElements = element.querySelectorAll('[data-category]');
+                this.log(`🏷️ Found ${categoryElements.length} categorization elements`, 'info');
+
+            } else {
+                this.log(`⚠️ ${test.component} component not found in current DOM`, 'warning');
+                this.log(`💡 Component may load dynamically when deep-dive is executed`, 'info');
+            }
+        }
     }
 
     // TEST 5: Search History Integration
