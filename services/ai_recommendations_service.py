@@ -167,7 +167,12 @@ class SpotifyInspiredRecommendationsService:
             logger.info(f"🔬 Detected research domains: {research_domains}")
 
             # Generate recommendations based on detected domains
-            recommendations = await self._generate_domain_based_recommendations(research_domains, db)
+            raw_recommendations = await self._generate_domain_based_recommendations(research_domains, db)
+
+            # 🚨 CRITICAL: Apply global deduplication to direct recommendations
+            logger.info("🔄 Applying global deduplication to direct user recommendations...")
+            recommendations = self._apply_global_deduplication(raw_recommendations)
+            logger.info(f"✅ Global deduplication applied to direct recommendations")
 
             return {
                 "recommendations": recommendations,
