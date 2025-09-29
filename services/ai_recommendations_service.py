@@ -473,6 +473,10 @@ class SpotifyInspiredRecommendationsService:
                         logger.info(f"🔬 AI fallback Cross-pollination added PMIDs: {new_pmids}, total used: {len(used_pmids)}")
 
                     raw_method_results["citation_opportunities"] = await self._generate_citation_opportunities(user_profile, db, used_pmids)
+                    if raw_method_results["citation_opportunities"].get("papers"):
+                        new_pmids = [p.get("pmid") for p in raw_method_results["citation_opportunities"]["papers"] if p.get("pmid")]
+                        used_pmids.update(new_pmids)
+                        logger.info(f"💡 AI fallback Citation opportunities added PMIDs: {new_pmids}, total used: {len(used_pmids)}")
 
                     # Extract papers arrays from method results (methods return {title, papers, updated})
                     raw_recommendations = {}
@@ -518,6 +522,11 @@ class SpotifyInspiredRecommendationsService:
                     logger.info(f"🔬 Cross-pollination added PMIDs: {new_pmids}, total used: {len(used_pmids)}")
 
                 raw_method_results["citation_opportunities"] = await self._generate_citation_opportunities(user_profile, db, used_pmids)
+                # Add papers from citation_opportunities to used set
+                if raw_method_results["citation_opportunities"].get("papers"):
+                    new_pmids = [p.get("pmid") for p in raw_method_results["citation_opportunities"]["papers"] if p.get("pmid")]
+                    used_pmids.update(new_pmids)
+                    logger.info(f"💡 Citation opportunities added PMIDs: {new_pmids}, total used: {len(used_pmids)}")
 
                 # Extract papers arrays from method results (methods return {title, papers, updated})
                 raw_recommendations = {}
@@ -1416,6 +1425,8 @@ class SpotifyInspiredRecommendationsService:
                 used_pmids = set()
             global_used_pmids = used_pmids.copy()
 
+            logger.info(f"🔥 Trending: Starting with {len(global_used_pmids)} used PMIDs: {list(global_used_pmids)[:5]}{'...' if len(global_used_pmids) > 5 else ''}")
+
             # Get trending papers in user's research fields with multiple strategies
             for domain in primary_domains[:3]:  # Increased from 2 to 3
                 trending_papers = []
@@ -1515,6 +1526,8 @@ class SpotifyInspiredRecommendationsService:
 
             # Sort by trending score
             recommendations.sort(key=lambda x: x["trending_score"], reverse=True)
+
+            logger.info(f"🔥 Trending: Generated {len(recommendations)} recommendations with PMIDs: {[r['pmid'] for r in recommendations[:5]]}{'...' if len(recommendations) > 5 else ''}")
 
             # Ensure we have at least some recommendations
             if len(recommendations) < 3:
@@ -1788,6 +1801,8 @@ class SpotifyInspiredRecommendationsService:
                 used_pmids = set()
             global_used_pmids = used_pmids.copy()
 
+            logger.info(f"💡 Citation Opportunities: Starting with {len(global_used_pmids)} used PMIDs: {list(global_used_pmids)[:5]}{'...' if len(global_used_pmids) > 5 else ''}")
+
             # Find recent papers in user's field that might benefit from citing their work
             for domain in primary_domains[:3]:
                 # Get recent papers with flexible date range
@@ -1828,6 +1843,7 @@ class SpotifyInspiredRecommendationsService:
                 for paper in recent_papers:
                     # Skip if we've already seen this paper OR if it's used by other methods
                     if paper.pmid in seen_pmids or paper.pmid in global_used_pmids:
+                        logger.info(f"💡 Citation Opportunities: Skipping duplicate PMID {paper.pmid} (seen: {paper.pmid in seen_pmids}, global: {paper.pmid in global_used_pmids})")
                         continue
 
                     seen_pmids.add(paper.pmid)
@@ -1854,6 +1870,8 @@ class SpotifyInspiredRecommendationsService:
 
             # Sort by opportunity score
             recommendations.sort(key=lambda x: x["opportunity_score"], reverse=True)
+
+            logger.info(f"💡 Citation Opportunities: Generated {len(recommendations)} recommendations with PMIDs: {[r['pmid'] for r in recommendations[:5]]}{'...' if len(recommendations) > 5 else ''}")
 
             return {
                 "title": "Citation Opportunities",

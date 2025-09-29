@@ -142,18 +142,40 @@ export class SemanticDeepDiveEngine {
    * Execute traditional deep-dive analysis
    */
   private async executeTraditionalDeepDive(request: SemanticDeepDiveRequest): Promise<any> {
-    // Import the traditional API function
-    const { fetchDeepDive } = await import('./api');
-    
-    const traditionalRequest: FetchDeepDiveArgs = {
-      url: request.url,
-      pmid: request.pmid,
-      title: request.title,
+    // Call the backend deep-dive endpoint directly
+    const backendUrl = 'https://r-dagent-production.up.railway.app/deep-dive';
+
+    const traditionalRequest = {
+      url: request.url || null,
+      pmid: request.pmid || null,
+      title: request.title || null,
       objective: request.objective,
-      projectId: request.projectId
+      projectId: request.projectId || null,
+
+      // Enhanced content extraction settings
+      content_extraction: {
+        require_full_text: true,
+        fallback_to_abstract: true,
+        enhanced_oa_detection: true,
+        quality_threshold: 0.7,
+        extraction_methods: ['pdf', 'html', 'xml', 'pubmed', 'arxiv'],
+        max_extraction_attempts: 3
+      }
     };
 
-    return await fetchDeepDive(traditionalRequest);
+    const response = await fetch(backendUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(traditionalRequest),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Deep-dive failed: ${response.status} ${response.statusText}`);
+    }
+
+    return await response.json();
   }
 
   /**
