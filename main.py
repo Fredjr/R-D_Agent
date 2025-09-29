@@ -12756,22 +12756,22 @@ async def get_all_deep_dive_analyses(
         analyses_data = []
         for analysis in analyses:
             analysis_data = {
-                "analysis_id": analysis.id,
-                "id": analysis.id,
-                "pmid": analysis.pmid,
-                "title": analysis.title,
-                "objective": analysis.objective,
+                "analysis_id": analysis.analysis_id,
+                "id": analysis.analysis_id,
+                "pmid": analysis.article_pmid,
+                "title": analysis.article_title,
+                "objective": "Deep dive analysis",  # DeepDiveAnalysis doesn't have objective field
                 "project_id": analysis.project_id,
                 "created_by": analysis.created_by,
                 "created_at": analysis.created_at.isoformat() if analysis.created_at else None,
                 "updated_at": analysis.updated_at.isoformat() if analysis.updated_at else None,
                 "processing_status": analysis.processing_status,
-                "has_results": bool(analysis.results),
+                "has_results": bool(analysis.scientific_model_analysis or analysis.experimental_methods_analysis or analysis.results_interpretation_analysis),
                 "results_summary": {
-                    "has_model_analysis": bool(analysis.results and "model_analysis" in str(analysis.results)),
-                    "has_methods_analysis": bool(analysis.results and "methods_analysis" in str(analysis.results)),
-                    "has_results_analysis": bool(analysis.results and "results_analysis" in str(analysis.results))
-                } if analysis.results else None
+                    "has_model_analysis": bool(analysis.scientific_model_analysis),
+                    "has_methods_analysis": bool(analysis.experimental_methods_analysis),
+                    "has_results_analysis": bool(analysis.results_interpretation_analysis)
+                }
             }
             analyses_data.append(analysis_data)
 
@@ -12803,16 +12803,17 @@ async def create_global_deep_dive_analysis(
 
         # Create new analysis record
         analysis = DeepDiveAnalysis(
-            id=str(uuid.uuid4()),
-            pmid=analysis_data.get("pmid"),
-            title=analysis_data.get("title"),
-            objective=analysis_data.get("objective"),
+            analysis_id=str(uuid.uuid4()),
+            article_pmid=analysis_data.get("pmid") or analysis_data.get("article_pmid"),
+            article_title=analysis_data.get("title") or analysis_data.get("article_title"),
             project_id=analysis_data.get("project_id", "default"),
             created_by=user_id,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
             processing_status="completed",
-            results=analysis_data.get("results")
+            scientific_model_analysis=analysis_data.get("results", {}).get("scientific_model_analysis") if analysis_data.get("results") else None,
+            experimental_methods_analysis=analysis_data.get("results", {}).get("experimental_methods_analysis") if analysis_data.get("results") else None,
+            results_interpretation_analysis=analysis_data.get("results", {}).get("results_interpretation_analysis") if analysis_data.get("results") else None
         )
 
         db.add(analysis)
@@ -12822,11 +12823,10 @@ async def create_global_deep_dive_analysis(
         logger.info(f"🔍 [Global Deep Dive Analyses] Created analysis: {analysis.id}")
 
         return {
-            "analysis_id": analysis.id,
-            "id": analysis.id,
-            "pmid": analysis.pmid,
-            "title": analysis.title,
-            "objective": analysis.objective,
+            "analysis_id": analysis.analysis_id,
+            "id": analysis.analysis_id,
+            "pmid": analysis.article_pmid,
+            "title": analysis.article_title,
             "project_id": analysis.project_id,
             "created_by": analysis.created_by,
             "created_at": analysis.created_at.isoformat(),
@@ -12862,16 +12862,16 @@ async def get_all_generate_review_analyses(
         analyses_data = []
         for report in reports:
             analysis_data = {
-                "analysis_id": report.id,
-                "id": report.id,
-                "review_id": report.id,
-                "molecule": report.molecule,
-                "objective": report.objective,
+                "analysis_id": report.report_id,
+                "id": report.report_id,
+                "review_id": report.report_id,
+                "molecule": getattr(report, 'molecule', 'Unknown'),
+                "objective": getattr(report, 'objective', 'Generate review analysis'),
                 "project_id": report.project_id,
                 "created_by": report.created_by,
                 "created_at": report.created_at.isoformat() if report.created_at else None,
                 "updated_at": report.updated_at.isoformat() if report.updated_at else None,
-                "processing_status": report.processing_status,
+                "processing_status": getattr(report, 'processing_status', 'completed'),
                 "has_results": bool(report.content),
                 "results_summary": {
                     "has_content": bool(report.content),
@@ -12909,14 +12909,13 @@ async def create_global_generate_review_analysis(
 
         # Create new report record
         report = Report(
-            id=str(uuid.uuid4()),
-            molecule=analysis_data.get("molecule"),
-            objective=analysis_data.get("objective"),
+            report_id=str(uuid.uuid4()),
+            title=analysis_data.get("molecule", "Generate Review Analysis"),
+            query=analysis_data.get("objective", "Generate review analysis"),
             project_id=analysis_data.get("project_id", "default"),
             created_by=user_id,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
-            processing_status="completed",
             content=analysis_data.get("results") or analysis_data.get("content")
         )
 
@@ -12927,15 +12926,15 @@ async def create_global_generate_review_analysis(
         logger.info(f"📝 [Global Generate Review Analyses] Created analysis: {report.id}")
 
         return {
-            "analysis_id": report.id,
-            "id": report.id,
-            "review_id": report.id,
-            "molecule": report.molecule,
-            "objective": report.objective,
+            "analysis_id": report.report_id,
+            "id": report.report_id,
+            "review_id": report.report_id,
+            "molecule": report.title,
+            "objective": report.query,
             "project_id": report.project_id,
             "created_by": report.created_by,
             "created_at": report.created_at.isoformat(),
-            "processing_status": report.processing_status,
+            "processing_status": "completed",
             "saved_to_database": True
         }
 
