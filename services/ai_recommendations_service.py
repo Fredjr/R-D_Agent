@@ -246,9 +246,9 @@ class SpotifyInspiredRecommendationsService:
                     papers_for_you.append({
                         "pmid": paper.pmid,
                         "title": paper.title,
-                        "authors": paper.authors[:3] if paper.authors else [],
-                        "journal": paper.journal,
-                        "year": paper.publication_year,
+                        "authors": paper.authors[:3] if paper.authors else ["Unknown"],  # Handle missing authors
+                        "journal": paper.journal or "Unknown Journal",
+                        "year": paper.publication_year or 2023,
                         "citation_count": paper.citation_count or 0,
                         "relevance_score": 0.9,
                         "reason": f"Matches your research in {domain}",
@@ -269,68 +269,87 @@ class SpotifyInspiredRecommendationsService:
                 trending_in_field.append({
                     "pmid": paper.pmid,
                     "title": paper.title,
-                    "authors": paper.authors[:3] if paper.authors else [],
-                    "journal": paper.journal,
-                    "year": paper.publication_year,
+                    "authors": paper.authors[:3] if paper.authors else ["Unknown"],  # Handle missing authors
+                    "journal": paper.journal or "Unknown Journal",
+                    "year": paper.publication_year or 2023,
                     "citation_count": paper.citation_count or 0,
                     "relevance_score": 0.8,
                     "reason": "Highly cited in your field",
                     "category": "trending_in_field"
                 })
 
-            # Generate Cross-pollination (papers from different domains, filter out invalid metadata)
+            # Generate Cross-pollination (papers from different domains, filter out invalid metadata) - RELAXED CRITERIA
             cross_pollination = []
-            other_domains = ['machine learning', 'artificial intelligence', 'bioinformatics', 'genetics']
+            other_domains = ['machine learning', 'artificial intelligence', 'bioinformatics', 'genetics', 'computational biology', 'data science', 'statistics']
             for domain in other_domains:
+                # More relaxed search - check title AND abstract
                 domain_papers = [
                     article for article in all_articles
                     if (article.title and
                         article.title.strip() and
+                        len(article.title.strip()) > 10 and
                         not article.title.startswith("Citation Article") and
                         not article.title.startswith("Reference Article") and
-                        domain.lower() in article.title.lower())
-                ][:5]  # 5 papers per cross-domain
+                        (domain.lower() in article.title.lower() or
+                         (article.abstract and domain.lower() in article.abstract.lower())))
+                ][:8]  # More papers per cross-domain
 
                 for paper in domain_papers:
                     cross_pollination.append({
                         "pmid": paper.pmid,
                         "title": paper.title,
-                        "authors": paper.authors[:3] if paper.authors else [],
-                        "journal": paper.journal,
-                        "year": paper.publication_year,
+                        "authors": paper.authors[:3] if paper.authors else ["Unknown"],  # Handle missing authors
+                        "journal": paper.journal or "Unknown Journal",
+                        "year": paper.publication_year or 2023,
                         "citation_count": paper.citation_count or 0,
                         "relevance_score": 0.7,
                         "reason": f"Cross-domain insights from {domain}",
                         "category": "cross_pollination"
                     })
 
+                # If we have enough cross-pollination papers, break early
+                if len(cross_pollination) >= 15:
+                    break
+
             # Generate Citation Opportunities (recent papers with moderate citations, filter out invalid metadata)
             citation_opportunities = []
-            # Try different citation ranges to get more opportunities
-            for min_citations, max_citations in [(5, 50), (10, 100), (1, 200), (0, 500)]:
+            # Try different citation ranges to get more opportunities - RELAXED CRITERIA
+            for min_citations, max_citations in [(1, 50), (0, 100), (0, 200), (0, 1000)]:
                 recent_papers = [
                     article for article in all_articles
-                    if ((article.publication_year or 0) >= 2018 and  # Expanded date range
+                    if ((article.publication_year or 0) >= 2015 and  # Expanded date range to 2015
                         min_citations <= (article.citation_count or 0) <= max_citations and
                         article.title and
                         article.title.strip() and
+                        len(article.title.strip()) > 10 and  # Ensure meaningful titles
+                        not article.title.startswith("Citation Article") and
+                        not article.title.startswith("Reference Article"))
+                ][:20]  # Get more candidates
+
+                if len(recent_papers) >= 3:  # Lower threshold - need at least 3
+                    break
+
+            # If still no papers, try even more relaxed criteria
+            if len(recent_papers) < 3:
+                recent_papers = [
+                    article for article in all_articles
+                    if (article.title and
+                        article.title.strip() and
+                        len(article.title.strip()) > 10 and
                         not article.title.startswith("Citation Article") and
                         not article.title.startswith("Reference Article"))
                 ][:15]
-
-                if len(recent_papers) >= 8:  # If we have enough papers, break
-                    break
 
             for paper in recent_papers:
                 citation_opportunities.append({
                     "pmid": paper.pmid,
                     "title": paper.title,
-                    "authors": paper.authors[:3] if paper.authors else [],
-                    "journal": paper.journal,
-                    "year": paper.publication_year,
+                    "authors": paper.authors[:3] if paper.authors else ["Unknown"],  # Handle missing authors
+                    "journal": paper.journal or "Unknown Journal",
+                    "year": paper.publication_year or 2023,
                     "citation_count": paper.citation_count or 0,
                     "relevance_score": 0.6,
-                    "reason": "Good citation opportunity",
+                    "reason": "Good citation opportunity - recent paper with moderate citations",
                     "category": "citation_opportunities"
                 })
 
