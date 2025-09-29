@@ -256,7 +256,7 @@ class SpotifyInspiredRecommendationsService:
                     papers_for_you.append({
                         "pmid": paper.pmid,
                         "title": paper.title,
-                        "authors": authors[:3] if authors else [],  # PubMed always has authors, but handle edge cases
+                        "authors": authors[:3] if authors else ["Author information not available"],  # Ensure we always have author info
                         "journal": paper.journal,
                         "year": paper.publication_year,
                         "citation_count": paper.citation_count or 0,
@@ -326,7 +326,7 @@ class SpotifyInspiredRecommendationsService:
                     cross_pollination.append({
                         "pmid": paper.pmid,
                         "title": paper.title,
-                        "authors": authors[:3] if authors else [],
+                        "authors": authors[:3] if authors else ["Author information not available"],
                         "journal": paper.journal,
                         "year": paper.publication_year,
                         "citation_count": paper.citation_count or 0,
@@ -381,7 +381,7 @@ class SpotifyInspiredRecommendationsService:
                 citation_opportunities.append({
                     "pmid": paper.pmid,
                     "title": paper.title,
-                    "authors": authors[:3] if authors else [],
+                    "authors": authors[:3] if authors else ["Author information not available"],
                     "journal": paper.journal,
                     "year": paper.publication_year,
                     "citation_count": paper.citation_count or 0,
@@ -1457,7 +1457,7 @@ class SpotifyInspiredRecommendationsService:
                     recommendations.append({
                         "pmid": paper.pmid,
                         "title": paper.title,
-                        "authors": paper.authors[:3] if paper.authors else [],
+                        "authors": paper.authors[:3] if paper.authors else ["Author information not available"],
                         "journal": paper.journal,
                         "year": paper.publication_year,
                         "citation_count": paper.citation_count or 0,
@@ -2510,7 +2510,7 @@ class SpotifyInspiredRecommendationsService:
                         papers_list.append({
                             "pmid": paper.pmid,
                             "title": paper.title,
-                            "authors": paper.authors[:3] if paper.authors else [],
+                            "authors": paper.authors[:3] if paper.authors else ["Author information not available"],
                             "journal": paper.journal,
                             "year": paper.publication_year,
                             "citation_count": paper.citation_count or 0,
