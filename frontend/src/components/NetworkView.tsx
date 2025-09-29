@@ -940,22 +940,28 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
   // Fetch collections for sidebar
   const fetchCollections = useCallback(async () => {
-    if (sourceType === 'project') {
-      try {
-        const response = await fetch(`/api/proxy/projects/${sourceId}/collections`, {
-          headers: {
-            'User-ID': user?.user_id || 'default_user',
-          },
-        });
-        if (response.ok) {
-          const collectionsData = await response.json();
-          setCollections(collectionsData);
-        }
-      } catch (error) {
-        console.error('Error fetching collections:', error);
+    if (!projectId) return;
+
+    try {
+      console.log('🔍 NetworkView fetching collections for project:', projectId);
+      const response = await fetch(`/api/proxy/projects/${projectId}/collections`, {
+        headers: {
+          'User-ID': user?.user_id || 'default_user',
+        },
+      });
+      if (response.ok) {
+        const collectionsData = await response.json();
+        console.log('✅ NetworkView collections fetched:', collectionsData);
+        setCollections(collectionsData.collections || []);
+      } else {
+        console.warn('⚠️ NetworkView failed to fetch collections:', response.status);
+        setCollections([]);
       }
+    } catch (error) {
+      console.error('❌ NetworkView error fetching collections:', error);
+      setCollections([]);
     }
-  }, [sourceType, sourceId, user]);
+  }, [projectId, user]);
 
   useEffect(() => {
     fetchNetworkData();

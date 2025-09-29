@@ -25,6 +25,7 @@ import {
   GlobeAltIcon
 } from '@heroicons/react/24/outline';
 import { useRealTimeAnalytics } from '@/hooks/useRealTimeAnalytics';
+import { useWeeklyMixIntegration } from '@/hooks/useWeeklyMixIntegration';
 
 interface RecommendationData {
   papers_for_you: any[];
@@ -69,6 +70,9 @@ export default function HomePage() {
 
   // Initialize real-time analytics
   const { trackEvent, trackRecommendationInteraction } = useRealTimeAnalytics('home');
+
+  // Initialize weekly mix integration
+  const { trackHomeSearch, checkForWeeklyMixUpdate } = useWeeklyMixIntegration();
 
   // Semantic recommendations state
   const [semanticRecommendations, setSemanticRecommendations] = useState<{
@@ -260,6 +264,13 @@ export default function HomePage() {
     });
 
     console.log('🏠 [Home Page] Navigating to project creation with params:', params.toString());
+
+    // Track search for weekly mix automation
+    trackHomeSearch(searchQuery, objective);
+
+    // Check if weekly mix needs update
+    checkForWeeklyMixUpdate();
+
     router.push(`/project/new?${params.toString()}`);
   };
 
