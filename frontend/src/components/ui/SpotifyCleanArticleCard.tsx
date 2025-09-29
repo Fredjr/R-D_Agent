@@ -127,8 +127,8 @@ export function SpotifyCleanArticleCard({
     );
   };
 
-  const primaryAuthor = paper.authors?.[0] || 'Unknown Author';
-  const additionalAuthors = paper.authors?.length > 1 ? ` +${paper.authors.length - 1}` : '';
+  const primaryAuthor = (paper.authors && paper.authors.length > 0) ? paper.authors[0] : 'Unknown Author';
+  const additionalAuthors = (paper.authors && paper.authors.length > 1) ? ` +${paper.authors.length - 1}` : '';
 
   return (
     <div

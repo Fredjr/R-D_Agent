@@ -91,15 +91,16 @@ export async function POST(request: NextRequest) {
 
         if (jobStatus === 'completed') {
           result = statusData.result || {};
-          result.analysis_id = jobId;
-          result.id = jobId;
-          result.review_id = jobId;
-          result.job_id = jobId;
+          // Type-safe property assignment
+          (result as any).analysis_id = jobId;
+          (result as any).id = jobId;
+          (result as any).review_id = jobId;
+          (result as any).job_id = jobId;
 
           console.log('🚀 [Sync Review] Job completed successfully:', {
-            resultsCount: result?.results?.length || 0,
-            hasQueries: !!result?.queries,
-            hasDiagnostics: !!result?.diagnostics
+            resultsCount: (result as any)?.results?.length || 0,
+            hasQueries: !!(result as any)?.queries,
+            hasDiagnostics: !!(result as any)?.diagnostics
           });
           break;
         } else if (jobStatus === 'failed') {
@@ -166,17 +167,17 @@ export async function POST(request: NextRequest) {
         });
 
         // Add analysis_id to response
-        result.analysis_id = savedData.analysis_id || savedData.id || savedData.review_id;
-        result.saved_to_database = true;
+        (result as any).analysis_id = savedData.analysis_id || savedData.id || savedData.review_id;
+        (result as any).saved_to_database = true;
       } else {
         console.warn('💾 [Sync Review] Failed to save analysis to database:', saveResponse.status);
-        result.saved_to_database = false;
-        result.save_error = await saveResponse.text();
+        (result as any).saved_to_database = false;
+        (result as any).save_error = await saveResponse.text();
       }
     } catch (saveError) {
       console.error('💾 [Sync Review] Error saving analysis:', saveError);
-      result.saved_to_database = false;
-      result.save_error = saveError instanceof Error ? saveError.message : 'Unknown save error';
+      (result as any).saved_to_database = false;
+      (result as any).save_error = saveError instanceof Error ? saveError.message : 'Unknown save error';
     }
 
     return NextResponse.json(result);
