@@ -1062,10 +1062,55 @@ class SpotifyInspiredRecommendationsService:
                     logger.error(f"❌ Error in alternative recommendation approach: {e}")
                     return await self._generate_fallback_profile(user_id, db)
 
+            # ALWAYS try to get user's collections for domain detection
+            try:
+                user_collections = db.query(Collection).filter(
+                    or_(
+                        Collection.created_by == user_id,
+                        Collection.created_by == resolved_user_id
+                    )
+                ).all()
+
+                logger.info(f"🔍 DOMAIN DETECTION: Found {len(user_collections)} collections for analysis")
+
+                # Extract research domains from collection names (ALWAYS do this)
+                collection_domains = []
+                if len(user_collections) > 0:
+                    for collection in user_collections:
+                        collection_text = f"{collection.collection_name} {collection.description or ''}".lower()
+                        logger.info(f"🔍 ANALYZING COLLECTION: '{collection.collection_name}'")
+
+                        # Detect research domains from collection names
+                        if any(term in collection_text for term in ['kidney', 'renal', 'nephrology', 'albuminuria']):
+                            collection_domains.append('nephrology')
+                            logger.info(f"✅ DETECTED: nephrology from '{collection.collection_name}'")
+                        if any(term in collection_text for term in ['diabetes', 'diabetic', 'glucose', 'insulin']):
+                            collection_domains.append('diabetes')
+                            logger.info(f"✅ DETECTED: diabetes from '{collection.collection_name}'")
+                        if any(term in collection_text for term in ['cardiovascular', 'heart', 'cardiac']):
+                            collection_domains.append('cardiovascular')
+                            logger.info(f"✅ DETECTED: cardiovascular from '{collection.collection_name}'")
+                        if any(term in collection_text for term in ['finerenone', 'mineralocorticoid', 'pharmacology']):
+                            collection_domains.append('pharmacology')
+                            logger.info(f"✅ DETECTED: pharmacology from '{collection.collection_name}'")
+
+                    # Remove duplicates
+                    collection_domains = list(set(collection_domains))
+                    logger.info(f"🎯 COLLECTION DOMAINS DETECTED: {collection_domains}")
+            except Exception as e:
+                logger.error(f"❌ Error analyzing collections for domains: {e}")
+                collection_domains = []
+
             # Process saved articles if we have them (or if we created an enhanced profile)
             if len(saved_articles) > 0:
-                # Extract research domains and topics from saved articles
-                profile["primary_domains"] = await self._extract_research_domains(saved_articles, db)
+                # Extract research domains from saved articles
+                article_domains = await self._extract_research_domains(saved_articles, db)
+
+                # COMBINE collection domains with article domains (collection domains take priority)
+                combined_domains = collection_domains + [d for d in article_domains if d not in collection_domains]
+                profile["primary_domains"] = combined_domains[:5]  # Limit to top 5
+                logger.info(f"🎯 COMBINED DOMAINS: Collection={collection_domains}, Article={article_domains}, Final={profile['primary_domains']}")
+
                 profile["topic_preferences"] = await self._analyze_topic_preferences(saved_articles, db)
 
                 # Calculate user activity patterns
@@ -1083,6 +1128,20 @@ class SpotifyInspiredRecommendationsService:
 
                 # Store total saved papers
                 profile["total_saved_papers"] = len(saved_articles)
+
+            # If no saved articles but we have collection domains, create profile from collections
+            elif len(collection_domains) > 0:
+                logger.info(f"🎯 NO ARTICLES but found collection domains: {collection_domains}")
+                profile["primary_domains"] = collection_domains
+                profile["topic_preferences"] = {domain: 0.8 for domain in collection_domains}
+                profile["activity_level"] = "moderate"
+                profile["discovery_preference"] = "balanced"
+                profile["collaboration_score"] = 0.7
+                profile["research_velocity"] = "active"
+                profile["recency_bias"] = 0.8
+                profile["total_saved_papers"] = len(user_collections) if 'user_collections' in locals() else 0
+                profile["is_collection_based"] = True
+                logger.info(f"✅ Created collection-based profile with domains: {collection_domains}")
 
             # If we have an enhanced fallback profile, we already set the necessary fields above
             elif profile.get("is_enhanced_fallback"):
