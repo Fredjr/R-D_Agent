@@ -69,6 +69,56 @@ export async function POST(request: NextRequest) {
       hasDiagnostics: !!result?.diagnostics
     });
 
+    // Save analysis to database
+    try {
+      console.log('💾 [Sync Review] Attempting to save analysis to database...');
+
+      const analysisData = {
+        molecule: body.molecule,
+        objective: body.objective || 'Synchronous generate review analysis',
+        processing_status: 'completed',
+        results: result,
+        user_id: userId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        // Additional metadata
+        max_results: body.max_results,
+        filters: enhancedBody.filters,
+        search_strategy: enhancedBody.search_strategy,
+        quality_threshold: enhancedBody.quality_threshold,
+        fullTextOnly: enhancedBody.fullTextOnly
+      };
+
+      // Save to database via the generate-review-analyses endpoint
+      const saveResponse = await fetch(`${BACKEND_URL.replace('r-dagent-production.up.railway.app', 'frontend-psi-seven-85.vercel.app')}/api/proxy/generate-review-analyses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': userId,
+        },
+        body: JSON.stringify(analysisData),
+      });
+
+      if (saveResponse.ok) {
+        const savedData = await saveResponse.json();
+        console.log('💾 [Sync Review] Analysis saved successfully:', {
+          analysisId: savedData.analysis_id || savedData.id || savedData.review_id
+        });
+
+        // Add analysis_id to response
+        result.analysis_id = savedData.analysis_id || savedData.id || savedData.review_id;
+        result.saved_to_database = true;
+      } else {
+        console.warn('💾 [Sync Review] Failed to save analysis to database:', saveResponse.status);
+        result.saved_to_database = false;
+        result.save_error = await saveResponse.text();
+      }
+    } catch (saveError) {
+      console.error('💾 [Sync Review] Error saving analysis:', saveError);
+      result.saved_to_database = false;
+      result.save_error = saveError instanceof Error ? saveError.message : 'Unknown save error';
+    }
+
     return NextResponse.json(result);
 
   } catch (error) {

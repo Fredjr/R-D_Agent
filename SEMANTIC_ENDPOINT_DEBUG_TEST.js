@@ -494,6 +494,6 @@ class SemanticEndpointDebugger {
 
 // Auto-execute when script is loaded
 (async () => {
-    const debugger = new SemanticEndpointDebugger();
-    await debugger.runDebugTests();
+    const semanticDebugger = new SemanticEndpointDebugger();
+    await semanticDebugger.runDebugTests();
 })();
