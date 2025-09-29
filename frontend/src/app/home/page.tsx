@@ -22,7 +22,8 @@ import {
   BeakerIcon,
   LightBulbIcon,
   SparklesIcon,
-  GlobeAltIcon
+  GlobeAltIcon,
+  UserGroupIcon
 } from '@heroicons/react/24/outline';
 import { useRealTimeAnalytics } from '@/hooks/useRealTimeAnalytics';
 import { useWeeklyMixIntegration } from '@/hooks/useWeeklyMixIntegration';
@@ -79,12 +80,14 @@ export default function HomePage() {
     crossDomain: any[];
     trending: any[];
     personalized: any[];
+    citationOpportunities: any[];
     loading: boolean;
     error: string | null;
   }>({
     crossDomain: [],
     trending: [],
     personalized: [],
+    citationOpportunities: [],
     loading: true,
     error: null
   });
@@ -100,8 +103,8 @@ export default function HomePage() {
       try {
         console.log('🏠 HOME: Fetching real semantic recommendations for user:', user.email);
 
-        // Fetch all three types in parallel using real recommendation APIs
-        const [crossDomainResponse, trendingResponse, personalizedResponse] = await Promise.allSettled([
+        // Fetch all four types in parallel using real recommendation APIs
+        const [crossDomainResponse, trendingResponse, personalizedResponse, citationResponse] = await Promise.allSettled([
           // Cross-Domain: Use cross-pollination API (integrates with search history)
           fetch(`/api/proxy/recommendations/cross-pollination/${user.email}`, {
             headers: { 'User-ID': user.email, 'Content-Type': 'application/json' }
@@ -112,6 +115,10 @@ export default function HomePage() {
           }),
           // Personalized: Use papers-for-you API (integrates with search history)
           fetch(`/api/proxy/recommendations/papers-for-you/${user.email}`, {
+            headers: { 'User-ID': user.email, 'Content-Type': 'application/json' }
+          }),
+          // Citation Opportunities: Papers that could benefit from user's expertise
+          fetch(`/api/proxy/recommendations/citation-opportunities/${user.email}`, {
             headers: { 'User-ID': user.email, 'Content-Type': 'application/json' }
           })
         ]);
@@ -158,16 +165,32 @@ export default function HomePage() {
                                [];
         }
 
+        // Process citation opportunities results
+        let citationResults = [];
+        if (citationResponse.status === 'fulfilled' && citationResponse.value.ok) {
+          const citationData = await citationResponse.value.json();
+          console.log('🏠 Citation Opportunities API response:', JSON.stringify(citationData, null, 2));
+
+          // Handle different response formats
+          citationResults = citationData.papers ||
+                           citationData.recommendations ||
+                           citationData.citation_opportunities ||
+                           (citationData.recommendations?.citation_opportunities) ||
+                           [];
+        }
+
         console.log('🏠 HOME: Real semantic recommendations fetched:', {
           crossDomain: crossDomainResults.length,
           trending: trendingResults.length,
-          personalized: personalizedResults.length
+          personalized: personalizedResults.length,
+          citationOpportunities: citationResults.length
         });
 
         setSemanticRecommendations({
           crossDomain: crossDomainResults, // Keep all results for dynamic count
           trending: trendingResults,
           personalized: personalizedResults,
+          citationOpportunities: citationResults,
           loading: false,
           error: null
         });
@@ -566,6 +589,50 @@ export default function HomePage() {
                   ))}
                 </div>
               </div>
+
+              {/* Citation Opportunities */}
+              {semanticRecommendations.citationOpportunities.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center">
+                      <UserGroupIcon className="w-5 h-5 mr-2 text-yellow-400" />
+                      <h3 className="text-lg font-semibold text-white">Citation Opportunities</h3>
+                      <span className="ml-2 bg-yellow-500/20 px-2 py-1 rounded text-xs text-yellow-300">
+                        {semanticRecommendations.citationOpportunities.length} papers
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        trackEvent('citation_opportunities_explore', { source: 'home_recommendations' });
+                        router.push('/discover?mode=citation_opportunities&category=citation_opportunities');
+                      }}
+                      className="text-xs text-yellow-400 hover:text-yellow-300 transition-colors"
+                    >
+                      Explore All →
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {semanticRecommendations.citationOpportunities.slice(0, 3).map((paper, index) => (
+                      <div
+                        key={`citation-${index}`}
+                        className="bg-gradient-to-br from-yellow-600/10 to-orange-600/10 rounded-lg p-4 border border-yellow-500/20 hover:border-yellow-400/40 transition-colors cursor-pointer"
+                        onClick={() => window.open(`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}`, '_blank')}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <span className="text-xs bg-yellow-500/20 text-yellow-300 px-2 py-1 rounded">💡 Cite</span>
+                          <span className="text-xs text-yellow-400">{paper.year}</span>
+                        </div>
+                        <h4 className="text-white text-sm font-medium mb-2 line-clamp-2">{paper.title}</h4>
+                        <p className="text-[var(--spotify-light-text)] text-xs mb-2 line-clamp-2">{paper.abstract?.substring(0, 120)}...</p>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-yellow-400">{paper.journal}</span>
+                          <span className="text-xs text-yellow-300">Citations: {paper.citation_count || 0}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </section>
