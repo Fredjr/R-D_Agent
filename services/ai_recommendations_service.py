@@ -1318,7 +1318,7 @@ class SpotifyInspiredRecommendationsService:
                 ).order_by(desc(Article.citation_count)).limit(5).all()
 
                 for paper in fallback_papers:
-                    if paper.pmid not in [r["pmid"] for r in recommendations]:
+                    if paper.pmid not in [r["pmid"] for r in recommendations] and paper.pmid not in global_used_pmids:
                         recommendations.append({
                             "pmid": paper.pmid,
                             "title": paper.title,
@@ -1525,7 +1525,7 @@ class SpotifyInspiredRecommendationsService:
                 ).order_by(desc(Article.citation_count)).limit(5).all()
 
                 for paper in fallback_papers:
-                    if paper.pmid not in [r["pmid"] for r in recommendations]:
+                    if paper.pmid not in [r["pmid"] for r in recommendations] and paper.pmid not in global_used_pmids:
                         months_since_pub = max(1, (datetime.now(timezone.utc).year - (paper.publication_year or datetime.now(timezone.utc).year)) * 12)
                         trending_score = (paper.citation_count or 0) / months_since_pub
 
@@ -1740,7 +1740,7 @@ class SpotifyInspiredRecommendationsService:
                 ).order_by(desc(Article.citation_count)).limit(5).all()
 
                 for paper in fallback_papers:
-                    if paper.pmid not in [r["pmid"] for r in recommendations]:
+                    if paper.pmid not in [r["pmid"] for r in recommendations] and paper.pmid not in global_used_pmids:
                         cross_pollination_score = 0.6  # Default score for fallback
 
                         recommendations.append({
@@ -1781,6 +1781,13 @@ class SpotifyInspiredRecommendationsService:
             primary_domains = user_profile.get("primary_domains", [])
             topic_preferences = user_profile.get("topic_preferences", {})
 
+            # Track seen PMIDs to avoid duplicates within this method
+            seen_pmids = set()
+            # Also avoid PMIDs already used by other methods
+            if used_pmids is None:
+                used_pmids = set()
+            global_used_pmids = used_pmids.copy()
+
             # Find recent papers in user's field that might benefit from citing their work
             for domain in primary_domains[:3]:
                 # Get recent papers with flexible date range
@@ -1819,6 +1826,11 @@ class SpotifyInspiredRecommendationsService:
                     ).order_by(desc(Article.publication_year), desc(Article.citation_count)).limit(15).all()
 
                 for paper in recent_papers:
+                    # Skip if we've already seen this paper OR if it's used by other methods
+                    if paper.pmid in seen_pmids or paper.pmid in global_used_pmids:
+                        continue
+
+                    seen_pmids.add(paper.pmid)
                     citation_opportunity_score = self._calculate_citation_opportunity_score(
                         paper, user_profile
                     )
