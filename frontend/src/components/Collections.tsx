@@ -11,6 +11,7 @@ import { useResponsive, MobileCollectionGrid, MobileTabs, MobileFAB } from './Mo
 import { CollectionLoadingSkeleton, InlineLoading } from './LoadingStates';
 import { SourceBadge } from './DataSourceIndicators';
 import { DeletableCollectionCard } from './ui/DeletableCard';
+import { useWeeklyMixIntegration } from '@/hooks/useWeeklyMixIntegration';
 
 interface CollectionsProps {
   projectId: string;
@@ -29,6 +30,9 @@ export default function Collections({
   onExploreCluster
 }: CollectionsProps) {
   const { user } = useAuth();
+
+  // Initialize weekly mix integration
+  const { trackCollectionAdd } = useWeeklyMixIntegration();
 
   // Use global collection sync instead of local state
   const {
@@ -74,7 +78,7 @@ export default function Collections({
 
   const handleCreateCollection = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!newCollection.collection_name.trim()) {
       alert('Please enter a collection name');
       return;
@@ -94,6 +98,12 @@ export default function Collections({
         throw new Error('Failed to create collection');
       }
 
+      // Get the created collection data
+      const createdCollection = await response.json();
+
+      // Track collection creation for weekly mix
+      trackCollectionAdd('', newCollection.collection_name, createdCollection.collection_id || '', 'collection_management');
+
       // Reset form and close modal
       setNewCollection({
         collection_name: '',
@@ -102,9 +112,8 @@ export default function Collections({
         icon: 'folder'
       });
       setShowCreateModal(false);
-      
-      // Get the created collection data and broadcast the update
-      const createdCollection = await response.json();
+
+      // Broadcast the update
       broadcastCollectionAdded({
         ...createdCollection,
         project_id: projectId

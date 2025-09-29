@@ -27,6 +27,7 @@ import { NetworkLoadingProgress, LoadingOverlay, useLoadingState } from './Loadi
 import { useResponsive, MobileSidebar } from './MobileOptimizations';
 import { useNetworkShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { SourceBadge, NodeSourceOverlay } from './DataSourceIndicators';
+import { useWeeklyMixIntegration } from '@/hooks/useWeeklyMixIntegration';
 
 export interface NetworkNode {
   id: string;
@@ -327,6 +328,9 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 }, ref) => {
   const { user } = useAuth();
   const [networkData, setNetworkData] = useState<NetworkData | null>(null);
+
+  // Initialize weekly mix integration
+  const { trackNetworkNavigation, trackPaperView } = useWeeklyMixIntegration();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<NetworkNode | null>(null);
@@ -994,6 +998,17 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       position: node.position,
       clickType: event.detail === 2 ? 'double' : event.ctrlKey || event.metaKey ? 'ctrl' : 'single'
     });
+
+    // Track network navigation for weekly mix
+    if (node.data?.metadata) {
+      const metadata = node.data.metadata as any;
+      trackNetworkNavigation(
+        metadata.pmid || node.id,
+        metadata.title || node.data.label || 'Unknown',
+        navigationMode || 'default',
+        projectId
+      );
+    }
 
     // First try to find in original networkData
     let networkNode = networkData?.nodes.find(n => n.id === node.id);

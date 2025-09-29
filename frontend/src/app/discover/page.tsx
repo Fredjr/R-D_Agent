@@ -24,6 +24,7 @@ import { SemanticSearchEngine, SemanticSearchQuery } from '@/lib/semantic-search
 import { PersonalizedRecommendationEngine, RecommendationContext } from '@/lib/recommendation-engine';
 import { CrossDomainDiscoveryEngine } from '@/lib/cross-domain-discovery';
 import SemanticDiscoveryInterface from '@/components/SemanticDiscoveryInterface';
+import SemanticRecommendationSections from '@/components/SemanticRecommendationSections';
 import { useRealTimeAnalytics } from '@/hooks/useRealTimeAnalytics';
 import { weeklyMixAutomation } from '@/lib/weekly-mix-automation';
 import { useWeeklyMixIntegration } from '@/hooks/useWeeklyMixIntegration';
@@ -67,15 +68,15 @@ function DiscoverPageContent() {
   const [crossDomainOpportunities, setCrossDomainOpportunities] = useState<any[]>([]);
   const [semanticResults, setSemanticResults] = useState<any[]>([]);
 
-  // Separate states for the 3 recommendation types from Home page
-  const [recommendationSections, setRecommendationSections] = useState<{
-    trending: { papers: any[], loading: boolean, error: string | null };
-    forYou: { papers: any[], loading: boolean, error: string | null };
+  // Separate states for the 3 semantic recommendation types
+  const [semanticRecommendations, setSemanticRecommendations] = useState<{
     crossDomain: { papers: any[], loading: boolean, error: string | null };
+    trending: { papers: any[], loading: boolean, error: string | null };
+    personalized: { papers: any[], loading: boolean, error: string | null };
   }>({
+    crossDomain: { papers: [], loading: false, error: null },
     trending: { papers: [], loading: false, error: null },
-    forYou: { papers: [], loading: false, error: null },
-    crossDomain: { papers: [], loading: false, error: null }
+    personalized: { papers: [], loading: false, error: null }
   });
 
   // Initialize semantic engines
@@ -161,6 +162,7 @@ function DiscoverPageContent() {
 
     // Fetch recommendations
     fetchWeeklyRecommendations();
+    fetchSemanticRecommendations();
   }, [user, selectedProject]);
 
   const initializeSemanticSystems = async () => {
@@ -326,7 +328,75 @@ function DiscoverPageContent() {
     await forceWeeklyMixUpdate();
 
     await fetchWeeklyRecommendations();
+    await fetchSemanticRecommendations();
     setRefreshing(false);
+  };
+
+  // Fetch semantic recommendations for the 3 sections
+  const fetchSemanticRecommendations = async () => {
+    if (!user?.email) return;
+
+    console.log('🧠 Fetching semantic recommendations...');
+
+    // Set loading states
+    setSemanticRecommendations(prev => ({
+      crossDomain: { ...prev.crossDomain, loading: true },
+      trending: { ...prev.trending, loading: true },
+      personalized: { ...prev.personalized, loading: true }
+    }));
+
+    try {
+      // For now, use demo data until semantic API endpoints are ready
+      const demoSemanticPapers = [
+        {
+          pmid: "semantic_001",
+          title: "Cross-Domain Applications of Machine Learning in Biological Systems",
+          authors: ["Chen, L.", "Rodriguez, M.", "Kim, S."],
+          journal: "Nature Machine Intelligence",
+          year: 2024,
+          citation_count: 89,
+          relevance_score: 0.88,
+          reason: "Bridges machine learning and biology domains",
+          category: "Cross-Domain",
+          semantic_analysis: {
+            methodology: 'computational',
+            complexity_score: 0.75,
+            novelty_type: 'breakthrough',
+            research_domains: ['machine_learning', 'biology', 'computer_science'],
+            technical_terms: ['neural networks', 'protein folding', 'deep learning']
+          }
+        }
+      ];
+
+      setSemanticRecommendations({
+        crossDomain: {
+          papers: demoSemanticPapers,
+          loading: false,
+          error: null
+        },
+        trending: {
+          papers: demoSemanticPapers,
+          loading: false,
+          error: null
+        },
+        personalized: {
+          papers: demoSemanticPapers,
+          loading: false,
+          error: null
+        }
+      });
+
+      console.log('✅ Semantic recommendations loaded (demo data)');
+
+    } catch (error) {
+      console.error('❌ Error fetching semantic recommendations:', error);
+
+      setSemanticRecommendations(prev => ({
+        crossDomain: { ...prev.crossDomain, loading: false, error: 'Failed to load' },
+        trending: { ...prev.trending, loading: false, error: 'Failed to load' },
+        personalized: { ...prev.personalized, loading: false, error: 'Failed to load' }
+      }));
+    }
   };
 
   const handlePlayPaper = (paper: any) => {
@@ -504,7 +574,7 @@ function DiscoverPageContent() {
   const loadTrendingRecommendations = async () => {
     if (!user) return;
 
-    setRecommendationSections(prev => ({
+    setSemanticRecommendations(prev => ({
       ...prev,
       trending: { ...prev.trending, loading: true, error: null }
     }));
@@ -526,7 +596,7 @@ function DiscoverPageContent() {
       const data = await response.json();
       console.log('🔥 Trending recommendations loaded:', data);
 
-      setRecommendationSections(prev => ({
+      setSemanticRecommendations(prev => ({
         ...prev,
         trending: {
           papers: data.papers || data.recommendations || [],
@@ -540,7 +610,7 @@ function DiscoverPageContent() {
 
     } catch (error) {
       console.error('❌ Failed to load trending recommendations:', error);
-      setRecommendationSections(prev => ({
+      setSemanticRecommendations(prev => ({
         ...prev,
         trending: {
           papers: [],
@@ -554,9 +624,9 @@ function DiscoverPageContent() {
   const loadForYouRecommendations = async () => {
     if (!user) return;
 
-    setRecommendationSections(prev => ({
+    setSemanticRecommendations(prev => ({
       ...prev,
-      forYou: { ...prev.forYou, loading: true, error: null }
+      personalized: { ...prev.personalized, loading: true, error: null }
     }));
 
     try {
@@ -576,9 +646,9 @@ function DiscoverPageContent() {
       const data = await response.json();
       console.log('💡 Personalized recommendations loaded:', data);
 
-      setRecommendationSections(prev => ({
+      setSemanticRecommendations(prev => ({
         ...prev,
-        forYou: {
+        personalized: {
           papers: data.papers || data.recommendations || [],
           loading: false,
           error: null
@@ -590,9 +660,9 @@ function DiscoverPageContent() {
 
     } catch (error) {
       console.error('❌ Failed to load personalized recommendations:', error);
-      setRecommendationSections(prev => ({
+      setSemanticRecommendations(prev => ({
         ...prev,
-        forYou: {
+        personalized: {
           papers: [],
           loading: false,
           error: error instanceof Error ? error.message : 'Failed to load personalized recommendations'
@@ -604,7 +674,7 @@ function DiscoverPageContent() {
   const loadCrossDomainRecommendations = async () => {
     if (!user) return;
 
-    setRecommendationSections(prev => ({
+    setSemanticRecommendations(prev => ({
       ...prev,
       crossDomain: { ...prev.crossDomain, loading: true, error: null }
     }));
@@ -626,7 +696,7 @@ function DiscoverPageContent() {
       const data = await response.json();
       console.log('🌐 Cross-domain recommendations loaded:', data);
 
-      setRecommendationSections(prev => ({
+      setSemanticRecommendations(prev => ({
         ...prev,
         crossDomain: {
           papers: data.papers || data.recommendations || [],
@@ -640,7 +710,7 @@ function DiscoverPageContent() {
 
     } catch (error) {
       console.error('❌ Failed to load cross-domain recommendations:', error);
-      setRecommendationSections(prev => ({
+      setSemanticRecommendations(prev => ({
         ...prev,
         crossDomain: {
           papers: [],
@@ -727,6 +797,21 @@ function DiscoverPageContent() {
             onFilterChange={handleFilterChange}
             onCrossDomainExplore={handleCrossDomainExplore}
             loading={loading}
+          />
+        </div>
+
+        {/* NEW: Semantic Recommendation Sections */}
+        <div className="mb-8 px-4 sm:px-6">
+          <SemanticRecommendationSections
+            crossDomainPapers={semanticRecommendations.crossDomain.papers}
+            trendingPapers={semanticRecommendations.trending.papers}
+            personalizedPapers={semanticRecommendations.personalized.papers}
+            loading={semanticRecommendations.crossDomain.loading || semanticRecommendations.trending.loading || semanticRecommendations.personalized.loading}
+            onPaperClick={handlePlayPaper}
+            onSeeAll={(queryType) => {
+              console.log(`🔍 See all clicked for: ${queryType}`);
+              // Handle see all navigation
+            }}
           />
         </div>
 
@@ -961,12 +1046,12 @@ function DiscoverPageContent() {
           })()}
 
           {/* Trending Now Section */}
-          {activeDiscoveryMode === 'trending' && recommendationSections.trending.papers.length > 0 && (
+          {activeDiscoveryMode === 'trending' && semanticRecommendations.trending.papers.length > 0 && (
             <SpotifyCleanSection
               section={{
                 title: "Trending Now",
                 description: "Hot papers trending in your research field",
-                papers: recommendationSections.trending.papers,
+                papers: semanticRecommendations.trending.papers,
                 updated: new Date().toISOString(),
                 icon: BeakerIcon,
                 color: '#ef4444',
@@ -985,12 +1070,12 @@ function DiscoverPageContent() {
           )}
 
           {/* For You Section */}
-          {activeDiscoveryMode === 'for_you' && recommendationSections.forYou.papers.length > 0 && (
+          {activeDiscoveryMode === 'for_you' && semanticRecommendations.personalized.papers.length > 0 && (
             <SpotifyCleanSection
               section={{
                 title: "For You",
                 description: "Personalized recommendations based on your search history",
-                papers: recommendationSections.forYou.papers,
+                papers: semanticRecommendations.personalized.papers,
                 updated: new Date().toISOString(),
                 icon: LightBulbIcon,
                 color: '#16a34a',
@@ -1009,12 +1094,12 @@ function DiscoverPageContent() {
           )}
 
           {/* Cross-Domain Discoveries Section */}
-          {activeDiscoveryMode === 'cross_domain_discoveries' && recommendationSections.crossDomain.papers.length > 0 && (
+          {activeDiscoveryMode === 'cross_domain_discoveries' && semanticRecommendations.crossDomain.papers.length > 0 && (
             <SpotifyCleanSection
               section={{
                 title: "Cross-Domain Discoveries",
                 description: "Interdisciplinary research opportunities",
-                papers: recommendationSections.crossDomain.papers,
+                papers: semanticRecommendations.crossDomain.papers,
                 updated: new Date().toISOString(),
                 icon: ArrowPathIcon,
                 color: '#6366f1',
@@ -1033,21 +1118,21 @@ function DiscoverPageContent() {
           )}
 
           {/* Loading states for recommendation sections */}
-          {activeDiscoveryMode === 'trending' && recommendationSections.trending.loading && (
+          {activeDiscoveryMode === 'trending' && semanticRecommendations.trending.loading && (
             <div className="text-center py-12">
               <LoadingSpinner size="lg" />
               <p className="text-[var(--spotify-light-text)] mt-4">Loading trending recommendations...</p>
             </div>
           )}
 
-          {activeDiscoveryMode === 'for_you' && recommendationSections.forYou.loading && (
+          {activeDiscoveryMode === 'for_you' && semanticRecommendations.personalized.loading && (
             <div className="text-center py-12">
               <LoadingSpinner size="lg" />
               <p className="text-[var(--spotify-light-text)] mt-4">Loading personalized recommendations...</p>
             </div>
           )}
 
-          {activeDiscoveryMode === 'cross_domain_discoveries' && recommendationSections.crossDomain.loading && (
+          {activeDiscoveryMode === 'cross_domain_discoveries' && semanticRecommendations.crossDomain.loading && (
             <div className="text-center py-12">
               <LoadingSpinner size="lg" />
               <p className="text-[var(--spotify-light-text)] mt-4">Loading cross-domain discoveries...</p>
@@ -1055,16 +1140,16 @@ function DiscoverPageContent() {
           )}
 
           {/* Error states for recommendation sections */}
-          {activeDiscoveryMode === 'trending' && recommendationSections.trending.error && (
-            <ErrorAlert>{recommendationSections.trending.error}</ErrorAlert>
+          {activeDiscoveryMode === 'trending' && semanticRecommendations.trending.error && (
+            <ErrorAlert>{semanticRecommendations.trending.error}</ErrorAlert>
           )}
 
-          {activeDiscoveryMode === 'for_you' && recommendationSections.forYou.error && (
-            <ErrorAlert>{recommendationSections.forYou.error}</ErrorAlert>
+          {activeDiscoveryMode === 'for_you' && semanticRecommendations.personalized.error && (
+            <ErrorAlert>{semanticRecommendations.personalized.error}</ErrorAlert>
           )}
 
-          {activeDiscoveryMode === 'cross_domain_discoveries' && recommendationSections.crossDomain.error && (
-            <ErrorAlert>{recommendationSections.crossDomain.error}</ErrorAlert>
+          {activeDiscoveryMode === 'cross_domain_discoveries' && semanticRecommendations.crossDomain.error && (
+            <ErrorAlert>{semanticRecommendations.crossDomain.error}</ErrorAlert>
           )}
         </div>
 
