@@ -29,6 +29,28 @@ export async function fetchReview(args: FetchReviewArgs): Promise<any> {
   const url = `${getEndpoint()}/generate-review`;
   const payload = buildPayload(args);
 
+  // Enhanced payload with same text extraction level as deep-dive
+  const enhancedPayload = {
+    ...payload,
+    // Enhanced content extraction settings (matching deep-dive)
+    content_extraction: {
+      require_full_text: args.fullTextOnly || false,
+      fallback_to_abstract: !args.fullTextOnly,
+      enhanced_oa_detection: true,
+      quality_threshold: args.fullTextOnly ? 0.8 : 0.6,
+      extraction_methods: ['pdf', 'html', 'xml', 'pubmed'],
+      max_extraction_attempts: 3
+    },
+    // Text processing settings
+    text_processing: {
+      min_abstract_length: args.fullTextOnly ? 200 : 100,
+      require_methods_section: args.fullTextOnly,
+      require_results_section: args.fullTextOnly,
+      include_references: true,
+      include_figures_tables: args.fullTextOnly
+    }
+  };
+
   // Create AbortController for timeout handling
   // SOLUTION: Remove all timeouts to prevent any timeout issues
   // Complex analyses (DAG mode, fullTextOnly, recall) can take 10-20 minutes
@@ -41,7 +63,7 @@ export async function fetchReview(args: FetchReviewArgs): Promise<any> {
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(enhancedPayload),
       signal: controller.signal,
     });
 
@@ -170,6 +192,36 @@ function buildDeepDivePayload({ url, pmid, title, objective, projectId }: FetchD
     title: title ?? null,
     objective,
     projectId: projectId ?? null,
+
+    // Enhanced content extraction settings (matching generate-review)
+    content_extraction: {
+      require_full_text: true, // Deep-dive always tries for full text
+      fallback_to_abstract: true, // But falls back if needed
+      enhanced_oa_detection: true,
+      quality_threshold: 0.7,
+      extraction_methods: ['pdf', 'html', 'xml', 'pubmed', 'arxiv'],
+      max_extraction_attempts: 3
+    },
+
+    // Text processing settings
+    text_processing: {
+      min_abstract_length: 150,
+      require_methods_section: true,
+      require_results_section: true,
+      include_references: true,
+      include_figures_tables: true,
+      extract_methodology_details: true,
+      extract_statistical_analysis: true
+    },
+
+    // Analysis depth settings
+    analysis_depth: {
+      methodology_analysis: true,
+      results_interpretation: true,
+      statistical_validation: true,
+      fact_anchoring: true,
+      cross_validation: true
+    }
   };
 }
 

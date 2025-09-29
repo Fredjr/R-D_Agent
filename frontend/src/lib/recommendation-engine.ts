@@ -393,7 +393,7 @@ export class PersonalizedRecommendationEngine {
   }
 
   // Helper methods (simplified implementations)
-  private async getUserProfile(userId: string): Promise<UserProfile | null> {
+  public async getUserProfile(userId: string): Promise<UserProfile | null> {
     return this.userProfiles.get(userId) || null;
   }
 
