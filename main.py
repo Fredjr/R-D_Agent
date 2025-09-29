@@ -13074,8 +13074,7 @@ async def get_recommendation_debug_stats(
         ).count()
 
         articles_with_authors = db.query(Article).filter(
-            Article.authors.isnot(None),
-            Article.authors != "[]"
+            Article.authors.isnot(None)
         ).count()
 
         # Check citation opportunity candidates
