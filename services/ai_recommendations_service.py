@@ -1123,6 +1123,9 @@ class SpotifyInspiredRecommendationsService:
                 "chemistry": ["chemical", "compound", "synthesis", "molecular", "reaction"]
             }
 
+            # Track seen PMIDs to avoid duplicates within this method
+            seen_pmids = set()
+
             # Get papers based on user's research domains with multiple strategies
             for domain in primary_domains[:3]:  # Top 3 domains
                 keywords = domain_keywords.get(domain.lower(), [domain])
@@ -1189,8 +1192,13 @@ class SpotifyInspiredRecommendationsService:
                     ).order_by(desc(Article.citation_count)).limit(3).all()
                     logger.info(f"💡 Strategy 4 (quality papers for {domain}): Found {len(domain_papers)} papers")
 
-                # Process found papers
+                # Process found papers (with deduplication)
                 for paper in domain_papers:
+                    # Skip if we've already seen this paper
+                    if paper.pmid in seen_pmids:
+                        continue
+
+                    seen_pmids.add(paper.pmid)
                     relevance_score = self._calculate_personalized_relevance(paper, user_profile)
 
                     # Generate personalized reason based on user's search history
@@ -1316,6 +1324,9 @@ class SpotifyInspiredRecommendationsService:
                 "chemistry": ["chemical", "compound", "synthesis", "molecular", "reaction"]
             }
 
+            # Track seen PMIDs to avoid duplicates within this method
+            seen_pmids = set()
+
             # Get trending papers in user's research fields with multiple strategies
             for domain in primary_domains[:3]:  # Increased from 2 to 3
                 trending_papers = []
@@ -1386,6 +1397,12 @@ class SpotifyInspiredRecommendationsService:
                     logger.info(f"🔥 Strategy 4 (high-citation papers): Found {len(trending_papers)} papers")
 
                 for paper in trending_papers:
+                    # Skip if we've already seen this paper
+                    if paper.pmid in seen_pmids:
+                        continue
+
+                    seen_pmids.add(paper.pmid)
+
                     # Calculate trending score based on citations per month since publication
                     months_since_pub = max(1, (datetime.now(timezone.utc).year - (paper.publication_year or datetime.now(timezone.utc).year)) * 12)
                     trending_score = (paper.citation_count or 0) / months_since_pub
@@ -2087,27 +2104,40 @@ class SpotifyInspiredRecommendationsService:
             for rec_type in priority_order:
                 if rec_type in recommendations and 'papers' in recommendations[rec_type]:
                     original_papers = recommendations[rec_type]['papers']
-                    deduplicated_papers = []
+
+                    # First, deduplicate within this category by PMID
+                    category_seen_pmids = set()
+                    category_deduplicated = []
 
                     for paper in original_papers:
                         pmid = paper.get('pmid')
-                        if pmid and pmid not in seen_pmids:
-                            deduplicated_papers.append(paper)
-                            seen_pmids.add(pmid)
-                        elif len(deduplicated_papers) < 2:  # Allow up to 2 duplicates per category for variety
-                            deduplicated_papers.append(paper)
+                        if pmid and pmid not in category_seen_pmids:
+                            category_deduplicated.append(paper)
+                            category_seen_pmids.add(pmid)
 
-                    # Ensure each category has at least some papers
-                    if len(deduplicated_papers) == 0 and len(original_papers) > 0:
-                        # If all papers were duplicates, take the first 2 anyway
-                        deduplicated_papers = original_papers[:2]
-                        logger.info(f"🔄 {rec_type}: All papers were duplicates, keeping first 2 for variety")
+                    logger.info(f"🔧 {rec_type}: Reduced from {len(original_papers)} to {len(category_deduplicated)} papers (within-category dedup)")
+
+                    # Then, apply global deduplication
+                    global_deduplicated = []
+                    for paper in category_deduplicated:
+                        pmid = paper.get('pmid')
+                        if pmid and pmid not in seen_pmids:
+                            global_deduplicated.append(paper)
+                            seen_pmids.add(pmid)
+
+                    # Ensure each category has at least some papers (but not duplicates)
+                    if len(global_deduplicated) == 0 and len(category_deduplicated) > 0:
+                        # If all papers were global duplicates, take the first unique one anyway
+                        global_deduplicated = category_deduplicated[:1]
+                        logger.info(f"🔄 {rec_type}: All papers were global duplicates, keeping first 1 for variety")
 
                     # Preserve the original structure but with deduplicated papers
                     deduplicated[rec_type] = {
                         **recommendations[rec_type],
-                        'papers': deduplicated_papers
+                        'papers': global_deduplicated
                     }
+
+                    logger.info(f"✅ {rec_type}: Final count = {len(global_deduplicated)} papers")
                 else:
                     deduplicated[rec_type] = recommendations.get(rec_type, {'papers': []})
 
