@@ -294,8 +294,8 @@ export class SemanticGenerateReviewEngine {
       return result;
     } catch (error) {
       console.error('🧠 [SEMANTIC-LIB] ❌ executeTraditionalReview error:', {
-        error: error.message,
-        stack: error.stack,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
         backendUrl: backendUrl
       });
       throw error;
