@@ -13054,6 +13054,86 @@ async def get_enhanced_pubmed_paper_details(
         logger.error(f"📄 [Enhanced PubMed Details] Error fetching PMID {pmid}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch enhanced PubMed details: {str(e)}")
 
+@app.get("/projects/{project_id}/generate-review-analyses")
+async def get_project_generate_review_analyses(
+    project_id: str,
+    user_id: str = Header(..., alias="User-ID"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db)
+):
+    """Get generate review analyses for a specific project"""
+    try:
+        logger.info(f"📝 [Project Generate Review] Fetching analyses for project: {project_id}")
+
+        reports = db.query(Report).filter(
+            Report.project_id == project_id,
+            Report.created_by == user_id
+        ).order_by(Report.created_at.desc()).offset(offset).limit(limit).all()
+
+        analyses_data = []
+        for report in reports:
+            analysis_data = {
+                "analysis_id": report.report_id,
+                "id": report.report_id,
+                "review_id": report.report_id,
+                "molecule": report.title,
+                "objective": report.query,
+                "project_id": report.project_id,
+                "created_by": report.created_by,
+                "created_at": report.created_at.isoformat() if report.created_at else None,
+                "updated_at": report.updated_at.isoformat() if report.updated_at else None,
+                "processing_status": "completed",
+                "has_results": bool(report.content)
+            }
+            analyses_data.append(analysis_data)
+
+        return {"analyses": analyses_data, "total": len(analyses_data), "project_id": project_id}
+
+    except Exception as e:
+        logger.error(f"📝 [Project Generate Review] Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch project generate review analyses: {str(e)}")
+
+@app.get("/collections/{collection_id}/generate-review-analyses")
+async def get_collection_generate_review_analyses(
+    collection_id: str,
+    user_id: str = Header(..., alias="User-ID"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db)
+):
+    """Get generate review analyses for a specific collection"""
+    try:
+        logger.info(f"📝 [Collection Generate Review] Fetching analyses for collection: {collection_id}")
+
+        # For now, return empty list as collections don't have direct analyses
+        # This could be enhanced to find analyses related to collection articles
+        return {"analyses": [], "total": 0, "collection_id": collection_id}
+
+    except Exception as e:
+        logger.error(f"📝 [Collection Generate Review] Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch collection generate review analyses: {str(e)}")
+
+@app.get("/collections/{collection_id}/deep-dive-analyses")
+async def get_collection_deep_dive_analyses(
+    collection_id: str,
+    user_id: str = Header(..., alias="User-ID"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db)
+):
+    """Get deep dive analyses for a specific collection"""
+    try:
+        logger.info(f"🔬 [Collection Deep Dive] Fetching analyses for collection: {collection_id}")
+
+        # For now, return empty list as collections don't have direct analyses
+        # This could be enhanced to find analyses related to collection articles
+        return {"analyses": [], "total": 0, "collection_id": collection_id}
+
+    except Exception as e:
+        logger.error(f"🔬 [Collection Deep Dive] Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch collection deep dive analyses: {str(e)}")
+
 # =============================================================================
 # MESH AUTOCOMPLETE ENDPOINTS
 # =============================================================================

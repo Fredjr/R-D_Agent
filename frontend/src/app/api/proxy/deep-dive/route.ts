@@ -77,11 +77,8 @@ async function forwardDeepDiveRequest(req: Request) {
         updated_at: new Date().toISOString()
       };
 
-      // Save to database via the new deep-dive-analyses endpoint
-      const baseUrl = req.url.split('/api/proxy/deep-dive')[0];
-      const saveUrl = `${baseUrl}/api/proxy/deep-dive-analyses`;
-
-      const saveResponse = await fetch(saveUrl, {
+      // Save to database via the backend deep-dive-analyses endpoint
+      const saveResponse = await fetch(`${BACKEND_BASE}/deep-dive-analyses`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
