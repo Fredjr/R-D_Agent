@@ -12805,16 +12805,16 @@ async def create_global_deep_dive_analysis(
         project_id = analysis_data.get("project_id")
         if not project_id or project_id == "default":
             # Find user's first project or create a default one
-            user_project = db.query(Project).filter(Project.created_by == user_id).first()
+            user_project = db.query(Project).filter(Project.owner_user_id == user_id).first()
             if user_project:
                 project_id = user_project.project_id
             else:
                 # Create a default project for the user
                 default_project = Project(
                     project_id=str(uuid.uuid4()),
-                    name="Default Project",
+                    project_name="Default Project",
                     description="Auto-created default project for analyses",
-                    created_by=user_id,
+                    owner_user_id=user_id,
                     created_at=datetime.utcnow(),
                     updated_at=datetime.utcnow()
                 )
@@ -12932,16 +12932,16 @@ async def create_global_generate_review_analysis(
         project_id = analysis_data.get("project_id")
         if not project_id or project_id == "default":
             # Find user's first project or create a default one
-            user_project = db.query(Project).filter(Project.created_by == user_id).first()
+            user_project = db.query(Project).filter(Project.owner_user_id == user_id).first()
             if user_project:
                 project_id = user_project.project_id
             else:
                 # Create a default project for the user
                 default_project = Project(
                     project_id=str(uuid.uuid4()),
-                    name="Default Project",
+                    project_name="Default Project",
                     description="Auto-created default project for analyses",
-                    created_by=user_id,
+                    owner_user_id=user_id,
                     created_at=datetime.utcnow(),
                     updated_at=datetime.utcnow()
                 )
