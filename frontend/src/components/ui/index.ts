@@ -24,6 +24,18 @@ export {
   type ConfirmModalProps
 } from './Modal';
 export {
+  ContextMenu,
+  DeleteConfirmationModal,
+  useContextMenu,
+  useLongPress
+} from './ContextMenu';
+export {
+  DeletableProjectCard,
+  DeletableReportCard,
+  DeletableCollectionCard,
+  DeletableDeepDiveCard
+} from './DeletableCard';
+export {
   Input,
   Textarea,
   PasswordInput,

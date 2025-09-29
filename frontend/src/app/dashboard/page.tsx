@@ -17,6 +17,7 @@ import {
   CardDescription,
   ProjectCard,
   SpotifyProjectCard,
+  DeletableProjectCard,
   PageHeader
 } from '@/components/ui';
 import { SpotifyTopBar } from '@/components/ui/SpotifyNavigation';
@@ -285,16 +286,22 @@ export default function Dashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map((project) => (
-              <SpotifyProjectCard
+              <DeletableProjectCard
                 key={project.project_id}
                 title={project.project_name}
                 description={project.description || 'No description provided'}
                 status="active"
                 lastUpdated={formatDate(project.updated_at)}
                 reportCount={0} // TODO: Add report count from API
+                projectId={project.project_id}
                 onClick={() => {
                   setSelectedProject(project);
                   fetchProjectDetails(project.project_id);
+                }}
+                onDelete={() => {
+                  // Refresh the projects list after deletion
+                  fetchProjects();
+                  setSelectedProject(null);
                 }}
               />
             ))}

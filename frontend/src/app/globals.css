@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "../styles/palantir-theme.css";
 @import "../styles/spotify-theme.css";
+@import "../styles/context-menu.css";
 
 /* Legacy variables for backward compatibility */
 :root {

@@ -1,0 +1,218 @@
+/* Context Menu Styles */
+.context-menu {
+  position: fixed;
+  z-index: 1000;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  padding: 4px 0;
+  min-width: 160px;
+  animation: contextMenuFadeIn 0.15s ease-out;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+}
+
+.context-menu-item:hover {
+  background-color: #f3f4f6;
+  color: #111827;
+}
+
+.context-menu-item.danger {
+  color: #dc2626;
+}
+
+.context-menu-item.danger:hover {
+  background-color: #fef2f2;
+  color: #b91c1c;
+}
+
+.context-menu-item:disabled {
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.context-menu-item:disabled:hover {
+  background-color: transparent;
+  color: #9ca3af;
+}
+
+.context-menu-separator {
+  height: 1px;
+  background-color: #e5e7eb;
+  margin: 4px 0;
+}
+
+@keyframes contextMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Long Press Feedback */
+.long-press-active {
+  animation: longPressRipple 3s ease-out;
+}
+
+@keyframes longPressRipple {
+  0% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(59, 130, 246, 0.2);
+  }
+  100% {
+    box-shadow: 0 0 0 20px rgba(59, 130, 246, 0);
+  }
+}
+
+/* Mobile Touch Feedback */
+@media (hover: none) and (pointer: coarse) {
+  .deletable-card {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  
+  .deletable-card:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
+  }
+}
+
+/* Desktop Hover States */
+@media (hover: hover) and (pointer: fine) {
+  .deletable-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    transition: all 0.2s ease;
+  }
+}
+
+/* Deletion Modal Overlay */
+.deletion-modal-overlay {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* Loading States */
+.deletion-loading {
+  position: relative;
+  overflow: hidden;
+}
+
+.deletion-loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  animation: deletionShimmer 1.5s infinite;
+}
+
+@keyframes deletionShimmer {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+/* Success/Error States */
+.deletion-success {
+  animation: deletionSuccess 0.5s ease-out;
+}
+
+.deletion-error {
+  animation: deletionError 0.5s ease-out;
+}
+
+@keyframes deletionSuccess {
+  0% {
+    background-color: #f0fdf4;
+    border-color: #22c55e;
+  }
+  100% {
+    background-color: transparent;
+    border-color: initial;
+  }
+}
+
+@keyframes deletionError {
+  0% {
+    background-color: #fef2f2;
+    border-color: #ef4444;
+  }
+  100% {
+    background-color: transparent;
+    border-color: initial;
+  }
+}
+
+/* Accessibility */
+.context-menu-item:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+}
+
+.deletion-modal button:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .context-menu {
+    border: 2px solid #000;
+  }
+  
+  .context-menu-item {
+    border-bottom: 1px solid #ccc;
+  }
+  
+  .context-menu-item:last-child {
+    border-bottom: none;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .context-menu,
+  .deletable-card,
+  .context-menu-item,
+  .deletion-loading::after {
+    animation: none;
+    transition: none;
+  }
+  
+  .deletable-card:hover {
+    transform: none;
+  }
+}

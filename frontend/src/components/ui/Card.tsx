@@ -298,8 +298,10 @@ const SpotifyProjectCard = React.forwardRef<HTMLDivElement, CardProps & {
   lastUpdated?: string;
   reportCount?: number;
   onClick?: () => void;
+  onDelete?: () => void;
   imageUrl?: string;
-}>(({ title, description, status = 'active', lastUpdated, reportCount, onClick, imageUrl, className, ...props }, ref) => {
+  projectId?: string;
+}>(({ title, description, status = 'active', lastUpdated, reportCount, onClick, onDelete, imageUrl, projectId, className, ...props }, ref) => {
   const statusColors = {
     active: 'bg-[var(--spotify-green)] text-[var(--spotify-black)]',
     completed: 'bg-[var(--spotify-blue)] text-white',
@@ -368,7 +370,9 @@ const SpotifyReportCard = React.forwardRef<HTMLDivElement, CardProps & {
   status?: 'processing' | 'completed' | 'failed';
   createdAt?: string;
   onClick?: () => void;
-}>(({ title, objective, status = 'completed', createdAt, onClick, className, ...props }, ref) => {
+  onDelete?: () => void;
+  reportId?: string;
+}>(({ title, objective, status = 'completed', createdAt, onClick, onDelete, reportId, className, ...props }, ref) => {
   const statusConfig = {
     processing: { color: 'bg-[var(--spotify-orange)] text-[var(--spotify-black)]', icon: '🔄' },
     completed: { color: 'bg-[var(--spotify-green)] text-[var(--spotify-black)]', icon: '✅' },

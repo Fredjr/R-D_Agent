@@ -29,7 +29,8 @@ import {
   CardDescription,
   ProjectNavigation,
   PageHeader,
-  SpotifyReportCard
+  SpotifyReportCard,
+  DeletableReportCard
 } from '@/components/ui';
 
 interface Project {
@@ -1419,44 +1420,20 @@ export default function ProjectPage() {
               {project.reports && project.reports.length > 0 ? (
                 <div className="space-y-3">
                   {project.reports.map((report) => (
-                    <SpotifyReportCard
+                    <DeletableReportCard
                       key={report.report_id}
                       title={report.title}
                       objective={report.objective}
                       status="completed"
                       createdAt={new Date(report.created_at).toLocaleDateString()}
+                      reportId={report.report_id}
                       className="relative"
                       onClick={() => window.open(`/report/${report.report_id}`, '_blank')}
-                    >
-                      <div className="absolute top-3 right-3 flex gap-2">
-                        <Button
-                          variant="success"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAddToCollection({
-                              title: report.title,
-                              source: 'report',
-                              source_id: report.report_id,
-                              pmid: report.objective.match(/PMID[:\s]*(\d+)/i)?.[1]
-                            });
-                          }}
-                          title="Add articles from this report to a collection"
-                        >
-                          📚
-                        </Button>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            window.open(`/report/${report.report_id}`, '_blank');
-                          }}
-                        >
-                          View
-                        </Button>
-                      </div>
-                    </SpotifyReportCard>
+                      onDelete={() => {
+                        // Refresh project data after deletion
+                        fetchProjectData();
+                      }}
+                    />
                   ))}
                 </div>
               ) : (
