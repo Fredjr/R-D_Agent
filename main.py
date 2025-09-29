@@ -12923,7 +12923,7 @@ async def create_global_generate_review_analysis(
         db.commit()
         db.refresh(report)
 
-        logger.info(f"📝 [Global Generate Review Analyses] Created analysis: {report.id}")
+        logger.info(f"📝 [Global Generate Review Analyses] Created analysis: {report.report_id}")
 
         return {
             "analysis_id": report.report_id,
