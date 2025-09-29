@@ -4,7 +4,7 @@ const BACKEND_URL = process.env.BACKEND_URL || 'https://r-dagent-production.up.r
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { jobId: string } }
+  context: { params: Promise<{ jobId: string }> }
 ) {
   try {
     const userID = request.headers.get('User-ID');
@@ -15,6 +15,7 @@ export async function GET(
       );
     }
 
+    const params = await context.params;
     const { jobId } = params;
 
     const response = await fetch(`${BACKEND_URL}/background-jobs/${jobId}/status`, {
