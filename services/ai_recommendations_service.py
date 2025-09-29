@@ -1388,13 +1388,13 @@ class SpotifyInspiredRecommendationsService:
                             Article.title.ilike(f'%{keyword}%'),
                             Article.abstract.ilike(f'%{keyword}%')
                         ),
-                        Article.publication_year >= datetime.now(timezone.utc).year - 4,  # Slightly older for quality
-                        Article.citation_count > 20,  # Higher quality threshold
+                        Article.publication_year >= datetime.now(timezone.utc).year - 6,  # RELAXED: More years for more papers
+                        Article.citation_count > 5,  # RELAXED: Lower threshold for more papers
                         Article.title.isnot(None),
                         Article.title != "",
                         ~Article.title.like("Citation Article%"),
                         ~Article.title.like("Reference Article%")
-                    ).order_by(desc(Article.citation_count)).limit(12).all()
+                    ).order_by(desc(Article.citation_count)).limit(15).all()  # INCREASED: More papers
 
                     if domain_papers:
                         logger.info(f"💡 Strategy 1 ({keyword}): Found {len(domain_papers)} recent papers")
@@ -1598,13 +1598,13 @@ class SpotifyInspiredRecommendationsService:
                             Article.title.ilike(f'%{keyword}%'),
                             Article.abstract.ilike(f'%{keyword}%')
                         ),
-                        Article.publication_year >= datetime.now(timezone.utc).year - 2,  # More recent for trending
-                        Article.citation_count > 5,  # Lower threshold but more recent
+                        Article.publication_year >= datetime.now(timezone.utc).year - 5,  # RELAXED: More years for trending
+                        Article.citation_count > 1,  # RELAXED: Much lower threshold
                         Article.title.isnot(None),
                         Article.title != "",
                         ~Article.title.like("Citation Article%"),
                         ~Article.title.like("Reference Article%")
-                    ).order_by(desc(Article.citation_count)).limit(12).all()
+                    ).order_by(desc(Article.citation_count)).limit(15).all()  # INCREASED: More trending papers
 
                     if trending_papers:
                         logger.info(f"🔥 Strategy 1 ({keyword}): Found {len(trending_papers)} recent trending papers")
@@ -1940,7 +1940,7 @@ class SpotifyInspiredRecommendationsService:
             return {
                 "title": "Cross-pollination",
                 "description": "Interdisciplinary discoveries at the intersection of your research",
-                "papers": recommendations[:8],
+                "papers": recommendations[:12],  # INCREASED: More cross-pollination papers
                 "updated": datetime.now(timezone.utc).isoformat(),
                 "refresh_reason": "Exploring connections between your research domains and adjacent fields"
             }
@@ -2042,7 +2042,7 @@ class SpotifyInspiredRecommendationsService:
             return {
                 "title": "Citation Opportunities",
                 "description": "Recent papers that could cite your work",
-                "papers": recommendations[:8],
+                "papers": recommendations[:12],  # INCREASED: More citation opportunities
                 "updated": datetime.now(timezone.utc).isoformat(),
                 "refresh_reason": "Based on recent publications in your research areas"
             }

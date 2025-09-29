@@ -1,0 +1,29 @@
+{
+  "paper_counts": {
+    "total": 16,
+    "with_titles": 16,
+    "with_authors": 16,
+    "with_abstracts": 8,
+    "recent": 16,
+    "high_citation": 8
+  },
+  "user_profile": null,
+  "domain_counts": {
+    "diabetes": 1,
+    "cardiovascular": 0,
+    "kidney": 0,
+    "nephrology": 0,
+    "machine learning": 1,
+    "artificial intelligence": 1,
+    "bioinformatics": 0,
+    "genetics": 0,
+    "computational biology": 0,
+    "data science": 0
+  },
+  "query_tests": {
+    "trending": 12,
+    "diabetes": 1,
+    "ml_ai": 2
+  },
+  "author_issues": 0
+}
