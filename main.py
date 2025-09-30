@@ -4171,6 +4171,34 @@ async def test():
     """Minimal test endpoint to debug HTTP protocol issues"""
     return {"test": "success", "message": "HTTP protocol working"}
 
+@app.get("/test-pubmed")
+async def test_pubmed():
+    """Test PubMed search functionality"""
+    try:
+        from services.ai_recommendations_service import get_spotify_recommendations_service
+
+        service = get_spotify_recommendations_service()
+
+        # Test simple PubMed search
+        results = await service._search_pubmed("diabetes", max_results=3, sort="relevance")
+
+        return {
+            "status": "success",
+            "query": "diabetes",
+            "results_count": len(results),
+            "results": results[:2] if results else [],
+            "message": f"PubMed search returned {len(results)} papers"
+        }
+
+    except Exception as e:
+        import traceback
+        return {
+            "status": "error",
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "message": "PubMed search failed"
+        }
+
 @app.get("/test-db")
 async def test_database_schema():
     """Minimal database test to identify schema issues"""
