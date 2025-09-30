@@ -1734,87 +1734,38 @@ class SpotifyInspiredRecommendationsService:
                         general_query = f"({' OR '.join(keywords[:2])}) AND (\"2022\"[Date - Publication]:\"2025\"[Date - Publication])"
                         trending_papers = await self._search_pubmed(general_query, max_results=6, sort="date")
                         logger.info(f"🔥 Strategy 3 (General Recent): Found {len(trending_papers)} papers for {domain}")
-                    trending_papers = db.query(Article).filter(
-                        or_(
-                            Article.title.ilike(f'%{keyword}%'),
-                            Article.abstract.ilike(f'%{keyword}%')
-                        ),
-                        Article.publication_year >= datetime.now(timezone.utc).year - 5,  # RELAXED: More years for trending
-                        Article.citation_count > 1,  # RELAXED: Much lower threshold
-                        Article.title.isnot(None),
-                        Article.title != "",
-                        ~Article.title.like("Citation Article%"),
-                        ~Article.title.like("Reference Article%")
-                    ).order_by(desc(Article.citation_count)).limit(15).all()  # INCREASED: More trending papers
 
-                    if trending_papers:
-                        logger.info(f"🔥 Strategy 1 ({keyword}): Found {len(trending_papers)} recent trending papers")
-                        break
-
-                # Strategy 2: Expand time range if needed (last 5 years, lower citation threshold)
-                if not trending_papers:
-                    for keyword in keywords[:3]:
-                        trending_papers = db.query(Article).filter(
-                            or_(
-                                Article.title.ilike(f'%{keyword}%'),
-                                Article.abstract.ilike(f'%{keyword}%')
-                            ),
-                            Article.publication_year >= datetime.now(timezone.utc).year - 5,
-                            Article.citation_count > 5,  # Lower threshold
-                            Article.title.isnot(None),
-                            Article.title != ""
-                        ).order_by(desc(Article.citation_count)).limit(12).all()
-
-                        if trending_papers:
-                            logger.info(f"🔥 Strategy 2 ({keyword}): Found {len(trending_papers)} trending papers")
-                            break
-
-                # Strategy 3: Get any papers in the domain (no date restriction)
-                if not trending_papers:
-                    for keyword in keywords[:3]:
-                        trending_papers = db.query(Article).filter(
-                            or_(
-                                Article.title.ilike(f'%{keyword}%'),
-                                Article.abstract.ilike(f'%{keyword}%')
-                            ),
-                            Article.title.isnot(None),
-                            Article.title != ""
-                        ).order_by(desc(Article.citation_count)).limit(8).all()
-
-                        if trending_papers:
-                            logger.info(f"🔥 Strategy 3 ({keyword}): Found {len(trending_papers)} domain papers")
-                            break
-
-                # Strategy 4: If still no results, get any high-citation papers and mark as trending
-                if not trending_papers:
-                    trending_papers = db.query(Article).filter(
-                        Article.title.isnot(None),
-                        Article.title != "",
-                        Article.citation_count > 0
-                    ).order_by(desc(Article.citation_count)).limit(6).all()
-                    logger.info(f"🔥 Strategy 4 (high-citation papers): Found {len(trending_papers)} papers")
-
+                # Process found papers (with deduplication)
+                if trending_papers:
+                # Process found papers (with deduplication)
                 for paper in trending_papers:
                     # Skip if we've already seen this paper OR if it's used by other methods
-                    if paper.pmid in seen_pmids or paper.pmid in global_used_pmids:
+                    if paper["pmid"] in seen_pmids or paper["pmid"] in global_used_pmids:
                         continue
 
-                    seen_pmids.add(paper.pmid)
+                    seen_pmids.add(paper["pmid"])
 
-                    # Calculate trending score based on citations per month since publication
-                    months_since_pub = max(1, (datetime.now(timezone.utc).year - (paper.publication_year or datetime.now(timezone.utc).year)) * 12)
-                    trending_score = (paper.citation_count or 0) / months_since_pub
+                    # Calculate trending score based on recency (PubMed results are already sorted by date)
+                    trending_score = paper.get("trending_score", 0.7)  # Default trending score
+
+                    # Parse authors string into list
+                    authors_str = paper.get("authors", "Author information not available")
+                    if authors_str and authors_str != "Author information not available":
+                        authors_list = [name.strip() for name in authors_str.split(",")][:3]
+                    else:
+                        authors_list = ["Author information not available"]
 
                     recommendations.append({
-                        "pmid": paper.pmid,
-                        "title": paper.title,
-                        "authors": paper.authors[:3] if paper.authors else ["Author information not available"],
-                        "journal": paper.journal,
-                        "year": paper.publication_year,
-                        "citation_count": paper.citation_count or 0,
+                        "pmid": paper["pmid"],
+                        "title": paper["title"],
+                        "authors": authors_list,
+                        "journal": paper.get("journal", "Unknown Journal"),
+                        "year": paper.get("publication_year", datetime.now().year),
+                        "citation_count": paper.get("citation_count", 0),
                         "trending_score": trending_score,
                         "reason": f"Trending in {domain}",
                         "category": "trending_in_field",
+                        "source": "pubmed",  # Mark as PubMed source
                         "spotify_style": {
                             "cover_color": "#ff6b35",  # Orange for trending
                             "subtitle": f"Hot in {domain}",
@@ -1827,37 +1778,52 @@ class SpotifyInspiredRecommendationsService:
 
             logger.info(f"🔥 Trending: Generated {len(recommendations)} recommendations with PMIDs: {[r['pmid'] for r in recommendations[:5]]}{'...' if len(recommendations) > 5 else ''}")
 
-            # Ensure we have at least some recommendations
-            if len(recommendations) < 3:
-                logger.info(f"🔥 Only {len(recommendations)} trending recommendations found, adding fallback papers")
-                fallback_papers = db.query(Article).filter(
-                    Article.title.isnot(None),
-                    Article.title != ""
-                ).order_by(desc(Article.citation_count)).limit(5).all()
+            # Ensure we have at least some recommendations using PubMed fallback
+            if len(recommendations) < 8:  # Target minimum 8 papers
+                logger.info(f"🔥 Only {len(recommendations)} trending recommendations found, searching PubMed for more")
 
-                for paper in fallback_papers:
-                    if paper.pmid not in [r["pmid"] for r in recommendations] and paper.pmid not in global_used_pmids:
-                        months_since_pub = max(1, (datetime.now(timezone.utc).year - (paper.publication_year or datetime.now(timezone.utc).year)) * 12)
-                        trending_score = (paper.citation_count or 0) / months_since_pub
+                # Fallback: Search for general trending topics
+                fallback_queries = [
+                    "(\"2024\"[Date - Publication]:\"2025\"[Date - Publication]) AND review",
+                    "(\"2024\"[Date - Publication]:\"2025\"[Date - Publication]) AND clinical trial",
+                    "(\"2023\"[Date - Publication]:\"2025\"[Date - Publication]) AND breakthrough"
+                ]
 
-                        recommendations.append({
-                            "pmid": paper.pmid,
-                            "title": paper.title,
-                            "authors": paper.authors[:3] if paper.authors else ["Author information not available"],
-                            "journal": paper.journal,
-                            "year": paper.publication_year,
-                            "citation_count": paper.citation_count or 0,
-                            "trending_score": trending_score,
-                            "reason": "High-impact trending research",
-                            "category": "trending_in_field",
-                            "spotify_style": {
-                                "cover_color": "#ff6b35",
-                                "subtitle": "Popular research",
-                                "trend_indicator": "🔥"
-                            }
-                        })
-                        if len(recommendations) >= 6:
+                for fallback_query in fallback_queries:
+                    if len(recommendations) >= 10:  # Stop when we have enough
+                        break
+
+                    fallback_papers = await self._search_pubmed(fallback_query, max_results=5, sort="date")
+
+                    for paper in fallback_papers:
+                        if len(recommendations) >= 10:
                             break
+
+                        if paper["pmid"] not in [r["pmid"] for r in recommendations] and paper["pmid"] not in global_used_pmids:
+                            # Parse authors string into list
+                            authors_str = paper.get("authors", "Author information not available")
+                            if authors_str and authors_str != "Author information not available":
+                                authors_list = [name.strip() for name in authors_str.split(",")][:3]
+                            else:
+                                authors_list = ["Author information not available"]
+
+                            recommendations.append({
+                                "pmid": paper["pmid"],
+                                "title": paper["title"],
+                                "authors": authors_list,
+                                "journal": paper.get("journal", "Unknown Journal"),
+                                "year": paper.get("publication_year", datetime.now().year),
+                                "citation_count": paper.get("citation_count", 0),
+                                "trending_score": 0.6,
+                                "reason": "Recent trending research",
+                                "category": "trending_in_field",
+                                "source": "pubmed",
+                                "spotify_style": {
+                                    "cover_color": "#ff6b35",
+                                    "subtitle": "Recent popular research",
+                                    "trend_indicator": "🔥"
+                                }
+                            })
 
             return {
                 "title": "Trending in Your Field",
