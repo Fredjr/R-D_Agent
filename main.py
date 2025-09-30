@@ -13861,11 +13861,17 @@ async def respond_to_invitation(
         if not invitation_id or response not in ['accept', 'decline']:
             raise HTTPException(status_code=400, detail="invitation_id and response ('accept' or 'decline') are required")
 
+        # Validate invitation_id is a valid integer
+        try:
+            invitation_id_int = int(invitation_id)
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=404, detail="Invitation not found or already responded")
+
         logger.info(f"👥 [Collaboration Response] User {user_id} responding '{response}' to invitation {invitation_id}")
 
         # Get invitation
         invitation = db.query(ProjectCollaborator).filter(
-            ProjectCollaborator.id == invitation_id,
+            ProjectCollaborator.id == invitation_id_int,
             ProjectCollaborator.user_id == user_id,
             ProjectCollaborator.accepted_at.is_(None),
             ProjectCollaborator.is_active == True
