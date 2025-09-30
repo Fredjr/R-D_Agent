@@ -166,10 +166,18 @@ class BackgroundProcessor:
         try:
             # Update status to processing
             await self._update_job_status(job_id, JobStatus.PROCESSING)
-            
+
+            # Add input validation
+            if not molecule and not objective:
+                logger.warning(f"⚠️ Generate-review job {job_id} has empty molecule and objective - using fallback")
+                molecule = molecule or "general research"
+                objective = objective or "comprehensive literature review"
+
+            logger.info(f"🔬 Processing generate-review job {job_id}: molecule='{molecule}', objective='{objective}'")
+
             # Initialize AI service
             ai_service = SpotifyInspiredRecommendationsService()
-            
+
             # Process the review (this is the long-running operation)
             result = await ai_service.generate_comprehensive_review(
                 molecule=molecule,
@@ -178,35 +186,49 @@ class BackgroundProcessor:
                 user_id=user_id,
                 **kwargs
             )
+
+            # Check if result indicates error
+            if isinstance(result, dict) and result.get("status") == "error":
+                raise Exception(f"AI service error: {result.get('error', 'Unknown error')}")
             
             # Save to database
-            with next(get_db()) as db:
-                report = Report(
-                    report_id=str(uuid.uuid4()),
-                    title=f"Review: {molecule}",
-                    objective=objective,
-                    project_id=project_id,
-                    created_by=user_id,
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
-                    content=result,
-                    status="completed"
-                )
-                db.add(report)
-                db.commit()
-                
-                # Update job with result
-                job_record = db.query(BackgroundJob).filter(BackgroundJob.job_id == job_id).first()
-                if job_record:
-                    job_record.status = JobStatus.COMPLETED.value
-                    job_record.result_id = report.report_id
-                    job_record.completed_at = datetime.utcnow()
+            report_id = str(uuid.uuid4())
+            report_title = f"Review: {molecule}"
+
+            try:
+                with next(get_db()) as db:
+                    report = Report(
+                        report_id=report_id,
+                        title=report_title,
+                        objective=objective,
+                        project_id=project_id,
+                        created_by=user_id,
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow(),
+                        content=result,
+                        status="completed"
+                    )
+                    db.add(report)
                     db.commit()
-            
-            # Update job result
+
+                    # Update job with result
+                    job_record = db.query(BackgroundJob).filter(BackgroundJob.job_id == job_id).first()
+                    if job_record:
+                        job_record.status = JobStatus.COMPLETED.value
+                        job_record.result_id = report_id
+                        job_record.completed_at = datetime.utcnow()
+                        db.commit()
+
+                    logger.info(f"✅ Generate-review job {job_id} completed successfully")
+
+            except Exception as db_error:
+                logger.error(f"❌ Database error in generate-review job {job_id}: {str(db_error)}")
+                raise db_error
+
+            # Update job result (using extracted values, not database objects)
             await self._update_job_status(job_id, JobStatus.COMPLETED, result_data={
-                "report_id": report.report_id,
-                "title": report.title,
+                "report_id": report_id,
+                "title": report_title,
                 "type": "generate_review"
             })
             
@@ -214,7 +236,20 @@ class BackgroundProcessor:
             await self._send_completion_notification(job_id, user_id, "generate_review", report.report_id)
             
         except Exception as e:
-            logger.error(f"Generate-review job {job_id} failed: {str(e)}")
+            logger.error(f"❌ Generate-review job {job_id} failed: {str(e)}", exc_info=True)
+
+            # Update job status in database with detailed error
+            try:
+                with next(get_db()) as db:
+                    job_record = db.query(BackgroundJob).filter(BackgroundJob.job_id == job_id).first()
+                    if job_record:
+                        job_record.status = JobStatus.FAILED.value
+                        job_record.error_message = str(e)
+                        job_record.completed_at = datetime.utcnow()
+                        db.commit()
+            except Exception as db_error:
+                logger.error(f"❌ Failed to update job record for {job_id}: {str(db_error)}")
+
             await self._update_job_status(job_id, JobStatus.FAILED, error_message=str(e))
         finally:
             # Clean up
@@ -234,10 +269,18 @@ class BackgroundProcessor:
         try:
             # Update status to processing
             await self._update_job_status(job_id, JobStatus.PROCESSING)
-            
+
+            # Add input validation
+            if not pmid and not article_title:
+                logger.warning(f"⚠️ Deep-dive job {job_id} has empty PMID and title - using fallback")
+                pmid = pmid or "unknown"
+                article_title = article_title or "Unknown Article"
+
+            logger.info(f"🔬 Processing deep-dive job {job_id}: pmid='{pmid}', title='{article_title}'")
+
             # Initialize deep dive service
             deep_dive_service = DeepDiveService()
-            
+
             # Process the deep dive (this is the long-running operation)
             result = await deep_dive_service.analyze_paper(
                 pmid=pmid,
@@ -245,45 +288,77 @@ class BackgroundProcessor:
                 user_id=user_id,
                 **kwargs
             )
+
+            # Validate result structure
+            if not isinstance(result, dict):
+                raise Exception(f"Invalid result format from deep dive service: {type(result)}")
+
+            required_keys = ["scientific_model_analysis", "experimental_methods_analysis", "results_interpretation_analysis"]
+            for key in required_keys:
+                if key not in result:
+                    logger.warning(f"⚠️ Missing key '{key}' in deep dive result, adding empty value")
+                    result[key] = {"status": "not_analyzed", "reason": "missing_data"}
             
             # Save to database
-            with next(get_db()) as db:
-                analysis = DeepDiveAnalysis(
-                    analysis_id=str(uuid.uuid4()),
-                    article_pmid=pmid,
-                    article_title=article_title,
-                    project_id=project_id,
-                    created_by=user_id,
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
-                    processing_status="completed",
-                    scientific_model_analysis=result.get("scientific_model_analysis"),
-                    experimental_methods_analysis=result.get("experimental_methods_analysis"),
-                    results_interpretation_analysis=result.get("results_interpretation_analysis")
-                )
-                db.add(analysis)
-                db.commit()
-                
-                # Update job with result
-                job_record = db.query(BackgroundJob).filter(BackgroundJob.job_id == job_id).first()
-                if job_record:
-                    job_record.status = JobStatus.COMPLETED.value
-                    job_record.result_id = analysis.analysis_id
-                    job_record.completed_at = datetime.utcnow()
+            analysis_id = str(uuid.uuid4())
+
+            try:
+                with next(get_db()) as db:
+                    analysis = DeepDiveAnalysis(
+                        analysis_id=analysis_id,
+                        article_pmid=pmid,
+                        article_title=article_title,
+                        project_id=project_id,
+                        created_by=user_id,
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow(),
+                        processing_status="completed",
+                        scientific_model_analysis=result.get("scientific_model_analysis"),
+                        experimental_methods_analysis=result.get("experimental_methods_analysis"),
+                        results_interpretation_analysis=result.get("results_interpretation_analysis")
+                    )
+                    db.add(analysis)
                     db.commit()
-            
-            # Update job result
+
+                    # Update job with result
+                    job_record = db.query(BackgroundJob).filter(BackgroundJob.job_id == job_id).first()
+                    if job_record:
+                        job_record.status = JobStatus.COMPLETED.value
+                        job_record.result_id = analysis_id
+                        job_record.completed_at = datetime.utcnow()
+                        db.commit()
+
+                    logger.info(f"✅ Deep-dive job {job_id} completed successfully")
+
+            except Exception as db_error:
+                logger.error(f"❌ Database error in deep-dive job {job_id}: {str(db_error)}")
+                raise db_error
+
+            # Update job result (using extracted values, not database objects)
             await self._update_job_status(job_id, JobStatus.COMPLETED, result_data={
-                "analysis_id": analysis.analysis_id,
+                "analysis_id": analysis_id,
                 "title": article_title,
                 "type": "deep_dive"
             })
-            
+
             # Send notification
-            await self._send_completion_notification(job_id, user_id, "deep_dive", analysis.analysis_id)
+            await self._send_completion_notification(job_id, user_id, "deep_dive", analysis_id)
             
         except Exception as e:
-            logger.error(f"Deep-dive job {job_id} failed: {str(e)}")
+            logger.error(f"❌ Deep-dive job {job_id} failed: {str(e)}", exc_info=True)
+
+            # Update job status in database with detailed error
+            try:
+                with next(get_db()) as db:
+                    job_record = db.query(BackgroundJob).filter(BackgroundJob.job_id == job_id).first()
+                    if job_record:
+                        job_record.status = JobStatus.FAILED.value
+                        job_record.error_message = str(e)
+                        job_record.completed_at = datetime.utcnow()
+                        db.commit()
+            except Exception as db_error:
+                logger.error(f"❌ Failed to update job record for {job_id}: {str(db_error)}")
+
             await self._update_job_status(job_id, JobStatus.FAILED, error_message=str(e))
         finally:
             # Clean up
