@@ -165,7 +165,7 @@ async def start_background_generate_review(
             molecule=request.get("molecule", ""),
             objective=request.get("objective", ""),
             max_results=request.get("max_results", 10),
-            **{k: v for k, v in request.items() if k not in ["project_id", "molecule", "objective", "max_results"]}
+            **{k: v for k, v in request.items() if k not in ["project_id", "molecule", "objective", "max_results", "user_id"]}
         )
 
         return {
@@ -196,7 +196,7 @@ async def start_background_deep_dive(
             project_id=request.get("project_id", "default"),
             pmid=request.get("pmid", ""),
             article_title=request.get("article_title", ""),
-            **{k: v for k, v in request.items() if k not in ["project_id", "pmid", "article_title"]}
+            **{k: v for k, v in request.items() if k not in ["project_id", "pmid", "article_title", "user_id"]}
         )
 
         return {
@@ -12208,8 +12208,24 @@ async def get_project_timeline(
         if not project:
             raise HTTPException(status_code=404, detail="Project not found or access denied")
 
-        # Get all articles in the project
-        articles = db.query(Article).filter(Article.project_id == project_id).all()
+        # Get all articles in the project through collections
+        # First get all collections for this project
+        collections = db.query(Collection).filter(Collection.project_id == project_id).all()
+
+        # Get all article PMIDs from all collections in the project
+        article_pmids = set()
+        for collection in collections:
+            article_collections = db.query(ArticleCollection).filter(
+                ArticleCollection.collection_id == collection.collection_id
+            ).all()
+            for ac in article_collections:
+                if ac.article_pmid:  # Only include articles with PMIDs
+                    article_pmids.add(ac.article_pmid)
+
+        # Get full Article records for these PMIDs
+        articles = []
+        if article_pmids:
+            articles = db.query(Article).filter(Article.pmid.in_(article_pmids)).all()
 
         if not articles:
             return {
