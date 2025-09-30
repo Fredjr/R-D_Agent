@@ -4175,19 +4175,47 @@ async def test():
 async def test_pubmed():
     """Test PubMed search functionality"""
     try:
-        from services.ai_recommendations_service import get_spotify_recommendations_service
+        import requests
 
-        service = get_spotify_recommendations_service()
+        # Test basic internet connectivity first
+        test_response = requests.get("https://httpbin.org/get", timeout=10)
+        if test_response.status_code != 200:
+            return {
+                "status": "error",
+                "error": "No internet connectivity",
+                "message": "Cannot reach external APIs"
+            }
 
-        # Test simple PubMed search
-        results = await service._search_pubmed("diabetes", max_results=3, sort="relevance")
+        # Test PubMed API directly
+        search_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+        search_params = {
+            "db": "pubmed",
+            "term": "diabetes",
+            "retmax": "3",
+            "retmode": "json",
+            "sort": "relevance"
+        }
+
+        search_response = requests.get(search_url, params=search_params, timeout=30, headers={
+            'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
+        })
+
+        if search_response.status_code != 200:
+            return {
+                "status": "error",
+                "error": f"PubMed API returned {search_response.status_code}",
+                "message": "PubMed API not accessible"
+            }
+
+        search_data = search_response.json()
+        pmids = search_data.get("esearchresult", {}).get("idlist", [])
 
         return {
             "status": "success",
             "query": "diabetes",
-            "results_count": len(results),
-            "results": results[:2] if results else [],
-            "message": f"PubMed search returned {len(results)} papers"
+            "results_count": len(pmids),
+            "pmids": pmids,
+            "message": f"PubMed API returned {len(pmids)} PMIDs"
         }
 
     except Exception as e:
@@ -4196,7 +4224,7 @@ async def test_pubmed():
             "status": "error",
             "error": str(e),
             "traceback": traceback.format_exc(),
-            "message": "PubMed search failed"
+            "message": "PubMed test failed"
         }
 
 @app.get("/test-db")
