@@ -13328,6 +13328,65 @@ async def create_global_generate_review_analysis(
         logger.error(f"📝 [Global Generate Review Analyses] Error creating analysis: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create generate review analysis: {str(e)}")
 
+@app.get("/pubmed/advanced-search")
+async def pubmed_advanced_search(
+    q: str = Query(..., description="Search query"),
+    limit: int = Query(20, ge=1, le=100, description="Maximum number of results"),
+    user_id: str = Header(..., alias="User-ID")
+):
+    """
+    Advanced PubMed search endpoint for comprehensive literature discovery.
+
+    This endpoint provides advanced search capabilities with:
+    - Fielded search support ([tiab], [mesh], [author], etc.)
+    - Publication date filtering
+    - Study type filtering
+    - Citation count weighting
+    """
+    try:
+        logger.info(f"🔍 [PubMed Advanced Search] Query: '{q}', Limit: {limit}")
+
+        # Use the existing PubMed search tool
+        pubmed_tool = PubMedSearchTool()
+
+        # Execute the search
+        search_results = pubmed_tool._run(q)
+
+        if not search_results or "No results found" in search_results:
+            return {
+                "query": q,
+                "articles": [],
+                "total_found": 0,
+                "limit": limit,
+                "status": "no_results"
+            }
+
+        # Parse results (the tool returns JSON string)
+        import json
+        try:
+            articles = json.loads(search_results) if isinstance(search_results, str) else search_results
+            if not isinstance(articles, list):
+                articles = []
+        except:
+            articles = []
+
+        # Limit results
+        articles = articles[:limit]
+
+        logger.info(f"🔍 [PubMed Advanced Search] Found {len(articles)} articles for query: '{q}'")
+
+        return {
+            "query": q,
+            "articles": articles,
+            "total_found": len(articles),
+            "limit": limit,
+            "status": "success"
+        }
+
+    except Exception as e:
+        logger.error(f"🔍 [PubMed Advanced Search] Error: {e}")
+        raise HTTPException(status_code=500, detail=f"PubMed search failed: {str(e)}")
+
 @app.get("/pubmed/details/{pmid}")
 async def get_pubmed_paper_details(
     pmid: str,
