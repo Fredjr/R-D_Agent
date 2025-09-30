@@ -176,7 +176,11 @@ class WeeklyMixAutomationSystem {
   async forceUpdate(userId: string): Promise<void> {
     try {
       const context = await this.getUserContext(userId);
-      
+
+      // 🔗 ENHANCE WITH PUBMED RECOMMENDATIONS
+      // First, get PubMed-based recommendations to enrich the weekly mix
+      await this.enhanceWithPubMedRecommendations(userId, context);
+
       // Call the weekly recommendations API with force refresh
       const response = await fetch(`/api/proxy/recommendations/weekly/${userId}?force_refresh=true`, {
         method: 'GET',
@@ -194,6 +198,122 @@ class WeeklyMixAutomationSystem {
       }
     } catch (error) {
       console.error('Failed to update weekly mix:', error);
+    }
+  }
+
+  /**
+   * Enhance weekly mix with PubMed recommendations
+   */
+  private async enhanceWithPubMedRecommendations(userId: string, context: any): Promise<void> {
+    try {
+      console.log('🔗 Enhancing weekly mix with PubMed recommendations');
+
+      const userDomains = context.researchDomains || [];
+      const recentPapers = this.getRecentUserPapers(userId);
+
+      // Get trending papers from PubMed based on user domains
+      if (userDomains.length > 0) {
+        const trendingResponse = await fetch('/api/proxy/pubmed/recommendations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-ID': userId
+          },
+          body: JSON.stringify({
+            type: 'trending',
+            user_domains: userDomains,
+            limit: 10
+          })
+        });
+
+        if (trendingResponse.ok) {
+          const trendingData = await trendingResponse.json();
+          console.log(`🔥 Got ${trendingData.recommendations.length} trending PubMed papers`);
+
+          // Store trending papers for use in weekly mix
+          this.storePubMedRecommendations(userId, 'trending', trendingData.recommendations);
+        }
+      }
+
+      // Get similar papers for user's recently saved papers
+      if (recentPapers.length > 0) {
+        for (const paper of recentPapers.slice(0, 3)) { // Top 3 recent papers
+          try {
+            const similarResponse = await fetch('/api/proxy/pubmed/recommendations', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'User-ID': userId
+              },
+              body: JSON.stringify({
+                type: 'similar',
+                pmid: paper.pmid,
+                limit: 5
+              })
+            });
+
+            if (similarResponse.ok) {
+              const similarData = await similarResponse.json();
+              console.log(`🔗 Got ${similarData.recommendations.length} similar papers for PMID ${paper.pmid}`);
+
+              // Store similar papers for use in weekly mix
+              this.storePubMedRecommendations(userId, 'similar', similarData.recommendations);
+            }
+          } catch (error) {
+            console.error(`Failed to get similar papers for PMID ${paper.pmid}:`, error);
+          }
+        }
+      }
+
+      console.log('✅ PubMed recommendations enhancement completed');
+
+    } catch (error) {
+      console.error('❌ Failed to enhance with PubMed recommendations:', error);
+    }
+  }
+
+  /**
+   * Get recent papers from user's activity
+   */
+  private getRecentUserPapers(userId: string): Array<{pmid: string, title: string}> {
+    try {
+      const activityHistory = this.activityHistory.get(userId) || [];
+      const recentActivity = activityHistory.filter(a =>
+        a.type === 'bookmark' &&
+        a.pmid &&
+        new Date().getTime() - a.timestamp.getTime() < 7 * 24 * 60 * 60 * 1000 // Last 7 days
+      );
+
+      return recentActivity.map(a => ({
+        pmid: a.pmid!,
+        title: a.title || 'Unknown title'
+      })).slice(0, 5); // Limit to 5 most recent
+
+    } catch (error) {
+      console.error('Error getting recent user papers:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Store PubMed recommendations for later use
+   */
+  private storePubMedRecommendations(userId: string, type: string, recommendations: any[]): void {
+    try {
+      const storageKey = `pubmed_recommendations_${userId}`;
+      const existing = JSON.parse(localStorage.getItem(storageKey) || '{}');
+
+      existing[type] = {
+        recommendations,
+        timestamp: new Date().toISOString(),
+        count: recommendations.length
+      };
+
+      localStorage.setItem(storageKey, JSON.stringify(existing));
+      console.log(`💾 Stored ${recommendations.length} ${type} PubMed recommendations for user ${userId}`);
+
+    } catch (error) {
+      console.error('Error storing PubMed recommendations:', error);
     }
   }
 
