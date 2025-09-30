@@ -165,7 +165,7 @@ def register_citation_endpoints(app):
                 raise HTTPException(status_code=404, detail=f"Article {pmid} not found")
 
             # Get citation count
-            citations = db.query(Citation).filter(Citation.cited_pmid == pmid).all()
+            citations = db.query(ArticleCitation).filter(ArticleCitation.cited_pmid == pmid).all()
 
             # Check enrichment status
             enriched_count = sum(1 for c in citations if c.citing_article_abstract is not None)
