@@ -146,6 +146,52 @@ def register_citation_endpoints(app):
             logger.error(f"Error fetching references for article {pmid}: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to fetch references: {str(e)}")
     
+    @app.get("/articles/{pmid}/enrich-citations")
+    async def get_enriched_citations_status(
+        pmid: str,
+        user_id: str = Header(..., alias="User-ID"),
+        db: Session = Depends(get_db)
+    ):
+        """
+        Get the current status of citation enrichment for an article.
+
+        This endpoint returns information about whether citations have been enriched
+        and provides a summary of available citation data.
+        """
+        try:
+            # Verify article exists
+            article = db.query(Article).filter(Article.pmid == pmid).first()
+            if not article:
+                raise HTTPException(status_code=404, detail=f"Article {pmid} not found")
+
+            # Get citation count
+            citations = db.query(Citation).filter(Citation.cited_pmid == pmid).all()
+
+            # Check enrichment status
+            enriched_count = sum(1 for c in citations if c.citing_article_abstract is not None)
+
+            return {
+                "source_article": {
+                    "pmid": pmid,
+                    "title": article.title
+                },
+                "citation_enrichment_status": {
+                    "total_citations": len(citations),
+                    "enriched_citations": enriched_count,
+                    "enrichment_percentage": (enriched_count / len(citations) * 100) if citations else 0,
+                    "needs_enrichment": enriched_count < len(citations)
+                },
+                "available_actions": [
+                    "POST /articles/{pmid}/enrich-citations - Enrich citation data"
+                ]
+            }
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error checking citation enrichment status for article {pmid}: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to check enrichment status: {str(e)}")
+
     @app.post("/articles/{pmid}/enrich-citations")
     async def enrich_article_citations(
         pmid: str,
@@ -154,7 +200,7 @@ def register_citation_endpoints(app):
     ):
         """
         Enrich an article with citation data from external APIs.
-        
+
         Fetches citation relationships from OpenAlex and stores them
         in the database for network visualization.
         """
