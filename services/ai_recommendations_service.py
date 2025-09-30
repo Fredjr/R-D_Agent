@@ -1724,79 +1724,74 @@ class SpotifyInspiredRecommendationsService:
 
             logger.info(f"🔥 Trending: Starting with {len(global_used_pmids)} used PMIDs: {list(global_used_pmids)[:5]}{'...' if len(global_used_pmids) > 5 else ''}")
 
-            # 🔄 TEMPORARY APPROACH: Use local database for trending papers with relaxed filtering
+            # 🚀 PUBMED APPROACH: Search PubMed for trending papers in user's research fields
             for domain in primary_domains[:3]:  # Top 3 domains
                 trending_papers = []
                 keywords = domain_keywords.get(domain.lower(), [domain])
 
                 logger.info(f"🔥 Processing domain '{domain}' with keywords: {keywords}")
 
-                # Strategy 1: Recent papers (last 3 years) with any citations
-                for keyword in keywords[:3]:
-                    papers = db.query(Article).filter(
-                        or_(
-                            Article.title.ilike(f'%{keyword}%'),
-                            Article.abstract.ilike(f'%{keyword}%')
-                        ),
-                        Article.publication_year >= datetime.now(timezone.utc).year - 3,  # Last 3 years
-                        Article.citation_count > 0,  # Any citations
-                        Article.title.isnot(None),
-                        Article.title != "",
-                        ~Article.title.like("Citation Article%"),
-                        ~Article.title.like("Reference Article%")
-                    ).order_by(desc(Article.publication_year), desc(Article.citation_count)).limit(8).all()
+                try:
+                    # Strategy 1: Very recent papers (last 1 year) - most trending
+                    recent_query = f"({' OR '.join(keywords[:3])}) AND (\"2024\"[Date - Publication]:\"2025\"[Date - Publication])"
+                    logger.info(f"🔥 PubMed Query 1: {recent_query}")
+                    trending_papers = await self._search_pubmed(recent_query, max_results=8, sort="date")
 
-                    trending_papers.extend(papers)
-                    if len(trending_papers) >= 8:  # Stop when we have enough
-                        break
+                    if trending_papers:
+                        logger.info(f"🔥 Strategy 1 (Very Recent): Found {len(trending_papers)} trending papers for {domain}")
+                    else:
+                        # Strategy 2: Last 2 years if very recent has no results
+                        expanded_query = f"({' OR '.join(keywords[:3])}) AND (\"2023\"[Date - Publication]:\"2025\"[Date - Publication])"
+                        logger.info(f"🔥 PubMed Query 2: {expanded_query}")
+                        trending_papers = await self._search_pubmed(expanded_query, max_results=8, sort="date")
 
-                # Strategy 2: If not enough, expand to last 5 years
-                if len(trending_papers) < 5:
-                    for keyword in keywords[:2]:
-                        papers = db.query(Article).filter(
-                            or_(
-                                Article.title.ilike(f'%{keyword}%'),
-                                Article.abstract.ilike(f'%{keyword}%')
-                            ),
-                            Article.publication_year >= datetime.now(timezone.utc).year - 5,
-                            Article.title.isnot(None),
-                            Article.title != ""
-                        ).order_by(desc(Article.publication_year), desc(Article.citation_count)).limit(6).all()
+                        if trending_papers:
+                            logger.info(f"🔥 Strategy 2 (Recent): Found {len(trending_papers)} papers for {domain}")
+                        else:
+                            # Strategy 3: Any recent papers in domain
+                            general_query = f"({' OR '.join(keywords[:2])}) AND (\"2022\"[Date - Publication]:\"2025\"[Date - Publication])"
+                            logger.info(f"🔥 PubMed Query 3: {general_query}")
+                            trending_papers = await self._search_pubmed(general_query, max_results=6, sort="date")
+                            logger.info(f"🔥 Strategy 3 (General Recent): Found {len(trending_papers)} papers for {domain}")
 
-                        trending_papers.extend(papers)
-                        if len(trending_papers) >= 8:
-                            break
+                except Exception as e:
+                    logger.error(f"❌ PubMed search failed for trending domain {domain}: {e}")
+                    trending_papers = []
 
-                logger.info(f"🔥 Found {len(trending_papers)} trending papers for domain '{domain}' using relaxed local DB search")
+                logger.info(f"🔥 Final result: {len(trending_papers)} NEW trending papers from PubMed for domain '{domain}'")
 
-                # Process found papers (with deduplication)
-                if trending_papers:
-                # Process found papers (with deduplication) - Database objects
+                # Process found papers (with deduplication) - PubMed dictionaries
                 for paper in trending_papers:
                     # Skip if we've already seen this paper OR if it's used by other methods
-                    if paper.pmid in seen_pmids or paper.pmid in global_used_pmids:
+                    if paper.get("pmid") in seen_pmids or paper.get("pmid") in global_used_pmids:
                         continue
 
-                    seen_pmids.add(paper.pmid)
+                    seen_pmids.add(paper.get("pmid"))
 
-                    # Calculate trending score based on citations per month since publication
-                    months_since_pub = max(1, (datetime.now(timezone.utc).year - (paper.publication_year or datetime.now(timezone.utc).year)) * 12)
-                    trending_score = (paper.citation_count or 0) / months_since_pub
+                    # Calculate trending score based on recency (PubMed results are already sorted by date)
+                    trending_score = paper.get("trending_score", 0.7)  # Default trending score
+
+                    # Parse authors string into list
+                    authors_str = paper.get("authors", "Author information not available")
+                    if authors_str and authors_str != "Author information not available":
+                        authors_list = [name.strip() for name in authors_str.split(",")][:3]
+                    else:
+                        authors_list = ["Author information not available"]
 
                     recommendations.append({
-                        "pmid": paper.pmid,
-                        "title": paper.title,
-                        "authors": paper.authors[:3] if paper.authors else ["Author information not available"],
-                        "journal": paper.journal,
-                        "year": paper.publication_year,
-                        "citation_count": paper.citation_count or 0,
+                        "pmid": paper.get("pmid"),
+                        "title": paper.get("title"),
+                        "authors": authors_list,
+                        "journal": paper.get("journal", "Unknown Journal"),
+                        "year": paper.get("publication_year", datetime.now().year),
+                        "citation_count": paper.get("citation_count", 0),
                         "trending_score": trending_score,
                         "reason": f"Trending in {domain}",
                         "category": "trending_in_field",
-                        "source": "database",  # Mark as database source (temporary)
+                        "source": "pubmed",  # Mark as PubMed source - FRESH papers!
                         "spotify_style": {
                             "cover_color": "#ff6b35",  # Orange for trending
-                            "subtitle": f"Hot in {domain}",
+                            "subtitle": f"Hot {domain} research from PubMed",
                             "trend_indicator": "🔥"
                         }
                     })
