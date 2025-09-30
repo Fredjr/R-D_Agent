@@ -40,7 +40,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttempts = useRef(0);
-  const maxReconnectAttempts = 5;
+  const maxReconnectAttempts = 3; // Reduced to prevent infinite loops
   const feedEndRef = useRef<HTMLDivElement>(null);
 
   // Fetch initial activities
@@ -140,19 +140,23 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({
         }
       };
 
-      wsRef.current.onclose = () => {
-        console.log('ActivityFeed WebSocket disconnected');
+      wsRef.current.onclose = (event) => {
+        console.log('ActivityFeed WebSocket disconnected:', event.code, event.reason);
         setWsConnected(false);
-        
-        // Attempt to reconnect with exponential backoff
-        if (reconnectAttempts.current < maxReconnectAttempts) {
-          const delay = Math.pow(2, reconnectAttempts.current) * 1000;
+
+        // Only attempt to reconnect if not a normal closure
+        if (event.code !== 1000 && reconnectAttempts.current < maxReconnectAttempts) {
+          const delay = Math.min(Math.pow(2, reconnectAttempts.current) * 1000, 10000); // Max 10s delay
+          console.log(`ActivityFeed reconnecting in ${delay}ms... (attempt ${reconnectAttempts.current + 1}/${maxReconnectAttempts})`);
           reconnectTimeoutRef.current = setTimeout(() => {
             reconnectAttempts.current++;
             connectWebSocket();
           }, delay);
         } else {
-          setWsError('Connection lost. Please refresh the page.');
+          console.log('ActivityFeed WebSocket reconnection stopped - max attempts reached or normal closure');
+          if (reconnectAttempts.current >= maxReconnectAttempts) {
+            setWsError('Connection lost. Please refresh the page to restore real-time updates.');
+          }
         }
       };
 

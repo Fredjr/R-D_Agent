@@ -113,16 +113,21 @@ export default function AnnotationsFeed({
           }
         };
 
-        ws.onclose = () => {
-          console.log('🔌 WebSocket disconnected');
+        ws.onclose = (event) => {
+          console.log('🔌 AnnotationsFeed WebSocket disconnected:', event.code, event.reason);
           setWsConnected(false);
-          
-          // Attempt to reconnect after 3 seconds
-          setTimeout(() => {
-            if (projectId && user) {
-              connectWebSocket();
-            }
-          }, 3000);
+
+          // Only attempt to reconnect if not a normal closure and we have valid context
+          if (event.code !== 1000 && projectId && user) {
+            console.log('🔄 AnnotationsFeed will attempt to reconnect in 5 seconds...');
+            setTimeout(() => {
+              if (projectId && user) {
+                connectWebSocket();
+              }
+            }, 5000); // Increased delay to reduce load
+          } else {
+            console.log('🚫 AnnotationsFeed WebSocket reconnection disabled');
+          }
         };
 
         ws.onerror = (error) => {
