@@ -13643,6 +13643,478 @@ async def get_papers_similarity_analysis(
         logger.error(f"🔍 [Similarity Analysis] Error: {e}")
         raise HTTPException(status_code=500, detail=f"Similarity analysis failed: {str(e)}")
 
+@app.get("/collections/{collection_id}/network")
+async def get_collection_network(
+    collection_id: str,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Generate network visualization for articles in a collection.
+
+    This endpoint analyzes all articles in a collection and creates a network
+    showing relationships between papers, authors, and research themes.
+    """
+    try:
+        logger.info(f"🔗 [Collection Network] Generating network for collection: {collection_id}")
+
+        # Verify collection exists and user has access
+        collection = db.query(Collection).filter(Collection.collection_id == collection_id).first()
+        if not collection:
+            raise HTTPException(status_code=404, detail="Collection not found")
+
+        # Check if user has access to the project
+        project = db.query(Project).filter(Project.project_id == collection.project_id).first()
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        # Get all articles in the collection
+        article_collections = db.query(ArticleCollection).filter(
+            ArticleCollection.collection_id == collection_id
+        ).all()
+
+        if not article_collections:
+            return {
+                "collection": {
+                    "collection_id": collection_id,
+                    "name": collection.name,
+                    "description": collection.description
+                },
+                "network": {
+                    "nodes": [],
+                    "edges": [],
+                    "clusters": []
+                },
+                "metadata": {
+                    "total_articles": 0,
+                    "total_authors": 0,
+                    "total_connections": 0
+                },
+                "status": "empty_collection"
+            }
+
+        # Get article details
+        article_pmids = [ac.article_pmid for ac in article_collections if ac.article_pmid]
+        articles = db.query(Article).filter(Article.pmid.in_(article_pmids)).all() if article_pmids else []
+
+        # Build network nodes (articles)
+        nodes = []
+        all_authors = set()
+        author_article_map = {}
+
+        for article in articles:
+            # Add article node
+            nodes.append({
+                "id": article.pmid,
+                "label": article.title[:50] + "..." if len(article.title) > 50 else article.title,
+                "type": "article",
+                "size": 30,
+                "color": "#3498db",
+                "metadata": {
+                    "pmid": article.pmid,
+                    "title": article.title,
+                    "authors": article.authors,
+                    "journal": article.journal,
+                    "year": article.publication_year,
+                    "citation_count": getattr(article, 'citation_count', 0)
+                }
+            })
+
+            # Track authors
+            if article.authors:
+                for author in article.authors:
+                    all_authors.add(author)
+                    if author not in author_article_map:
+                        author_article_map[author] = []
+                    author_article_map[author].append(article.pmid)
+
+        # Add author nodes (for authors with multiple papers)
+        author_nodes = []
+        for author, article_list in author_article_map.items():
+            if len(article_list) > 1:  # Only show authors with multiple papers
+                author_nodes.append({
+                    "id": f"author_{author.replace(' ', '_')}",
+                    "label": author,
+                    "type": "author",
+                    "size": 20 + len(article_list) * 5,  # Size based on paper count
+                    "color": "#e74c3c",
+                    "metadata": {
+                        "name": author,
+                        "paper_count": len(article_list),
+                        "papers": article_list
+                    }
+                })
+
+        nodes.extend(author_nodes)
+
+        # Build edges
+        edges = []
+        edge_id = 0
+
+        # Author-Article connections
+        for author, article_list in author_article_map.items():
+            if len(article_list) > 1:  # Only for authors with multiple papers
+                author_id = f"author_{author.replace(' ', '_')}"
+                for pmid in article_list:
+                    edges.append({
+                        "id": f"edge_{edge_id}",
+                        "source": author_id,
+                        "target": pmid,
+                        "type": "authorship",
+                        "weight": 1,
+                        "color": "#95a5a6"
+                    })
+                    edge_id += 1
+
+        # Article-Article connections (same journal or similar year)
+        for i, article1 in enumerate(articles):
+            for article2 in articles[i+1:]:
+                connection_strength = 0
+                connection_reasons = []
+
+                # Same journal connection
+                if article1.journal and article2.journal and article1.journal == article2.journal:
+                    connection_strength += 0.3
+                    connection_reasons.append("same_journal")
+
+                # Similar publication year (within 2 years)
+                if article1.publication_year and article2.publication_year:
+                    year_diff = abs(article1.publication_year - article2.publication_year)
+                    if year_diff <= 2:
+                        connection_strength += 0.2
+                        connection_reasons.append("similar_year")
+
+                # Shared authors
+                if article1.authors and article2.authors:
+                    shared_authors = set(article1.authors) & set(article2.authors)
+                    if shared_authors:
+                        connection_strength += len(shared_authors) * 0.4
+                        connection_reasons.append("shared_authors")
+
+                # Add edge if connection is strong enough
+                if connection_strength >= 0.3:
+                    edges.append({
+                        "id": f"edge_{edge_id}",
+                        "source": article1.pmid,
+                        "target": article2.pmid,
+                        "type": "similarity",
+                        "weight": connection_strength,
+                        "color": "#f39c12",
+                        "metadata": {
+                            "strength": round(connection_strength, 2),
+                            "reasons": connection_reasons
+                        }
+                    })
+                    edge_id += 1
+
+        # Create research clusters based on journals
+        clusters = []
+        journal_groups = {}
+        for article in articles:
+            if article.journal:
+                if article.journal not in journal_groups:
+                    journal_groups[article.journal] = []
+                journal_groups[article.journal].append(article.pmid)
+
+        for journal, pmids in journal_groups.items():
+            if len(pmids) > 1:  # Only create clusters with multiple papers
+                clusters.append({
+                    "cluster_id": f"journal_{journal.replace(' ', '_')}",
+                    "name": f"{journal} Research",
+                    "type": "journal_cluster",
+                    "articles": pmids,
+                    "size": len(pmids),
+                    "color": "#9b59b6"
+                })
+
+        logger.info(f"🔗 [Collection Network] Generated network: {len(nodes)} nodes, {len(edges)} edges, {len(clusters)} clusters")
+
+        return {
+            "collection": {
+                "collection_id": collection_id,
+                "name": collection.name,
+                "description": collection.description,
+                "project_id": collection.project_id
+            },
+            "network": {
+                "nodes": nodes,
+                "edges": edges,
+                "clusters": clusters
+            },
+            "metadata": {
+                "total_articles": len(articles),
+                "total_authors": len(all_authors),
+                "total_connections": len(edges),
+                "network_density": len(edges) / (len(nodes) * (len(nodes) - 1) / 2) if len(nodes) > 1 else 0,
+                "largest_cluster_size": max((len(cluster["articles"]) for cluster in clusters), default=0)
+            },
+            "status": "success"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"🔗 [Collection Network] Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Collection network generation failed: {str(e)}")
+
+@app.get("/collaborations/manage")
+async def get_collaboration_management(
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get collaboration management dashboard for the user.
+
+    This endpoint provides an overview of all projects the user owns or collaborates on,
+    pending invitations, and collaboration statistics.
+    """
+    try:
+        logger.info(f"👥 [Collaboration Management] Getting dashboard for user: {user_id}")
+
+        # Get projects owned by user
+        owned_projects = db.query(Project).filter(Project.owner_user_id == user_id).all()
+
+        # Get projects where user is a collaborator
+        collaborator_projects = db.query(Project).join(ProjectCollaborator).filter(
+            ProjectCollaborator.user_id == user_id,
+            ProjectCollaborator.status == 'active'
+        ).all()
+
+        # Get pending invitations
+        pending_invitations = db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.user_id == user_id,
+            ProjectCollaborator.status == 'pending'
+        ).all()
+
+        # Build owned projects data
+        owned_projects_data = []
+        for project in owned_projects:
+            # Get collaborator count
+            collaborator_count = db.query(ProjectCollaborator).filter(
+                ProjectCollaborator.project_id == project.project_id,
+                ProjectCollaborator.status == 'active'
+            ).count()
+
+            # Get recent activity (collections created in last 30 days)
+            from datetime import datetime, timedelta
+            recent_activity = db.query(Collection).filter(
+                Collection.project_id == project.project_id,
+                Collection.created_at >= datetime.utcnow() - timedelta(days=30)
+            ).count()
+
+            owned_projects_data.append({
+                "project_id": project.project_id,
+                "name": project.project_name,
+                "description": project.description,
+                "created_at": project.created_at.isoformat() if project.created_at else None,
+                "collaborator_count": collaborator_count,
+                "recent_activity": recent_activity,
+                "role": "owner"
+            })
+
+        # Build collaborator projects data
+        collaborator_projects_data = []
+        for project in collaborator_projects:
+            # Get owner info
+            owner = db.query(User).filter(User.user_id == project.owner_user_id).first()
+
+            collaborator_projects_data.append({
+                "project_id": project.project_id,
+                "name": project.project_name,
+                "description": project.description,
+                "owner": owner.email if owner else "Unknown",
+                "role": "collaborator"
+            })
+
+        # Build pending invitations data
+        pending_invitations_data = []
+        for invitation in pending_invitations:
+            project = db.query(Project).filter(Project.project_id == invitation.project_id).first()
+            owner = db.query(User).filter(User.user_id == project.owner_user_id).first() if project else None
+
+            pending_invitations_data.append({
+                "invitation_id": invitation.id,
+                "project_id": invitation.project_id,
+                "project_name": project.project_name if project else "Unknown Project",
+                "invited_by": owner.email if owner else "Unknown",
+                "invited_at": invitation.created_at.isoformat() if invitation.created_at else None,
+                "role": invitation.role
+            })
+
+        # Calculate collaboration statistics
+        total_projects = len(owned_projects) + len(collaborator_projects)
+        total_collaborators = sum(
+            db.query(ProjectCollaborator).filter(
+                ProjectCollaborator.project_id == project.project_id,
+                ProjectCollaborator.status == 'active'
+            ).count() for project in owned_projects
+        )
+
+        logger.info(f"👥 [Collaboration Management] Found {total_projects} projects, {total_collaborators} collaborators")
+
+        return {
+            "user_id": user_id,
+            "owned_projects": owned_projects_data,
+            "collaborator_projects": collaborator_projects_data,
+            "pending_invitations": pending_invitations_data,
+            "statistics": {
+                "total_projects": total_projects,
+                "owned_projects": len(owned_projects),
+                "collaborator_projects": len(collaborator_projects),
+                "pending_invitations": len(pending_invitations),
+                "total_collaborators": total_collaborators
+            },
+            "status": "success"
+        }
+
+    except Exception as e:
+        logger.error(f"👥 [Collaboration Management] Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Collaboration management failed: {str(e)}")
+
+@app.post("/collaborations/invite")
+async def invite_collaborator(
+    request: dict,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Invite a user to collaborate on a project.
+
+    Request body should contain:
+    - project_id: ID of the project
+    - email: Email of the user to invite
+    - role: Role to assign (default: 'collaborator')
+    """
+    try:
+        project_id = request.get('project_id')
+        email = request.get('email')
+        role = request.get('role', 'collaborator')
+
+        if not project_id or not email:
+            raise HTTPException(status_code=400, detail="project_id and email are required")
+
+        logger.info(f"👥 [Collaboration Invite] Inviting {email} to project {project_id}")
+
+        # Verify project exists and user is owner
+        project = db.query(Project).filter(Project.project_id == project_id).first()
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        if project.owner_user_id != user_id:
+            raise HTTPException(status_code=403, detail="Only project owner can invite collaborators")
+
+        # Check if user exists
+        invited_user = db.query(User).filter(User.email == email).first()
+        if not invited_user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Check if already a collaborator
+        existing_collaboration = db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == invited_user.user_id
+        ).first()
+
+        if existing_collaboration:
+            if existing_collaboration.status == 'active':
+                raise HTTPException(status_code=400, detail="User is already a collaborator")
+            elif existing_collaboration.status == 'pending':
+                raise HTTPException(status_code=400, detail="Invitation already pending")
+
+        # Create invitation
+        invitation = ProjectCollaborator(
+            project_id=project_id,
+            user_id=invited_user.user_id,
+            role=role,
+            status='pending',
+            created_at=datetime.utcnow()
+        )
+
+        db.add(invitation)
+        db.commit()
+
+        logger.info(f"👥 [Collaboration Invite] Invitation sent to {email}")
+
+        return {
+            "invitation_id": invitation.id,
+            "project_id": project_id,
+            "invited_user": email,
+            "role": role,
+            "status": "pending",
+            "message": f"Invitation sent to {email}",
+            "success": True
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"👥 [Collaboration Invite] Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Invitation failed: {str(e)}")
+
+@app.post("/collaborations/respond")
+async def respond_to_invitation(
+    request: dict,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Respond to a collaboration invitation.
+
+    Request body should contain:
+    - invitation_id: ID of the invitation
+    - response: 'accept' or 'decline'
+    """
+    try:
+        invitation_id = request.get('invitation_id')
+        response = request.get('response')
+
+        if not invitation_id or response not in ['accept', 'decline']:
+            raise HTTPException(status_code=400, detail="invitation_id and response ('accept' or 'decline') are required")
+
+        logger.info(f"👥 [Collaboration Response] User {user_id} responding '{response}' to invitation {invitation_id}")
+
+        # Get invitation
+        invitation = db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.id == invitation_id,
+            ProjectCollaborator.user_id == user_id,
+            ProjectCollaborator.status == 'pending'
+        ).first()
+
+        if not invitation:
+            raise HTTPException(status_code=404, detail="Invitation not found or already responded")
+
+        # Update invitation status
+        if response == 'accept':
+            invitation.status = 'active'
+            invitation.accepted_at = datetime.utcnow()
+            message = "Invitation accepted successfully"
+        else:
+            invitation.status = 'declined'
+            invitation.declined_at = datetime.utcnow()
+            message = "Invitation declined"
+
+        db.commit()
+
+        # Get project info for response
+        project = db.query(Project).filter(Project.project_id == invitation.project_id).first()
+
+        logger.info(f"👥 [Collaboration Response] Invitation {response}ed")
+
+        return {
+            "invitation_id": invitation_id,
+            "project_id": invitation.project_id,
+            "project_name": project.project_name if project else "Unknown",
+            "response": response,
+            "status": invitation.status,
+            "message": message,
+            "success": True
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"👥 [Collaboration Response] Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Response failed: {str(e)}")
+
 @app.get("/pubmed/details/{pmid}")
 async def get_pubmed_paper_details(
     pmid: str,
