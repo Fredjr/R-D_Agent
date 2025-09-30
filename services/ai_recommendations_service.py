@@ -206,15 +206,36 @@ class SpotifyInspiredRecommendationsService:
             logger.info(f"🎯 DIRECT RECOMMENDATIONS: Using profile with domains {research_domains}")
 
             # Generate recommendations using the SAME methods as individual APIs
-            papers_for_you_result = await self._generate_papers_for_you(user_profile, db)
-            trending_result = await self._generate_trending_in_field(user_profile, db)
-            cross_pollination_result = await self._generate_cross_pollination(user_profile, db)
-            citation_opportunities_result = await self._generate_citation_opportunities(user_profile, db)
+            # Track used PMIDs to avoid duplicates across sections
+            used_pmids = set()
 
-            # Extract papers from results (handle both dict and list formats)
+            papers_for_you_result = await self._generate_papers_for_you(user_profile, db, used_pmids)
+
+            # Update used PMIDs after Papers for You
             papers_for_you_papers = papers_for_you_result.get("papers", []) if isinstance(papers_for_you_result, dict) else papers_for_you_result
+            for paper in papers_for_you_papers:
+                if paper.get('pmid'):
+                    used_pmids.add(paper['pmid'])
+
+            trending_result = await self._generate_trending_in_field(user_profile, db, used_pmids)
+
+            # Update used PMIDs after Trending
             trending_papers = trending_result.get("papers", []) if isinstance(trending_result, dict) else trending_result
+            for paper in trending_papers:
+                if paper.get('pmid'):
+                    used_pmids.add(paper['pmid'])
+
+            cross_pollination_result = await self._generate_cross_pollination(user_profile, db, used_pmids)
+
+            # Update used PMIDs after Cross-pollination
             cross_pollination_papers = cross_pollination_result.get("papers", []) if isinstance(cross_pollination_result, dict) else cross_pollination_result
+            for paper in cross_pollination_papers:
+                if paper.get('pmid'):
+                    used_pmids.add(paper['pmid'])
+
+            citation_opportunities_result = await self._generate_citation_opportunities(user_profile, db, used_pmids)
+
+            # Extract papers from results (already extracted above for deduplication tracking)
             citation_opportunities_papers = citation_opportunities_result.get("papers", []) if isinstance(citation_opportunities_result, dict) else citation_opportunities_result
 
             logger.info(f"🎯 DIRECT RECOMMENDATIONS GENERATED:")
