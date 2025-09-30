@@ -30,9 +30,10 @@ export interface UseNotificationsReturn {
   markAsRead: (notificationId: string) => void;
   clearAll: () => void;
   handleNotificationClick: (notification: NotificationData) => void;
+  resetConnection: () => void;
 }
 
-const WEBSOCKET_URL = process.env.NODE_ENV === 'production' 
+const WEBSOCKET_URL = process.env.NODE_ENV === 'production'
   ? 'wss://r-dagent-production.up.railway.app/ws'
   : 'ws://localhost:8000/ws';
 
@@ -43,10 +44,11 @@ export function useNotifications(): UseNotificationsReturn {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttempts = useRef(0);
-  const maxReconnectAttempts = 5;
+  const maxReconnectAttempts = 3; // Reduced from 5 to prevent infinite loops
+  const connectionFailedRef = useRef(false);
 
   const connect = useCallback(() => {
-    if (!user?.email) {
+    if (!user?.email || connectionFailedRef.current) {
       return;
     }
 
@@ -54,14 +56,26 @@ export function useNotifications(): UseNotificationsReturn {
     const wsUrl = `${WEBSOCKET_URL}/${encodeURIComponent(userEmail)}`;
 
     try {
+      console.log(`🔗 Attempting WebSocket connection to: ${wsUrl}`);
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
+      // Set a connection timeout
+      const connectionTimeout = setTimeout(() => {
+        if (ws.readyState === WebSocket.CONNECTING) {
+          console.log('⏰ WebSocket connection timeout, closing...');
+          ws.close();
+          connectionFailedRef.current = true;
+        }
+      }, 10000); // 10 second timeout
+
       ws.onopen = () => {
+        clearTimeout(connectionTimeout);
         console.log('🔗 WebSocket connected for notifications');
         setIsConnected(true);
         reconnectAttempts.current = 0;
-        
+        connectionFailedRef.current = false;
+
         // Send ping to keep connection alive
         const pingInterval = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
@@ -108,30 +122,43 @@ export function useNotifications(): UseNotificationsReturn {
       };
 
       ws.onclose = (event) => {
+        clearTimeout(connectionTimeout);
         console.log('🔌 WebSocket disconnected:', event.code, event.reason);
         setIsConnected(false);
         wsRef.current = null;
 
-        // Attempt to reconnect if not a normal closure
-        if (event.code !== 1000 && reconnectAttempts.current < maxReconnectAttempts) {
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
-          console.log(`🔄 Attempting to reconnect in ${delay}ms...`);
-          
+        // Only attempt to reconnect if not a normal closure and we haven't exceeded max attempts
+        if (event.code !== 1000 &&
+            reconnectAttempts.current < maxReconnectAttempts &&
+            !connectionFailedRef.current) {
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000); // Max 10s delay
+          console.log(`🔄 Attempting to reconnect in ${delay}ms... (attempt ${reconnectAttempts.current + 1}/${maxReconnectAttempts})`);
+
           reconnectTimeoutRef.current = setTimeout(() => {
             reconnectAttempts.current++;
             connect();
           }, delay);
+        } else {
+          console.log('🚫 WebSocket reconnection disabled - max attempts reached or connection failed');
+          connectionFailedRef.current = true;
         }
       };
 
       ws.onerror = (error) => {
+        clearTimeout(connectionTimeout);
         console.error('❌ WebSocket error:', error);
         setIsConnected(false);
+
+        // Mark connection as failed to prevent infinite retries
+        if (reconnectAttempts.current >= maxReconnectAttempts) {
+          connectionFailedRef.current = true;
+        }
       };
 
     } catch (error) {
       console.error('❌ Failed to create WebSocket connection:', error);
       setIsConnected(false);
+      connectionFailedRef.current = true;
     }
   }, [user]);
 
@@ -145,9 +172,20 @@ export function useNotifications(): UseNotificationsReturn {
       wsRef.current.close(1000, 'Component unmounting');
       wsRef.current = null;
     }
-    
+
     setIsConnected(false);
+    connectionFailedRef.current = true; // Prevent automatic reconnection
   }, []);
+
+  const resetConnection = useCallback(() => {
+    console.log('🔄 Resetting WebSocket connection...');
+    disconnect();
+    reconnectAttempts.current = 0;
+    connectionFailedRef.current = false;
+    setTimeout(() => {
+      connect();
+    }, 1000);
+  }, [disconnect, connect]);
 
   const markAsRead = useCallback((notificationId: string) => {
     setNotifications(prev => 
@@ -222,7 +260,8 @@ export function useNotifications(): UseNotificationsReturn {
     isConnected,
     markAsRead,
     clearAll,
-    handleNotificationClick
+    handleNotificationClick,
+    resetConnection
   };
 }
 
