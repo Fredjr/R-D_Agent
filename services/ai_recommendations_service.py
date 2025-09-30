@@ -1549,7 +1549,6 @@ class SpotifyInspiredRecommendationsService:
                     domain_papers = []
 
                 logger.info(f"💡 Final result: {len(domain_papers)} NEW papers from PubMed for domain '{domain}'")
-                    logger.info(f"💡 Strategy 4 (quality papers for {domain}): Found {len(domain_papers)} papers")
 
                 # Process found papers (with deduplication) - PubMed dictionaries
                 for paper in domain_papers:
