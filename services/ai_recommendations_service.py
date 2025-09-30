@@ -2568,10 +2568,33 @@ class SpotifyInspiredRecommendationsService:
                     if duplicates_found:
                         logger.info(f"🔄 {rec_type}: Removed {len(duplicates_found)} global duplicates: {duplicates_found}")
 
-                    # 🚨 STRICT DEDUPLICATION: Do not add duplicates for variety
-                    # This was causing the remaining duplicate issue
+                    # 🚨 RELAXED DEDUPLICATION: Allow some duplicates to ensure minimum papers per section
+                    # If we have too few papers after deduplication, add some back for variety
+                    min_papers_per_section = 8  # Target minimum papers per section
+                    if len(global_deduplicated) < min_papers_per_section and len(category_deduplicated) > len(global_deduplicated):
+                        logger.info(f"🔄 {rec_type}: Only {len(global_deduplicated)} unique papers, adding duplicates to reach {min_papers_per_section}")
+
+                        # Add back some duplicate papers to reach minimum threshold
+                        for paper in category_deduplicated:
+                            if len(global_deduplicated) >= min_papers_per_section:
+                                break
+                            pmid = paper.get('pmid')
+                            if pmid and pmid in seen_pmids:
+                                # Add duplicate but mark it as such
+                                duplicate_paper = paper.copy()
+                                duplicate_paper['is_duplicate'] = True
+                                duplicate_paper['duplicate_reason'] = f'Added for variety in {rec_type}'
+                                global_deduplicated.append(duplicate_paper)
+                                logger.info(f"🔄 {rec_type}: Added duplicate PMID {pmid} for section variety")
+
                     if len(global_deduplicated) == 0 and len(category_deduplicated) > 0:
-                        logger.info(f"🔄 {rec_type}: All papers were global duplicates, section will be empty for strict deduplication")
+                        logger.info(f"🔄 {rec_type}: All papers were global duplicates, adding first few for section content")
+                        # Add at least 3 papers even if they're duplicates
+                        for paper in category_deduplicated[:3]:
+                            duplicate_paper = paper.copy()
+                            duplicate_paper['is_duplicate'] = True
+                            duplicate_paper['duplicate_reason'] = f'Section would be empty without duplicates'
+                            global_deduplicated.append(duplicate_paper)
 
                     # Preserve the original structure but with deduplicated papers
                     deduplicated[rec_type] = {

@@ -39,9 +39,9 @@ class PostDeploymentComprehensiveDiagnostic {
             { endpoint: '/api/proxy/generate-review-analyses', method: 'GET', name: 'Generate Review Analyses List' },
             { endpoint: '/api/proxy/pubmed/details/29622564', method: 'GET', name: 'PubMed Details' },
             
-            // Project-specific endpoints
-            { endpoint: '/api/proxy/projects/test-project/generate-review-analyses', method: 'GET', name: 'Project Generate Review Analyses' },
-            { endpoint: '/api/proxy/projects/test-project/deep-dive-analyses', method: 'GET', name: 'Project Deep Dive Analyses' },
+            // Project-specific endpoints (using real project ID)
+            { endpoint: '/api/proxy/projects/5ac213d7-6fcc-46ff-9420-5c7f4b421012/generate-review-analyses', method: 'GET', name: 'Project Generate Review Analyses' },
+            { endpoint: '/api/proxy/projects/5ac213d7-6fcc-46ff-9420-5c7f4b421012/deep-dive-analyses', method: 'GET', name: 'Project Deep Dive Analyses' },
             
             // Collection-specific endpoints
             { endpoint: '/api/proxy/collections/test-collection/generate-review-analyses', method: 'GET', name: 'Collection Generate Review Analyses' },
