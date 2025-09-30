@@ -1638,14 +1638,12 @@ class SpotifyInspiredRecommendationsService:
                                         "cover_color": "#3498db",
                                         "subtitle": "Fresh research from PubMed",
                                         "play_count": paper.get("citation_count", 0)
-                                    })
+                                    }
+                                })
 
                 except Exception as e:
                     logger.error(f"❌ PubMed fallback search failed: {e}")
                     # If PubMed completely fails, we'll just return what we have
-                        })
-                        if len(recommendations) >= 8:
-                            break
 
             logger.info(f"💡 Generated {len(recommendations)} personalized recommendations")
 
