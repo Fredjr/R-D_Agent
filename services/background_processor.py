@@ -232,8 +232,8 @@ class BackgroundProcessor:
                 "type": "generate_review"
             })
             
-            # Send notification
-            await self._send_completion_notification(job_id, user_id, "generate_review", report.report_id)
+            # Send notification (using extracted report_id, not database object)
+            await self._send_completion_notification(job_id, user_id, "generate_review", report_id)
             
         except Exception as e:
             logger.error(f"❌ Generate-review job {job_id} failed: {str(e)}", exc_info=True)
