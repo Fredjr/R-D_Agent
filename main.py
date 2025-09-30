@@ -13877,13 +13877,15 @@ async def get_collaboration_management(
         # Get projects where user is a collaborator
         collaborator_projects = db.query(Project).join(ProjectCollaborator).filter(
             ProjectCollaborator.user_id == user_id,
-            ProjectCollaborator.status == 'active'
+            ProjectCollaborator.is_active == True,
+            ProjectCollaborator.accepted_at.isnot(None)
         ).all()
 
-        # Get pending invitations
+        # Get pending invitations (invited but not yet accepted)
         pending_invitations = db.query(ProjectCollaborator).filter(
             ProjectCollaborator.user_id == user_id,
-            ProjectCollaborator.status == 'pending'
+            ProjectCollaborator.accepted_at.is_(None),
+            ProjectCollaborator.is_active == True
         ).all()
 
         # Build owned projects data
@@ -13892,7 +13894,8 @@ async def get_collaboration_management(
             # Get collaborator count
             collaborator_count = db.query(ProjectCollaborator).filter(
                 ProjectCollaborator.project_id == project.project_id,
-                ProjectCollaborator.status == 'active'
+                ProjectCollaborator.is_active == True,
+                ProjectCollaborator.accepted_at.isnot(None)
             ).count()
 
             # Get recent activity (collections created in last 30 days)
@@ -13937,7 +13940,7 @@ async def get_collaboration_management(
                 "project_id": invitation.project_id,
                 "project_name": project.project_name if project else "Unknown Project",
                 "invited_by": owner.email if owner else "Unknown",
-                "invited_at": invitation.created_at.isoformat() if invitation.created_at else None,
+                "invited_at": invitation.invited_at.isoformat() if invitation.invited_at else None,
                 "role": invitation.role
             })
 
@@ -13946,7 +13949,8 @@ async def get_collaboration_management(
         total_collaborators = sum(
             db.query(ProjectCollaborator).filter(
                 ProjectCollaborator.project_id == project.project_id,
-                ProjectCollaborator.status == 'active'
+                ProjectCollaborator.is_active == True,
+                ProjectCollaborator.accepted_at.isnot(None)
             ).count() for project in owned_projects
         )
 
@@ -14015,9 +14019,9 @@ async def invite_collaborator(
         ).first()
 
         if existing_collaboration:
-            if existing_collaboration.status == 'active':
+            if existing_collaboration.is_active and existing_collaboration.accepted_at:
                 raise HTTPException(status_code=400, detail="User is already a collaborator")
-            elif existing_collaboration.status == 'pending':
+            elif existing_collaboration.is_active and not existing_collaboration.accepted_at:
                 raise HTTPException(status_code=400, detail="Invitation already pending")
 
         # Create invitation
@@ -14025,8 +14029,8 @@ async def invite_collaborator(
             project_id=project_id,
             user_id=invited_user.user_id,
             role=role,
-            status='pending',
-            created_at=datetime.utcnow()
+            is_active=True,
+            invited_at=datetime.utcnow()
         )
 
         db.add(invitation)
@@ -14040,6 +14044,7 @@ async def invite_collaborator(
             "invited_user": email,
             "role": role,
             "status": "pending",
+            "invited_at": invitation.invited_at.isoformat() if invitation.invited_at else None,
             "message": f"Invitation sent to {email}",
             "success": True
         }
@@ -14076,7 +14081,8 @@ async def respond_to_invitation(
         invitation = db.query(ProjectCollaborator).filter(
             ProjectCollaborator.id == invitation_id,
             ProjectCollaborator.user_id == user_id,
-            ProjectCollaborator.status == 'pending'
+            ProjectCollaborator.accepted_at.is_(None),
+            ProjectCollaborator.is_active == True
         ).first()
 
         if not invitation:
@@ -14084,12 +14090,10 @@ async def respond_to_invitation(
 
         # Update invitation status
         if response == 'accept':
-            invitation.status = 'active'
             invitation.accepted_at = datetime.utcnow()
             message = "Invitation accepted successfully"
         else:
-            invitation.status = 'declined'
-            invitation.declined_at = datetime.utcnow()
+            invitation.is_active = False
             message = "Invitation declined"
 
         db.commit()
@@ -14104,7 +14108,8 @@ async def respond_to_invitation(
             "project_id": invitation.project_id,
             "project_name": project.project_name if project else "Unknown",
             "response": response,
-            "status": invitation.status,
+            "status": "accepted" if response == 'accept' else "declined",
+            "accepted_at": invitation.accepted_at.isoformat() if invitation.accepted_at else None,
             "message": message,
             "success": True
         }
