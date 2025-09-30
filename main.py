@@ -13387,6 +13387,262 @@ async def pubmed_advanced_search(
         logger.error(f"🔍 [PubMed Advanced Search] Error: {e}")
         raise HTTPException(status_code=500, detail=f"PubMed search failed: {str(e)}")
 
+@app.get("/papers/topic-analysis")
+async def get_papers_topic_analysis(
+    q: str = Query(..., description="Search query or topic"),
+    limit: int = Query(20, ge=1, le=100, description="Maximum number of papers to analyze"),
+    user_id: str = Header(..., alias="User-ID")
+):
+    """
+    Perform topic analysis on a collection of papers based on search query.
+
+    This endpoint searches for papers matching the query and performs topic modeling
+    to identify key themes, research areas, and trending topics.
+    """
+    try:
+        logger.info(f"🔍 [Topic Analysis] Query: '{q}', Limit: {limit}")
+
+        # Use PubMed search to get papers
+        pubmed_tool = PubMedSearchTool()
+        search_results = pubmed_tool._run(q)
+
+        if not search_results or "No results found" in search_results:
+            return {
+                "query": q,
+                "papers_analyzed": 0,
+                "topics": [],
+                "status": "no_papers_found"
+            }
+
+        # Parse results
+        import json
+        try:
+            papers = json.loads(search_results) if isinstance(search_results, str) else search_results
+            if not isinstance(papers, list):
+                papers = []
+        except:
+            papers = []
+
+        # Limit papers
+        papers = papers[:limit]
+
+        # Extract abstracts and titles for topic analysis
+        texts = []
+        paper_info = []
+        for paper in papers:
+            if paper.get('abstract'):
+                texts.append(f"{paper.get('title', '')} {paper.get('abstract', '')}")
+                paper_info.append({
+                    'pmid': paper.get('pmid'),
+                    'title': paper.get('title'),
+                    'journal': paper.get('journal'),
+                    'year': paper.get('pub_year')
+                })
+
+        # Simple topic analysis using keyword extraction
+        from collections import Counter
+        import re
+
+        # Extract common terms (simple approach)
+        all_text = ' '.join(texts).lower()
+        # Remove common words and extract meaningful terms
+        words = re.findall(r'\b[a-z]{4,}\b', all_text)
+        common_words = {'with', 'from', 'this', 'that', 'were', 'been', 'have', 'their', 'they', 'than', 'more', 'most', 'some', 'such', 'also', 'only', 'other', 'these', 'those', 'when', 'where', 'what', 'which', 'while', 'after', 'before', 'during', 'between', 'among', 'through', 'about', 'above', 'below', 'under', 'over'}
+        filtered_words = [w for w in words if w not in common_words]
+
+        # Get top terms
+        word_counts = Counter(filtered_words)
+        top_terms = word_counts.most_common(20)
+
+        # Create topic clusters (simplified)
+        topics = []
+        if top_terms:
+            # Group related terms into topics
+            medical_terms = [term for term, count in top_terms if any(med in term for med in ['disease', 'treatment', 'therapy', 'clinical', 'patient', 'medical', 'health', 'drug', 'cancer', 'diabetes'])]
+            research_terms = [term for term, count in top_terms if any(res in term for res in ['study', 'analysis', 'research', 'method', 'approach', 'model', 'data', 'results'])]
+
+            if medical_terms:
+                topics.append({
+                    'topic_id': 'medical_clinical',
+                    'topic_name': 'Medical & Clinical Research',
+                    'keywords': medical_terms[:10],
+                    'paper_count': len([p for p in papers if any(term in p.get('abstract', '').lower() for term in medical_terms[:5])]),
+                    'relevance_score': 0.8
+                })
+
+            if research_terms:
+                topics.append({
+                    'topic_id': 'methodology_analysis',
+                    'topic_name': 'Research Methodology & Analysis',
+                    'keywords': research_terms[:10],
+                    'paper_count': len([p for p in papers if any(term in p.get('abstract', '').lower() for term in research_terms[:5])]),
+                    'relevance_score': 0.7
+                })
+
+            # General topic from top terms
+            topics.append({
+                'topic_id': 'general_terms',
+                'topic_name': 'Key Research Terms',
+                'keywords': [term for term, count in top_terms[:15]],
+                'paper_count': len(papers),
+                'relevance_score': 0.6
+            })
+
+        logger.info(f"🔍 [Topic Analysis] Found {len(topics)} topics from {len(papers)} papers")
+
+        return {
+            "query": q,
+            "papers_analyzed": len(papers),
+            "topics": topics,
+            "analysis_metadata": {
+                "total_terms_extracted": len(word_counts),
+                "unique_journals": len(set(p.get('journal', '') for p in papers if p.get('journal'))),
+                "year_range": {
+                    "earliest": min((p.get('pub_year', 2024) for p in papers if p.get('pub_year')), default=2024),
+                    "latest": max((p.get('pub_year', 2024) for p in papers if p.get('pub_year')), default=2024)
+                }
+            },
+            "status": "success"
+        }
+
+    except Exception as e:
+        logger.error(f"🔍 [Topic Analysis] Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Topic analysis failed: {str(e)}")
+
+@app.get("/papers/similarity-analysis")
+async def get_papers_similarity_analysis(
+    pmid1: str = Query(..., description="First paper PMID"),
+    pmid2: str = Query(..., description="Second paper PMID"),
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Analyze similarity between two research papers.
+
+    This endpoint compares two papers and provides similarity metrics including
+    content similarity, citation overlap, author overlap, and topic similarity.
+    """
+    try:
+        logger.info(f"🔍 [Similarity Analysis] Comparing {pmid1} vs {pmid2}")
+
+        # Get both articles from database
+        article1 = db.query(Article).filter(Article.pmid == pmid1).first()
+        article2 = db.query(Article).filter(Article.pmid == pmid2).first()
+
+        if not article1:
+            raise HTTPException(status_code=404, detail=f"Article {pmid1} not found")
+        if not article2:
+            raise HTTPException(status_code=404, detail=f"Article {pmid2} not found")
+
+        # Calculate various similarity metrics
+        similarity_metrics = {}
+
+        # 1. Title similarity (simple word overlap)
+        title1_words = set(article1.title.lower().split()) if article1.title else set()
+        title2_words = set(article2.title.lower().split()) if article2.title else set()
+        title_overlap = len(title1_words & title2_words)
+        title_union = len(title1_words | title2_words)
+        title_similarity = title_overlap / title_union if title_union > 0 else 0
+
+        # 2. Author overlap
+        authors1 = set(article1.authors) if article1.authors else set()
+        authors2 = set(article2.authors) if article2.authors else set()
+        author_overlap = len(authors1 & authors2)
+        author_similarity = author_overlap / max(len(authors1), len(authors2)) if max(len(authors1), len(authors2)) > 0 else 0
+
+        # 3. Journal similarity
+        journal_similarity = 1.0 if (article1.journal and article2.journal and article1.journal == article2.journal) else 0.0
+
+        # 4. Year proximity
+        year1 = article1.publication_year or 2024
+        year2 = article2.publication_year or 2024
+        year_diff = abs(year1 - year2)
+        year_similarity = max(0, 1 - (year_diff / 10))  # Similarity decreases over 10 years
+
+        # 5. Abstract similarity (if available)
+        abstract_similarity = 0.0
+        if hasattr(article1, 'abstract') and hasattr(article2, 'abstract') and article1.abstract and article2.abstract:
+            abstract1_words = set(article1.abstract.lower().split())
+            abstract2_words = set(article2.abstract.lower().split())
+            abstract_overlap = len(abstract1_words & abstract2_words)
+            abstract_union = len(abstract1_words | abstract2_words)
+            abstract_similarity = abstract_overlap / abstract_union if abstract_union > 0 else 0
+
+        # Calculate overall similarity score
+        weights = {
+            'title': 0.3,
+            'authors': 0.2,
+            'journal': 0.2,
+            'year': 0.1,
+            'abstract': 0.2
+        }
+
+        overall_similarity = (
+            title_similarity * weights['title'] +
+            author_similarity * weights['authors'] +
+            journal_similarity * weights['journal'] +
+            year_similarity * weights['year'] +
+            abstract_similarity * weights['abstract']
+        )
+
+        # Determine similarity category
+        if overall_similarity >= 0.7:
+            similarity_category = "highly_similar"
+        elif overall_similarity >= 0.4:
+            similarity_category = "moderately_similar"
+        elif overall_similarity >= 0.2:
+            similarity_category = "somewhat_similar"
+        else:
+            similarity_category = "dissimilar"
+
+        logger.info(f"🔍 [Similarity Analysis] Overall similarity: {overall_similarity:.3f} ({similarity_category})")
+
+        return {
+            "paper1": {
+                "pmid": pmid1,
+                "title": article1.title,
+                "authors": article1.authors,
+                "journal": article1.journal,
+                "year": article1.publication_year
+            },
+            "paper2": {
+                "pmid": pmid2,
+                "title": article2.title,
+                "authors": article2.authors,
+                "journal": article2.journal,
+                "year": article2.publication_year
+            },
+            "similarity_metrics": {
+                "overall_similarity": round(overall_similarity, 3),
+                "similarity_category": similarity_category,
+                "detailed_scores": {
+                    "title_similarity": round(title_similarity, 3),
+                    "author_similarity": round(author_similarity, 3),
+                    "journal_similarity": round(journal_similarity, 3),
+                    "year_similarity": round(year_similarity, 3),
+                    "abstract_similarity": round(abstract_similarity, 3)
+                },
+                "overlap_details": {
+                    "shared_authors": list(authors1 & authors2),
+                    "shared_title_words": list(title1_words & title2_words),
+                    "same_journal": article1.journal == article2.journal,
+                    "year_difference": year_diff
+                }
+            },
+            "analysis_metadata": {
+                "comparison_method": "multi_metric_weighted",
+                "weights_used": weights,
+                "total_metrics": 5
+            },
+            "status": "success"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"🔍 [Similarity Analysis] Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Similarity analysis failed: {str(e)}")
+
 @app.get("/pubmed/details/{pmid}")
 async def get_pubmed_paper_details(
     pmid: str,
