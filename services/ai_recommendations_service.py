@@ -22,6 +22,8 @@ from datetime import datetime, timedelta, timezone
 from collections import defaultdict, Counter
 import json
 import re
+import requests
+import xml.etree.ElementTree as ET
 
 from database import get_db, Article, Collection, Project, User, ArticleCollection
 from sqlalchemy.orm import Session
@@ -1512,131 +1514,118 @@ class SpotifyInspiredRecommendationsService:
                 used_pmids = set()
             global_used_pmids = used_pmids.copy()
 
-            # Get papers based on user's research domains with multiple strategies
+            # 🚀 NEW APPROACH: Search PubMed for fresh, relevant papers based on user's research domains
             for domain in primary_domains[:3]:  # Top 3 domains
                 keywords = domain_keywords.get(domain.lower(), [domain])
                 logger.info(f"💡 Processing domain '{domain}' with keywords: {keywords}")
 
-                # Strategy 1: PERSONALIZED - High-quality established papers (last 4 years)
-                for keyword in keywords[:3]:
-                    domain_papers = db.query(Article).filter(
-                        or_(
-                            Article.title.ilike(f'%{keyword}%'),
-                            Article.abstract.ilike(f'%{keyword}%')
-                        ),
-                        Article.publication_year >= datetime.now(timezone.utc).year - 6,  # RELAXED: More years for more papers
-                        Article.citation_count > 5,  # RELAXED: Lower threshold for more papers
-                        Article.title.isnot(None),
-                        Article.title != "",
-                        ~Article.title.like("Citation Article%"),
-                        ~Article.title.like("Reference Article%")
-                    ).order_by(desc(Article.citation_count)).limit(15).all()  # INCREASED: More papers
+                # Strategy 1: Recent high-impact papers (last 3 years)
+                recent_query = f"({' OR '.join(keywords[:3])}) AND (\"2022\"[Date - Publication]:\"2025\"[Date - Publication])"
+                domain_papers = await self._search_pubmed(recent_query, max_results=8, sort="relevance")
+
+                if domain_papers:
+                    logger.info(f"💡 Strategy 1 (Recent): Found {len(domain_papers)} recent papers for {domain}")
+                else:
+                    # Strategy 2: Expand to last 5 years if needed
+                    expanded_query = f"({' OR '.join(keywords[:3])}) AND (\"2020\"[Date - Publication]:\"2025\"[Date - Publication])"
+                    domain_papers = await self._search_pubmed(expanded_query, max_results=8, sort="relevance")
 
                     if domain_papers:
-                        logger.info(f"💡 Strategy 1 ({keyword}): Found {len(domain_papers)} recent papers")
-                        break
-
-                # Strategy 2: Expand time range if needed
-                if not domain_papers:
-                    for keyword in keywords[:3]:
-                        domain_papers = db.query(Article).filter(
-                            or_(
-                                Article.title.ilike(f'%{keyword}%'),
-                                Article.abstract.ilike(f'%{keyword}%')
-                            ),
-                            Article.publication_year >= datetime.now(timezone.utc).year - 5,
-                            Article.title.isnot(None),
-                            Article.title != ""
-                        ).order_by(desc(Article.citation_count)).limit(10).all()
-
-                        if domain_papers:
-                            logger.info(f"💡 Strategy 2 ({keyword}): Found {len(domain_papers)} papers")
-                            break
-
-                # Strategy 3: Get any papers in domain
-                if not domain_papers:
-                    for keyword in keywords[:2]:
-                        domain_papers = db.query(Article).filter(
-                            or_(
-                                Article.title.ilike(f'%{keyword}%'),
-                                Article.abstract.ilike(f'%{keyword}%')
-                            ),
-                            Article.title.isnot(None),
-                            Article.title != ""
-                        ).order_by(desc(Article.citation_count)).limit(4).all()
-
-                        if domain_papers:
-                            logger.info(f"💡 Strategy 3 ({keyword}): Found {len(domain_papers)} papers")
-                            break
-
-                # Strategy 4: If still no results, get any quality papers and personalize the reason
-                if not domain_papers:
-                    domain_papers = db.query(Article).filter(
-                        Article.title.isnot(None),
-                        Article.title != "",
-                        Article.citation_count > 0
-                    ).order_by(desc(Article.citation_count)).limit(3).all()
+                        logger.info(f"💡 Strategy 2 (Expanded): Found {len(domain_papers)} papers for {domain}")
+                    else:
+                        # Strategy 3: Any papers in domain (no date restriction)
+                        general_query = f"({' OR '.join(keywords[:2])})"
+                        domain_papers = await self._search_pubmed(general_query, max_results=6, sort="relevance")
+                        logger.info(f"💡 Strategy 3 (General): Found {len(domain_papers)} papers for {domain}")
                     logger.info(f"💡 Strategy 4 (quality papers for {domain}): Found {len(domain_papers)} papers")
 
                 # Process found papers (with deduplication)
                 for paper in domain_papers:
                     # Skip if we've already seen this paper OR if it's used by other methods
-                    if paper.pmid in seen_pmids or paper.pmid in global_used_pmids:
+                    if paper["pmid"] in seen_pmids or paper["pmid"] in global_used_pmids:
                         continue
 
-                    seen_pmids.add(paper.pmid)
-                    relevance_score = self._calculate_personalized_relevance(paper, user_profile)
+                    seen_pmids.add(paper["pmid"])
+                    relevance_score = paper.get("relevance_score", 0.8)  # PubMed results have default relevance
 
                     # Generate personalized reason based on user's search history
                     reason = self._generate_personalized_reason(domain, user_profile)
 
+                    # Parse authors string into list
+                    authors_str = paper.get("authors", "Author information not available")
+                    if authors_str and authors_str != "Author information not available":
+                        authors_list = [name.strip() for name in authors_str.split(",")][:3]
+                    else:
+                        authors_list = ["Author information not available"]
+
                     recommendations.append({
-                        "pmid": paper.pmid,
-                        "title": paper.title,
-                        "authors": paper.authors[:3] if paper.authors else ["Author information not available"],
-                        "journal": paper.journal,
-                        "year": paper.publication_year,
-                        "citation_count": paper.citation_count or 0,
+                        "pmid": paper["pmid"],
+                        "title": paper["title"],
+                        "authors": authors_list,
+                        "journal": paper.get("journal", "Unknown Journal"),
+                        "year": paper.get("publication_year", datetime.now().year),
+                        "citation_count": paper.get("citation_count", 0),
                         "relevance_score": relevance_score,
                         "reason": reason,
                         "category": "papers_for_you",
                         "is_fallback": False,  # NEVER mark as fallback
+                        "source": "pubmed",  # Mark as PubMed source
                         "spotify_style": {
                             "cover_color": self._generate_cover_color(domain),
                             "subtitle": f"Because you research {domain}",
-                            "play_count": paper.citation_count or 0
+                            "play_count": paper.get("citation_count", 0)
                         }
                     })
 
             # Sort by relevance and return top recommendations
             recommendations.sort(key=lambda x: x["relevance_score"], reverse=True)
 
-            # Ensure we have at least some recommendations
-            if len(recommendations) < 3:
-                logger.info(f"💡 Only {len(recommendations)} recommendations found, adding fallback papers")
-                fallback_papers = db.query(Article).filter(
-                    Article.title.isnot(None),
-                    Article.title != ""
-                ).order_by(desc(Article.citation_count)).limit(5).all()
+            # Ensure we have at least some recommendations using PubMed fallback
+            if len(recommendations) < 8:  # Target minimum 8 papers
+                logger.info(f"💡 Only {len(recommendations)} recommendations found, searching PubMed for more papers")
 
-                for paper in fallback_papers:
-                    if paper.pmid not in [r["pmid"] for r in recommendations] and paper.pmid not in global_used_pmids:
-                        recommendations.append({
-                            "pmid": paper.pmid,
-                            "title": paper.title,
-                            "authors": paper.authors[:3] if paper.authors else ["Author information not available"],
-                            "journal": paper.journal,
-                            "year": paper.publication_year,
-                            "citation_count": paper.citation_count or 0,
-                            "relevance_score": 0.6,
-                            "reason": "High-impact research in your field",
-                            "category": "papers_for_you",
-                            "is_fallback": False,  # Still not marked as fallback
-                            "spotify_style": {
-                                "cover_color": "#3498db",
-                                "subtitle": "Popular research",
-                                "play_count": paper.citation_count or 0
-                            }
+                # Fallback: Search for general high-quality recent papers
+                fallback_queries = [
+                    "high impact factor AND (\"2023\"[Date - Publication]:\"2025\"[Date - Publication])",
+                    "review AND (\"2022\"[Date - Publication]:\"2025\"[Date - Publication])",
+                    "clinical trial AND (\"2023\"[Date - Publication]:\"2025\"[Date - Publication])"
+                ]
+
+                for fallback_query in fallback_queries:
+                    if len(recommendations) >= 10:  # Stop when we have enough
+                        break
+
+                    fallback_papers = await self._search_pubmed(fallback_query, max_results=5, sort="relevance")
+
+                    for paper in fallback_papers:
+                        if len(recommendations) >= 10:
+                            break
+
+                        if paper["pmid"] not in [r["pmid"] for r in recommendations] and paper["pmid"] not in global_used_pmids:
+                            # Parse authors string into list
+                            authors_str = paper.get("authors", "Author information not available")
+                            if authors_str and authors_str != "Author information not available":
+                                authors_list = [name.strip() for name in authors_str.split(",")][:3]
+                            else:
+                                authors_list = ["Author information not available"]
+
+                            recommendations.append({
+                                "pmid": paper["pmid"],
+                                "title": paper["title"],
+                                "authors": authors_list,
+                                "journal": paper.get("journal", "Unknown Journal"),
+                                "year": paper.get("publication_year", datetime.now().year),
+                                "citation_count": paper.get("citation_count", 0),
+                                "relevance_score": 0.6,
+                                "reason": "High-impact recent research",
+                                "category": "papers_for_you",
+                                "is_fallback": False,  # Still not marked as fallback
+                                "source": "pubmed",
+                                "spotify_style": {
+                                    "cover_color": "#3498db",
+                                    "subtitle": "Popular recent research",
+                                    "play_count": paper.get("citation_count", 0)
+                                }
                         })
                         if len(recommendations) >= 8:
                             break
@@ -1720,15 +1709,31 @@ class SpotifyInspiredRecommendationsService:
 
             logger.info(f"🔥 Trending: Starting with {len(global_used_pmids)} used PMIDs: {list(global_used_pmids)[:5]}{'...' if len(global_used_pmids) > 5 else ''}")
 
-            # Get trending papers in user's research fields with multiple strategies
-            for domain in primary_domains[:3]:  # Increased from 2 to 3
+            # 🚀 NEW APPROACH: Search PubMed for trending papers in user's research fields
+            for domain in primary_domains[:3]:  # Top 3 domains
                 trending_papers = []
                 keywords = domain_keywords.get(domain.lower(), [domain])
 
                 logger.info(f"🔥 Processing domain '{domain}' with keywords: {keywords}")
 
-                # Strategy 1: TRENDING - Very recent papers (last 2 years) with good citation velocity
-                for keyword in keywords[:3]:  # Try top 3 keywords
+                # Strategy 1: Very recent papers (last 1 year) - most trending
+                recent_query = f"({' OR '.join(keywords[:3])}) AND (\"2024\"[Date - Publication]:\"2025\"[Date - Publication])"
+                trending_papers = await self._search_pubmed(recent_query, max_results=8, sort="date")
+
+                if trending_papers:
+                    logger.info(f"🔥 Strategy 1 (Very Recent): Found {len(trending_papers)} trending papers for {domain}")
+                else:
+                    # Strategy 2: Last 2 years if very recent has no results
+                    expanded_query = f"({' OR '.join(keywords[:3])}) AND (\"2023\"[Date - Publication]:\"2025\"[Date - Publication])"
+                    trending_papers = await self._search_pubmed(expanded_query, max_results=8, sort="date")
+
+                    if trending_papers:
+                        logger.info(f"🔥 Strategy 2 (Recent): Found {len(trending_papers)} papers for {domain}")
+                    else:
+                        # Strategy 3: Any recent papers in domain
+                        general_query = f"({' OR '.join(keywords[:2])}) AND (\"2022\"[Date - Publication]:\"2025\"[Date - Publication])"
+                        trending_papers = await self._search_pubmed(general_query, max_results=6, sort="date")
+                        logger.info(f"🔥 Strategy 3 (General Recent): Found {len(trending_papers)} papers for {domain}")
                     trending_papers = db.query(Article).filter(
                         or_(
                             Article.title.ilike(f'%{keyword}%'),
@@ -2524,6 +2529,136 @@ class SpotifyInspiredRecommendationsService:
         score += base_score * 0.15
 
         return min(score, 1.0)
+
+    async def _search_pubmed(self, query: str, max_results: int = 20, sort: str = "relevance") -> List[Dict[str, Any]]:
+        """
+        Search PubMed for articles using eUtils API
+
+        Args:
+            query: Search query (e.g., "diabetes nephrology")
+            max_results: Maximum number of results to return
+            sort: Sort order ("relevance", "date", "citation_count")
+
+        Returns:
+            List of article dictionaries with PubMed data
+        """
+        try:
+            logger.info(f"🔍 PubMed Search: '{query}' (limit: {max_results}, sort: {sort})")
+
+            # Step 1: Search for PMIDs
+            search_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+            search_params = {
+                "db": "pubmed",
+                "term": query,
+                "retmax": str(max_results),
+                "retmode": "json",
+                "sort": sort
+            }
+
+            search_response = requests.get(search_url, params=search_params, timeout=30, headers={
+                'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
+            })
+            search_response.raise_for_status()
+            search_data = search_response.json()
+
+            pmids = search_data.get("esearchresult", {}).get("idlist", [])
+            logger.info(f"🔍 Found {len(pmids)} PMIDs for query: '{query}'")
+
+            if not pmids:
+                return []
+
+            # Step 2: Fetch article details
+            fetch_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+            fetch_params = {
+                "db": "pubmed",
+                "id": ",".join(pmids),
+                "retmode": "xml",
+                "rettype": "abstract"
+            }
+
+            fetch_response = requests.get(fetch_url, params=fetch_params, timeout=30, headers={
+                'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
+            })
+            fetch_response.raise_for_status()
+
+            xml_text = fetch_response.text()
+            articles = self._parse_pubmed_xml(xml_text)
+
+            logger.info(f"✅ Successfully parsed {len(articles)} articles from PubMed")
+            return articles
+
+        except Exception as e:
+            logger.error(f"❌ PubMed search failed for query '{query}': {e}")
+            return []
+
+    def _parse_pubmed_xml(self, xml_text: str) -> List[Dict[str, Any]]:
+        """Parse PubMed XML response to extract article data"""
+        articles = []
+
+        try:
+            # Use regex-based parsing for robustness (similar to frontend implementation)
+            article_matches = re.findall(r'<PubmedArticle>.*?</PubmedArticle>', xml_text, re.DOTALL)
+
+            for article_xml in article_matches:
+                try:
+                    # Extract PMID
+                    pmid_match = re.search(r'<PMID[^>]*>(\d+)</PMID>', article_xml)
+                    pmid = pmid_match.group(1) if pmid_match else None
+
+                    # Extract title
+                    title_match = re.search(r'<ArticleTitle>(.*?)</ArticleTitle>', article_xml, re.DOTALL)
+                    title = title_match.group(1) if title_match else "No title available"
+                    title = re.sub(r'<[^>]+>', '', title).strip()  # Remove HTML tags
+
+                    # Extract abstract
+                    abstract_match = re.search(r'<AbstractText[^>]*>(.*?)</AbstractText>', article_xml, re.DOTALL)
+                    abstract = abstract_match.group(1) if abstract_match else "No abstract available"
+                    abstract = re.sub(r'<[^>]+>', '', abstract).strip()  # Remove HTML tags
+
+                    # Extract authors
+                    author_matches = re.findall(r'<LastName>(.*?)</LastName>.*?<ForeName>(.*?)</ForeName>', article_xml, re.DOTALL)
+                    authors = [f"{first} {last}" for last, first in author_matches]
+                    author_string = ", ".join(authors[:3])  # Limit to first 3 authors
+                    if len(authors) > 3:
+                        author_string += " et al."
+
+                    # Extract journal
+                    journal_match = re.search(r'<Title>(.*?)</Title>', article_xml)
+                    journal = journal_match.group(1) if journal_match else "Unknown Journal"
+
+                    # Extract publication year
+                    year_match = re.search(r'<Year>(\d{4})</Year>', article_xml)
+                    pub_year = int(year_match.group(1)) if year_match else datetime.now().year
+
+                    # Extract DOI
+                    doi_match = re.search(r'<ELocationID EIdType="doi"[^>]*>(.*?)</ELocationID>', article_xml)
+                    doi = doi_match.group(1) if doi_match else None
+
+                    if pmid and title and title != "No title available":
+                        articles.append({
+                            "pmid": pmid,
+                            "title": title,
+                            "abstract": abstract,
+                            "authors": author_string,
+                            "journal": journal,
+                            "publication_year": pub_year,
+                            "doi": doi,
+                            "url": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
+                            "citation_count": 0,  # Will be enriched later if needed
+                            "source": "pubmed",
+                            "relevance_score": 0.8,  # Default relevance for PubMed results
+                            "trending_score": 0.7,   # Default trending score
+                            "opportunity_score": 0.6  # Default opportunity score
+                        })
+
+                except Exception as e:
+                    logger.warning(f"⚠️ Failed to parse article XML: {e}")
+                    continue
+
+        except Exception as e:
+            logger.error(f"❌ Failed to parse PubMed XML: {e}")
+
+        return articles
 
     def _apply_global_deduplication(self, recommendations: Dict[str, Any]) -> Dict[str, Any]:
         """Apply global deduplication across all recommendation types"""
