@@ -28,7 +28,7 @@ export default function DebugCollectionsPage() {
         },
       });
 
-      const result = {
+      const result: any = {
         status: response.status,
         statusText: response.statusText,
         ok: response.ok,
@@ -43,9 +43,9 @@ export default function DebugCollectionsPage() {
         result.error = errorText;
       }
 
-      setTestResults(prev => ({ ...prev, projects: result }));
-    } catch (error) {
-      setTestResults(prev => ({ ...prev, projects: { error: error.message } }));
+      setTestResults((prev: any) => ({ ...prev, projects: result }));
+    } catch (error: any) {
+      setTestResults((prev: any) => ({ ...prev, projects: { error: error.message } }));
     }
   };
 
@@ -59,7 +59,7 @@ export default function DebugCollectionsPage() {
         },
       });
 
-      const result = {
+      const result: any = {
         status: response.status,
         statusText: response.statusText,
         ok: response.ok,
@@ -74,9 +74,9 @@ export default function DebugCollectionsPage() {
         result.error = errorText;
       }
 
-      setTestResults(prev => ({ ...prev, collections: result }));
-    } catch (error) {
-      setTestResults(prev => ({ ...prev, collections: { error: error.message } }));
+      setTestResults((prev: any) => ({ ...prev, collections: result }));
+    } catch (error: any) {
+      setTestResults((prev: any) => ({ ...prev, collections: { error: error.message } }));
     }
   };
 
@@ -90,7 +90,7 @@ export default function DebugCollectionsPage() {
         },
       });
 
-      const result = {
+      const result: any = {
         status: response.status,
         statusText: response.statusText,
         ok: response.ok,
@@ -105,9 +105,9 @@ export default function DebugCollectionsPage() {
         result.error = errorText;
       }
 
-      setTestResults(prev => ({ ...prev, backendDirect: result }));
-    } catch (error) {
-      setTestResults(prev => ({ ...prev, backendDirect: { error: error.message } }));
+      setTestResults((prev: any) => ({ ...prev, backendDirect: result }));
+    } catch (error: any) {
+      setTestResults((prev: any) => ({ ...prev, backendDirect: { error: error.message } }));
     }
   };
 
