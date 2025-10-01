@@ -327,7 +327,7 @@ export const DeletableCollectionCard: React.FC<DeletableCollectionCardProps> = (
         className={className}
       >
         {/* Use the existing SpotifyCollectionCard component */}
-        <div className="spotify-card-enhanced bg-white" onClick={onClick}>
+        <div className="spotify-card-enhanced bg-white border border-gray-200 shadow-sm" onClick={onClick} style={{ backgroundColor: 'white', color: 'inherit' }}>
           <div className="flex items-center mb-4">
             <div 
               className="w-12 h-12 rounded-lg flex items-center justify-center mr-4"
@@ -338,15 +338,15 @@ export const DeletableCollectionCard: React.FC<DeletableCollectionCardProps> = (
               </svg>
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">{title}</h3>
-              <p className="text-sm text-gray-600">{articleCount} articles</p>
+              <h3 className="text-lg font-semibold mb-1" style={{ color: '#111827' }}>{title}</h3>
+              <p className="text-sm" style={{ color: '#6B7280' }}>{articleCount} articles</p>
             </div>
           </div>
           {description && (
-            <p className="text-sm text-gray-700 mb-4">{description}</p>
+            <p className="text-sm mb-4" style={{ color: '#374151' }}>{description}</p>
           )}
           {lastUpdated && (
-            <p className="text-xs text-gray-500">Updated {lastUpdated}</p>
+            <p className="text-xs" style={{ color: '#9CA3AF' }}>Updated {lastUpdated}</p>
           )}
         </div>
       </div>

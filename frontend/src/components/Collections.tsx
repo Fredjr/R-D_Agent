@@ -231,8 +231,8 @@ export default function Collections({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Collections</h2>
-          <p className="text-gray-600">Organize and curate your research articles</p>
+          <h2 className="text-2xl font-bold" style={{ color: 'white' }}>Collections</h2>
+          <p style={{ color: '#D1D5DB' }}>Organize and manage your research article collections</p>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
