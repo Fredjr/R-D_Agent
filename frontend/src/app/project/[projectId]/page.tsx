@@ -1411,132 +1411,155 @@ export default function ProjectPage() {
             {/* Project Data Sections */}
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-8 mb-8">
           {/* Reports Section */}
-          <Card variant="default" padding="lg">
-            <CardHeader>
-              <CardTitle>Reports ({project.reports?.length || 0})</CardTitle>
-              <CardDescription>Generated research reports and analyses</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {project.reports && project.reports.length > 0 ? (
-                <div className="space-y-3">
-                  {project.reports.map((report) => (
-                    <DeletableReportCard
-                      key={report.report_id}
-                      title={report.title}
-                      objective={report.objective}
-                      status="completed"
-                      createdAt={new Date(report.created_at).toLocaleDateString()}
-                      reportId={report.report_id}
-                      className="relative"
-                      onClick={() => window.open(`/report/${report.report_id}`, '_blank')}
-                      onDelete={() => {
-                        // Refresh project data after deletion
-                        fetchProjectData();
-                      }}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-[var(--palantir-gray-500)] text-sm">
-                  No reports yet. Create your first report to get started.
-                </p>
-              )}
-            </CardContent>
-          </Card>
+          <div className="bg-[var(--spotify-dark-gray)] rounded-lg shadow p-6 border border-[var(--spotify-border-gray)]">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-[var(--spotify-white)] flex items-center">
+                <span className="text-green-400 mr-2">📊</span>
+                Reports
+              </h3>
+              <span className="text-xs bg-[var(--spotify-green)]/20 text-[var(--spotify-green)] px-2 py-1 rounded-full">
+                {project.reports?.length || 0} reports
+              </span>
+            </div>
+            <div className="text-sm text-[var(--spotify-light-text)] mb-4">
+              Generated research reports and analyses
+            </div>
+            {project.reports && project.reports.length > 0 ? (
+              <div className="max-h-80 overflow-y-auto scrollbar-thin scrollbar-track-[var(--spotify-medium-gray)] scrollbar-thumb-[var(--spotify-light-gray)] space-y-3">
+                {project.reports.map((report) => (
+                  <DeletableReportCard
+                    key={report.report_id}
+                    title={report.title}
+                    objective={report.objective}
+                    status="completed"
+                    createdAt={new Date(report.created_at).toLocaleDateString()}
+                    reportId={report.report_id}
+                    className="relative"
+                    onClick={() => window.open(`/report/${report.report_id}`, '_blank')}
+                    onDelete={() => {
+                      // Refresh project data after deletion
+                      fetchProjectData();
+                    }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <div className="text-green-400 text-4xl mb-4">📊</div>
+                <p className="text-[var(--spotify-light-text)] text-sm">No reports yet.</p>
+                <p className="text-[var(--spotify-muted-text)] text-xs mt-1">Create your first report to get started</p>
+              </div>
+            )}
+          </div>
 
           {/* Report Iterations Section */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Report Iterations</h3>
+          <div className="bg-[var(--spotify-dark-gray)] rounded-lg shadow p-6 border border-[var(--spotify-border-gray)]">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-[var(--spotify-white)]">Report Iterations</h3>
+              <span className="text-xs bg-[var(--spotify-medium-gray)] text-[var(--spotify-light-text)] px-2 py-1 rounded-full">
+                {project.reports?.length || 0} versions
+              </span>
+            </div>
             {project.reports && project.reports.length > 0 ? (
               <div className="space-y-3">
-                <div className="text-sm text-gray-600 mb-3">
+                <div className="text-sm text-[var(--spotify-light-text)] mb-3">
                   Track how your research evolves with each report iteration
                 </div>
-                {project.reports
-                  .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                  .map((report, index) => (
-                  <div
-                    key={report.report_id}
-                    className="border border-gray-200 rounded-lg p-3 hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer relative"
-                    onClick={() => window.open(`/report/${report.report_id}`, '_blank')}
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800">
-                        v{project.reports.length - index}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {new Date(report.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <h4 className="font-medium text-gray-900 text-sm mb-1 line-clamp-2">{report.title}</h4>
-                    <p className="text-xs text-gray-600 line-clamp-2">{report.objective}</p>
-                    {index === 0 && (
-                      <div className="absolute top-2 right-2">
-                        <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded bg-green-100 text-green-800">
-                          Latest
+                <div className="max-h-80 overflow-y-auto scrollbar-thin scrollbar-track-[var(--spotify-medium-gray)] scrollbar-thumb-[var(--spotify-light-gray)] space-y-3">
+                  {project.reports
+                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                    .map((report, index) => (
+                    <div
+                      key={report.report_id}
+                      className="border border-[var(--spotify-border-gray)] rounded-lg p-3 hover:border-[var(--spotify-green)] hover:bg-[var(--spotify-medium-gray)] transition-all cursor-pointer relative"
+                      onClick={() => window.open(`/report/${report.report_id}`, '_blank')}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-[var(--spotify-blue)]/20 text-[var(--spotify-blue)]">
+                          v{project.reports.length - index}
+                        </span>
+                        <span className="text-xs text-[var(--spotify-light-text)]">
+                          {new Date(report.created_at).toLocaleDateString()}
                         </span>
                       </div>
-                    )}
-                  </div>
-                ))}
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                  <div className="flex items-center gap-2 text-sm text-blue-800">
+                      <h4 className="font-medium text-[var(--spotify-white)] text-sm mb-1 line-clamp-2">{report.title}</h4>
+                      <p className="text-xs text-[var(--spotify-light-text)] line-clamp-2">{report.objective}</p>
+                      {index === 0 && (
+                        <div className="absolute top-2 right-2">
+                          <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded bg-[var(--spotify-green)] text-black">
+                            Latest
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 p-3 bg-[var(--spotify-blue)]/10 rounded-lg border border-[var(--spotify-blue)]/20">
+                  <div className="flex items-center gap-2 text-sm text-[var(--spotify-blue)]">
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                     </svg>
                     <span className="font-medium">Iteration Insights</span>
                   </div>
-                  <p className="text-xs text-blue-700 mt-1">
+                  <p className="text-xs text-[var(--spotify-light-text)] mt-1">
                     Each report builds on previous research. Compare versions to see how your understanding evolves with new analyses and data.
                   </p>
                 </div>
               </div>
             ) : (
               <div className="text-center py-8">
-                <svg className="w-12 h-12 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-12 h-12 text-[var(--spotify-muted-text)] mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                <p className="text-gray-500 text-sm">No report iterations yet.</p>
-                <p className="text-gray-400 text-xs mt-1">Create multiple reports to track research evolution</p>
+                <p className="text-[var(--spotify-light-text)] text-sm">No report iterations yet.</p>
+                <p className="text-[var(--spotify-muted-text)] text-xs mt-1">Create multiple reports to track research evolution</p>
               </div>
             )}
           </div>
 
           {/* Deep Dive Analyses Section */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Deep Dive Analyses ({project.deep_dive_analyses?.length || 0})</h3>
+          <div className="bg-[var(--spotify-dark-gray)] rounded-lg shadow p-6 border border-[var(--spotify-border-gray)]">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-[var(--spotify-white)] flex items-center">
+                <span className="text-purple-400 mr-2">🔬</span>
+                Deep Dive Analyses
+              </h3>
+              <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-1 rounded-full">
+                {project.deep_dive_analyses?.length || 0} analyses
+              </span>
+            </div>
             {project.deep_dive_analyses && project.deep_dive_analyses.length > 0 ? (
-              <div className="space-y-3">
+              <div className="max-h-80 overflow-y-auto scrollbar-thin scrollbar-track-[var(--spotify-medium-gray)] scrollbar-thumb-[var(--spotify-light-gray)] space-y-3">
                 {project.deep_dive_analyses.map((analysis) => (
                   <div
                     key={analysis.analysis_id}
-                    className="border border-gray-200 rounded-lg p-4 hover:border-purple-300 hover:shadow-md transition-all"
+                    className="border border-[var(--spotify-border-gray)] rounded-lg p-4 hover:border-purple-400/40 hover:bg-[var(--spotify-medium-gray)] transition-all"
                   >
                     <div
                       className="cursor-pointer"
                       onClick={() => window.open(`/analysis/${analysis.analysis_id}`, '_blank')}
                     >
-                      <h4 className="font-medium text-gray-900 mb-1">{analysis.article_title}</h4>
+                      <h4 className="font-medium text-[var(--spotify-white)] mb-1">{analysis.article_title}</h4>
                       {analysis.article_pmid && (
-                        <p className="text-sm text-blue-600 mb-1">PMID: {analysis.article_pmid}</p>
+                        <p className="text-sm text-[var(--spotify-blue)] mb-1">PMID: {analysis.article_pmid}</p>
                       )}
                       <div className="flex justify-between items-center mb-2">
                         <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                           analysis.processing_status === 'completed'
-                            ? 'bg-green-100 text-green-800'
+                            ? 'bg-[var(--spotify-green)]/20 text-[var(--spotify-green)]'
                             : analysis.processing_status === 'processing'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-gray-100 text-gray-800'
+                            ? 'bg-[var(--spotify-yellow)]/20 text-[var(--spotify-yellow)]'
+                            : 'bg-[var(--spotify-muted-text)]/20 text-[var(--spotify-muted-text)]'
                         }`}>
                           {analysis.processing_status}
                         </span>
                       </div>
-                      <div className="flex justify-between items-center text-xs text-gray-500 mb-3">
+                      <div className="flex justify-between items-center text-xs text-[var(--spotify-light-text)] mb-3">
                         <span>By {analysis.created_by}</span>
                         <span>{new Date(analysis.created_at).toLocaleDateString()}</span>
                       </div>
                     </div>
-                    <div className="flex gap-2 pt-2 border-t border-gray-100">
+                    <div className="flex gap-2 pt-2 border-t border-[var(--spotify-border-gray)]">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1547,7 +1570,7 @@ export default function ProjectPage() {
                             source_id: analysis.analysis_id
                           });
                         }}
-                        className="flex-1 px-3 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                        className="flex-1 px-3 py-1.5 text-xs bg-[var(--spotify-green)] text-black rounded hover:bg-[var(--spotify-green-hover)] transition-colors font-medium"
                         title="Add this analyzed article to a collection"
                       >
                         📚 Add to Collection
@@ -1557,7 +1580,7 @@ export default function ProjectPage() {
                           e.stopPropagation();
                           window.open(`/analysis/${analysis.analysis_id}`, '_blank');
                         }}
-                        className="px-3 py-1.5 text-xs bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
+                        className="px-3 py-1.5 text-xs bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors font-medium"
                       >
                         View Analysis
                       </button>
@@ -1566,29 +1589,45 @@ export default function ProjectPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-gray-500 text-sm">No deep dive analyses yet. Start your first analysis to explore articles in detail.</p>
+              <div className="text-center py-8">
+                <div className="text-purple-400 text-4xl mb-4">🔬</div>
+                <p className="text-[var(--spotify-light-text)] text-sm">No deep dive analyses yet.</p>
+                <p className="text-[var(--spotify-muted-text)] text-xs mt-1">Start your first analysis to explore articles in detail</p>
+              </div>
             )}
           </div>
 
           {/* Collaborators Section */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Collaborators ({project.collaborators?.length || 0})</h3>
+          <div className="bg-[var(--spotify-dark-gray)] rounded-lg shadow p-6 border border-[var(--spotify-border-gray)]">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-[var(--spotify-white)] flex items-center">
+                <span className="text-orange-400 mr-2">👥</span>
+                Collaborators
+              </h3>
+              <span className="text-xs bg-orange-500/20 text-orange-300 px-2 py-1 rounded-full">
+                {project.collaborators?.length || 0} members
+              </span>
+            </div>
             {project.collaborators && project.collaborators.length > 0 ? (
-              <div className="space-y-3">
+              <div className="max-h-60 overflow-y-auto scrollbar-thin scrollbar-track-[var(--spotify-medium-gray)] scrollbar-thumb-[var(--spotify-light-gray)] space-y-3">
                 {project.collaborators.map((collaborator) => (
-                  <div key={collaborator.user_id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                  <div key={collaborator.user_id} className="flex items-center justify-between p-3 border border-[var(--spotify-border-gray)] rounded-lg hover:bg-[var(--spotify-medium-gray)] transition-colors">
                     <div>
-                      <p className="font-medium text-gray-900">{collaborator.username}</p>
-                      <p className="text-sm text-gray-600 capitalize">{collaborator.role}</p>
+                      <p className="font-medium text-[var(--spotify-white)]">{collaborator.username}</p>
+                      <p className="text-sm text-[var(--spotify-light-text)] capitalize">{collaborator.role}</p>
                     </div>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-[var(--spotify-muted-text)]">
                       {new Date(collaborator.invited_at).toLocaleDateString()}
                     </span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-gray-500 text-sm">No collaborators yet. Invite team members to collaborate on this project.</p>
+              <div className="text-center py-8">
+                <div className="text-orange-400 text-4xl mb-4">👥</div>
+                <p className="text-[var(--spotify-light-text)] text-sm">No collaborators yet.</p>
+                <p className="text-[var(--spotify-muted-text)] text-xs mt-1">Invite team members to collaborate on this project</p>
+              </div>
             )}
           </div>
         </div>

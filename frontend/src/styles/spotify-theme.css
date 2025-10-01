@@ -195,6 +195,26 @@
   background: var(--spotify-light-text);
 }
 
+/* Thin Scrollbar Styles for Project Workspace */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-track-spotify-medium::-webkit-scrollbar-track {
+  background: var(--spotify-medium-gray);
+  border-radius: 3px;
+}
+
+.scrollbar-thumb-spotify-light::-webkit-scrollbar-thumb {
+  background: var(--spotify-light-gray);
+  border-radius: 3px;
+}
+
+.scrollbar-thumb-spotify-light::-webkit-scrollbar-thumb:hover {
+  background: var(--spotify-muted-text);
+}
+
 /* Card Styles - Spotify Inspired */
 .card-spotify {
   background: var(--spotify-card-bg);
