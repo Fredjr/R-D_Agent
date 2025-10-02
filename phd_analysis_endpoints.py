@@ -273,7 +273,7 @@ def calculate_phd_progress_metrics(project_data: Dict[str, Any]) -> Dict[str, An
         }
 
         # Calculate recent activity based on actual timestamps
-        from datetime import datetime, timedelta
+        from datetime import timedelta
         week_ago = datetime.now() - timedelta(days=7)
 
         recent_reports = 0
