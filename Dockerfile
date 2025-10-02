@@ -1,6 +1,9 @@
 # Use Python 3.11 (more stable than 3.12 for Railway)
 FROM python:3.11-slim
 
+# Force rebuild - cache bust
+ARG CACHE_BUST=2025-10-02-22-50
+
 # Set working directory
 WORKDIR /app
 
