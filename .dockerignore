@@ -14,3 +14,21 @@ dist
 frontend/.next
 frontend/.vercel
 frontend/.turbo
+
+# Large model cache directories (6.5GB+)
+models_cache/
+.cache/
+*.log
+tmp/
+build/
+data/
+datasets/
+*.tar.gz
+*.zip
+
+# Development files
+.pytest_cache/
+.coverage
+.mypy_cache/
+.DS_Store
+Thumbs.db
