@@ -14,17 +14,19 @@ This module handles:
 import asyncio
 import json
 import logging
+import os
 from datetime import datetime
 from typing import Dict, List, Any, Optional
+
+# Real model mode - Railway deployment complete
+DEMO_MODE = False
 
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 # Import existing dependencies
-from database import get_db
-from models.project import Project
-from models.user import User
+from database import get_db, Project, User, Report, DeepDiveAnalysis, Annotation, Collection, ArticleCollection
 
 # Import PhD orchestration system
 from phd_thesis_agents import PhDThesisOrchestrator, create_phd_orchestrator, run_phd_analysis
@@ -41,12 +43,28 @@ logger = logging.getLogger(__name__)
 # Initialize router
 router = APIRouter(prefix="/projects", tags=["phd-analysis"])
 
-# Initialize LLM
-llm = ChatOpenAI(
-    model="gpt-4",
-    temperature=0.1,
-    openai_api_key=os.getenv("OPENAI_API_KEY")
-)
+# Lazy LLM initialization
+_llm = None
+
+def get_llm():
+    """Get or initialize the LLM instance"""
+    global _llm
+    if _llm is None:
+        from langchain_openai import ChatOpenAI
+        from dotenv import load_dotenv
+        load_dotenv()  # Load environment variables
+
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            logger.warning("OpenAI API key not found - PhD analysis will not work")
+            return None
+
+        _llm = ChatOpenAI(
+            model=os.getenv("OPENAI_MODEL", "gpt-4o"),
+            temperature=0.1,
+            openai_api_key=api_key
+        )
+    return _llm
 
 # =============================================================================
 # PYDANTIC MODELS
@@ -130,7 +148,56 @@ async def get_project_data(project_id: str, db: Session) -> Dict[str, Any]:
         project = db.query(Project).filter(Project.project_id == project_id).first()
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
-        
+
+        # Get reports for this project
+        reports = db.query(Report).filter(Report.project_id == project_id).all()
+        reports_data = []
+        for report in reports:
+            reports_data.append({
+                "report_id": report.report_id,
+                "title": report.title,
+                "objective": report.objective,
+                "molecule": report.molecule,
+                "clinical_mode": report.clinical_mode,
+                "dag_mode": report.dag_mode,
+                "article_count": report.article_count or 0,
+                "created_at": report.created_at.isoformat() if report.created_at else None,
+                "status": report.status,
+                "summary": report.summary,
+                "processing_time_seconds": report.processing_time_seconds
+            })
+
+        # Get deep dive analyses for this project
+        deep_dives = db.query(DeepDiveAnalysis).filter(DeepDiveAnalysis.project_id == project_id).all()
+        deep_dives_data = []
+        for analysis in deep_dives:
+            deep_dives_data.append({
+                "analysis_id": analysis.analysis_id,
+                "title": analysis.title,
+                "analysis_type": analysis.analysis_type,
+                "status": analysis.status,
+                "created_at": analysis.created_at.isoformat() if analysis.created_at else None,
+                "processing_time_seconds": analysis.processing_time_seconds
+            })
+
+        # Get collections for this project
+        collections = db.query(Collection).filter(Collection.project_id == project_id).all()
+        collections_data = []
+        for collection in collections:
+            # Count articles in this collection
+            article_count = db.query(ArticleCollection).filter(
+                ArticleCollection.collection_id == collection.collection_id
+            ).count()
+
+            collections_data.append({
+                "collection_id": collection.collection_id,
+                "collection_name": collection.collection_name,
+                "description": collection.description,
+                "article_count": article_count,
+                "created_at": collection.created_at.isoformat() if collection.created_at else None,
+                "updated_at": collection.updated_at.isoformat() if collection.updated_at else None
+            })
+
         # Build comprehensive project data structure
         project_data = {
             "project_id": project.project_id,
@@ -138,23 +205,22 @@ async def get_project_data(project_id: str, db: Session) -> Dict[str, Any]:
             "description": project.description or "",
             "created_at": project.created_at.isoformat() if project.created_at else None,
             "updated_at": project.updated_at.isoformat() if project.updated_at else None,
-            
+
             # Collections data
-            "collections": [],
-            
+            "collections": collections_data,
+
             # Reports data
-            "reports": [],
-            
+            "reports": reports_data,
+
             # Deep dive analyses
-            "deep_dive_analyses": [],
-            
+            "deep_dive_analyses": deep_dives_data,
+
             # Additional metadata
             "owner_user_id": project.owner_user_id
         }
-        
-        # TODO: Add actual data retrieval from related tables
-        # This would be implemented based on your existing database schema
-        
+
+        logger.info(f"📊 Retrieved project data: {len(reports_data)} reports, {len(deep_dives_data)} deep dives, {len(collections_data)} collections")
+
         return project_data
         
     except Exception as e:
@@ -168,35 +234,76 @@ def calculate_phd_progress_metrics(project_data: Dict[str, Any]) -> Dict[str, An
         collections = project_data.get("collections", [])
         reports = project_data.get("reports", [])
         deep_dives = project_data.get("deep_dive_analyses", [])
-        
-        # Calculate paper counts
-        total_papers = sum(len(collection.get("articles", [])) for collection in collections)
+
+        # Calculate paper counts from collections
+        total_papers = sum(collection.get("article_count", 0) for collection in collections)
         total_analyses = len(reports) + len(deep_dives)
-        
-        # Calculate progress metrics
+
+        # Calculate more realistic progress metrics based on actual data
+        # Each report/analysis represents significant research work
+        chapters_completed = min(6, max(1, total_analyses // 4))  # More conservative estimate
+        words_per_analysis = 3000  # More realistic estimate for academic writing
+        estimated_words = total_analyses * words_per_analysis
+
         dissertation_progress = {
-            "chapters_completed": min(6, total_analyses // 3),  # Rough estimate
+            "chapters_completed": chapters_completed,
             "total_chapters": 6,
-            "words_written": total_analyses * 2500,  # Estimate based on analyses
+            "words_written": estimated_words,
             "target_words": 80000,
-            "completion_percentage": min(100, (total_analyses * 2500 / 80000) * 100)
+            "completion_percentage": min(100, (estimated_words / 80000) * 100)
         }
-        
+
+        # Extract research topics from reports for better insights
+        research_topics = set()
+        molecules_studied = set()
+        for report in reports:
+            if report.get("molecule"):
+                molecules_studied.add(report["molecule"])
+            if report.get("title"):
+                # Simple keyword extraction (could be enhanced with NLP)
+                title_words = report["title"].lower().split()
+                research_topics.update([word for word in title_words if len(word) > 4])
+
         literature_coverage = {
             "papers_reviewed": total_papers,
             "key_authors_covered": [],  # Would be extracted from actual paper data
-            "theoretical_frameworks": [],  # Would be identified from analysis
-            "methodology_gaps": []  # Would be identified from gap analysis
+            "theoretical_frameworks": list(research_topics)[:10],  # Top research themes
+            "methodology_gaps": [],  # Would be identified from gap analysis
+            "molecules_studied": list(molecules_studied)
         }
-        
-        # Calculate recent activity (last 7 days)
+
+        # Calculate recent activity based on actual timestamps
+        from datetime import datetime, timedelta
+        week_ago = datetime.now() - timedelta(days=7)
+
+        recent_reports = 0
+        recent_deep_dives = 0
+        for report in reports:
+            if report.get("created_at"):
+                try:
+                    created_date = datetime.fromisoformat(report["created_at"].replace('Z', '+00:00'))
+                    if created_date >= week_ago:
+                        recent_reports += 1
+                except:
+                    pass
+
+        for analysis in deep_dives:
+            if analysis.get("created_at"):
+                try:
+                    created_date = datetime.fromisoformat(analysis["created_at"].replace('Z', '+00:00'))
+                    if created_date >= week_ago:
+                        recent_deep_dives += 1
+                except:
+                    pass
+
         recent_activity = {
-            "papers_added_this_week": min(total_papers, 10),  # Placeholder
-            "deep_dives_completed": len([d for d in deep_dives if d.get("created_at")]),
+            "papers_added_this_week": 0,  # Would need to track article additions
+            "deep_dives_completed": recent_deep_dives,
+            "reports_generated": recent_reports,
             "collections_updated": len(collections),
-            "gap_analyses_run": 0  # Would track actual gap analyses
+            "total_research_outputs": total_analyses
         }
-        
+
         return {
             "dissertation_progress": dissertation_progress,
             "literature_coverage": literature_coverage,
@@ -243,6 +350,9 @@ async def generate_phd_analysis(
         project_data = await get_project_data(project_id, db)
         
         # Create PhD orchestrator
+        llm = get_llm()
+        if not llm:
+            raise HTTPException(status_code=503, detail="OpenAI API key not configured - PhD analysis unavailable")
         phd_orchestrator = create_phd_orchestrator(llm)
         
         # Prepare analysis configuration
@@ -385,11 +495,24 @@ async def get_phd_progress(
     Get existing PhD progress data for a project
     """
     try:
-        # For now, calculate fresh progress data
-        # In production, this might retrieve cached progress data
+        logger.info(f"📊 Getting PhD progress for project {project_id}")
+
+        # Validate project exists first
+        project = db.query(Project).filter(Project.project_id == project_id).first()
+        if not project:
+            logger.error(f"Project {project_id} not found")
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        # Calculate fresh progress data using default request
         request = PhDProgressRequest()
-        return await calculate_phd_progress(project_id, request, db)
-        
+        result = await calculate_phd_progress(project_id, request, db)
+
+        logger.info(f"📊 PhD progress retrieved successfully for project {project_id}")
+        return result
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
         logger.error(f"Error retrieving PhD progress for project {project_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve PhD progress: {str(e)}")
@@ -455,6 +578,9 @@ async def generate_enhanced_comprehensive_summary(
         
         else:
             # Run standard comprehensive analysis
+            llm = get_llm()
+            if not llm:
+                raise HTTPException(status_code=503, detail="OpenAI API key not configured")
             base_orchestrator = ProjectSummaryOrchestrator(llm)
             base_results = await base_orchestrator.generate_comprehensive_summary(project_data)
             
