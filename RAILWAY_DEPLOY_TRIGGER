@@ -1,6 +1,7 @@
 # Railway Deployment Trigger File
 # This file is used to trigger Railway deployments from GitHub
-# Timestamp: 2025-10-02T22:45:00Z
+# Timestamp: 2025-10-02T22:50:00Z
+# FORCE REBUILD - Docker cache issue detected
 
 DEPLOYMENT_VERSION=v2.1.0
 DEPLOYMENT_REASON=Fix missing backend methods for PhD analysis
