@@ -12717,7 +12717,359 @@ class ProjectCreate(BaseModel):
     project_name: str = Field(..., min_length=1, max_length=255, description="Project name")
     description: Optional[str] = Field(None, max_length=1000, description="Project description")
 
+# =============================================================================
+# PHD ANALYSIS ENDPOINTS
+# =============================================================================
 
+print("🔍 Attempting to import PhD analysis functionality...")
+
+# Import PhD analysis functionality
+try:
+    from phd_thesis_agents import create_phd_orchestrator, PhDThesisOrchestrator, initialize_phd_models
+    PHD_ANALYSIS_AVAILABLE = True
+    logger.info("✅ PhD analysis endpoints loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ PhD analysis not available: {e}")
+    PHD_ANALYSIS_AVAILABLE = False
+
+# Define PhD helper functions directly in main.py to avoid import issues
+async def get_phd_project_data(project_id: str, db: Session) -> Dict[str, Any]:
+    """Retrieve comprehensive project data for PhD analysis"""
+    try:
+        # Get project
+        project = db.query(Project).filter(Project.project_id == project_id).first()
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        # Get reports for this project
+        reports = db.query(Report).filter(Report.project_id == project_id).all()
+        reports_data = []
+        for report in reports:
+            reports_data.append({
+                "report_id": report.report_id,
+                "title": report.title,
+                "objective": report.objective,
+                "molecule": report.molecule,
+                "article_count": report.article_count or 0,
+                "created_at": report.created_at.isoformat() if report.created_at else None,
+                "status": report.status,
+                "summary": report.summary
+            })
+
+        # Get deep dive analyses for this project
+        deep_dives = db.query(DeepDiveAnalysis).filter(DeepDiveAnalysis.project_id == project_id).all()
+        deep_dives_data = []
+        for analysis in deep_dives:
+            deep_dives_data.append({
+                "analysis_id": analysis.analysis_id,
+                "title": analysis.title,
+                "analysis_type": analysis.analysis_type,
+                "status": analysis.status,
+                "created_at": analysis.created_at.isoformat() if analysis.created_at else None
+            })
+
+        # Get collections for this project
+        collections = db.query(Collection).filter(Collection.project_id == project_id).all()
+        collections_data = []
+        for collection in collections:
+            # Count articles in this collection
+            article_count = db.query(ArticleCollection).filter(
+                ArticleCollection.collection_id == collection.collection_id
+            ).count()
+
+            collections_data.append({
+                "collection_id": collection.collection_id,
+                "collection_name": collection.collection_name,
+                "description": collection.description,
+                "article_count": article_count,
+                "created_at": collection.created_at.isoformat() if collection.created_at else None
+            })
+
+        # Build comprehensive project data structure
+        project_data = {
+            "project_id": project.project_id,
+            "project_name": project.project_name,
+            "description": project.description or "",
+            "created_at": project.created_at.isoformat() if project.created_at else None,
+            "updated_at": project.updated_at.isoformat() if project.updated_at else None,
+            "collections": collections_data,
+            "reports": reports_data,
+            "deep_dive_analyses": deep_dives_data,
+            "owner_user_id": project.owner_user_id
+        }
+
+        logger.info(f"📊 Retrieved project data: {len(reports_data)} reports, {len(deep_dives_data)} deep dives, {len(collections_data)} collections")
+        return project_data
+
+    except Exception as e:
+        logger.error(f"Error retrieving project data for {project_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve project data: {str(e)}")
+
+def calculate_phd_progress_from_data(project_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Calculate PhD progress metrics from project data"""
+    try:
+        # Extract metrics from project data
+        collections = project_data.get("collections", [])
+        reports = project_data.get("reports", [])
+        deep_dives = project_data.get("deep_dive_analyses", [])
+
+        # Calculate paper counts from collections
+        total_papers = sum(collection.get("article_count", 0) for collection in collections)
+        total_analyses = len(reports) + len(deep_dives)
+
+        # Calculate more realistic progress metrics based on actual data
+        chapters_completed = min(6, max(1, total_analyses // 4))  # More conservative estimate
+        words_per_analysis = 3000  # More realistic estimate for academic writing
+        estimated_words = total_analyses * words_per_analysis
+
+        dissertation_progress = {
+            "chapters_completed": chapters_completed,
+            "total_chapters": 6,
+            "words_written": estimated_words,
+            "target_words": 80000,
+            "completion_percentage": min(100, (estimated_words / 80000) * 100)
+        }
+
+        # Extract research topics from reports for better insights
+        research_topics = set()
+        molecules_studied = set()
+        for report in reports:
+            if report.get("molecule"):
+                molecules_studied.add(report["molecule"])
+            if report.get("title"):
+                # Simple keyword extraction
+                title_words = report["title"].lower().split()
+                research_topics.update([word for word in title_words if len(word) > 4])
+
+        literature_coverage = {
+            "papers_reviewed": total_papers,
+            "key_authors_covered": [],
+            "theoretical_frameworks": list(research_topics)[:10],
+            "methodology_gaps": [],
+            "molecules_studied": list(molecules_studied)
+        }
+
+        # Calculate recent activity
+        from datetime import timedelta
+        week_ago = datetime.now() - timedelta(days=7)
+
+        recent_reports = 0
+        recent_deep_dives = 0
+        for report in reports:
+            if report.get("created_at"):
+                try:
+                    created_date = datetime.fromisoformat(report["created_at"].replace('Z', '+00:00'))
+                    if created_date >= week_ago:
+                        recent_reports += 1
+                except:
+                    pass
+
+        for analysis in deep_dives:
+            if analysis.get("created_at"):
+                try:
+                    created_date = datetime.fromisoformat(analysis["created_at"].replace('Z', '+00:00'))
+                    if created_date >= week_ago:
+                        recent_deep_dives += 1
+                except:
+                    pass
+
+        recent_activity = {
+            "papers_added_this_week": 0,
+            "deep_dives_completed": recent_deep_dives,
+            "reports_generated": recent_reports,
+            "collections_updated": len(collections),
+            "total_research_outputs": total_analyses
+        }
+
+        return {
+            "dissertation_progress": dissertation_progress,
+            "literature_coverage": literature_coverage,
+            "recent_activity": recent_activity,
+            "research_milestones": {
+                "proposal_defense": None,
+                "comprehensive_exams": None,
+                "data_collection": None,
+                "dissertation_defense": None
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Error calculating PhD progress metrics: {e}")
+        return {
+            "dissertation_progress": {"chapters_completed": 0, "total_chapters": 6, "completion_percentage": 0},
+            "literature_coverage": {"papers_reviewed": 0},
+            "recent_activity": {"papers_added_this_week": 0},
+            "research_milestones": {}
+        }
+
+# Initialize PhD models on startup
+@app.on_event("startup")
+async def initialize_phd_models_on_startup():
+    """Initialize PhD models when the application starts"""
+    if PHD_ANALYSIS_AVAILABLE:
+        try:
+            logger.info("🎓 Initializing PhD models on startup...")
+            models = initialize_phd_models()
+            if models:
+                logger.info(f"✅ PhD models initialized successfully: {list(models.keys())}")
+            else:
+                logger.warning("⚠️ PhD models not available - using graceful degradation")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize PhD models: {e}")
+            logger.info("🔧 PhD features will use graceful degradation")
+    else:
+        logger.info("🔧 PhD analysis not available - skipping model initialization")
+
+@app.post("/projects/{project_id}/phd-analysis")
+async def generate_phd_analysis_endpoint(
+    project_id: str,
+    request: dict,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """Generate PhD-specific analysis for a project using specialized agent orchestration"""
+    if not PHD_ANALYSIS_AVAILABLE:
+        raise HTTPException(status_code=503, detail="PhD analysis service not available")
+
+    start_time = datetime.now()
+
+    try:
+        logger.info(f"🎓 Starting PhD analysis for project {project_id}")
+        logger.info(f"🎓 Analysis type: {request.get('analysis_type', 'comprehensive_phd')}")
+
+        # Get comprehensive project data
+        project_data = await get_phd_project_data(project_id, db)
+
+        # Create PhD orchestrator
+        llm = get_llm()
+        if not llm:
+            raise HTTPException(status_code=503, detail="OpenAI API key not configured - PhD analysis unavailable")
+        phd_orchestrator = create_phd_orchestrator(llm)
+
+        # Prepare analysis configuration
+        analysis_config = {
+            "analysis_type": request.get("analysis_type", "comprehensive_phd"),
+            "agent_config": request.get("agent_config", {
+                "literature_review": {"enabled": True},
+                "methodology_synthesis": {"enabled": True},
+                "gap_analysis": {"enabled": True},
+                "thesis_structure": {"enabled": True},
+                "citation_network": {"enabled": True}
+            }),
+            "user_context": request.get("user_context", {
+                "academic_level": "phd",
+                "research_stage": "dissertation"
+            }),
+            "output_preferences": request.get("output_preferences", {
+                "format": "thesis_structured",
+                "citation_style": "apa"
+            }),
+            "include_base_analysis": request.get("include_base_analysis", True)
+        }
+
+        # Run PhD analysis
+        analysis_results = await phd_orchestrator.generate_phd_analysis(project_data, analysis_config)
+
+        # Calculate processing time
+        processing_time = (datetime.now() - start_time).total_seconds()
+
+        # Prepare response
+        response = {
+            "analysis_type": request.get("analysis_type", "comprehensive_phd"),
+            "timestamp": datetime.now().isoformat(),
+            "project_id": project_id,
+            "agent_results": analysis_results.get("agent_results", {}),
+            "phd_outputs": analysis_results.get("phd_outputs", {}),
+            "base_analysis": analysis_results.get("base_analysis"),
+            "processing_time_seconds": processing_time,
+            "agents_executed": list(analysis_results.get("agent_results", {}).keys()),
+            "error": analysis_results.get("error")
+        }
+
+        logger.info(f"🎓 PhD analysis completed for project {project_id} in {processing_time:.2f}s")
+        logger.info(f"🎓 Agents executed: {response['agents_executed']}")
+
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"🎓 PhD analysis failed for project {project_id}: {e}")
+        processing_time = (datetime.now() - start_time).total_seconds()
+
+        return {
+            "analysis_type": request.get("analysis_type", "comprehensive_phd"),
+            "timestamp": datetime.now().isoformat(),
+            "project_id": project_id,
+            "processing_time_seconds": processing_time,
+            "error": str(e)
+        }
+
+@app.get("/projects/{project_id}/phd-progress")
+async def get_phd_progress_endpoint(
+    project_id: str,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """Get PhD progress metrics for a project"""
+    if not PHD_ANALYSIS_AVAILABLE:
+        raise HTTPException(status_code=503, detail="PhD analysis service not available")
+
+    try:
+        logger.info(f"📊 Calculating PhD progress for project {project_id}")
+
+        # Get project data
+        project_data = await get_phd_project_data(project_id, db)
+
+        # Calculate progress metrics
+        progress_metrics = calculate_phd_progress_from_data(project_data)
+
+        # Generate recommendations
+        recommendations = []
+        next_steps = []
+
+        # Add recommendations based on progress
+        completion_pct = progress_metrics["dissertation_progress"].get("completion_percentage", 0)
+        papers_reviewed = progress_metrics["literature_coverage"].get("papers_reviewed", 0)
+
+        if completion_pct < 25:
+            recommendations.append("Focus on comprehensive literature review and theoretical framework development")
+            next_steps.append("Conduct systematic literature search and organize papers into collections")
+        elif completion_pct < 50:
+            recommendations.append("Begin methodology development and research design planning")
+            next_steps.append("Run gap analysis to identify research opportunities")
+        elif completion_pct < 75:
+            recommendations.append("Focus on data collection and analysis methodology")
+            next_steps.append("Generate thesis chapter structure and begin writing")
+        else:
+            recommendations.append("Focus on results analysis and discussion development")
+            next_steps.append("Prepare for dissertation defense and final revisions")
+
+        if papers_reviewed < 50:
+            recommendations.append("Expand literature review to include more comprehensive coverage")
+            next_steps.append("Add more papers to collections and conduct deep dive analyses")
+
+        response = {
+            "project_id": project_id,
+            "timestamp": datetime.now().isoformat(),
+            "dissertation_progress": progress_metrics["dissertation_progress"],
+            "literature_coverage": progress_metrics["literature_coverage"],
+            "research_milestones": progress_metrics["research_milestones"],
+            "recent_activity": progress_metrics["recent_activity"],
+            "recommendations": recommendations,
+            "next_steps": next_steps
+        }
+
+        logger.info(f"📊 PhD progress calculated for project {project_id}")
+        logger.info(f"📊 Completion: {completion_pct:.1f}%, Papers: {papers_reviewed}")
+
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error calculating PhD progress for project {project_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to calculate PhD progress: {str(e)}")
 
 # Cloud Run entry point
 if __name__ == "__main__":
@@ -14431,191 +14783,7 @@ async def mesh_health_check():
             detail=f"MeSH autocomplete service unhealthy: {str(e)}"
         )
 
-# =============================================================================
-# PHD ANALYSIS ENDPOINTS
-# =============================================================================
 
-# Import PhD analysis functionality
-try:
-    from phd_analysis_endpoints import (
-        PhDAnalysisRequest, PhDProgressRequest,
-        PhDAnalysisResponse, PhDProgressResponse,
-        get_project_data, calculate_phd_progress_metrics
-    )
-    from phd_thesis_agents import create_phd_orchestrator, PhDThesisOrchestrator, initialize_phd_models
-    PHD_ANALYSIS_AVAILABLE = True
-    logger.info("✅ PhD analysis endpoints loaded successfully")
-except ImportError as e:
-    logger.warning(f"⚠️ PhD analysis not available: {e}")
-    PHD_ANALYSIS_AVAILABLE = False
-
-# Initialize PhD models on startup
-@app.on_event("startup")
-async def initialize_phd_models_on_startup():
-    """Initialize PhD models when the application starts"""
-    if PHD_ANALYSIS_AVAILABLE:
-        try:
-            logger.info("🎓 Initializing PhD models on startup...")
-            models = initialize_phd_models()
-            if models:
-                logger.info(f"✅ PhD models initialized successfully: {list(models.keys())}")
-            else:
-                logger.warning("⚠️ PhD models not available - using graceful degradation")
-        except Exception as e:
-            logger.error(f"❌ Failed to initialize PhD models: {e}")
-            logger.info("🔧 PhD features will use graceful degradation")
-    else:
-        logger.info("🔧 PhD analysis not available - skipping model initialization")
-
-@app.post("/projects/{project_id}/phd-analysis")
-async def generate_phd_analysis_endpoint(
-    project_id: str,
-    request: dict,
-    user_id: str = Header(..., alias="User-ID"),
-    db: Session = Depends(get_db)
-):
-    """Generate PhD-specific analysis for a project using specialized agent orchestration"""
-    if not PHD_ANALYSIS_AVAILABLE:
-        raise HTTPException(status_code=503, detail="PhD analysis service not available")
-
-    start_time = datetime.now()
-
-    try:
-        logger.info(f"🎓 Starting PhD analysis for project {project_id}")
-        logger.info(f"🎓 Analysis type: {request.get('analysis_type', 'comprehensive_phd')}")
-
-        # Get comprehensive project data
-        project_data = await get_project_data(project_id, db)
-
-        # Create PhD orchestrator
-        phd_orchestrator = create_phd_orchestrator(llm)
-
-        # Prepare analysis configuration
-        analysis_config = {
-            "analysis_type": request.get("analysis_type", "comprehensive_phd"),
-            "agent_config": request.get("agent_config", {
-                "literature_review": {"enabled": True},
-                "methodology_synthesis": {"enabled": True},
-                "gap_analysis": {"enabled": True},
-                "thesis_structure": {"enabled": True},
-                "citation_network": {"enabled": True}
-            }),
-            "user_context": request.get("user_context", {
-                "academic_level": "phd",
-                "research_stage": "dissertation"
-            }),
-            "output_preferences": request.get("output_preferences", {
-                "format": "thesis_structured",
-                "citation_style": "apa"
-            }),
-            "include_base_analysis": request.get("include_base_analysis", True)
-        }
-
-        # Run PhD analysis
-        analysis_results = await phd_orchestrator.generate_phd_analysis(project_data, analysis_config)
-
-        # Calculate processing time
-        processing_time = (datetime.now() - start_time).total_seconds()
-
-        # Prepare response
-        response = {
-            "analysis_type": request.get("analysis_type", "comprehensive_phd"),
-            "timestamp": datetime.now().isoformat(),
-            "project_id": project_id,
-            "agent_results": analysis_results.get("agent_results", {}),
-            "phd_outputs": analysis_results.get("phd_outputs", {}),
-            "base_analysis": analysis_results.get("base_analysis"),
-            "processing_time_seconds": processing_time,
-            "agents_executed": list(analysis_results.get("agent_results", {}).keys()),
-            "error": analysis_results.get("error")
-        }
-
-        logger.info(f"🎓 PhD analysis completed for project {project_id} in {processing_time:.2f}s")
-        logger.info(f"🎓 Agents executed: {response['agents_executed']}")
-
-        return response
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"🎓 PhD analysis failed for project {project_id}: {e}")
-        processing_time = (datetime.now() - start_time).total_seconds()
-
-        return {
-            "analysis_type": request.get("analysis_type", "comprehensive_phd"),
-            "timestamp": datetime.now().isoformat(),
-            "project_id": project_id,
-            "processing_time_seconds": processing_time,
-            "error": str(e)
-        }
-
-@app.get("/projects/{project_id}/phd-progress")
-async def get_phd_progress_endpoint(
-    project_id: str,
-    user_id: str = Header(..., alias="User-ID"),
-    db: Session = Depends(get_db)
-):
-    """Get PhD progress metrics for a project"""
-    if not PHD_ANALYSIS_AVAILABLE:
-        raise HTTPException(status_code=503, detail="PhD analysis service not available")
-
-    try:
-        logger.info(f"📊 Calculating PhD progress for project {project_id}")
-
-        # Get project data
-        project_data = await get_project_data(project_id, db)
-
-        # Calculate progress metrics
-        progress_metrics = calculate_phd_progress_metrics(project_data)
-
-        # Generate recommendations
-        recommendations = []
-        next_steps = []
-
-        # Add recommendations based on progress
-        completion_pct = progress_metrics["dissertation_progress"].get("completion_percentage", 0)
-        papers_reviewed = progress_metrics["literature_coverage"].get("papers_reviewed", 0)
-
-        if completion_pct < 25:
-            recommendations.append("Focus on comprehensive literature review and theoretical framework development")
-            next_steps.append("Conduct systematic literature search and organize papers into collections")
-        elif completion_pct < 50:
-            recommendations.append("Begin methodology development and research design planning")
-            next_steps.append("Run gap analysis to identify research opportunities")
-        elif completion_pct < 75:
-            recommendations.append("Focus on data collection and analysis methodology")
-            next_steps.append("Generate thesis chapter structure and begin writing")
-        else:
-            recommendations.append("Focus on results analysis and discussion development")
-            next_steps.append("Prepare for dissertation defense and final revisions")
-
-        if papers_reviewed < 50:
-            recommendations.append("Expand literature review to include more comprehensive coverage")
-            next_steps.append("Add more papers to collections and conduct deep dive analyses")
-
-        response = {
-            "project_id": project_id,
-            "timestamp": datetime.now().isoformat(),
-            "dissertation_progress": progress_metrics["dissertation_progress"],
-            "literature_coverage": progress_metrics["literature_coverage"],
-            "research_milestones": progress_metrics["research_milestones"],
-            "recent_activity": progress_metrics["recent_activity"],
-            "recommendations": recommendations,
-            "next_steps": next_steps
-        }
-
-        logger.info(f"📊 PhD progress calculated for project {project_id}")
-        logger.info(f"📊 Completion: {completion_pct:.1f}%, Papers: {papers_reviewed}")
-
-        return response
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error calculating PhD progress for project {project_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to calculate PhD progress: {str(e)}")
-
-# =============================================================================
 # SPOTIFY-INSPIRED AI RECOMMENDATIONS ENDPOINTS
 # =============================================================================
 
