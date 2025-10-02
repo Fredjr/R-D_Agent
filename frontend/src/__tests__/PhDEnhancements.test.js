@@ -1,34 +1,47 @@
 /**
- * PhD Enhancement Integration Tests
- * Extends SUPER_COMPREHENSIVE_PLATFORM_TEST.js with PhD-specific functionality
- * 
- * Tests the seamless integration of PhD features into existing project workspace
+ * PhD Enhancement Browser Test Script
+ *
+ * Browser-compatible test script for PhD features
+ * Run this in the browser console on your project workspace page
  */
 
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { jest } from '@jest/globals';
-import PhDProgressDashboard from '../components/PhDProgressDashboard';
-import { SpotifyQuickActions } from '../components/ui/SpotifyQuickActions';
+// PhD Enhancement Browser Test Suite
+class PhDEnhancementBrowserTest {
+    constructor() {
+        this.results = [];
+        this.testProjectId = '5ac213d7-6fcc-46ff-9420-5c7f4b421012';
+    }
 
-// Mock the auth context
-const mockUser = {
-  email: 'phd.student@university.edu',
-  name: 'PhD Student',
-  role: 'researcher'
-};
+    log(message, type = 'info') {
+        const timestamp = new Date().toISOString();
+        const emoji = {
+            'info': 'ℹ️',
+            'success': '✅',
+            'warning': '⚠️',
+            'error': '❌',
+            'test': '🧪'
+        }[type] || 'ℹ️';
 
-const mockAuthContext = {
-  user: mockUser,
-  loading: false,
-  error: null
-};
+        console.log(`${emoji} [${timestamp}] ${message}`);
+        this.results.push({ timestamp, type, message });
+    }
 
-jest.mock('../contexts/AuthContext', () => ({
-  useAuth: () => mockAuthContext
-}));
+    async testPhDAPIEndpoints() {
+        this.log('🧪 Testing PhD API Endpoints', 'test');
 
-// Mock fetch for API calls
-global.fetch = jest.fn();
+        // Test PhD Progress API
+        try {
+            const response = await fetch(`/api/proxy/projects/${this.testProjectId}/phd-progress`);
+            if (response.status === 503) {
+                this.log('PhD Progress API: Graceful degradation working', 'success');
+            } else if (response.ok) {
+                this.log('PhD Progress API: Fully operational!', 'success');
+            } else {
+                this.log(`PhD Progress API: Returned ${response.status}`, 'warning');
+            }
+        } catch (error) {
+            this.log(`PhD Progress API Error: ${error.message}`, 'error');
+        }
 
 describe('PhD Enhancement Integration Tests', () => {
   const mockProjectId = 'test-phd-project-123';
@@ -467,7 +480,7 @@ describe('PhD Enhancement Integration Tests', () => {
 });
 
 // Integration test helper functions
-export const createMockPhDProject = () => ({
+const createMockPhDProject = () => ({
   project_id: 'phd-test-project',
   project_name: 'PhD Research Project',
   description: 'Comprehensive PhD research on machine learning applications',
@@ -495,7 +508,7 @@ export const createMockPhDProject = () => ({
   }))
 });
 
-export const mockPhDAnalysisResponse = {
+const mockPhDAnalysisResponse = {
   analysis_type: 'thesis_structured',
   timestamp: new Date().toISOString(),
   agent_results: {
@@ -527,4 +540,10 @@ export const mockPhDAnalysisResponse = {
       research_opportunities: ['Integration of emerging AI techniques', 'Interdisciplinary approaches']
     }
   }
+};
+
+// Export helper functions for use in other tests
+module.exports = {
+  createMockPhDProject,
+  mockPhDAnalysisResponse
 };

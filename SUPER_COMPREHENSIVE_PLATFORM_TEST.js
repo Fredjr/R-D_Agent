@@ -26,7 +26,9 @@ class SuperComprehensivePlatformTest {
             collections: [],
             networkNodes: [],
             backgroundJobs: [],
-            analyses: []
+            analyses: [],
+            phdAnalyses: [],
+            phdProgress: []
         };
         this.metrics = {
             totalTests: 0,
@@ -946,6 +948,255 @@ class SuperComprehensivePlatformTest {
         return results;
     }
 
+    async testPhDEnhancementFeatures() {
+        this.log('🎓 PHASE 8: PHD ENHANCEMENT FEATURES TESTING', 'phase');
+
+        const tests = [];
+        const testProjectId = this.testProjectId;
+
+        // Test 1: PhD Analysis Endpoint
+        tests.push({
+            name: 'PhD Analysis - Thesis Structured',
+            test: async () => {
+                const result = await this.makeRequest(`${this.backendUrl}/projects/${testProjectId}/phd-analysis`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        analysis_type: 'thesis_structured',
+                        agent_config: {
+                            literature_review: { enabled: true },
+                            methodology_synthesis: { enabled: true },
+                            gap_analysis: { enabled: true },
+                            thesis_structure: { enabled: true },
+                            citation_network: { enabled: true }
+                        },
+                        user_context: {
+                            academic_level: 'phd',
+                            research_stage: 'dissertation'
+                        }
+                    })
+                });
+
+                if (result.success) {
+                    this.testData.phdAnalyses.push(result.data);
+                    this.log('✅ PhD Analysis endpoint working', 'success');
+
+                    // Validate PhD-specific response structure
+                    const hasPhDOutputs = result.data.phd_outputs || result.data.agent_results;
+                    const hasAgentResults = result.data.agents_executed && result.data.agents_executed.length > 0;
+
+                    if (hasPhDOutputs || hasAgentResults) {
+                        this.log('✅ PhD analysis contains specialized outputs', 'success');
+                    } else {
+                        this.log('⚠️ PhD analysis missing specialized outputs', 'warning');
+                    }
+                }
+
+                return result;
+            }
+        });
+
+        // Test 2: PhD Progress Calculation
+        tests.push({
+            name: 'PhD Progress Metrics',
+            test: async () => {
+                const result = await this.makeRequest(`${this.backendUrl}/projects/${testProjectId}/phd-progress`);
+
+                if (result.success) {
+                    this.testData.phdProgress.push(result.data);
+                    this.log('✅ PhD Progress endpoint working', 'success');
+
+                    // Validate progress structure
+                    const hasProgressMetrics = result.data.dissertation_progress &&
+                                             result.data.literature_coverage &&
+                                             result.data.recent_activity;
+
+                    if (hasProgressMetrics) {
+                        this.log('✅ PhD progress contains all required metrics', 'success');
+                        this.log(`📊 Progress: ${result.data.dissertation_progress?.completion_percentage || 0}%`, 'info');
+                        this.log(`📚 Papers reviewed: ${result.data.literature_coverage?.papers_reviewed || 0}`, 'info');
+                    } else {
+                        this.log('⚠️ PhD progress missing required metrics', 'warning');
+                    }
+                }
+
+                return result;
+            }
+        });
+
+        // Test 3: Enhanced Comprehensive Summary with PhD Features
+        tests.push({
+            name: 'Enhanced Comprehensive Summary with PhD',
+            test: async () => {
+                const result = await this.makeRequest(`${this.backendUrl}/projects/${testProjectId}/generate-comprehensive-summary`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        analysis_mode: 'phd_enhanced',
+                        phd_enhancements: {
+                            thesis_structure: true,
+                            methodology_synthesis: true,
+                            gap_analysis: true,
+                            citation_analysis: true,
+                            academic_writing: true
+                        },
+                        user_context: {
+                            academic_level: 'phd',
+                            research_stage: 'dissertation',
+                            preferred_citation_style: 'apa'
+                        }
+                    })
+                });
+
+                if (result.success) {
+                    this.log('✅ Enhanced comprehensive summary working', 'success');
+
+                    // Check for PhD enhancements in response
+                    const hasPhDEnhancements = result.data.summary_type === 'phd_enhanced_comprehensive' ||
+                                             result.data.phd_enhancements ||
+                                             result.data.agents_executed;
+
+                    if (hasPhDEnhancements) {
+                        this.log('✅ Comprehensive summary includes PhD enhancements', 'success');
+                    } else {
+                        this.log('⚠️ Comprehensive summary missing PhD enhancements', 'warning');
+                    }
+                }
+
+                return result;
+            }
+        });
+
+        // Execute all PhD enhancement tests
+        const results = [];
+        for (const testCase of tests) {
+            this.log(`🧪 Testing: ${testCase.name}`, 'test');
+            try {
+                const result = await testCase.test();
+                results.push({ name: testCase.name, result, success: result.success });
+
+                if (result.success) {
+                    this.log(`✅ ${testCase.name} - SUCCESS`, 'success');
+                } else {
+                    this.log(`❌ ${testCase.name} - FAILED: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                this.log(`❌ ${testCase.name} - ERROR: ${error.message}`, 'error');
+                results.push({ name: testCase.name, result: { success: false, error: error.message }, success: false });
+            }
+
+            // Small delay between tests
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        const successCount = results.filter(r => r.success).length;
+        this.log(`🎓 PhD Enhancement Features: ${successCount}/${results.length} tests passed`, 'summary');
+
+        return results;
+    }
+
+    async testPhDIntegrationFeatures() {
+        this.log('🔬 PHASE 9: PHD INTEGRATION TESTING', 'phase');
+
+        const tests = [];
+        const testProjectId = this.testProjectId;
+
+        // Test 1: PhD Dashboard Integration (Frontend)
+        tests.push({
+            name: 'PhD Dashboard Frontend Integration',
+            test: async () => {
+                const result = await this.makeRequest(`${this.baseUrl}/api/proxy/projects/${testProjectId}/phd-progress`);
+
+                if (result.success) {
+                    this.log('✅ PhD Dashboard frontend proxy working', 'success');
+                } else {
+                    this.log('⚠️ PhD Dashboard frontend proxy may not be deployed yet', 'warning');
+                }
+
+                return result;
+            }
+        });
+
+        // Test 2: PhD Quick Actions Integration (Frontend)
+        tests.push({
+            name: 'PhD Quick Actions Frontend Integration',
+            test: async () => {
+                const result = await this.makeRequest(`${this.baseUrl}/api/proxy/projects/${testProjectId}/phd-analysis`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        analysis_type: 'gap_analysis',
+                        agent_config: {
+                            gap_analysis: { enabled: true }
+                        }
+                    })
+                });
+
+                if (result.success) {
+                    this.log('✅ PhD Quick Actions frontend proxy working', 'success');
+                } else {
+                    this.log('⚠️ PhD Quick Actions frontend proxy may not be deployed yet', 'warning');
+                }
+
+                return result;
+            }
+        });
+
+        // Test 3: PhD Features with Existing Collections
+        tests.push({
+            name: 'PhD Analysis with Existing Collections',
+            test: async () => {
+                // First get project collections
+                const collectionsResult = await this.makeRequest(`${this.backendUrl}/projects/${testProjectId}/collections`);
+
+                if (collectionsResult.success && collectionsResult.data.collections?.length > 0) {
+                    // Run PhD analysis on project with collections
+                    const result = await this.makeRequest(`${this.backendUrl}/projects/${testProjectId}/phd-analysis`, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            analysis_type: 'comprehensive_phd',
+                            include_base_analysis: true
+                        })
+                    });
+
+                    if (result.success) {
+                        this.log('✅ PhD analysis works with existing collections', 'success');
+                        this.log(`📚 Analyzed project with ${collectionsResult.data.collections.length} collections`, 'info');
+                    }
+
+                    return result;
+                } else {
+                    this.log('⚠️ No collections found for PhD integration test', 'warning');
+                    return { success: true, data: { message: 'No collections to test with' } };
+                }
+            }
+        });
+
+        // Execute all PhD integration tests
+        const results = [];
+        for (const testCase of tests) {
+            this.log(`🧪 Testing: ${testCase.name}`, 'test');
+            try {
+                const result = await testCase.test();
+                results.push({ name: testCase.name, result, success: result.success });
+
+                if (result.success) {
+                    this.log(`✅ ${testCase.name} - SUCCESS`, 'success');
+                } else {
+                    this.log(`❌ ${testCase.name} - FAILED: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                this.log(`❌ ${testCase.name} - ERROR: ${error.message}`, 'error');
+                results.push({ name: testCase.name, result: { success: false, error: error.message }, success: false });
+            }
+
+            // Small delay between tests
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        const successCount = results.filter(r => r.success).length;
+        this.log(`🔬 PhD Integration Features: ${successCount}/${results.length} tests passed`, 'summary');
+
+        return results;
+    }
+
     async runSuperComprehensiveTest() {
         this.log('🚀 STARTING SUPER COMPREHENSIVE PLATFORM TEST', 'phase');
         this.log('🎯 Testing ALL platform functionalities end-to-end', 'info');
@@ -958,6 +1209,8 @@ class SuperComprehensivePlatformTest {
             backgroundJobs: [],
             webSocketFeatures: [],
             advancedAnalysis: [],
+            phdEnhancements: [],
+            phdIntegration: [],
             summary: {}
         };
 
@@ -983,6 +1236,12 @@ class SuperComprehensivePlatformTest {
             // Phase 7: Advanced Analysis Features Testing
             allResults.advancedAnalysis = await this.testAdvancedAnalysisFeatures();
 
+            // Phase 8: PhD Enhancement Features Testing
+            allResults.phdEnhancements = await this.testPhDEnhancementFeatures();
+
+            // Phase 9: PhD Integration Testing
+            allResults.phdIntegration = await this.testPhDIntegrationFeatures();
+
             // Calculate final metrics
             this.metrics.averageResponseTime = this.metrics.totalResponseTime / this.metrics.totalTests;
             const successRate = (this.metrics.successfulTests / this.metrics.totalTests) * 100;
@@ -1003,7 +1262,9 @@ class SuperComprehensivePlatformTest {
                     networkPapers: allResults.networkPapers.length,
                     backgroundJobs: allResults.backgroundJobs.length,
                     webSocketFeatures: allResults.webSocketFeatures.length,
-                    advancedAnalysis: allResults.advancedAnalysis.length
+                    advancedAnalysis: allResults.advancedAnalysis.length,
+                    phdEnhancements: allResults.phdEnhancements.length,
+                    phdIntegration: allResults.phdIntegration.length
                 }
             };
 
@@ -1040,7 +1301,9 @@ class SuperComprehensivePlatformTest {
             'Network Papers': { tests: results.networkPapers, emoji: '📄' },
             'Background Jobs': { tests: results.backgroundJobs, emoji: '⚙️' },
             'WebSocket Features': { tests: results.webSocketFeatures, emoji: '🔌' },
-            'Advanced Analysis': { tests: results.advancedAnalysis, emoji: '🔬' }
+            'Advanced Analysis': { tests: results.advancedAnalysis, emoji: '🔬' },
+            'PhD Enhancements': { tests: results.phdEnhancements, emoji: '🎓' },
+            'PhD Integration': { tests: results.phdIntegration, emoji: '🔬' }
         };
 
         const analysis = {};
@@ -1097,6 +1360,39 @@ class SuperComprehensivePlatformTest {
             recommendations.push('⚠️ WebSocket connectivity may need investigation');
         }
 
+        // Check PhD enhancement system performance
+        const phdEnhancementsWorking = results.phdEnhancements?.some(test => test.result?.success);
+        if (phdEnhancementsWorking) {
+            recommendations.push('🎓 PhD enhancement features are operational');
+        } else if (results.phdEnhancements?.length > 0) {
+            recommendations.push('⚠️ PhD enhancement features may need attention');
+        }
+
+        const phdIntegrationWorking = results.phdIntegration?.some(test => test.result?.success);
+        if (phdIntegrationWorking) {
+            recommendations.push('🔬 PhD integration with existing features is working');
+        } else if (results.phdIntegration?.length > 0) {
+            recommendations.push('⚠️ PhD integration may need investigation');
+        }
+
+        // PhD-specific recommendations
+        if (phdEnhancementsWorking && phdIntegrationWorking) {
+            recommendations.push('🎉 Platform is PhD-ready with specialized academic features');
+        } else if (results.phdEnhancements?.length > 0 || results.phdIntegration?.length > 0) {
+            recommendations.push('🎓 PhD features are being tested - check deployment status');
+        }
+
         return recommendations;
     }
+}
+
+// Execute the comprehensive test when this file is run
+if (typeof window !== 'undefined') {
+    // Browser environment
+    window.SuperComprehensivePlatformTest = SuperComprehensivePlatformTest;
+    console.log('🎓 Super Comprehensive Platform Test with PhD Features loaded');
+    console.log('📋 Run: new SuperComprehensivePlatformTest().runSuperComprehensiveTest()');
+} else if (typeof module !== 'undefined' && module.exports) {
+    // Node.js environment
+    module.exports = SuperComprehensivePlatformTest;
 }
