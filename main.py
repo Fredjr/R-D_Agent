@@ -9851,7 +9851,7 @@ async def generate_comprehensive_project_summary(
                     "total_collaborators": len(collaborators),
                     "total_annotations": len(annotations),
                     "total_deep_dives": len(deep_dive_analyses),
-                    "project_duration_days": (datetime.utcnow() - project.created_at).days,
+                    "project_duration_days": (datetime.utcnow().replace(tzinfo=None) - project.created_at.replace(tzinfo=None)).days if project.created_at else 0,
                     "phd_enhancements_enabled": list(k for k, v in phd_enhancements.items() if v)
                 }
             }
@@ -9874,7 +9874,7 @@ async def generate_comprehensive_project_summary(
                     "total_collaborators": len(collaborators),
                     "total_annotations": len(annotations),
                     "total_deep_dives": len(deep_dive_analyses),
-                    "project_duration_days": (datetime.utcnow() - project.created_at).days
+                    "project_duration_days": (datetime.utcnow().replace(tzinfo=None) - project.created_at.replace(tzinfo=None)).days if project.created_at else 0
                 }
             }
 
