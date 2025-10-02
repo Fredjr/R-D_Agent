@@ -63,48 +63,30 @@ export default function PhDProgressDashboard({ projectId, onRefresh }: PhDProgre
     setError(null);
     
     try {
+      console.log('📊 [PhD Dashboard] Fetching progress for project:', projectId);
       const response = await fetch(`/api/proxy/projects/${projectId}/phd-progress`, {
         headers: {
           'User-ID': user.email,
         },
       });
 
+      console.log('📊 [PhD Dashboard] Response status:', response.status);
+
       if (!response.ok) {
-        throw new Error('Failed to fetch PhD progress data');
+        const errorText = await response.text();
+        console.error('📊 [PhD Dashboard] API error:', response.status, errorText);
+        throw new Error(`Failed to fetch PhD progress data: ${response.status} ${errorText}`);
       }
 
       const data = await response.json();
+      console.log('📊 [PhD Dashboard] Progress data received:', data);
       setProgressData(data);
     } catch (error: any) {
       console.error('Error fetching PhD progress:', error);
       setError(error.message);
-      
-      // Fallback to mock data for development
-      setProgressData({
-        dissertation_progress: {
-          chapters_completed: 2,
-          total_chapters: 6,
-          words_written: 15000,
-          target_words: 80000,
-          completion_percentage: 33
-        },
-        literature_coverage: {
-          papers_reviewed: 127,
-          key_authors_covered: ['Smith, J.', 'Johnson, M.', 'Williams, R.'],
-          theoretical_frameworks: ['Social Cognitive Theory', 'Systems Theory'],
-          methodology_gaps: ['Longitudinal studies', 'Mixed methods']
-        },
-        research_milestones: {
-          proposal_defense: new Date('2023-06-15'),
-          comprehensive_exams: new Date('2023-09-20'),
-        },
-        recent_activity: {
-          papers_added_this_week: 8,
-          deep_dives_completed: 3,
-          collections_updated: 2,
-          gap_analyses_run: 1
-        }
-      });
+
+      // Don't set mock data - let the error state show
+      setProgressData(null);
     } finally {
       setLoading(false);
     }
@@ -127,9 +109,20 @@ export default function PhDProgressDashboard({ projectId, onRefresh }: PhDProgre
   if (error || !progressData) {
     return (
       <div className="bg-gradient-to-r from-red-500 to-orange-500 p-6 rounded-lg">
-        <div className="flex items-center text-white">
-          <ExclamationTriangleIcon className="h-6 w-6 mr-2" />
-          <span>Unable to load PhD progress data</span>
+        <div className="flex items-center justify-between text-white">
+          <div className="flex items-center">
+            <ExclamationTriangleIcon className="h-6 w-6 mr-2" />
+            <div>
+              <div className="font-medium">Unable to load PhD progress data</div>
+              {error && <div className="text-sm text-red-100 mt-1">{error}</div>}
+            </div>
+          </div>
+          <button
+            onClick={fetchProgressData}
+            className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded text-sm transition-colors"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
