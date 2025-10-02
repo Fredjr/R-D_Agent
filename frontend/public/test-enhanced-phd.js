@@ -1,0 +1,329 @@
+/**
+ * Enhanced PhD System Browser Test
+ * Tests all PhD enhancement features with improved backend data
+ */
+
+class EnhancedPhDSystemTest {
+    constructor() {
+        this.results = {
+            successes: 0,
+            warnings: 0,
+            errors: 0,
+            details: []
+        };
+    }
+
+    log(level, message) {
+        const timestamp = new Date().toISOString();
+        const emoji = level === 'success' ? '✅' : level === 'warning' ? '⚠️' : level === 'error' ? '❌' : 'ℹ️';
+        console.log(`${emoji} [${timestamp}] ${message}`);
+        
+        this.results[level === 'success' ? 'successes' : level === 'warning' ? 'warnings' : 'errors']++;
+        this.results.details.push({ level, message, timestamp });
+    }
+
+    async runAllTests() {
+        this.log('info', '🚀 Starting Enhanced PhD System Tests');
+        this.log('info', '🎯 Testing improved backend data quality and UI components');
+
+        // Test 1: PhD Progress Dashboard with Enhanced Data
+        await this.testEnhancedProgressDashboard();
+
+        // Test 2: Enhanced Thesis Chapter Generation
+        await this.testEnhancedThesisGeneration();
+
+        // Test 3: Improved Gap Analysis
+        await this.testImprovedGapAnalysis();
+
+        // Test 4: Enhanced Methodology Synthesis
+        await this.testEnhancedMethodologySynthesis();
+
+        // Test 5: UI Component Loading States
+        await this.testUILoadingStates();
+
+        // Test 6: Error Handling
+        await this.testErrorHandling();
+
+        // Test 7: Data Integration
+        await this.testDataIntegration();
+
+        this.printSummary();
+    }
+
+    async testEnhancedProgressDashboard() {
+        this.log('info', '📊 Testing Enhanced PhD Progress Dashboard');
+        
+        try {
+            // Check if dashboard shows real research themes
+            const dashboard = document.querySelector('[data-testid="phd-progress-dashboard"]') || 
+                            document.querySelector('.phd-progress-dashboard') ||
+                            document.querySelector('div[class*="gradient"]');
+            
+            if (dashboard) {
+                this.log('success', 'PhD Progress Dashboard component found');
+                
+                // Check for research themes display
+                const themeElements = dashboard.querySelectorAll('[class*="theme"], [class*="framework"]');
+                if (themeElements.length > 0) {
+                    this.log('success', `Research themes displayed: ${themeElements.length} elements found`);
+                } else {
+                    this.log('warning', 'Research themes not visually displayed (may be in data only)');
+                }
+                
+                // Check for progress metrics
+                const progressElements = dashboard.querySelectorAll('[class*="progress"], .text-2xl');
+                if (progressElements.length >= 3) {
+                    this.log('success', `Progress metrics displayed: ${progressElements.length} metrics found`);
+                } else {
+                    this.log('warning', 'Limited progress metrics displayed');
+                }
+            } else {
+                this.log('warning', 'PhD Progress Dashboard not found on current page');
+            }
+        } catch (error) {
+            this.log('error', `PhD Progress Dashboard test failed: ${error.message}`);
+        }
+    }
+
+    async testEnhancedThesisGeneration() {
+        this.log('info', '📖 Testing Enhanced Thesis Chapter Generation');
+        
+        try {
+            // Look for thesis chapter button
+            const thesisButton = Array.from(document.querySelectorAll('button')).find(btn => 
+                btn.textContent.includes('Thesis') || btn.textContent.includes('Chapter')
+            );
+            
+            if (thesisButton) {
+                this.log('success', 'Thesis Chapter Generation button found');
+                
+                // Check if button is functional (not disabled)
+                if (!thesisButton.disabled) {
+                    this.log('success', 'Thesis Chapter Generation button is enabled');
+                } else {
+                    this.log('warning', 'Thesis Chapter Generation button is disabled');
+                }
+            } else {
+                this.log('warning', 'Thesis Chapter Generation button not found');
+            }
+
+            // Check for existing thesis structure display
+            const thesisStructure = document.querySelector('[data-component="thesis-structure"]');
+            if (thesisStructure) {
+                this.log('success', 'Thesis Structure component found');
+                
+                // Check for chapter elements
+                const chapters = thesisStructure.querySelectorAll('[class*="chapter"], [class*="border"]');
+                if (chapters.length > 0) {
+                    this.log('success', `Thesis chapters displayed: ${chapters.length} chapters found`);
+                } else {
+                    this.log('info', 'No thesis chapters currently displayed (may need generation)');
+                }
+            } else {
+                this.log('info', 'Thesis Structure component not currently displayed');
+            }
+        } catch (error) {
+            this.log('error', `Enhanced Thesis Generation test failed: ${error.message}`);
+        }
+    }
+
+    async testImprovedGapAnalysis() {
+        this.log('info', '🔍 Testing Improved Gap Analysis');
+        
+        try {
+            // Look for gap analysis button
+            const gapButton = Array.from(document.querySelectorAll('button')).find(btn => 
+                btn.textContent.includes('Gap') || btn.textContent.includes('Literature')
+            );
+            
+            if (gapButton) {
+                this.log('success', 'Gap Analysis button found');
+            } else {
+                this.log('warning', 'Gap Analysis button not found');
+            }
+
+            // Check for existing gap analysis display
+            const gapAnalysis = document.querySelector('[data-component="gap-analysis"]');
+            if (gapAnalysis) {
+                this.log('success', 'Gap Analysis component found');
+                
+                // Check for gap elements
+                const gaps = gapAnalysis.querySelectorAll('[class*="gap"], [class*="border"]');
+                if (gaps.length > 0) {
+                    this.log('success', `Research gaps displayed: ${gaps.length} gaps found`);
+                } else {
+                    this.log('info', 'No research gaps currently displayed');
+                }
+            } else {
+                this.log('info', 'Gap Analysis component not currently displayed');
+            }
+        } catch (error) {
+            this.log('error', `Improved Gap Analysis test failed: ${error.message}`);
+        }
+    }
+
+    async testEnhancedMethodologySynthesis() {
+        this.log('info', '🧪 Testing Enhanced Methodology Synthesis');
+        
+        try {
+            // Look for methodology button
+            const methodButton = Array.from(document.querySelectorAll('button')).find(btn => 
+                btn.textContent.includes('Methodology') || btn.textContent.includes('Method')
+            );
+            
+            if (methodButton) {
+                this.log('success', 'Methodology Synthesis button found');
+            } else {
+                this.log('warning', 'Methodology Synthesis button not found');
+            }
+
+            // Check for existing methodology display
+            const methodSynthesis = document.querySelector('[data-component="methodology-synthesis"]');
+            if (methodSynthesis) {
+                this.log('success', 'Methodology Synthesis component found');
+                
+                // Check for methodology elements
+                const methods = methodSynthesis.querySelectorAll('[class*="method"], [class*="border"]');
+                if (methods.length > 0) {
+                    this.log('success', `Methodologies displayed: ${methods.length} methods found`);
+                } else {
+                    this.log('info', 'No methodologies currently displayed');
+                }
+            } else {
+                this.log('info', 'Methodology Synthesis component not currently displayed');
+            }
+        } catch (error) {
+            this.log('error', `Enhanced Methodology Synthesis test failed: ${error.message}`);
+        }
+    }
+
+    async testUILoadingStates() {
+        this.log('info', '⏳ Testing UI Loading States');
+        
+        try {
+            // Check if loading states are implemented (look for skeleton loaders)
+            const skeletonElements = document.querySelectorAll('[class*="animate-pulse"], [class*="skeleton"]');
+            
+            if (skeletonElements.length > 0) {
+                this.log('success', `Loading states implemented: ${skeletonElements.length} skeleton elements found`);
+            } else {
+                this.log('info', 'No loading states currently visible (components may be loaded)');
+            }
+
+            // Check for loading indicators in buttons
+            const loadingButtons = Array.from(document.querySelectorAll('button')).filter(btn => 
+                btn.textContent.includes('Loading') || btn.textContent.includes('Generating') || btn.disabled
+            );
+            
+            if (loadingButtons.length > 0) {
+                this.log('success', `Loading buttons found: ${loadingButtons.length} buttons in loading state`);
+            } else {
+                this.log('info', 'No buttons currently in loading state');
+            }
+        } catch (error) {
+            this.log('error', `UI Loading States test failed: ${error.message}`);
+        }
+    }
+
+    async testErrorHandling() {
+        this.log('info', '🚨 Testing Error Handling');
+        
+        try {
+            // Check for error displays
+            const errorElements = document.querySelectorAll('[class*="error"], [class*="red-"], .bg-red-50');
+            
+            if (errorElements.length > 0) {
+                this.log('warning', `Error states visible: ${errorElements.length} error elements found`);
+            } else {
+                this.log('success', 'No error states currently visible (good!)');
+            }
+
+            // Check for retry buttons
+            const retryButtons = Array.from(document.querySelectorAll('button')).filter(btn => 
+                btn.textContent.includes('Retry') || btn.textContent.includes('Try Again')
+            );
+            
+            if (retryButtons.length > 0) {
+                this.log('info', `Retry functionality available: ${retryButtons.length} retry buttons found`);
+            } else {
+                this.log('info', 'No retry buttons currently visible');
+            }
+        } catch (error) {
+            this.log('error', `Error Handling test failed: ${error.message}`);
+        }
+    }
+
+    async testDataIntegration() {
+        this.log('info', '🔗 Testing Data Integration');
+        
+        try {
+            // Test API endpoints
+            const projectId = window.location.pathname.split('/').pop();
+            
+            if (projectId && projectId.length > 10) {
+                this.log('success', `Project ID detected: ${projectId}`);
+                
+                // Test PhD Progress endpoint
+                try {
+                    const response = await fetch(`/api/proxy/projects/${projectId}/phd-progress`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.log('success', 'PhD Progress API endpoint working');
+                        
+                        if (data.dissertation_progress && data.literature_coverage) {
+                            this.log('success', 'PhD Progress data structure is correct');
+                        } else {
+                            this.log('warning', 'PhD Progress data structure may be incomplete');
+                        }
+                    } else {
+                        this.log('warning', `PhD Progress API returned ${response.status}`);
+                    }
+                } catch (apiError) {
+                    this.log('warning', `PhD Progress API test failed: ${apiError.message}`);
+                }
+            } else {
+                this.log('warning', 'Could not detect valid project ID from URL');
+            }
+        } catch (error) {
+            this.log('error', `Data Integration test failed: ${error.message}`);
+        }
+    }
+
+    printSummary() {
+        console.log('\n' + '='.repeat(60));
+        console.log('📊 ENHANCED PhD SYSTEM TEST SUMMARY');
+        console.log('='.repeat(60));
+        
+        this.log('success', `✅ Successes: ${this.results.successes}`);
+        this.log('warning', `⚠️ Warnings: ${this.results.warnings}`);
+        this.log('error', `❌ Errors: ${this.results.errors}`);
+        
+        const totalTests = this.results.successes + this.results.warnings + this.results.errors;
+        const successRate = ((this.results.successes / totalTests) * 100).toFixed(1);
+        
+        console.log(`\n📈 Success Rate: ${successRate}%`);
+        
+        if (this.results.errors === 0 && this.results.warnings <= 3) {
+            this.log('success', '🎉 Enhanced PhD System is working excellently!');
+        } else if (this.results.errors <= 2) {
+            this.log('warning', '⚡ Enhanced PhD System is mostly functional with minor issues');
+        } else {
+            this.log('error', '🔧 Enhanced PhD System needs attention');
+        }
+        
+        console.log('\n' + '='.repeat(60));
+    }
+}
+
+// Auto-run test when script is loaded
+if (typeof window !== 'undefined') {
+    window.EnhancedPhDSystemTest = EnhancedPhDSystemTest;
+    
+    // Add a global function to run the test
+    window.testEnhancedPhDSystem = () => {
+        const test = new EnhancedPhDSystemTest();
+        return test.runAllTests();
+    };
+    
+    console.log('🧪 Enhanced PhD System Test loaded. Run testEnhancedPhDSystem() to start testing.');
+}

@@ -492,7 +492,17 @@ class MethodologySynthesisAgent:
             statistical_methods = await self._extract_statistical_methods(papers)
             experimental_designs = await self._analyze_experimental_designs(papers)
 
+            # Format methodologies for UI components
+            formatted_methodologies = self._format_methodologies_for_ui(methodologies, statistical_methods, papers)
+            methodology_comparisons = self._generate_methodology_comparisons(formatted_methodologies)
+            recommended_combinations = self._generate_recommended_combinations(formatted_methodologies)
+
             return {
+                "methodologies": formatted_methodologies,
+                "comparisons": methodology_comparisons,
+                "papers_analyzed": len(papers),
+                "recommended_combinations": recommended_combinations,
+                # Legacy format for backward compatibility
                 "methodology_categories": methodologies,
                 "statistical_methods": statistical_methods,
                 "experimental_designs": experimental_designs,
@@ -718,13 +728,20 @@ class ResearchGapAgent:
             temporal_gaps = await self._identify_temporal_gaps(papers)
             cross_domain_gaps = await self._identify_cross_domain_opportunities(papers)
 
+            # Format gaps for UI components
+            formatted_gaps = self._format_gaps_for_ui(semantic_gaps, methodology_gaps, temporal_gaps, cross_domain_gaps)
+
             return {
+                "identified_gaps": formatted_gaps,
+                "papers_analyzed": len(papers),
+                "research_domains": self._extract_research_domains(papers),
+                "gap_summary": self._generate_gap_summary(semantic_gaps, methodology_gaps, temporal_gaps),
+                "research_opportunities": self._generate_research_opportunities(semantic_gaps, methodology_gaps, temporal_gaps),
+                # Legacy format for backward compatibility
                 "semantic_gaps": semantic_gaps,
                 "methodology_gaps": methodology_gaps,
                 "temporal_gaps": temporal_gaps,
-                "cross_domain_opportunities": cross_domain_gaps,
-                "gap_summary": self._generate_gap_summary(semantic_gaps, methodology_gaps, temporal_gaps),
-                "research_opportunities": self._generate_research_opportunities(semantic_gaps, methodology_gaps, temporal_gaps)
+                "cross_domain_opportunities": cross_domain_gaps
             }
 
         except Exception as e:
@@ -1027,55 +1044,64 @@ class ThesisStructureAgent:
         return papers
 
     async def _generate_thesis_chapters(self, papers: List[Dict[str, Any]], research_objective: str, analysis_results: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Generate thesis chapter structure"""
+        """Generate dynamic thesis chapter structure based on actual research content"""
+
+        # Extract key themes and topics from papers
+        research_themes = self._extract_research_themes(papers)
+        methodology_types = self._extract_methodology_types(papers)
+        key_findings_themes = self._extract_key_findings(papers)
+
+        # Calculate realistic word estimates based on content
+        total_papers = len(papers)
+        complexity_factor = min(2.0, total_papers / 20)  # More papers = more complex thesis
+
         chapters = [
             {
                 "chapter_number": 1,
                 "title": "Introduction",
-                "sections": [
-                    "Background and Context",
-                    "Problem Statement",
-                    "Research Questions and Objectives",
-                    "Significance of the Study",
-                    "Thesis Structure Overview"
-                ],
-                "estimated_pages": 15,
+                "sections": self._generate_introduction_sections(research_objective, research_themes),
+                "estimated_pages": max(12, int(15 * complexity_factor)),
+                "estimated_words": max(3000, int(3750 * complexity_factor)),
+                "completion_status": "not_started",
                 "key_content": {
                     "research_objective": research_objective,
-                    "context_papers": papers[:5]  # Key foundational papers
+                    "context_papers": papers[:5],
+                    "research_themes": research_themes[:3],
+                    "problem_statement": self._generate_problem_statement(research_themes, papers),
+                    "research_questions": self._generate_research_questions(research_objective, research_themes)
                 }
             },
             {
                 "chapter_number": 2,
                 "title": "Literature Review",
-                "sections": [
-                    "Theoretical Framework",
-                    "Previous Research and Findings",
-                    "Research Gaps and Opportunities",
-                    "Conceptual Model"
-                ],
-                "estimated_pages": 25,
+                "sections": self._generate_literature_sections(research_themes, papers),
+                "estimated_pages": max(20, int(25 * complexity_factor)),
+                "estimated_words": max(5000, int(6250 * complexity_factor)),
+                "completion_status": "not_started",
                 "key_content": {
                     "theoretical_frameworks": analysis_results.get("agent_results", {}).get("literature_review", {}).get("theoretical_frameworks", []),
                     "literature_clusters": analysis_results.get("agent_results", {}).get("literature_review", {}).get("thematic_clusters", []),
-                    "research_gaps": analysis_results.get("agent_results", {}).get("research_gap", {}).get("semantic_gaps", [])
+                    "research_gaps": analysis_results.get("agent_results", {}).get("research_gap", {}).get("semantic_gaps", []),
+                    "key_authors": self._extract_key_authors(papers),
+                    "seminal_papers": self._identify_seminal_papers(papers),
+                    "research_evolution": self._analyze_research_evolution(papers),
+                    "thematic_synthesis": research_themes
                 }
             },
             {
                 "chapter_number": 3,
                 "title": "Research Methodology",
-                "sections": [
-                    "Research Philosophy and Approach",
-                    "Research Design",
-                    "Data Collection Methods",
-                    "Data Analysis Techniques",
-                    "Ethical Considerations",
-                    "Limitations"
-                ],
-                "estimated_pages": 20,
+                "sections": self._generate_methodology_sections(methodology_types),
+                "estimated_pages": max(18, int(20 * complexity_factor)),
+                "estimated_words": max(4500, int(5000 * complexity_factor)),
+                "completion_status": "not_started",
                 "key_content": {
                     "methodology_synthesis": analysis_results.get("agent_results", {}).get("methodology_synthesis", {}),
-                    "recommended_methods": []
+                    "recommended_methods": self._recommend_methodologies(methodology_types, research_themes),
+                    "methodology_types": methodology_types,
+                    "statistical_approaches": self._extract_statistical_methods(papers),
+                    "data_collection_strategies": self._analyze_data_collection(papers),
+                    "validation_approaches": self._identify_validation_methods(papers)
                 }
             },
             {
@@ -1126,6 +1152,626 @@ class ThesisStructureAgent:
         ]
 
         return chapters
+
+    def _extract_research_themes(self, papers: List[Dict[str, Any]]) -> List[str]:
+        """Extract key research themes from papers"""
+        themes = set()
+        for paper in papers:
+            title = paper.get('title', '').lower()
+            abstract = paper.get('abstract', '').lower()
+
+            # Extract key terms (simple keyword extraction)
+            text = f"{title} {abstract}"
+            words = text.split()
+
+            # Common research themes in medical/scientific literature
+            theme_keywords = {
+                'diabetes': ['diabetes', 'diabetic', 'glucose', 'insulin', 'glycemic'],
+                'cardiovascular': ['cardiovascular', 'cardiac', 'heart', 'coronary', 'vascular'],
+                'inflammation': ['inflammation', 'inflammatory', 'cytokine', 'immune'],
+                'metabolism': ['metabolism', 'metabolic', 'metabolite', 'energy'],
+                'pharmacology': ['drug', 'medication', 'pharmaceutical', 'therapy', 'treatment'],
+                'epidemiology': ['population', 'cohort', 'epidemiological', 'prevalence', 'incidence'],
+                'clinical_trial': ['trial', 'randomized', 'controlled', 'clinical', 'intervention'],
+                'biomarker': ['biomarker', 'marker', 'indicator', 'predictor'],
+                'genetics': ['genetic', 'gene', 'genomic', 'mutation', 'polymorphism'],
+                'prevention': ['prevention', 'preventive', 'prophylaxis', 'screening']
+            }
+
+            for theme, keywords in theme_keywords.items():
+                if any(keyword in text for keyword in keywords):
+                    themes.add(theme.replace('_', ' ').title())
+
+        return list(themes)[:8]  # Return top 8 themes
+
+    def _extract_methodology_types(self, papers: List[Dict[str, Any]]) -> List[str]:
+        """Extract methodology types from papers"""
+        methodologies = set()
+        for paper in papers:
+            title = paper.get('title', '').lower()
+            abstract = paper.get('abstract', '').lower()
+
+            text = f"{title} {abstract}"
+
+            # Common methodology indicators
+            method_keywords = {
+                'systematic_review': ['systematic review', 'meta-analysis', 'literature review'],
+                'randomized_trial': ['randomized', 'rct', 'controlled trial', 'clinical trial'],
+                'cohort_study': ['cohort', 'longitudinal', 'prospective', 'follow-up'],
+                'case_control': ['case-control', 'case control', 'retrospective'],
+                'cross_sectional': ['cross-sectional', 'cross sectional', 'survey'],
+                'experimental': ['experimental', 'laboratory', 'in vitro', 'in vivo'],
+                'observational': ['observational', 'descriptive', 'correlational'],
+                'qualitative': ['qualitative', 'interview', 'focus group', 'thematic'],
+                'mixed_methods': ['mixed methods', 'mixed-methods', 'triangulation']
+            }
+
+            for method, keywords in method_keywords.items():
+                if any(keyword in text for keyword in keywords):
+                    methodologies.add(method.replace('_', ' ').title())
+
+        return list(methodologies)[:6]  # Return top 6 methodologies
+
+    def _extract_key_findings(self, papers: List[Dict[str, Any]]) -> List[str]:
+        """Extract key findings themes from papers"""
+        findings = []
+        for paper in papers[:10]:  # Analyze top 10 papers
+            abstract = paper.get('abstract', '')
+            if abstract:
+                # Simple extraction of conclusion-like sentences
+                sentences = abstract.split('.')
+                for sentence in sentences:
+                    if any(word in sentence.lower() for word in ['found', 'showed', 'demonstrated', 'concluded', 'results']):
+                        findings.append(sentence.strip())
+        return findings[:5]  # Return top 5 findings
+
+    def _generate_introduction_sections(self, research_objective: str, themes: List[str]) -> List[str]:
+        """Generate dynamic introduction sections based on research themes"""
+        base_sections = [
+            "Background and Context",
+            "Problem Statement",
+            "Research Questions and Objectives",
+            "Significance of the Study",
+            "Thesis Structure Overview"
+        ]
+
+        # Add theme-specific sections
+        if 'Diabetes' in themes:
+            base_sections.insert(1, "Diabetes Mellitus: Current Understanding")
+        if 'Cardiovascular' in themes:
+            base_sections.insert(-2, "Cardiovascular Health Implications")
+        if 'Clinical Trial' in themes:
+            base_sections.insert(-2, "Clinical Evidence Framework")
+
+        return base_sections
+
+    def _generate_literature_sections(self, themes: List[str], papers: List[Dict[str, Any]]) -> List[str]:
+        """Generate dynamic literature review sections"""
+        sections = ["Theoretical Framework"]
+
+        # Add theme-specific sections
+        for theme in themes[:4]:  # Top 4 themes
+            sections.append(f"{theme}: Current Research")
+
+        sections.extend([
+            "Research Gaps and Opportunities",
+            "Conceptual Model Development",
+            "Summary and Synthesis"
+        ])
+
+        return sections
+
+    def _generate_methodology_sections(self, methodology_types: List[str]) -> List[str]:
+        """Generate methodology sections based on identified methods"""
+        sections = [
+            "Research Philosophy and Approach",
+            "Research Design Overview"
+        ]
+
+        # Add method-specific sections
+        if 'Systematic Review' in methodology_types:
+            sections.append("Systematic Review Protocol")
+        if 'Randomized Trial' in methodology_types:
+            sections.append("Clinical Trial Design")
+        if 'Cohort Study' in methodology_types:
+            sections.append("Longitudinal Study Framework")
+
+        sections.extend([
+            "Data Collection Methods",
+            "Data Analysis Techniques",
+            "Ethical Considerations",
+            "Study Limitations"
+        ])
+
+        return sections
+
+    def _generate_problem_statement(self, themes: List[str], papers: List[Dict[str, Any]]) -> str:
+        """Generate a problem statement based on research themes"""
+        if not themes:
+            return "The research problem will be defined based on literature analysis."
+
+        primary_theme = themes[0] if themes else "healthcare"
+        return f"Despite significant advances in {primary_theme.lower()} research, critical gaps remain in understanding the complex relationships between multiple factors affecting patient outcomes."
+
+    def _generate_research_questions(self, objective: str, themes: List[str]) -> List[str]:
+        """Generate research questions based on objective and themes"""
+        questions = []
+        if themes:
+            questions.append(f"What are the key factors influencing {themes[0].lower()} outcomes?")
+            if len(themes) > 1:
+                questions.append(f"How do {themes[0].lower()} and {themes[1].lower()} interact?")
+        questions.append("What are the implications for clinical practice?")
+        return questions
+
+    def _extract_key_authors(self, papers: List[Dict[str, Any]]) -> List[str]:
+        """Extract key authors from papers"""
+        author_counts = {}
+        for paper in papers:
+            authors = paper.get('authors', [])
+            for author in authors[:3]:  # First 3 authors are usually most important
+                if isinstance(author, str):
+                    author_counts[author] = author_counts.get(author, 0) + 1
+
+        # Return top 10 authors by frequency
+        return sorted(author_counts.keys(), key=lambda x: author_counts[x], reverse=True)[:10]
+
+    def _identify_seminal_papers(self, papers: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Identify seminal papers (simplified heuristic)"""
+        # Sort by year (older papers) and return top 5
+        sorted_papers = sorted(papers, key=lambda x: x.get('year', 2024))
+        return sorted_papers[:5]
+
+    def _analyze_research_evolution(self, papers: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Analyze how research has evolved over time"""
+        years = [paper.get('year', 2024) for paper in papers if paper.get('year')]
+        if not years:
+            return {"trend": "insufficient_data"}
+
+        return {
+            "earliest_year": min(years),
+            "latest_year": max(years),
+            "span_years": max(years) - min(years),
+            "trend": "increasing" if len([y for y in years if y > 2020]) > len(years) / 2 else "established"
+        }
+
+    def _recommend_methodologies(self, methodology_types: List[str], themes: List[str]) -> List[str]:
+        """Recommend methodologies based on identified types and themes"""
+        recommendations = []
+
+        if 'Systematic Review' in methodology_types:
+            recommendations.append("Conduct systematic review and meta-analysis")
+        if 'Randomized Trial' in methodology_types:
+            recommendations.append("Design randomized controlled trial")
+        if 'Cohort Study' in methodology_types:
+            recommendations.append("Implement longitudinal cohort study")
+
+        # Theme-based recommendations
+        if 'Diabetes' in themes:
+            recommendations.append("Include HbA1c and glucose monitoring")
+        if 'Cardiovascular' in themes:
+            recommendations.append("Incorporate cardiac biomarkers")
+
+        return recommendations[:5]
+
+    def _extract_statistical_methods(self, papers: List[Dict[str, Any]]) -> List[str]:
+        """Extract statistical methods mentioned in papers"""
+        methods = set()
+        statistical_terms = [
+            'regression', 'anova', 'chi-square', 't-test', 'correlation',
+            'logistic regression', 'linear regression', 'survival analysis',
+            'meta-analysis', 'bayesian', 'machine learning', 'neural network'
+        ]
+
+        for paper in papers:
+            text = f"{paper.get('title', '')} {paper.get('abstract', '')}".lower()
+            for term in statistical_terms:
+                if term in text:
+                    methods.add(term.title())
+
+        return list(methods)[:8]
+
+    def _analyze_data_collection(self, papers: List[Dict[str, Any]]) -> List[str]:
+        """Analyze data collection strategies from papers"""
+        strategies = set()
+        collection_terms = [
+            'survey', 'questionnaire', 'interview', 'blood sample',
+            'medical records', 'database', 'registry', 'biobank',
+            'clinical assessment', 'laboratory test'
+        ]
+
+        for paper in papers:
+            text = f"{paper.get('title', '')} {paper.get('abstract', '')}".lower()
+            for term in collection_terms:
+                if term in text:
+                    strategies.add(term.title())
+
+        return list(strategies)[:6]
+
+    def _identify_validation_methods(self, papers: List[Dict[str, Any]]) -> List[str]:
+        """Identify validation approaches from papers"""
+        validations = set()
+        validation_terms = [
+            'cross-validation', 'bootstrap', 'sensitivity analysis',
+            'external validation', 'internal validation', 'replication'
+        ]
+
+        for paper in papers:
+            text = f"{paper.get('title', '')} {paper.get('abstract', '')}".lower()
+            for term in validation_terms:
+                if term in text:
+                    validations.add(term.title())
+
+        return list(validations)[:4]
+
+    def _format_gaps_for_ui(self, semantic_gaps: List, methodology_gaps: List, temporal_gaps: List, cross_domain_gaps: List) -> List[Dict[str, Any]]:
+        """Format gaps for UI component consumption"""
+        formatted_gaps = []
+        gap_id = 1
+
+        # Format semantic gaps
+        for gap in semantic_gaps[:3]:  # Top 3 semantic gaps
+            formatted_gaps.append({
+                "id": f"semantic_{gap_id}",
+                "title": f"Semantic Relevance Gap",
+                "description": f"Research area with limited connection to your objective (similarity: {gap.get('similarity_score', 0):.2f})",
+                "gap_type": "theoretical",
+                "severity": "medium" if gap.get('similarity_score', 0) < 0.2 else "low",
+                "research_opportunity": "Explore connections between this research area and your objective to identify novel insights",
+                "potential_impact": "Could reveal unexplored theoretical connections and broaden research scope",
+                "suggested_approaches": [
+                    "Conduct systematic review of connecting concepts",
+                    "Interview experts in both domains",
+                    "Develop conceptual framework linking areas"
+                ],
+                "timeline_estimate": "3-6 months",
+                "related_papers": [gap.get('paper', {}).get('title', 'Unknown paper')]
+            })
+            gap_id += 1
+
+        # Format methodology gaps
+        for gap in methodology_gaps[:2]:  # Top 2 methodology gaps
+            severity = "high" if gap.get('representation_percentage', 0) < 10 else "medium"
+            formatted_gaps.append({
+                "id": f"methodology_{gap_id}",
+                "title": f"Underrepresented Methodology: {gap.get('methodology', 'Unknown').title()}",
+                "description": f"Only {gap.get('current_count', 0)} out of {gap.get('total_papers', 0)} papers use {gap.get('methodology', 'this')} approaches",
+                "gap_type": "methodological",
+                "severity": severity,
+                "research_opportunity": f"Apply {gap.get('methodology', 'this')} methodology to your research domain for novel insights",
+                "potential_impact": "Could provide new perspectives and validate findings through methodological triangulation",
+                "suggested_approaches": [
+                    f"Design {gap.get('methodology', 'alternative')} study protocol",
+                    "Collaborate with experts in this methodology",
+                    "Pilot study to test feasibility"
+                ],
+                "timeline_estimate": "6-12 months",
+                "related_papers": []
+            })
+            gap_id += 1
+
+        # Format temporal gaps
+        for gap in temporal_gaps[:2]:  # Top 2 temporal gaps
+            if gap.get('gap_type') == 'recent_research_gap':
+                formatted_gaps.append({
+                    "id": f"temporal_{gap_id}",
+                    "title": f"Recent Research Gap ({gap.get('year', 'Unknown')})",
+                    "description": f"Limited recent research in {gap.get('year', 'recent years')} - only {gap.get('paper_count', 0)} papers found",
+                    "gap_type": "temporal",
+                    "severity": "medium",
+                    "research_opportunity": "Conduct up-to-date research to fill recent knowledge gaps",
+                    "potential_impact": "Ensure research reflects current state of knowledge and recent developments",
+                    "suggested_approaches": [
+                        "Systematic search for recent publications",
+                        "Contact researchers for unpublished work",
+                        "Conduct primary research to fill gap"
+                    ],
+                    "timeline_estimate": "2-4 months",
+                    "related_papers": []
+                })
+                gap_id += 1
+
+        # Format cross-domain opportunities
+        for gap in cross_domain_gaps[:1]:  # Top 1 cross-domain opportunity
+            formatted_gaps.append({
+                "id": f"cross_domain_{gap_id}",
+                "title": f"Cross-Domain Opportunity: {gap.get('domain', 'Unknown').title()}",
+                "description": gap.get('description', 'Cross-domain research opportunity identified'),
+                "gap_type": "geographical",  # Using geographical as proxy for cross-domain
+                "severity": "low",
+                "research_opportunity": "Explore interdisciplinary connections to broaden research impact",
+                "potential_impact": "Could lead to innovative solutions by combining insights from multiple domains",
+                "suggested_approaches": [
+                    "Literature review across domains",
+                    "Interdisciplinary collaboration",
+                    "Conceptual framework development"
+                ],
+                "timeline_estimate": "4-8 months",
+                "related_papers": []
+            })
+            gap_id += 1
+
+        return formatted_gaps
+
+    def _extract_research_domains(self, papers: List[Dict[str, Any]]) -> List[str]:
+        """Extract research domains from papers"""
+        domains = set()
+        domain_keywords = {
+            'Medicine': ['medical', 'clinical', 'patient', 'treatment', 'therapy'],
+            'Public Health': ['public health', 'epidemiology', 'population', 'prevention'],
+            'Pharmacology': ['drug', 'pharmaceutical', 'medication', 'pharmacokinetics'],
+            'Biochemistry': ['biochemical', 'molecular', 'protein', 'enzyme'],
+            'Genetics': ['genetic', 'genomic', 'gene', 'dna', 'mutation'],
+            'Nutrition': ['nutrition', 'dietary', 'food', 'nutrient'],
+            'Psychology': ['psychological', 'behavioral', 'mental health', 'cognitive'],
+            'Statistics': ['statistical', 'analysis', 'model', 'regression']
+        }
+
+        for paper in papers:
+            text = f"{paper.get('title', '')} {paper.get('abstract', '')}".lower()
+            for domain, keywords in domain_keywords.items():
+                if any(keyword in text for keyword in keywords):
+                    domains.add(domain)
+
+        return list(domains)[:6]  # Return top 6 domains
+
+    def _format_methodologies_for_ui(self, methodologies: List, statistical_methods: List, papers: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Format methodologies for UI component consumption"""
+        formatted_methodologies = []
+        method_id = 1
+
+        # Define methodology categories and their characteristics
+        methodology_info = {
+            'experimental': {
+                'category': 'experimental',
+                'advantages': [
+                    'Establishes causal relationships',
+                    'Controls for confounding variables',
+                    'High internal validity',
+                    'Reproducible results'
+                ],
+                'limitations': [
+                    'May lack external validity',
+                    'Ethical constraints in some contexts',
+                    'Resource intensive',
+                    'Artificial laboratory conditions'
+                ],
+                'typical_applications': ['Drug trials', 'Intervention studies', 'Laboratory experiments', 'A/B testing']
+            },
+            'observational': {
+                'category': 'observational',
+                'advantages': [
+                    'High external validity',
+                    'Studies natural conditions',
+                    'Cost-effective',
+                    'Large sample sizes possible'
+                ],
+                'limitations': [
+                    'Cannot establish causation',
+                    'Confounding variables',
+                    'Selection bias potential',
+                    'Limited control over variables'
+                ],
+                'typical_applications': ['Cohort studies', 'Case-control studies', 'Cross-sectional surveys', 'Registry studies']
+            },
+            'computational': {
+                'category': 'computational',
+                'advantages': [
+                    'Handles large datasets',
+                    'Identifies complex patterns',
+                    'Predictive capabilities',
+                    'Scalable analysis'
+                ],
+                'limitations': [
+                    'Black box algorithms',
+                    'Requires large datasets',
+                    'Overfitting risk',
+                    'Limited interpretability'
+                ],
+                'typical_applications': ['Machine learning', 'Data mining', 'Predictive modeling', 'Network analysis']
+            },
+            'theoretical': {
+                'category': 'theoretical',
+                'advantages': [
+                    'Conceptual framework development',
+                    'Synthesizes existing knowledge',
+                    'Guides future research',
+                    'Cost-effective'
+                ],
+                'limitations': [
+                    'Limited empirical validation',
+                    'May be too abstract',
+                    'Difficult to test',
+                    'Subjective interpretation'
+                ],
+                'typical_applications': ['Literature reviews', 'Meta-analyses', 'Conceptual models', 'Theory development']
+            },
+            'mixed_methods': {
+                'category': 'mixed_methods',
+                'advantages': [
+                    'Comprehensive understanding',
+                    'Triangulation of findings',
+                    'Addresses multiple research questions',
+                    'Balances strengths and weaknesses'
+                ],
+                'limitations': [
+                    'Complex design and analysis',
+                    'Resource intensive',
+                    'Requires multiple skill sets',
+                    'Integration challenges'
+                ],
+                'typical_applications': ['Health services research', 'Program evaluation', 'Social research', 'Implementation studies']
+            }
+        }
+
+        # Count methodology usage in papers
+        methodology_counts = {}
+        for paper in papers:
+            text = f"{paper.get('title', '')} {paper.get('abstract', '')}".lower()
+
+            # Check for methodology indicators
+            if any(word in text for word in ['experiment', 'trial', 'intervention', 'randomized']):
+                methodology_counts['experimental'] = methodology_counts.get('experimental', 0) + 1
+            if any(word in text for word in ['observational', 'cohort', 'cross-sectional', 'survey']):
+                methodology_counts['observational'] = methodology_counts.get('observational', 0) + 1
+            if any(word in text for word in ['machine learning', 'algorithm', 'computational', 'model']):
+                methodology_counts['computational'] = methodology_counts.get('computational', 0) + 1
+            if any(word in text for word in ['review', 'meta-analysis', 'theoretical', 'framework']):
+                methodology_counts['theoretical'] = methodology_counts.get('theoretical', 0) + 1
+            if any(word in text for word in ['mixed methods', 'qualitative', 'quantitative']):
+                methodology_counts['mixed_methods'] = methodology_counts.get('mixed_methods', 0) + 1
+
+        # Create formatted methodology objects
+        for method_name, count in methodology_counts.items():
+            if count > 0:  # Only include methodologies found in papers
+                info = methodology_info.get(method_name, methodology_info['theoretical'])
+
+                formatted_methodologies.append({
+                    "id": f"method_{method_id}",
+                    "name": method_name.replace('_', ' ').title(),
+                    "category": info['category'],
+                    "description": f"Research methodology identified in {count} papers from your collection",
+                    "frequency": count,
+                    "papers_using": [p.get('title', f'Paper {i+1}') for i, p in enumerate(papers) if self._paper_uses_methodology(p, method_name)][:5],
+                    "advantages": info['advantages'],
+                    "limitations": info['limitations'],
+                    "typical_applications": info['typical_applications'],
+                    "statistical_methods": [method for method in statistical_methods if method.lower() in method_name.lower()][:3],
+                    "data_requirements": self._get_data_requirements(method_name),
+                    "validation_approaches": self._get_validation_approaches(method_name)
+                })
+                method_id += 1
+
+        return formatted_methodologies
+
+    def _paper_uses_methodology(self, paper: Dict[str, Any], methodology: str) -> bool:
+        """Check if a paper uses a specific methodology"""
+        text = f"{paper.get('title', '')} {paper.get('abstract', '')}".lower()
+        method_keywords = {
+            'experimental': ['experiment', 'trial', 'intervention', 'randomized'],
+            'observational': ['observational', 'cohort', 'cross-sectional', 'survey'],
+            'computational': ['machine learning', 'algorithm', 'computational', 'model'],
+            'theoretical': ['review', 'meta-analysis', 'theoretical', 'framework'],
+            'mixed_methods': ['mixed methods', 'qualitative', 'quantitative']
+        }
+
+        keywords = method_keywords.get(methodology, [])
+        return any(keyword in text for keyword in keywords)
+
+    def _get_data_requirements(self, methodology: str) -> List[str]:
+        """Get data requirements for a methodology"""
+        requirements = {
+            'experimental': ['Control group', 'Randomization', 'Outcome measures', 'Baseline data'],
+            'observational': ['Large sample size', 'Longitudinal data', 'Exposure variables', 'Confounders'],
+            'computational': ['Large datasets', 'Feature variables', 'Training data', 'Validation set'],
+            'theoretical': ['Literature corpus', 'Conceptual frameworks', 'Expert knowledge', 'Historical data'],
+            'mixed_methods': ['Quantitative data', 'Qualitative data', 'Integration plan', 'Multiple sources']
+        }
+        return requirements.get(methodology, ['Standard research data'])
+
+    def _get_validation_approaches(self, methodology: str) -> List[str]:
+        """Get validation approaches for a methodology"""
+        validations = {
+            'experimental': ['Replication', 'Peer review', 'Statistical significance', 'Effect size'],
+            'observational': ['External validation', 'Sensitivity analysis', 'Subgroup analysis', 'Bias assessment'],
+            'computational': ['Cross-validation', 'Hold-out testing', 'Bootstrap', 'Performance metrics'],
+            'theoretical': ['Expert review', 'Logical consistency', 'Empirical support', 'Peer evaluation'],
+            'mixed_methods': ['Triangulation', 'Member checking', 'Convergent validity', 'Integration assessment']
+        }
+        return validations.get(methodology, ['Standard validation'])
+
+    def _generate_methodology_comparisons(self, methodologies: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Generate methodology comparisons"""
+        comparisons = []
+
+        for i, method_a in enumerate(methodologies):
+            for method_b in methodologies[i+1:]:
+                # Calculate similarity based on category and applications
+                similarity_score = self._calculate_methodology_similarity(method_a, method_b)
+
+                comparisons.append({
+                    "methodology_a": method_a['name'],
+                    "methodology_b": method_b['name'],
+                    "similarity_score": similarity_score,
+                    "complementary_aspects": self._find_complementary_aspects(method_a, method_b),
+                    "conflicting_aspects": self._find_conflicting_aspects(method_a, method_b)
+                })
+
+        return comparisons[:5]  # Return top 5 comparisons
+
+    def _calculate_methodology_similarity(self, method_a: Dict[str, Any], method_b: Dict[str, Any]) -> float:
+        """Calculate similarity between two methodologies"""
+        # Simple similarity based on shared applications and category
+        apps_a = set(method_a.get('typical_applications', []))
+        apps_b = set(method_b.get('typical_applications', []))
+
+        if not apps_a or not apps_b:
+            return 0.0
+
+        intersection = len(apps_a.intersection(apps_b))
+        union = len(apps_a.union(apps_b))
+
+        jaccard_similarity = intersection / union if union > 0 else 0.0
+
+        # Boost similarity if same category
+        if method_a.get('category') == method_b.get('category'):
+            jaccard_similarity += 0.2
+
+        return min(1.0, jaccard_similarity)
+
+    def _find_complementary_aspects(self, method_a: Dict[str, Any], method_b: Dict[str, Any]) -> List[str]:
+        """Find complementary aspects between methodologies"""
+        complementary = []
+
+        # Check if one addresses the other's limitations
+        limitations_a = set(adv.lower() for adv in method_a.get('limitations', []))
+        advantages_b = set(adv.lower() for adv in method_b.get('advantages', []))
+
+        if 'external validity' in advantages_b and 'may lack external validity' in limitations_a:
+            complementary.append("Method B provides external validity that Method A lacks")
+
+        if 'causal relationships' in advantages_b and 'cannot establish causation' in limitations_a:
+            complementary.append("Method B establishes causation while Method A provides correlation")
+
+        if not complementary:
+            complementary.append("Both methods can provide different perspectives on the research question")
+
+        return complementary[:3]
+
+    def _find_conflicting_aspects(self, method_a: Dict[str, Any], method_b: Dict[str, Any]) -> List[str]:
+        """Find conflicting aspects between methodologies"""
+        conflicts = []
+
+        # Check for conflicting data requirements or approaches
+        if method_a.get('category') == 'experimental' and method_b.get('category') == 'observational':
+            conflicts.append("Different levels of control over variables")
+
+        if 'Large datasets' in method_a.get('data_requirements', []) and 'Small sample' in method_b.get('data_requirements', []):
+            conflicts.append("Different sample size requirements")
+
+        if not conflicts:
+            conflicts.append("No major conflicts identified")
+
+        return conflicts[:2]
+
+    def _generate_recommended_combinations(self, methodologies: List[Dict[str, Any]]) -> List[str]:
+        """Generate recommended methodology combinations"""
+        combinations = []
+
+        method_names = [m['name'] for m in methodologies]
+
+        if 'Experimental' in method_names and 'Observational' in method_names:
+            combinations.append("Combine experimental and observational approaches for comprehensive evidence")
+
+        if 'Theoretical' in method_names and any('Experimental' in name or 'Observational' in name for name in method_names):
+            combinations.append("Use theoretical framework to guide empirical research design")
+
+        if 'Computational' in method_names:
+            combinations.append("Apply computational methods to analyze large-scale patterns in your data")
+
+        if len(methodologies) >= 3:
+            combinations.append("Consider mixed-methods approach to leverage multiple methodology strengths")
+
+        return combinations[:4]
 
     async def _create_chapter_outlines(self, chapters: List[Dict[str, Any]], analysis_results: Dict[str, Any]) -> Dict[str, Any]:
         """Create detailed outlines for each chapter"""
