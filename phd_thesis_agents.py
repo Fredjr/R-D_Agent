@@ -23,6 +23,20 @@ from langchain.tools import Tool
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 
+# Set up logger first - before any imports that might fail
+logger = logging.getLogger(__name__)
+
+# Import existing orchestrator
+try:
+    from project_summary_agents import ProjectSummaryOrchestrator
+    logger.info("✅ ProjectSummaryOrchestrator imported successfully")
+except ImportError as e:
+    logger.error(f"❌ Failed to import ProjectSummaryOrchestrator: {e}")
+    # Create a dummy class to prevent further errors
+    class ProjectSummaryOrchestrator:
+        def __init__(self, llm):
+            self.llm = llm
+
 # HuggingFace imports with model caching
 try:
     import os
@@ -44,12 +58,7 @@ try:
 except ImportError as e:
     HUGGINGFACE_AVAILABLE = False
     MODELS_CACHE_DIR = None
-    logging.warning(f"HuggingFace dependencies not available: {e}. Using fallback implementations.")
-
-# Import existing orchestrator
-from project_summary_agents import ProjectSummaryOrchestrator
-
-logger = logging.getLogger(__name__)
+    logger.warning(f"HuggingFace dependencies not available: {e}. Using fallback implementations.")
 
 # =============================================================================
 # MODEL INITIALIZATION AND CACHING
