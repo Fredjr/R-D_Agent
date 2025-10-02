@@ -25,16 +25,19 @@ interface ResearchGap {
 }
 
 interface LiteratureGapAnalysisProps {
-  gaps: ResearchGap[];
+  gaps?: ResearchGap[] | any[]; // More flexible - accept any array structure
   totalPapersAnalyzed?: number;
   analysisDate?: string;
   researchDomains?: string[];
-  onGapClick?: (gap: ResearchGap) => void;
-  onExploreOpportunity?: (gap: ResearchGap) => void;
+  onGapClick?: (gap: ResearchGap | any) => void;
+  onExploreOpportunity?: (gap: ResearchGap | any) => void;
   className?: string;
   loading?: boolean;
   error?: string;
   onRetry?: () => void;
+  // Additional flexible props for different API response structures
+  rawData?: any; // Accept raw API response data
+  gapAnalysisData?: any; // Accept nested gap analysis data
 }
 
 export default function LiteratureGapAnalysis({
@@ -47,10 +50,93 @@ export default function LiteratureGapAnalysis({
   className = '',
   loading = false,
   error,
-  onRetry
+  onRetry,
+  rawData,
+  gapAnalysisData
 }: LiteratureGapAnalysisProps) {
   const [expandedGaps, setExpandedGaps] = useState<Set<string>>(new Set());
   const [selectedGapType, setSelectedGapType] = useState<string>('all');
+
+  // Flexible data processing - handle different API response structures
+  const processGapsData = () => {
+    console.log('🔍 [Gap Analysis] Processing data:', {
+      gaps: gaps,
+      gapAnalysisData: gapAnalysisData,
+      rawData: rawData?.agent_results?.gap_analysis
+    });
+
+    // Try multiple data sources in order of preference
+    let processedGaps: any[] = [];
+    let processedPapersAnalyzed = totalPapersAnalyzed;
+    let processedDomains = researchDomains;
+
+    // 1. Direct gaps prop
+    if (gaps && Array.isArray(gaps) && gaps.length > 0) {
+      processedGaps = gaps;
+    }
+    // 2. From gapAnalysisData prop
+    else if (gapAnalysisData) {
+      processedGaps = gapAnalysisData.identified_gaps || gapAnalysisData.gaps || [];
+      processedPapersAnalyzed = gapAnalysisData.papers_analyzed || processedPapersAnalyzed;
+      processedDomains = gapAnalysisData.research_domains || processedDomains;
+    }
+    // 3. From rawData prop
+    else if (rawData) {
+      // Try different nested structures
+      const gapData = rawData.agent_results?.gap_analysis ||
+                     rawData.phd_outputs?.gap_analysis ||
+                     rawData.gap_analysis ||
+                     rawData;
+
+      processedGaps = gapData.identified_gaps ||
+                     gapData.gaps ||
+                     gapData.semantic_gaps ||
+                     gapData.methodology_gaps ||
+                     gapData.temporal_gaps ||
+                     [];
+
+      processedPapersAnalyzed = gapData.papers_analyzed || processedPapersAnalyzed;
+      processedDomains = gapData.research_domains || processedDomains;
+    }
+
+    // Normalize gap objects to ensure consistent structure
+    processedGaps = processedGaps.map((gap: any, index: number) => {
+      if (typeof gap === 'string') {
+        // Convert string gaps to objects
+        return {
+          id: `gap_${index}`,
+          title: gap,
+          description: gap,
+          gap_type: 'general',
+          severity: 'medium',
+          research_opportunity: `Explore: ${gap}`,
+          potential_impact: 'Moderate research impact'
+        };
+      }
+
+      // Ensure required fields exist
+      return {
+        id: gap.id || `gap_${index}`,
+        title: gap.title || gap.name || gap.gap || `Research Gap ${index + 1}`,
+        description: gap.description || gap.summary || gap.details || gap.title || 'No description available',
+        gap_type: gap.gap_type || gap.type || gap.category || 'general',
+        severity: gap.severity || gap.priority || gap.importance || 'medium',
+        research_opportunity: gap.research_opportunity || gap.opportunity || gap.suggestion || 'Research opportunity identified',
+        potential_impact: gap.potential_impact || gap.impact || gap.significance || 'Potential research impact',
+        related_papers: gap.related_papers || gap.papers || [],
+        suggested_approaches: gap.suggested_approaches || gap.approaches || gap.methods || [],
+        timeline_estimate: gap.timeline_estimate || gap.timeline || gap.duration
+      };
+    });
+
+    return {
+      gaps: processedGaps,
+      papersAnalyzed: processedPapersAnalyzed,
+      domains: processedDomains || []
+    };
+  };
+
+  const { gaps: processedGaps, papersAnalyzed, domains } = processGapsData();
 
   const toggleGap = (gapId: string) => {
     const newExpanded = new Set(expandedGaps);
@@ -95,12 +181,12 @@ export default function LiteratureGapAnalysis({
     }
   };
 
-  const filteredGaps = selectedGapType === 'all' 
-    ? gaps 
-    : gaps.filter(gap => gap.gap_type === selectedGapType);
+  const filteredGaps = selectedGapType === 'all'
+    ? processedGaps
+    : processedGaps.filter(gap => gap.gap_type === selectedGapType);
 
-  const gapTypes = ['all', ...Array.from(new Set(gaps.map(gap => gap.gap_type)))];
-  const gapCounts = gaps.reduce((acc, gap) => {
+  const gapTypes = ['all', ...Array.from(new Set(processedGaps.map(gap => gap.gap_type)))];
+  const gapCounts = processedGaps.reduce((acc, gap) => {
     acc[gap.severity] = (acc[gap.severity] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
@@ -198,7 +284,7 @@ export default function LiteratureGapAnalysis({
       {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
         <div className="text-center">
-          <div className="text-2xl font-bold text-gray-900">{gaps.length}</div>
+          <div className="text-2xl font-bold text-gray-900">{processedGaps.length}</div>
           <div className="text-sm text-gray-600">Total Gaps</div>
         </div>
         <div className="text-center">
@@ -210,17 +296,17 @@ export default function LiteratureGapAnalysis({
           <div className="text-sm text-gray-600">High Priority</div>
         </div>
         <div className="text-center">
-          <div className="text-2xl font-bold text-gray-900">{totalPapersAnalyzed}</div>
+          <div className="text-2xl font-bold text-gray-900">{papersAnalyzed}</div>
           <div className="text-sm text-gray-600">Papers Analyzed</div>
         </div>
       </div>
 
       {/* Research Domains */}
-      {researchDomains.length > 0 && (
+      {domains.length > 0 && (
         <div className="mb-6">
           <h4 className={combineClasses(phdTypography.sectionHeader, 'mb-2')}>Research Domains</h4>
           <div className="flex flex-wrap gap-2">
-            {researchDomains.map((domain, idx) => (
+            {domains.map((domain: any, idx: number) => (
               <span key={idx} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
                 {domain}
               </span>
@@ -232,7 +318,7 @@ export default function LiteratureGapAnalysis({
       {/* Filter Tabs */}
       <div className="mb-6">
         <div className="flex flex-wrap gap-2">
-          {gapTypes.map((type) => (
+          {gapTypes.map((type: any) => (
             <button
               key={type}
               onClick={() => setSelectedGapType(type)}
@@ -246,7 +332,7 @@ export default function LiteratureGapAnalysis({
               {type === 'all' ? 'All Gaps' : type.charAt(0).toUpperCase() + type.slice(1)}
               {type !== 'all' && (
                 <span className="ml-1 text-xs">
-                  ({gaps.filter(g => g.gap_type === type).length})
+                  ({processedGaps.filter(g => g.gap_type === type).length})
                 </span>
               )}
             </button>
@@ -256,7 +342,7 @@ export default function LiteratureGapAnalysis({
 
       {/* Gap List */}
       <div className="space-y-3">
-        {filteredGaps.map((gap) => {
+        {filteredGaps.map((gap: any) => {
           const isExpanded = expandedGaps.has(gap.id);
           
           return (
@@ -329,7 +415,7 @@ export default function LiteratureGapAnalysis({
                       <div>
                         <h5 className={combineClasses(phdTypography.body, 'font-semibold mb-2')}>Suggested Approaches</h5>
                         <ul className="space-y-1">
-                          {gap.suggested_approaches.map((approach, idx) => (
+                          {gap.suggested_approaches.map((approach: any, idx: number) => (
                             <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
                               <span className="w-1.5 h-1.5 bg-amber-400 rounded-full mt-2"></span>
                               {approach}
@@ -386,11 +472,27 @@ export default function LiteratureGapAnalysis({
       </div>
 
       {/* Empty State */}
-      {gaps.length === 0 && (
+      {filteredGaps.length === 0 && !loading && (
         <div className="text-center py-8">
           <MagnifyingGlassIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">No literature gaps identified yet</p>
-          <p className="text-gray-500 text-sm mt-1">Run the Gap Analysis to discover research opportunities</p>
+          <p className="text-gray-600">
+            {processedGaps.length === 0
+              ? "No literature gaps identified yet"
+              : `No ${selectedGapType} gaps found`}
+          </p>
+          <p className="text-gray-500 text-sm mt-1">
+            {processedGaps.length === 0
+              ? "Run the Gap Analysis to discover research opportunities"
+              : "Try selecting a different gap type"}
+          </p>
+          {processedGaps.length === 0 && onRetry && (
+            <button
+              onClick={onRetry}
+              className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              Run Gap Analysis
+            </button>
+          )}
         </div>
       )}
     </div>

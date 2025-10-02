@@ -67,10 +67,17 @@ export function SpotifyQuickActions({ actions, className }: SpotifyQuickActionsP
                       style={{ color: action.color }}
                     />
                   </div>
-                  <div>
-                    <p className="text-[var(--spotify-white)] font-medium text-sm">
-                      {action.loading ? 'Loading...' : action.label}
-                    </p>
+                  <div className="relative">
+                    <div className="flex items-center justify-center space-x-1">
+                      <p className="text-[var(--spotify-white)] font-medium text-sm">
+                        {action.loading ? 'Loading...' : action.label}
+                      </p>
+                      {action.badge && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                          {action.badge}
+                        </span>
+                      )}
+                    </div>
                     {action.description && (
                       <p className="text-[var(--spotify-light-text)] text-xs mt-1 line-clamp-2">
                         {action.description}
@@ -111,9 +118,16 @@ export function SpotifyQuickActions({ actions, className }: SpotifyQuickActionsP
                     />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[var(--spotify-white)] font-medium text-sm mb-1">
-                      {action.loading ? 'Loading...' : action.label}
-                    </p>
+                    <div className="flex items-center space-x-2 mb-1">
+                      <p className="text-[var(--spotify-white)] font-medium text-sm">
+                        {action.loading ? 'Loading...' : action.label}
+                      </p>
+                      {action.badge && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                          {action.badge}
+                        </span>
+                      )}
+                    </div>
                     {action.description && (
                       <p className="text-[var(--spotify-light-text)] text-xs line-clamp-2">
                         {action.description}

@@ -36,16 +36,19 @@ interface MethodologyComparison {
 }
 
 interface MethodologySynthesisProps {
-  methodologies: Methodology[];
-  comparisons?: MethodologyComparison[];
+  methodologies?: Methodology[] | any[]; // More flexible - accept any array structure
+  comparisons?: MethodologyComparison[] | any[];
   totalPapersAnalyzed?: number;
   recommendedCombinations?: string[];
-  onMethodologyClick?: (methodology: Methodology) => void;
+  onMethodologyClick?: (methodology: Methodology | any) => void;
   onCompareMethodologies?: (methodA: string, methodB: string) => void;
   className?: string;
   loading?: boolean;
   error?: string;
   onRetry?: () => void;
+  // Additional flexible props for different API response structures
+  rawData?: any; // Accept raw API response data
+  methodologyData?: any; // Accept nested methodology data
 }
 
 export default function MethodologySynthesis({
@@ -58,11 +61,101 @@ export default function MethodologySynthesis({
   className = '',
   loading = false,
   error,
-  onRetry
+  onRetry,
+  rawData,
+  methodologyData
 }: MethodologySynthesisProps) {
   const [expandedMethods, setExpandedMethods] = useState<Set<string>>(new Set());
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'list' | 'comparison'>('list');
+
+  // Flexible data processing - handle different API response structures
+  const processMethodologyData = () => {
+    let processedMethodologies: any[] = [];
+    let processedComparisons = comparisons;
+    let processedPapersAnalyzed = totalPapersAnalyzed;
+    let processedRecommendations = recommendedCombinations;
+
+    // 1. Direct methodologies prop
+    if (methodologies && Array.isArray(methodologies) && methodologies.length > 0) {
+      processedMethodologies = methodologies;
+    }
+    // 2. From methodologyData prop
+    else if (methodologyData) {
+      processedMethodologies = methodologyData.methodologies || methodologyData.methods || [];
+      processedComparisons = methodologyData.comparisons || processedComparisons;
+      processedPapersAnalyzed = methodologyData.papers_analyzed || processedPapersAnalyzed;
+      processedRecommendations = methodologyData.recommended_combinations || processedRecommendations;
+    }
+    // 3. From rawData prop
+    else if (rawData) {
+      // Try different nested structures
+      const methodData = rawData.agent_results?.methodology_synthesis ||
+                        rawData.phd_outputs?.methodology_synthesis ||
+                        rawData.methodology_synthesis ||
+                        rawData;
+
+      processedMethodologies = methodData.methodologies ||
+                              methodData.methodology_categories ||
+                              methodData.methods ||
+                              methodData.extracted_methodologies ||
+                              [];
+
+      processedComparisons = methodData.comparisons || processedComparisons;
+      processedPapersAnalyzed = methodData.papers_analyzed || processedPapersAnalyzed;
+      processedRecommendations = methodData.recommended_combinations ||
+                                methodData.recommendations ||
+                                processedRecommendations;
+    }
+
+    // Normalize methodology objects to ensure consistent structure
+    processedMethodologies = processedMethodologies.map((method: any, index: number) => {
+      if (typeof method === 'string') {
+        // Convert string methodologies to objects
+        return {
+          id: `method_${index}`,
+          name: method,
+          category: 'mixed_methods',
+          description: method,
+          frequency: 1,
+          papers_using: [],
+          advantages: [`Uses ${method} approach`],
+          limitations: ['Limitations not specified'],
+          typical_applications: ['General research applications']
+        };
+      }
+
+      // Ensure required fields exist
+      return {
+        id: method.id || `method_${index}`,
+        name: method.name || method.methodology || method.method || `Methodology ${index + 1}`,
+        category: method.category || method.type || method.classification || 'mixed_methods',
+        description: method.description || method.summary || method.details || 'No description available',
+        frequency: method.frequency || method.count || method.usage || 1,
+        papers_using: method.papers_using || method.papers || method.references || [],
+        advantages: method.advantages || method.benefits || method.strengths || [],
+        limitations: method.limitations || method.weaknesses || method.drawbacks || [],
+        typical_applications: method.typical_applications || method.applications || method.uses || [],
+        statistical_methods: method.statistical_methods || method.statistics || [],
+        data_requirements: method.data_requirements || method.data_needs || [],
+        validation_approaches: method.validation_approaches || method.validation || []
+      };
+    });
+
+    return {
+      methodologies: processedMethodologies,
+      comparisons: processedComparisons,
+      papersAnalyzed: processedPapersAnalyzed,
+      recommendations: processedRecommendations
+    };
+  };
+
+  const {
+    methodologies: processedMethodologies,
+    comparisons: processedComparisons,
+    papersAnalyzed,
+    recommendations
+  } = processMethodologyData();
 
   const toggleMethod = (methodId: string) => {
     const newExpanded = new Set(expandedMethods);
@@ -95,12 +188,12 @@ export default function MethodologySynthesis({
     }
   };
 
-  const filteredMethodologies = selectedCategory === 'all' 
-    ? methodologies 
-    : methodologies.filter(method => method.category === selectedCategory);
+  const filteredMethodologies = selectedCategory === 'all'
+    ? processedMethodologies
+    : processedMethodologies.filter(method => method.category === selectedCategory);
 
-  const categories = ['all', ...Array.from(new Set(methodologies.map(method => method.category)))];
-  const categoryStats = methodologies.reduce((acc, method) => {
+  const categories = ['all', ...Array.from(new Set(processedMethodologies.map(method => method.category)))];
+  const categoryStats = processedMethodologies.reduce((acc, method) => {
     acc[method.category] = (acc[method.category] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
@@ -228,7 +321,7 @@ export default function MethodologySynthesis({
       {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
         <div className="text-center">
-          <div className="text-2xl font-bold text-gray-900">{methodologies.length}</div>
+          <div className="text-2xl font-bold text-gray-900">{processedMethodologies.length}</div>
           <div className="text-sm text-gray-600">Methodologies</div>
         </div>
         <div className="text-center">
@@ -240,20 +333,20 @@ export default function MethodologySynthesis({
           <div className="text-sm text-gray-600">Observational</div>
         </div>
         <div className="text-center">
-          <div className="text-2xl font-bold text-gray-900">{totalPapersAnalyzed}</div>
+          <div className="text-2xl font-bold text-gray-900">{papersAnalyzed}</div>
           <div className="text-sm text-gray-600">Papers Analyzed</div>
         </div>
       </div>
 
       {/* Recommended Combinations */}
-      {recommendedCombinations.length > 0 && (
+      {recommendations.length > 0 && (
         <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
           <h4 className={combineClasses(phdTypography.sectionHeader, 'mb-2 flex items-center gap-2')}>
             <CheckCircleIcon className="h-5 w-5 text-emerald-600" />
             Recommended Method Combinations
           </h4>
           <div className="space-y-2">
-            {recommendedCombinations.map((combination, idx) => (
+            {recommendations.map((combination: any, idx: number) => (
               <div key={idx} className="flex items-center gap-2 text-sm text-emerald-800">
                 <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
                 {combination}
@@ -268,7 +361,7 @@ export default function MethodologySynthesis({
           {/* Category Filter */}
           <div className="mb-6">
             <div className="flex flex-wrap gap-2">
-              {categories.map((category) => (
+              {categories.map((category: any) => (
                 <button
                   key={category}
                   onClick={() => setSelectedCategory(category)}
@@ -291,7 +384,7 @@ export default function MethodologySynthesis({
 
           {/* Methodology List */}
           <div className="space-y-3">
-            {filteredMethodologies.map((methodology) => {
+            {filteredMethodologies.map((methodology: any) => {
               const isExpanded = expandedMethods.has(methodology.id);
               
               return (
@@ -346,7 +439,7 @@ export default function MethodologySynthesis({
                               Advantages
                             </h5>
                             <ul className="space-y-1">
-                              {methodology.advantages.map((advantage, idx) => (
+                              {methodology.advantages.map((advantage: any, idx: number) => (
                                 <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
                                   <span className="w-1.5 h-1.5 bg-green-400 rounded-full mt-2"></span>
                                   {advantage}
@@ -361,7 +454,7 @@ export default function MethodologySynthesis({
                               Limitations
                             </h5>
                             <ul className="space-y-1">
-                              {methodology.limitations.map((limitation, idx) => (
+                              {methodology.limitations.map((limitation: any, idx: number) => (
                                 <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
                                   <span className="w-1.5 h-1.5 bg-orange-400 rounded-full mt-2"></span>
                                   {limitation}
@@ -376,7 +469,7 @@ export default function MethodologySynthesis({
                           <div>
                             <h5 className={combineClasses(phdTypography.body, 'font-semibold mb-2')}>Typical Applications</h5>
                             <div className="flex flex-wrap gap-1">
-                              {methodology.typical_applications.slice(0, 4).map((app, idx) => (
+                              {methodology.typical_applications.slice(0, 4).map((app: any, idx: number) => (
                                 <span key={idx} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">
                                   {app}
                                 </span>
@@ -393,7 +486,7 @@ export default function MethodologySynthesis({
                             <div>
                               <h5 className={combineClasses(phdTypography.body, 'font-semibold mb-2')}>Statistical Methods</h5>
                               <div className="flex flex-wrap gap-1">
-                                {methodology.statistical_methods.slice(0, 3).map((method, idx) => (
+                                {methodology.statistical_methods.slice(0, 3).map((method: any, idx: number) => (
                                   <span key={idx} className="px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded">
                                     {method}
                                   </span>
@@ -448,7 +541,7 @@ export default function MethodologySynthesis({
       )}
 
       {/* Empty State */}
-      {methodologies.length === 0 && (
+      {filteredMethodologies.length === 0 && !loading && (
         <div className="text-center py-8">
           <BeakerIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-600">No methodologies analyzed yet</p>

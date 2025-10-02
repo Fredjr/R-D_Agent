@@ -26,15 +26,18 @@ interface ThesisChapter {
 }
 
 interface ThesisChapterStructureProps {
-  chapters: ThesisChapter[];
+  chapters?: ThesisChapter[] | any[]; // More flexible - accept any array structure
   totalEstimatedWords?: number;
   completionPercentage?: number;
-  onChapterClick?: (chapter: ThesisChapter) => void;
-  onEditChapter?: (chapter: ThesisChapter) => void;
+  onChapterClick?: (chapter: ThesisChapter | any) => void;
+  onEditChapter?: (chapter: ThesisChapter | any) => void;
   className?: string;
   loading?: boolean;
   error?: string;
   onRetry?: () => void;
+  // Additional flexible props for different API response structures
+  rawData?: any; // Accept raw API response data
+  thesisData?: any; // Accept nested thesis data
 }
 
 export default function ThesisChapterStructure({
@@ -46,9 +49,98 @@ export default function ThesisChapterStructure({
   className = '',
   loading = false,
   error,
-  onRetry
+  onRetry,
+  rawData,
+  thesisData
 }: ThesisChapterStructureProps) {
   const [expandedChapters, setExpandedChapters] = useState<Set<number>>(new Set());
+
+  // Flexible data processing - handle different API response structures
+  const processThesisData = () => {
+    let processedChapters: any[] = [];
+    let processedWords = totalEstimatedWords;
+    let processedCompletion = completionPercentage;
+
+    // 1. Direct chapters prop
+    if (chapters && Array.isArray(chapters) && chapters.length > 0) {
+      processedChapters = chapters;
+    }
+    // 2. From thesisData prop
+    else if (thesisData) {
+      processedChapters = thesisData.chapters || thesisData.thesis_structure?.chapters || [];
+      processedWords = thesisData.total_estimated_words || processedWords;
+      processedCompletion = thesisData.completion_percentage || processedCompletion;
+    }
+    // 3. From rawData prop - CHECK AGENT_RESULTS FIRST (where the API actually puts it)
+    else if (rawData) {
+      // Try different nested structures - prioritize agent_results
+      const thesisStructure = rawData.agent_results?.thesis_structure ||  // API puts it here!
+                             rawData.phd_outputs?.thesis_structure ||
+                             rawData.thesis_structure ||
+                             rawData;
+
+      processedChapters = thesisStructure.thesis_chapters ||  // API uses this field name!
+                         thesisStructure.chapters ||
+                         [];
+
+      processedWords = thesisStructure.total_estimated_words ||
+                      thesisStructure.estimated_words ||
+                      processedWords;
+
+      processedCompletion = thesisStructure.completion_percentage ||
+                           thesisStructure.overall_progress ||
+                           processedCompletion;
+    }
+
+    // Normalize chapter objects to ensure consistent structure
+    processedChapters = processedChapters.map((chapter: any, index: number) => {
+      if (typeof chapter === 'string') {
+        // Convert string chapters to objects
+        return {
+          chapter_number: index + 1,
+          title: chapter,
+          sections: [],
+          estimated_pages: 10,
+          estimated_words: 2500,
+          completion_status: 'not_started'
+        };
+      }
+
+      // Ensure required fields exist with robust fallbacks
+      return {
+        chapter_number: chapter.chapter_number || chapter.chapter || index + 1,
+        title: chapter.title || chapter.chapter_title || chapter.name || `Chapter ${index + 1}`,
+        sections: chapter.sections || chapter.section_titles || [],
+        estimated_pages: chapter.estimated_pages || chapter.pages || 15,
+        estimated_words: chapter.estimated_words || chapter.words || (chapter.estimated_pages || 15) * 250, // Estimate 250 words per page
+        key_content: chapter.key_content || {
+          research_objective: chapter.research_objective || chapter.objective || 'Research objective to be defined',
+          context_papers: chapter.context_papers || chapter.papers || [],
+          methodologies: chapter.methodologies || chapter.methods || [],
+          key_findings: chapter.key_findings || chapter.findings || [],
+          // Extract additional content from key_content if it exists
+          ...(chapter.key_content || {})
+        },
+        completion_status: chapter.completion_status || chapter.status || 'not_started',
+        last_updated: chapter.last_updated || chapter.updated_at,
+        // Add description from key_content fields
+        description: chapter.description ||
+                    chapter.key_content?.research_objective ||
+                    chapter.key_content?.problem_statement ||
+                    chapter.key_content?.analysis_framework ||
+                    chapter.key_content?.research_contributions ||
+                    `Chapter ${index + 1}: ${chapter.title || 'Untitled Chapter'}`
+      };
+    });
+
+    return {
+      chapters: processedChapters,
+      totalWords: processedWords,
+      completion: processedCompletion
+    };
+  };
+
+  const { chapters: processedChapters, totalWords, completion } = processThesisData();
 
   const toggleChapter = (chapterNumber: number) => {
     const newExpanded = new Set(expandedChapters);
@@ -155,23 +247,23 @@ export default function ThesisChapterStructure({
       <div className="mb-6 p-4 bg-gray-50 rounded-lg">
         <div className="flex justify-between items-center mb-2">
           <span className={phdTypography.sectionHeader}>Overall Progress</span>
-          <span className={combineClasses(phdTypography.body, 'font-semibold')}>{completionPercentage}%</span>
+          <span className={combineClasses(phdTypography.body, 'font-semibold')}>{completion}%</span>
         </div>
         <div className={phdComponents.progressBar.container}>
-          <div 
+          <div
             className={phdComponents.progressBar.fill}
-            style={{ width: `${completionPercentage}%` }}
+            style={{ width: `${completion}%` }}
           />
         </div>
         <div className="flex justify-between mt-2">
-          <span className={phdTypography.caption}>{totalEstimatedWords.toLocaleString()} words estimated</span>
-          <span className={phdTypography.caption}>{chapters.length} chapters</span>
+          <span className={phdTypography.caption}>{totalWords.toLocaleString()} words estimated</span>
+          <span className={phdTypography.caption}>{processedChapters.length} chapters</span>
         </div>
       </div>
 
       {/* Chapter List */}
       <div className="space-y-3">
-        {chapters.map((chapter) => {
+        {processedChapters.map((chapter: any) => {
           const isExpanded = expandedChapters.has(chapter.chapter_number);
           
           return (
@@ -242,7 +334,7 @@ export default function ThesisChapterStructure({
                     <div>
                       <h4 className={combineClasses(phdTypography.sectionHeader, 'mb-2')}>Sections</h4>
                       <ul className="space-y-1">
-                        {chapter.sections.map((section, idx) => (
+                        {chapter.sections.map((section: any, idx: number) => (
                           <li key={idx} className="flex items-center gap-2 text-sm text-gray-700">
                             <span className="w-1.5 h-1.5 bg-purple-400 rounded-full"></span>
                             {section}
@@ -274,7 +366,7 @@ export default function ThesisChapterStructure({
                           <div>
                             <h5 className={combineClasses(phdTypography.body, 'font-semibold mb-1')}>Methodologies</h5>
                             <div className="flex flex-wrap gap-1">
-                              {chapter.key_content.methodologies.slice(0, 3).map((method, idx) => (
+                              {chapter.key_content.methodologies.slice(0, 3).map((method: any, idx: number) => (
                                 <span key={idx} className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs rounded">
                                   {method}
                                 </span>
@@ -310,7 +402,7 @@ export default function ThesisChapterStructure({
       </div>
 
       {/* Empty State */}
-      {chapters.length === 0 && (
+      {processedChapters.length === 0 && !loading && (
         <div className="text-center py-8">
           <BookOpenIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-600">No thesis structure generated yet</p>

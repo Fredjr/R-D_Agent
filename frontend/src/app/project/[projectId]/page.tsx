@@ -124,6 +124,8 @@ export default function ProjectPage() {
   const [generatingGapAnalysis, setGeneratingGapAnalysis] = useState(false);
   const [generatingMethodologySynthesis, setGeneratingMethodologySynthesis] = useState(false);
   const [showPhdDashboard, setShowPhdDashboard] = useState(false);
+  const [selectedChapter, setSelectedChapter] = useState<any>(null);
+  const [showChapterModal, setShowChapterModal] = useState(false);
 
   // Collection management state
   const [collections, setCollections] = useState<any[]>([]);
@@ -646,7 +648,20 @@ Perfect for your dissertation chapters! 🎓`);
       }
 
       const data = await response.json();
-      setPhdAnalysisData(data);
+
+      // Merge with existing PhD analysis data instead of overwriting
+      setPhdAnalysisData((prevData: any) => ({
+        ...prevData,
+        ...data,
+        agent_results: {
+          ...prevData?.agent_results,
+          ...data.agent_results
+        },
+        phd_outputs: {
+          ...prevData?.phd_outputs,
+          ...data.phd_outputs
+        }
+      }));
 
       console.log('📖 Thesis chapter generated successfully:', data);
 
@@ -694,7 +709,20 @@ Perfect for your dissertation chapters! 🎓`);
       }
 
       const data = await response.json();
-      setPhdAnalysisData(data);
+
+      // Merge with existing PhD analysis data instead of overwriting
+      setPhdAnalysisData((prevData: any) => ({
+        ...prevData,
+        ...data,
+        agent_results: {
+          ...prevData?.agent_results,
+          ...data.agent_results
+        },
+        phd_outputs: {
+          ...prevData?.phd_outputs,
+          ...data.phd_outputs
+        }
+      }));
 
       console.log('🔍 Gap analysis generated successfully:', data);
 
@@ -741,7 +769,20 @@ Perfect for your dissertation chapters! 🎓`);
       }
 
       const data = await response.json();
-      setPhdAnalysisData(data);
+
+      // Merge with existing PhD analysis data instead of overwriting
+      setPhdAnalysisData((prevData: any) => ({
+        ...prevData,
+        ...data,
+        agent_results: {
+          ...prevData?.agent_results,
+          ...data.agent_results
+        },
+        phd_outputs: {
+          ...prevData?.phd_outputs,
+          ...data.phd_outputs
+        }
+      }));
 
       console.log('🧪 Methodology synthesis generated successfully:', data);
 
@@ -1862,18 +1903,23 @@ Perfect for your dissertation chapters! 🎓`);
         {phdAnalysisData && (
           <div className="space-y-8 mb-8">
             {/* Thesis Chapter Structure */}
-            {(phdAnalysisData?.phd_outputs?.thesis_structure || generatingThesisChapter) && (
+            {(phdAnalysisData?.agent_results?.thesis_structure || phdAnalysisData?.phd_outputs?.thesis_structure || generatingThesisChapter) && (
               <div data-component="thesis-structure">
                 <ThesisChapterStructure
-                  chapters={phdAnalysisData?.phd_outputs?.thesis_structure?.chapters || []}
-                  totalEstimatedWords={phdAnalysisData?.phd_outputs?.thesis_structure?.total_words}
-                  completionPercentage={phdAnalysisData?.phd_outputs?.thesis_structure?.completion_percentage}
+                  chapters={phdAnalysisData?.agent_results?.thesis_structure?.thesis_chapters || phdAnalysisData?.agent_results?.thesis_structure?.chapters || phdAnalysisData?.phd_outputs?.thesis_structure?.chapters || []}
+                  totalEstimatedWords={phdAnalysisData?.agent_results?.thesis_structure?.total_words || phdAnalysisData?.phd_outputs?.thesis_structure?.total_words}
+                  completionPercentage={phdAnalysisData?.agent_results?.thesis_structure?.completion_percentage || phdAnalysisData?.phd_outputs?.thesis_structure?.completion_percentage}
                   loading={generatingThesisChapter}
                   error={phdAnalysisData?.error}
+                  rawData={phdAnalysisData}
+                  thesisData={phdAnalysisData?.agent_results?.thesis_structure || phdAnalysisData?.phd_outputs?.thesis_structure}
                   onRetry={() => handleThesisChapter()}
                   onChapterClick={(chapter) => {
-                    console.log('Chapter clicked:', chapter);
-                    // TODO: Implement chapter detail view
+                    console.log('🔍 Chapter clicked:', chapter);
+                    console.log('🔍 Chapter key_content:', chapter.key_content);
+                    console.log('🔍 Full phdAnalysisData:', phdAnalysisData);
+                    setSelectedChapter(chapter);
+                    setShowChapterModal(true);
                   }}
                   onEditChapter={(chapter) => {
                     console.log('Edit chapter:', chapter);
@@ -1886,14 +1932,24 @@ Perfect for your dissertation chapters! 🎓`);
             {/* Literature Gap Analysis */}
             {(phdAnalysisData?.agent_results?.gap_analysis || generatingGapAnalysis) && (
               <div data-component="gap-analysis">
+                {(() => {
+                  console.log('🔍 Gap Analysis Data Structure:', phdAnalysisData?.agent_results?.gap_analysis);
+                  return null;
+                })()}
                 <LiteratureGapAnalysis
-                  gaps={phdAnalysisData?.agent_results?.gap_analysis?.identified_gaps || []}
-                  totalPapersAnalyzed={phdAnalysisData?.agent_results?.gap_analysis?.papers_analyzed}
+                  gaps={phdAnalysisData?.agent_results?.gap_analysis?.identified_gaps ||
+                        phdAnalysisData?.agent_results?.literature_review?.review_gaps || []}
+                  totalPapersAnalyzed={phdAnalysisData?.agent_results?.literature_review?.papers_analyzed ||
+                                     phdAnalysisData?.agent_results?.gap_analysis?.papers_analyzed || 0}
                   analysisDate={phdAnalysisData?.timestamp}
                   researchDomains={phdAnalysisData?.agent_results?.gap_analysis?.research_domains || []}
                   loading={generatingGapAnalysis}
-                  error={phdAnalysisData?.error}
+                  error={phdAnalysisData?.agent_results?.gap_analysis?.error ?
+                    "Gap analysis backend is being updated. Showing literature review gaps instead." :
+                    phdAnalysisData?.error}
                   onRetry={() => handleGapAnalysis()}
+                  rawData={phdAnalysisData}
+                  gapAnalysisData={phdAnalysisData?.agent_results?.gap_analysis}
                   onGapClick={(gap) => {
                     console.log('Gap clicked:', gap);
                     // TODO: Implement gap detail view
@@ -1909,14 +1965,21 @@ Perfect for your dissertation chapters! 🎓`);
             {/* Methodology Synthesis */}
             {(phdAnalysisData?.agent_results?.methodology_synthesis || generatingMethodologySynthesis) && (
               <div data-component="methodology-synthesis">
+                {(() => {
+                  console.log('🔍 Methodology Synthesis Data Structure:', phdAnalysisData?.agent_results?.methodology_synthesis);
+                  return null;
+                })()}
                 <MethodologySynthesis
-                  methodologies={phdAnalysisData?.agent_results?.methodology_synthesis?.methodologies || []}
+                  methodologies={phdAnalysisData?.agent_results?.methodology_synthesis?.methodologies ||
+                               phdAnalysisData?.agent_results?.methodology_synthesis?.methodology_categories || []}
                   comparisons={phdAnalysisData?.agent_results?.methodology_synthesis?.comparisons || []}
-                  totalPapersAnalyzed={phdAnalysisData?.agent_results?.methodology_synthesis?.papers_analyzed}
+                  totalPapersAnalyzed={phdAnalysisData?.agent_results?.methodology_synthesis?.papers_analyzed || 0}
                   recommendedCombinations={phdAnalysisData?.agent_results?.methodology_synthesis?.recommended_combinations || []}
                   loading={generatingMethodologySynthesis}
                   error={phdAnalysisData?.error}
                   onRetry={() => handleMethodologySynthesis()}
+                  rawData={phdAnalysisData}
+                  methodologyData={phdAnalysisData?.agent_results?.methodology_synthesis}
                   onMethodologyClick={(methodology) => {
                     console.log('Methodology clicked:', methodology);
                     // TODO: Implement methodology detail view
@@ -2218,6 +2281,218 @@ Perfect for your dissertation chapters! 🎓`);
             setActiveTab('overview');
           }}
         />
+      )}
+
+      {/* Chapter Detail Modal */}
+      {showChapterModal && selectedChapter && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Chapter {selectedChapter.chapter_number}: {selectedChapter.title}
+                </h2>
+                <button
+                  onClick={() => setShowChapterModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Chapter Overview */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="font-semibold text-gray-900 mb-2">Chapter Overview</h3>
+                  <p className="text-gray-700">{selectedChapter.description || selectedChapter.key_content?.research_objective || selectedChapter.key_content?.problem_statement || selectedChapter.key_content?.analysis_framework || selectedChapter.key_content?.research_contributions || 'Chapter overview will be developed based on research progress'}</p>
+                </div>
+
+                {/* Key Content */}
+                {selectedChapter.key_content && (
+                  <div className="space-y-4">
+                    {/* Research Objective */}
+                    {selectedChapter.key_content.research_objective && (
+                      <div className="bg-blue-50 rounded-lg p-4">
+                        <h3 className="font-semibold text-blue-900 mb-2">Research Objective</h3>
+                        <p className="text-blue-800">{selectedChapter.key_content.research_objective}</p>
+                      </div>
+                    )}
+
+                    {/* Problem Statement */}
+                    {selectedChapter.key_content.problem_statement && (
+                      <div className="bg-orange-50 rounded-lg p-4">
+                        <h3 className="font-semibold text-orange-900 mb-2">Problem Statement</h3>
+                        <p className="text-orange-800">{selectedChapter.key_content.problem_statement}</p>
+                      </div>
+                    )}
+
+                    {/* Research Questions */}
+                    {selectedChapter.key_content.research_questions && selectedChapter.key_content.research_questions.length > 0 && (
+                      <div className="bg-green-50 rounded-lg p-4">
+                        <h3 className="font-semibold text-green-900 mb-2">Research Questions</h3>
+                        <ul className="list-disc list-inside space-y-1">
+                          {selectedChapter.key_content.research_questions.map((question: any, index: number) => (
+                            <li key={index} className="text-green-800">{question}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Context Papers */}
+                    {selectedChapter.key_content.context_papers && selectedChapter.key_content.context_papers.length > 0 && (
+                      <div className="bg-purple-50 rounded-lg p-4">
+                        <h3 className="font-semibold text-purple-900 mb-2">Key Papers ({selectedChapter.key_content.context_papers.length})</h3>
+                        <div className="space-y-2">
+                          {selectedChapter.key_content.context_papers.slice(0, 3).map((paper: any, index: number) => (
+                            <div key={index} className="text-purple-800 text-sm">
+                              <strong>{paper.title || paper.name || `Paper ${index + 1}`}</strong>
+                              {paper.authors && <span className="text-purple-600"> - {paper.authors}</span>}
+                              {paper.year && <span className="text-purple-600"> ({paper.year})</span>}
+                            </div>
+                          ))}
+                          {selectedChapter.key_content.context_papers.length > 3 && (
+                            <p className="text-purple-600 text-sm">...and {selectedChapter.key_content.context_papers.length - 3} more papers</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Seminal Papers */}
+                    {selectedChapter.key_content.seminal_papers && selectedChapter.key_content.seminal_papers.length > 0 && (
+                      <div className="bg-indigo-50 rounded-lg p-4">
+                        <h3 className="font-semibold text-indigo-900 mb-2">Seminal Papers ({selectedChapter.key_content.seminal_papers.length})</h3>
+                        <div className="space-y-2">
+                          {selectedChapter.key_content.seminal_papers.slice(0, 3).map((paper: any, index: number) => (
+                            <div key={index} className="text-indigo-800 text-sm">
+                              <strong>{paper.title || paper.name || `Paper ${index + 1}`}</strong>
+                              {paper.authors && <span className="text-indigo-600"> - {paper.authors}</span>}
+                              {paper.year && <span className="text-indigo-600"> ({paper.year})</span>}
+                            </div>
+                          ))}
+                          {selectedChapter.key_content.seminal_papers.length > 3 && (
+                            <p className="text-indigo-600 text-sm">...and {selectedChapter.key_content.seminal_papers.length - 3} more papers</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Comparison Papers */}
+                    {selectedChapter.key_content.comparison_papers && selectedChapter.key_content.comparison_papers.length > 0 && (
+                      <div className="bg-teal-50 rounded-lg p-4">
+                        <h3 className="font-semibold text-teal-900 mb-2">Comparison Papers ({selectedChapter.key_content.comparison_papers.length})</h3>
+                        <p className="text-teal-800 text-sm">Comprehensive literature comparison with {selectedChapter.key_content.comparison_papers.length} relevant papers for discussion and analysis.</p>
+                      </div>
+                    )}
+
+                    {/* Analysis Framework */}
+                    {selectedChapter.key_content.analysis_framework && (
+                      <div className="bg-yellow-50 rounded-lg p-4">
+                        <h3 className="font-semibold text-yellow-900 mb-2">Analysis Framework</h3>
+                        <p className="text-yellow-800">{selectedChapter.key_content.analysis_framework}</p>
+                      </div>
+                    )}
+
+                    {/* Theoretical Contributions */}
+                    {selectedChapter.key_content.theoretical_contributions && (
+                      <div className="bg-pink-50 rounded-lg p-4">
+                        <h3 className="font-semibold text-pink-900 mb-2">Theoretical Contributions</h3>
+                        <p className="text-pink-800">{selectedChapter.key_content.theoretical_contributions}</p>
+                      </div>
+                    )}
+
+                    {/* Research Contributions */}
+                    {selectedChapter.key_content.research_contributions && (
+                      <div className="bg-red-50 rounded-lg p-4">
+                        <h3 className="font-semibold text-red-900 mb-2">Research Contributions</h3>
+                        <p className="text-red-800">{selectedChapter.key_content.research_contributions}</p>
+                      </div>
+                    )}
+
+                    {/* Methodology Synthesis */}
+                    {selectedChapter.key_content.methodology_synthesis && (
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <h3 className="font-semibold text-gray-900 mb-2">Methodology Synthesis</h3>
+                        <div className="text-gray-800 text-sm">
+                          {typeof selectedChapter.key_content.methodology_synthesis === 'object' ?
+                            Object.keys(selectedChapter.key_content.methodology_synthesis).map((key: string) => (
+                              <div key={key} className="mb-2">
+                                <strong className="capitalize">{key.replace(/_/g, ' ')}:</strong> {selectedChapter.key_content.methodology_synthesis[key]}
+                              </div>
+                            )) :
+                            <p>{selectedChapter.key_content.methodology_synthesis}</p>
+                          }
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Future Research */}
+                    {selectedChapter.key_content.future_research && selectedChapter.key_content.future_research.length > 0 && (
+                      <div className="bg-cyan-50 rounded-lg p-4">
+                        <h3 className="font-semibold text-cyan-900 mb-2">Future Research Directions</h3>
+                        <ul className="list-disc list-inside space-y-1">
+                          {selectedChapter.key_content.future_research.map((direction: any, index: number) => (
+                            <li key={index} className="text-cyan-800">{direction}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Chapter Sections */}
+                {selectedChapter.sections && selectedChapter.sections.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-4">Sections</h3>
+                    <div className="space-y-3">
+                      {selectedChapter.sections.map((section: any, index: number) => (
+                        <div key={index} className="border border-gray-200 rounded-lg p-4">
+                          <h4 className="font-medium text-gray-900 mb-2">
+                            {section.title || `Section ${index + 1}`}
+                          </h4>
+                          <p className="text-gray-600 text-sm">
+                            {section.description || typeof section === 'string' ? section : `This section will cover ${section.title || section || 'key aspects'} of the chapter`}
+                          </p>
+                          {section.estimated_words && (
+                            <p className="text-gray-500 text-xs mt-2">
+                              Estimated words: {section.estimated_words}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Chapter Metadata */}
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="bg-blue-50 rounded-lg p-3">
+                    <span className="font-medium text-blue-900">Estimated Words:</span>
+                    <span className="text-blue-700 ml-2">
+                      {selectedChapter.estimated_words || 'Not specified'}
+                    </span>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-3">
+                    <span className="font-medium text-green-900">Status:</span>
+                    <span className="text-green-700 ml-2">
+                      {selectedChapter.status || 'Not Started'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => setShowChapterModal(false)}
+                  className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </MobileResponsiveLayout>
   );

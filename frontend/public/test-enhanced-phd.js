@@ -318,12 +318,104 @@ class EnhancedPhDSystemTest {
 // Auto-run test when script is loaded
 if (typeof window !== 'undefined') {
     window.EnhancedPhDSystemTest = EnhancedPhDSystemTest;
-    
+
     // Add a global function to run the test
     window.testEnhancedPhDSystem = () => {
         const test = new EnhancedPhDSystemTest();
         return test.runAllTests();
     };
-    
+
+    // Add a debug function for data flow issues
+    window.debugPhdDataFlow = () => {
+        console.log('🔍 DEBUGGING PhD DATA FLOW ISSUE');
+
+        // Find gap analysis button and trigger it with data monitoring
+        const gapButton = Array.from(document.querySelectorAll('button')).find(btn =>
+            btn.textContent.includes('Literature Gap Analysis') ||
+            btn.textContent.includes('Gap Analysis')
+        );
+
+        if (gapButton) {
+            console.log('🎯 Found Gap Analysis button, triggering with data monitoring...');
+
+            // Monitor console for success messages
+            const originalLog = console.log;
+            console.log = function(...args) {
+                if (args[0] && args[0].includes && args[0].includes('Gap analysis generated successfully')) {
+                    const data = args[1];
+
+                    console.log('🔍 INTERCEPTED GAP ANALYSIS DATA:');
+                    console.log('📊 Full data structure:', data);
+
+                    // Check the exact path the component expects
+                    const expectedPath = data?.agent_results?.gap_analysis?.identified_gaps;
+                    console.log('📊 Expected component path (agent_results.gap_analysis.identified_gaps):', expectedPath);
+                    console.log('📊 Expected path length:', expectedPath?.length || 0);
+
+                    // Check alternative paths
+                    console.log('🔍 Alternative data locations:');
+                    console.log('📊 phd_outputs.gap_analysis:', data?.phd_outputs?.gap_analysis);
+                    console.log('📊 agent_results keys:', Object.keys(data?.agent_results || {}));
+
+                    if (data?.agent_results?.gap_analysis) {
+                        console.log('📊 gap_analysis keys:', Object.keys(data.agent_results.gap_analysis));
+                    }
+
+                    // Check if gaps are in a different format
+                    if (expectedPath && expectedPath.length === 0) {
+                        console.log('❌ PROBLEM: identified_gaps array is empty!');
+                        console.log('🔍 Checking if gaps are in different locations...');
+
+                        // Check all possible gap locations
+                        const possibleGapLocations = [
+                            data?.agent_results?.gap_analysis?.gaps,
+                            data?.agent_results?.gap_analysis?.research_gaps,
+                            data?.phd_outputs?.gap_analysis?.identified_gaps,
+                            data?.phd_outputs?.gap_analysis?.gaps,
+                            data?.gap_analysis?.identified_gaps,
+                            data?.gaps
+                        ];
+
+                        possibleGapLocations.forEach((location, index) => {
+                            if (location && Array.isArray(location) && location.length > 0) {
+                                console.log(`✅ FOUND GAPS at location ${index}:`, location.slice(0, 2));
+                            }
+                        });
+                    } else if (expectedPath && expectedPath.length > 0) {
+                        console.log('✅ SUCCESS: Found gaps in expected location:', expectedPath.slice(0, 2));
+                    }
+
+                    // Check component state after 3 seconds
+                    setTimeout(() => {
+                        const gapComponent = document.querySelector('[data-component="gap-analysis"]');
+                        if (gapComponent) {
+                            const hasEmptyState = gapComponent.textContent.includes('No literature gaps identified yet');
+                            console.log('📊 Component still showing empty state:', hasEmptyState);
+
+                            if (hasEmptyState) {
+                                console.log('❌ DATA FLOW BROKEN: Backend has data but component shows empty state');
+                            } else {
+                                console.log('✅ DATA FLOW WORKING: Component now shows data');
+                            }
+                        }
+                    }, 3000);
+                }
+                originalLog.apply(console, args);
+            };
+
+            // Click the button
+            gapButton.click();
+
+            // Restore console.log after 20 seconds
+            setTimeout(() => {
+                console.log = originalLog;
+                console.log('🔍 Data flow debug completed');
+            }, 20000);
+        } else {
+            console.log('❌ Gap Analysis button not found');
+        }
+    };
+
     console.log('🧪 Enhanced PhD System Test loaded. Run testEnhancedPhDSystem() to start testing.');
+    console.log('🔍 Run debugPhdDataFlow() to debug data flow issues.');
 }
