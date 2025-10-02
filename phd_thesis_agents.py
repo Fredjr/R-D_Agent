@@ -48,8 +48,14 @@ try:
     from sklearn.cluster import KMeans
     from sklearn.metrics.pairwise import cosine_similarity
 
-    # Set up model cache directory
-    MODELS_CACHE_DIR = os.environ.get('TRANSFORMERS_CACHE', './models_cache')
+    # Set up model cache directory - use Railway Volume if available
+    if os.environ.get('RAILWAY_VOLUME_MOUNT_PATH'):
+        # Use Railway Volume for persistent model storage
+        MODELS_CACHE_DIR = os.path.join(os.environ.get('RAILWAY_VOLUME_MOUNT_PATH'), 'models_cache')
+    else:
+        # Fallback to local cache (development)
+        MODELS_CACHE_DIR = os.environ.get('TRANSFORMERS_CACHE', './models_cache')
+
     os.makedirs(MODELS_CACHE_DIR, exist_ok=True)
 
     HUGGINGFACE_AVAILABLE = True
