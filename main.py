@@ -12762,10 +12762,13 @@ async def get_phd_project_data(project_id: str, db: Session) -> Dict[str, Any]:
         for analysis in deep_dives:
             deep_dives_data.append({
                 "analysis_id": analysis.analysis_id,
-                "title": analysis.title,
-                "analysis_type": analysis.analysis_type,
-                "status": analysis.status,
-                "created_at": analysis.created_at.isoformat() if analysis.created_at else None
+                "title": analysis.article_title,  # Use article_title instead of title
+                "article_pmid": analysis.article_pmid,
+                "article_journal": analysis.article_journal,
+                "article_year": analysis.article_year,
+                "processing_status": analysis.processing_status,
+                "created_at": analysis.created_at.isoformat() if analysis.created_at else None,
+                "processing_time_seconds": analysis.processing_time_seconds
             })
 
         # Get collections for this project
