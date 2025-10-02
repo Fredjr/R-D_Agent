@@ -23,20 +23,121 @@ from langchain.tools import Tool
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 
-# HuggingFace imports
+# HuggingFace imports with model caching
 try:
+    import os
     from langchain_huggingface import HuggingFaceEmbeddings, HuggingFacePipeline
-    from transformers import pipeline
+    from transformers import pipeline, AutoModel, AutoTokenizer
+    from sentence_transformers import SentenceTransformer
     import torch
+    import numpy as np
+    from sklearn.cluster import KMeans
+    from sklearn.metrics.pairwise import cosine_similarity
+
+    # Set up model cache directory
+    MODELS_CACHE_DIR = os.environ.get('TRANSFORMERS_CACHE', './models_cache')
+    os.makedirs(MODELS_CACHE_DIR, exist_ok=True)
+
     HUGGINGFACE_AVAILABLE = True
-except ImportError:
+    logger.info(f"✅ HuggingFace available. Cache dir: {MODELS_CACHE_DIR}")
+
+except ImportError as e:
     HUGGINGFACE_AVAILABLE = False
-    logging.warning("HuggingFace dependencies not available. Using fallback implementations.")
+    MODELS_CACHE_DIR = None
+    logging.warning(f"HuggingFace dependencies not available: {e}. Using fallback implementations.")
 
 # Import existing orchestrator
 from project_summary_agents import ProjectSummaryOrchestrator
 
 logger = logging.getLogger(__name__)
+
+# =============================================================================
+# MODEL INITIALIZATION AND CACHING
+# =============================================================================
+
+def initialize_phd_models():
+    """Initialize and cache PhD-specific models"""
+    if not HUGGINGFACE_AVAILABLE:
+        logger.warning("HuggingFace not available - skipping model initialization")
+        return {}
+
+    models = {}
+
+    try:
+        logger.info("🚀 Initializing PhD models...")
+
+        # Initialize SPECTER for paper embeddings
+        try:
+            logger.info("📄 Loading SPECTER model...")
+            models['specter_model'] = AutoModel.from_pretrained(
+                'allenai/specter',
+                cache_dir=MODELS_CACHE_DIR,
+                torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
+            )
+            models['specter_tokenizer'] = AutoTokenizer.from_pretrained(
+                'allenai/specter',
+                cache_dir=MODELS_CACHE_DIR
+            )
+            logger.info("✅ SPECTER model loaded successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to load SPECTER: {e}")
+
+        # Initialize SciBERT for scientific text
+        try:
+            logger.info("🧬 Loading SciBERT model...")
+            models['scibert_model'] = AutoModel.from_pretrained(
+                'allenai/scibert_scivocab_uncased',
+                cache_dir=MODELS_CACHE_DIR,
+                torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
+            )
+            models['scibert_tokenizer'] = AutoTokenizer.from_pretrained(
+                'allenai/scibert_scivocab_uncased',
+                cache_dir=MODELS_CACHE_DIR
+            )
+            logger.info("✅ SciBERT model loaded successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to load SciBERT: {e}")
+
+        # Initialize Sentence Transformer
+        try:
+            logger.info("🔗 Loading Sentence Transformer...")
+            models['sentence_transformer'] = SentenceTransformer(
+                'sentence-transformers/all-MiniLM-L6-v2',
+                cache_folder=MODELS_CACHE_DIR
+            )
+            logger.info("✅ Sentence Transformer loaded successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to load Sentence Transformer: {e}")
+
+        # Initialize BART for summarization
+        try:
+            logger.info("📝 Loading BART model...")
+            models['bart_pipeline'] = pipeline(
+                "summarization",
+                model="facebook/bart-large-cnn",
+                cache_dir=MODELS_CACHE_DIR,
+                torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
+            )
+            logger.info("✅ BART model loaded successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to load BART: {e}")
+
+        logger.info(f"🎉 PhD model initialization completed! Loaded {len(models)} models")
+        return models
+
+    except Exception as e:
+        logger.error(f"❌ PhD model initialization failed: {e}")
+        return {}
+
+# Global model cache
+_PHD_MODELS_CACHE = None
+
+def get_phd_models():
+    """Get cached PhD models, initializing if necessary"""
+    global _PHD_MODELS_CACHE
+    if _PHD_MODELS_CACHE is None:
+        _PHD_MODELS_CACHE = initialize_phd_models()
+    return _PHD_MODELS_CACHE
 
 # =============================================================================
 # PHD-SPECIFIC AGENT CLASSES

@@ -14442,12 +14442,30 @@ try:
         PhDAnalysisResponse, PhDProgressResponse,
         get_project_data, calculate_phd_progress_metrics
     )
-    from phd_thesis_agents import create_phd_orchestrator, PhDThesisOrchestrator
+    from phd_thesis_agents import create_phd_orchestrator, PhDThesisOrchestrator, initialize_phd_models
     PHD_ANALYSIS_AVAILABLE = True
     logger.info("✅ PhD analysis endpoints loaded successfully")
 except ImportError as e:
     logger.warning(f"⚠️ PhD analysis not available: {e}")
     PHD_ANALYSIS_AVAILABLE = False
+
+# Initialize PhD models on startup
+@app.on_event("startup")
+async def initialize_phd_models_on_startup():
+    """Initialize PhD models when the application starts"""
+    if PHD_ANALYSIS_AVAILABLE:
+        try:
+            logger.info("🎓 Initializing PhD models on startup...")
+            models = initialize_phd_models()
+            if models:
+                logger.info(f"✅ PhD models initialized successfully: {list(models.keys())}")
+            else:
+                logger.warning("⚠️ PhD models not available - using graceful degradation")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize PhD models: {e}")
+            logger.info("🔧 PhD features will use graceful degradation")
+    else:
+        logger.info("🔧 PhD analysis not available - skipping model initialization")
 
 @app.post("/projects/{project_id}/phd-analysis")
 async def generate_phd_analysis_endpoint(
