@@ -20,6 +20,7 @@ import { SpotifyCollectionCard } from '@/components/ui/SpotifyCard';
 import { SpotifyProjectHeader } from '@/components/ui/SpotifyProjectHeader';
 import { SpotifyProjectTabs } from '@/components/ui/SpotifyProjectTabs';
 import { SpotifyQuickActions, createQuickActions } from '@/components/ui/SpotifyQuickActions';
+import PhDProgressDashboard from '@/components/PhDProgressDashboard';
 import {
   Button,
   Card,
@@ -112,6 +113,13 @@ export default function ProjectPage() {
   const [sendingInvite, setSendingInvite] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+
+  // PhD-specific state
+  const [phdAnalysisData, setPhdAnalysisData] = useState<any>(null);
+  const [generatingThesisChapter, setGeneratingThesisChapter] = useState(false);
+  const [generatingGapAnalysis, setGeneratingGapAnalysis] = useState(false);
+  const [generatingMethodologySynthesis, setGeneratingMethodologySynthesis] = useState(false);
+  const [showPhdDashboard, setShowPhdDashboard] = useState(false);
 
   // Collection management state
   const [collections, setCollections] = useState<any[]>([]);
@@ -516,12 +524,27 @@ export default function ProjectPage() {
   const handleGenerateComprehensiveSummary = async () => {
     setGeneratingComprehensiveSummary(true);
     try {
+      // Enhanced payload for PhD-specific analysis
+      const analysisPayload = {
+        analysis_type: 'thesis_structured',
+        include_methodology_synthesis: true,
+        include_gap_analysis: true,
+        include_citation_analysis: true,
+        output_format: 'academic_chapters',
+        user_context: {
+          academic_level: 'phd',
+          research_stage: 'dissertation',
+          preferred_citation_style: 'apa' // Could be user preference
+        }
+      };
+
       const response = await fetch(`/api/proxy/projects/${projectId}/generate-comprehensive-summary`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'User-ID': user?.email || 'default_user',
         },
+        body: JSON.stringify(analysisPayload),
       });
 
       if (!response.ok) {
@@ -530,7 +553,18 @@ export default function ProjectPage() {
 
       const data = await response.json();
       setComprehensiveSummary(data);
-      alert('✅ Comprehensive project summary generated successfully!');
+
+      // Enhanced success message with thesis-specific value
+      alert(`✅ Thesis-structured analysis generated successfully!
+
+📚 Generated sections:
+• Literature Review Framework
+• Methodology Synthesis
+• Research Gap Analysis
+• Future Research Directions
+• Citation Bibliography
+
+Perfect for your dissertation chapters! 🎓`);
     } catch (error: any) {
       console.error('Error generating comprehensive summary:', error);
       alert(`❌ Failed to generate comprehensive summary: ${error.message}`);
@@ -576,6 +610,153 @@ export default function ProjectPage() {
       alert('Failed to send invitation. Please try again.');
     } finally {
       setSendingInvite(false);
+    }
+  };
+
+  // PhD-specific handlers
+  const handleThesisChapter = async () => {
+    setGeneratingThesisChapter(true);
+    try {
+      console.log('📖 [PhD] Generating thesis chapter for project:', projectId);
+
+      const response = await fetch(`/api/proxy/projects/${projectId}/phd-analysis`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user?.email || 'default_user',
+        },
+        body: JSON.stringify({
+          analysis_type: 'thesis_chapter',
+          include_thesis_structure: true,
+          include_literature_review: true,
+          include_methodology_synthesis: true,
+          output_format: 'academic_chapters',
+          citation_style: 'apa',
+          academic_level: 'phd',
+          research_stage: 'dissertation'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate thesis chapter');
+      }
+
+      const data = await response.json();
+      setPhdAnalysisData(data);
+
+      alert(`📖 Thesis chapter generated successfully!
+
+✅ Generated sections:
+• Literature Review Framework
+• Theoretical Foundation
+• Methodology Overview
+• Key Findings Summary
+• Academic Citations
+
+Perfect for your dissertation! 🎓`);
+
+    } catch (error: any) {
+      console.error('Error generating thesis chapter:', error);
+      alert(`❌ Failed to generate thesis chapter: ${error.message}`);
+    } finally {
+      setGeneratingThesisChapter(false);
+    }
+  };
+
+  const handleGapAnalysis = async () => {
+    setGeneratingGapAnalysis(true);
+    try {
+      console.log('🔍 [PhD] Generating gap analysis for project:', projectId);
+
+      const response = await fetch(`/api/proxy/projects/${projectId}/phd-analysis`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user?.email || 'default_user',
+        },
+        body: JSON.stringify({
+          analysis_type: 'gap_analysis',
+          include_gap_analysis: true,
+          include_literature_review: true,
+          semantic_gaps: true,
+          methodology_gaps: true,
+          temporal_gaps: true,
+          cross_domain_opportunities: true,
+          academic_level: 'phd'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate gap analysis');
+      }
+
+      const data = await response.json();
+      setPhdAnalysisData(data);
+
+      alert(`🔍 Literature gap analysis complete!
+
+✅ Identified:
+• Research Gaps in Literature
+• Methodology Opportunities
+• Temporal Research Trends
+• Cross-Domain Connections
+• Future Research Directions
+
+Great for identifying your research contribution! 🎯`);
+
+    } catch (error: any) {
+      console.error('Error generating gap analysis:', error);
+      alert(`❌ Failed to generate gap analysis: ${error.message}`);
+    } finally {
+      setGeneratingGapAnalysis(false);
+    }
+  };
+
+  const handleMethodologySynthesis = async () => {
+    setGeneratingMethodologySynthesis(true);
+    try {
+      console.log('🧪 [PhD] Generating methodology synthesis for project:', projectId);
+
+      const response = await fetch(`/api/proxy/projects/${projectId}/phd-analysis`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user?.email || 'default_user',
+        },
+        body: JSON.stringify({
+          analysis_type: 'methodology_synthesis',
+          include_methodology_synthesis: true,
+          classification_model: 'scibert',
+          statistical_extraction: true,
+          experimental_design_analysis: true,
+          methodology_comparison: true,
+          academic_level: 'phd'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate methodology synthesis');
+      }
+
+      const data = await response.json();
+      setPhdAnalysisData(data);
+
+      alert(`🧪 Methodology synthesis complete!
+
+✅ Analyzed:
+• Research Method Classifications
+• Statistical Approaches Used
+• Experimental Design Patterns
+• Methodology Effectiveness
+• Best Practice Recommendations
+
+Perfect for your methods chapter! 📊`);
+
+    } catch (error: any) {
+      console.error('Error generating methodology synthesis:', error);
+      alert(`❌ Failed to generate methodology synthesis: ${error.message}`);
+    } finally {
+      setGeneratingMethodologySynthesis(false);
     }
   };
 
@@ -924,11 +1105,19 @@ export default function ProjectPage() {
                 onDeepDive: () => setShowDeepDiveModal(true),
                 onSummary: () => setShowSummaryModal(true),
                 onComprehensiveAnalysis: handleGenerateComprehensiveSummary,
-                onInviteCollaborators: () => setShowInviteModal(true)
+                onInviteCollaborators: () => setShowInviteModal(true),
+                // PhD-specific handlers
+                onThesisChapter: handleThesisChapter,
+                onGapAnalysis: handleGapAnalysis,
+                onMethodologySynthesis: handleMethodologySynthesis
               },
               {
                 generatingComprehensiveSummary,
-                creatingNote
+                creatingNote,
+                // PhD-specific loading states
+                generatingThesisChapter,
+                generatingGapAnalysis,
+                generatingMethodologySynthesis
               }
             )}
           />
@@ -1408,6 +1597,17 @@ export default function ProjectPage() {
         {/* Tab Content */}
         {activeTab === 'overview' && (
           <>
+            {/* PhD Progress Dashboard */}
+            <div className="mb-8">
+              <PhDProgressDashboard
+                projectId={projectId}
+                onRefresh={() => {
+                  // Refresh project data when PhD progress updates
+                  fetchProjectData();
+                }}
+              />
+            </div>
+
             {/* Project Data Sections */}
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-8 mb-8">
           {/* Reports Section */}
