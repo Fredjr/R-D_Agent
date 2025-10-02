@@ -1,13 +1,15 @@
 'use client';
 
 import React from 'react';
-import { 
+import {
   PlusIcon,
   DocumentTextIcon,
   BeakerIcon,
   ChartBarIcon,
   UserPlusIcon,
-  PencilIcon
+  PencilIcon,
+  BookOpenIcon,
+  MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
 import { cn } from '@/lib/utils';
 
@@ -20,6 +22,7 @@ interface QuickAction {
   onClick: () => void;
   disabled?: boolean;
   loading?: boolean;
+  badge?: string;
 }
 
 interface SpotifyQuickActionsProps {
@@ -135,9 +138,17 @@ export const createQuickActions = (handlers: {
   onSummary: () => void;
   onComprehensiveAnalysis: () => void;
   onInviteCollaborators: () => void;
+  // PhD-specific handlers
+  onThesisChapter: () => void;
+  onGapAnalysis: () => void;
+  onMethodologySynthesis: () => void;
 }, loading: {
   generatingComprehensiveSummary?: boolean;
   creatingNote?: boolean;
+  // PhD-specific loading states
+  generatingThesisChapter?: boolean;
+  generatingGapAnalysis?: boolean;
+  generatingMethodologySynthesis?: boolean;
 } = {}): QuickAction[] => [
   {
     id: 'new-report',
@@ -180,6 +191,36 @@ export const createQuickActions = (handlers: {
     color: '#8b5cf6',
     onClick: handlers.onComprehensiveAnalysis,
     loading: loading.generatingComprehensiveSummary
+  },
+  {
+    id: 'thesis-chapter',
+    label: '📖 Thesis Chapter Generator',
+    description: 'Structure findings into academic chapter format',
+    icon: BookOpenIcon,
+    color: '#8b5cf6',
+    onClick: handlers.onThesisChapter,
+    loading: loading.generatingThesisChapter,
+    badge: 'PhD'
+  },
+  {
+    id: 'gap-analysis',
+    label: '🔍 Literature Gap Analysis',
+    description: 'Identify research gaps and future opportunities',
+    icon: MagnifyingGlassIcon,
+    color: '#f59e0b',
+    onClick: handlers.onGapAnalysis,
+    loading: loading.generatingGapAnalysis,
+    badge: 'PhD'
+  },
+  {
+    id: 'methodology-synthesis',
+    label: '🧪 Methodology Synthesis',
+    description: 'Extract and compare research methods across papers',
+    icon: BeakerIcon,
+    color: '#10b981',
+    onClick: handlers.onMethodologySynthesis,
+    loading: loading.generatingMethodologySynthesis,
+    badge: 'PhD'
   },
   {
     id: 'invite',

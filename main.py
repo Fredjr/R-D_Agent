@@ -9703,9 +9703,21 @@ async def generate_comprehensive_project_summary(
     http_request: Request,
     db: Session = Depends(get_db)
 ):
-    """Generate a comprehensive project summary using specialized agents"""
+    """Generate a comprehensive project summary using specialized agents with optional PhD enhancements"""
     try:
         current_user = http_request.headers.get("User-ID", "default_user")
+
+        # Parse request body for PhD enhancements
+        request_body = {}
+        try:
+            request_body = await http_request.json()
+        except:
+            request_body = {}
+
+        # Check if PhD enhancements are requested
+        phd_enhancements = request_body.get("phd_enhancements", {})
+        analysis_mode = request_body.get("analysis_mode", "comprehensive")
+        user_context = request_body.get("user_context", {})
 
         # Verify project access and get full project data
         project = db.query(Project).filter(Project.project_id == project_id).first()
@@ -9788,27 +9800,83 @@ async def generate_comprehensive_project_summary(
 
         # Initialize the orchestrator with LLM
         llm = get_llm_analyzer()
-        orchestrator = ProjectSummaryOrchestrator(llm)
 
-        # Generate comprehensive summary using specialized agents
-        summary_results = await orchestrator.generate_comprehensive_summary(project_data)
+        # Check if PhD enhancements are requested and available
+        if any(phd_enhancements.values()) and PHD_ANALYSIS_AVAILABLE:
+            logger.info(f"🎓 Running PhD-enhanced comprehensive analysis for project {project_id}")
 
-        # Return the comprehensive analysis
-        return {
-            "project_id": project_id,
-            "project_name": project.project_name,
-            "generated_at": datetime.utcnow().isoformat(),
-            "generated_by": current_user,
-            "summary_type": "comprehensive",
-            "analysis_results": summary_results,
-            "metadata": {
-                "total_reports": len(reports),
-                "total_collaborators": len(collaborators),
-                "total_annotations": len(annotations),
-                "total_deep_dives": len(deep_dive_analyses),
-                "project_duration_days": (datetime.utcnow() - project.created_at).days
+            # Create PhD orchestrator
+            phd_orchestrator = create_phd_orchestrator(llm)
+
+            # Prepare PhD analysis configuration
+            analysis_config = {
+                "analysis_type": "thesis_structured" if phd_enhancements.get("thesis_structure") else "comprehensive_phd",
+                "agent_config": {
+                    "literature_review": {"enabled": True},
+                    "methodology_synthesis": {"enabled": phd_enhancements.get("methodology_synthesis", False)},
+                    "gap_analysis": {"enabled": phd_enhancements.get("gap_analysis", False)},
+                    "thesis_structure": {"enabled": phd_enhancements.get("thesis_structure", False)},
+                    "citation_network": {"enabled": phd_enhancements.get("citation_analysis", False)}
+                },
+                "user_context": user_context,
+                "output_preferences": {
+                    "format": "academic_chapters" if phd_enhancements.get("academic_writing") else "comprehensive",
+                    "citation_style": user_context.get("citation_style", "apa")
+                },
+                "include_base_analysis": True
             }
-        }
+
+            # Generate PhD-enhanced analysis
+            phd_results = await phd_orchestrator.generate_phd_analysis(project_data, analysis_config)
+
+            # Return enhanced results
+            return {
+                "project_id": project_id,
+                "project_name": project.project_name,
+                "generated_at": datetime.utcnow().isoformat(),
+                "generated_by": current_user,
+                "summary_type": "phd_enhanced_comprehensive",
+                "analysis_mode": analysis_mode,
+                "base_analysis": phd_results.get("base_analysis"),
+                "phd_enhancements": {
+                    "thesis_chapters": phd_results.get("phd_outputs", {}).get("thesis_structure"),
+                    "gap_analysis": phd_results.get("agent_results", {}).get("gap_analysis"),
+                    "methodology_synthesis": phd_results.get("agent_results", {}).get("methodology_synthesis"),
+                    "citation_analysis": phd_results.get("agent_results", {}).get("citation_network"),
+                    "literature_review": phd_results.get("agent_results", {}).get("literature_review")
+                },
+                "agents_executed": list(phd_results.get("agent_results", {}).keys()),
+                "metadata": {
+                    "total_reports": len(reports),
+                    "total_collaborators": len(collaborators),
+                    "total_annotations": len(annotations),
+                    "total_deep_dives": len(deep_dive_analyses),
+                    "project_duration_days": (datetime.utcnow() - project.created_at).days,
+                    "phd_enhancements_enabled": list(k for k, v in phd_enhancements.items() if v)
+                }
+            }
+
+        else:
+            # Standard comprehensive analysis
+            orchestrator = ProjectSummaryOrchestrator(llm)
+            summary_results = await orchestrator.generate_comprehensive_summary(project_data)
+
+            # Return the standard comprehensive analysis
+            return {
+                "project_id": project_id,
+                "project_name": project.project_name,
+                "generated_at": datetime.utcnow().isoformat(),
+                "generated_by": current_user,
+                "summary_type": "comprehensive",
+                "analysis_results": summary_results,
+                "metadata": {
+                    "total_reports": len(reports),
+                    "total_collaborators": len(collaborators),
+                    "total_annotations": len(annotations),
+                    "total_deep_dives": len(deep_dive_analyses),
+                    "project_duration_days": (datetime.utcnow() - project.created_at).days
+                }
+            }
 
     except HTTPException:
         raise
@@ -14362,6 +14430,172 @@ async def mesh_health_check():
             status_code=503,
             detail=f"MeSH autocomplete service unhealthy: {str(e)}"
         )
+
+# =============================================================================
+# PHD ANALYSIS ENDPOINTS
+# =============================================================================
+
+# Import PhD analysis functionality
+try:
+    from phd_analysis_endpoints import (
+        PhDAnalysisRequest, PhDProgressRequest,
+        PhDAnalysisResponse, PhDProgressResponse,
+        get_project_data, calculate_phd_progress_metrics
+    )
+    from phd_thesis_agents import create_phd_orchestrator, PhDThesisOrchestrator
+    PHD_ANALYSIS_AVAILABLE = True
+    logger.info("✅ PhD analysis endpoints loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ PhD analysis not available: {e}")
+    PHD_ANALYSIS_AVAILABLE = False
+
+@app.post("/projects/{project_id}/phd-analysis")
+async def generate_phd_analysis_endpoint(
+    project_id: str,
+    request: dict,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """Generate PhD-specific analysis for a project using specialized agent orchestration"""
+    if not PHD_ANALYSIS_AVAILABLE:
+        raise HTTPException(status_code=503, detail="PhD analysis service not available")
+
+    start_time = datetime.now()
+
+    try:
+        logger.info(f"🎓 Starting PhD analysis for project {project_id}")
+        logger.info(f"🎓 Analysis type: {request.get('analysis_type', 'comprehensive_phd')}")
+
+        # Get comprehensive project data
+        project_data = await get_project_data(project_id, db)
+
+        # Create PhD orchestrator
+        phd_orchestrator = create_phd_orchestrator(llm)
+
+        # Prepare analysis configuration
+        analysis_config = {
+            "analysis_type": request.get("analysis_type", "comprehensive_phd"),
+            "agent_config": request.get("agent_config", {
+                "literature_review": {"enabled": True},
+                "methodology_synthesis": {"enabled": True},
+                "gap_analysis": {"enabled": True},
+                "thesis_structure": {"enabled": True},
+                "citation_network": {"enabled": True}
+            }),
+            "user_context": request.get("user_context", {
+                "academic_level": "phd",
+                "research_stage": "dissertation"
+            }),
+            "output_preferences": request.get("output_preferences", {
+                "format": "thesis_structured",
+                "citation_style": "apa"
+            }),
+            "include_base_analysis": request.get("include_base_analysis", True)
+        }
+
+        # Run PhD analysis
+        analysis_results = await phd_orchestrator.generate_phd_analysis(project_data, analysis_config)
+
+        # Calculate processing time
+        processing_time = (datetime.now() - start_time).total_seconds()
+
+        # Prepare response
+        response = {
+            "analysis_type": request.get("analysis_type", "comprehensive_phd"),
+            "timestamp": datetime.now().isoformat(),
+            "project_id": project_id,
+            "agent_results": analysis_results.get("agent_results", {}),
+            "phd_outputs": analysis_results.get("phd_outputs", {}),
+            "base_analysis": analysis_results.get("base_analysis"),
+            "processing_time_seconds": processing_time,
+            "agents_executed": list(analysis_results.get("agent_results", {}).keys()),
+            "error": analysis_results.get("error")
+        }
+
+        logger.info(f"🎓 PhD analysis completed for project {project_id} in {processing_time:.2f}s")
+        logger.info(f"🎓 Agents executed: {response['agents_executed']}")
+
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"🎓 PhD analysis failed for project {project_id}: {e}")
+        processing_time = (datetime.now() - start_time).total_seconds()
+
+        return {
+            "analysis_type": request.get("analysis_type", "comprehensive_phd"),
+            "timestamp": datetime.now().isoformat(),
+            "project_id": project_id,
+            "processing_time_seconds": processing_time,
+            "error": str(e)
+        }
+
+@app.get("/projects/{project_id}/phd-progress")
+async def get_phd_progress_endpoint(
+    project_id: str,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """Get PhD progress metrics for a project"""
+    if not PHD_ANALYSIS_AVAILABLE:
+        raise HTTPException(status_code=503, detail="PhD analysis service not available")
+
+    try:
+        logger.info(f"📊 Calculating PhD progress for project {project_id}")
+
+        # Get project data
+        project_data = await get_project_data(project_id, db)
+
+        # Calculate progress metrics
+        progress_metrics = calculate_phd_progress_metrics(project_data)
+
+        # Generate recommendations
+        recommendations = []
+        next_steps = []
+
+        # Add recommendations based on progress
+        completion_pct = progress_metrics["dissertation_progress"].get("completion_percentage", 0)
+        papers_reviewed = progress_metrics["literature_coverage"].get("papers_reviewed", 0)
+
+        if completion_pct < 25:
+            recommendations.append("Focus on comprehensive literature review and theoretical framework development")
+            next_steps.append("Conduct systematic literature search and organize papers into collections")
+        elif completion_pct < 50:
+            recommendations.append("Begin methodology development and research design planning")
+            next_steps.append("Run gap analysis to identify research opportunities")
+        elif completion_pct < 75:
+            recommendations.append("Focus on data collection and analysis methodology")
+            next_steps.append("Generate thesis chapter structure and begin writing")
+        else:
+            recommendations.append("Focus on results analysis and discussion development")
+            next_steps.append("Prepare for dissertation defense and final revisions")
+
+        if papers_reviewed < 50:
+            recommendations.append("Expand literature review to include more comprehensive coverage")
+            next_steps.append("Add more papers to collections and conduct deep dive analyses")
+
+        response = {
+            "project_id": project_id,
+            "timestamp": datetime.now().isoformat(),
+            "dissertation_progress": progress_metrics["dissertation_progress"],
+            "literature_coverage": progress_metrics["literature_coverage"],
+            "research_milestones": progress_metrics["research_milestones"],
+            "recent_activity": progress_metrics["recent_activity"],
+            "recommendations": recommendations,
+            "next_steps": next_steps
+        }
+
+        logger.info(f"📊 PhD progress calculated for project {project_id}")
+        logger.info(f"📊 Completion: {completion_pct:.1f}%, Papers: {papers_reviewed}")
+
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error calculating PhD progress for project {project_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to calculate PhD progress: {str(e)}")
 
 # =============================================================================
 # SPOTIFY-INSPIRED AI RECOMMENDATIONS ENDPOINTS

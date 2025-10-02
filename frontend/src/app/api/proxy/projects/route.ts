@@ -5,11 +5,16 @@ import { handleProxyError, handleProxyException } from '@/lib/errorHandler';
 const BACKEND_URL = "https://r-dagent-production.up.railway.app";
 
 export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const user_id = searchParams.get('user_id') || 'default_user';
+
   try {
-    const { searchParams } = new URL(request.url);
-    const user_id = searchParams.get('user_id') || 'default_user';
-    
-    console.log('🔄 Fetching projects for user:', user_id);
+
+    console.log('🔄 [Projects GET] Fetching projects for user:', user_id);
+
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
 
     const response = await fetch(`${BACKEND_URL}/projects?user_id=${user_id}`, {
       method: 'GET',
@@ -17,19 +22,40 @@ export async function GET(request: NextRequest) {
         'Content-Type': 'application/json',
         'User-ID': request.headers.get('User-ID') || user_id,
       },
+      signal: controller.signal,
     });
 
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
-      console.error('❌ Backend projects fetch failed:', response.status);
+      console.error('❌ [Projects GET] Backend projects fetch failed:', response.status, response.statusText);
       return await handleProxyError(response, 'Projects fetch', BACKEND_URL);
     }
 
     const data = await response.json();
-    console.log('✅ Projects fetched successfully:', data.projects?.length || 0, 'projects');
+    console.log('✅ [Projects GET] Projects fetched successfully:', data.projects?.length || 0, 'projects');
 
     return NextResponse.json(data);
-  } catch (error) {
-    console.error('❌ Projects fetch proxy exception:', error);
+  } catch (error: any) {
+    console.error('❌ [Projects GET] Projects fetch proxy exception:', error);
+
+    // Handle timeout specifically
+    if (error.name === 'AbortError') {
+      return NextResponse.json(
+        {
+          error: 'Projects fetch failed',
+          message: 'Request timed out after 25 seconds',
+          status: 504,
+          timestamp: new Date().toISOString(),
+          path: `${BACKEND_URL}/projects?user_id=${user_id}`,
+          details: {
+            backend_url: BACKEND_URL
+          }
+        },
+        { status: 504 }
+      );
+    }
+
     return handleProxyException(error, 'Projects fetch', BACKEND_URL);
   }
 }
