@@ -21,6 +21,10 @@ import { SpotifyProjectHeader } from '@/components/ui/SpotifyProjectHeader';
 import { SpotifyProjectTabs } from '@/components/ui/SpotifyProjectTabs';
 import { SpotifyQuickActions, createQuickActions } from '@/components/ui/SpotifyQuickActions';
 import PhDProgressDashboard from '@/components/PhDProgressDashboard';
+import PhDEnhancedSummary from '@/components/phd/PhDEnhancedSummary';
+import ThesisChapterStructure from '@/components/phd/ThesisChapterStructure';
+import LiteratureGapAnalysis from '@/components/phd/LiteratureGapAnalysis';
+import MethodologySynthesis from '@/components/phd/MethodologySynthesis';
 import {
   Button,
   Card,
@@ -644,16 +648,15 @@ Perfect for your dissertation chapters! 🎓`);
       const data = await response.json();
       setPhdAnalysisData(data);
 
-      alert(`📖 Thesis chapter generated successfully!
+      console.log('📖 Thesis chapter generated successfully:', data);
 
-✅ Generated sections:
-• Literature Review Framework
-• Theoretical Foundation
-• Methodology Overview
-• Key Findings Summary
-• Academic Citations
-
-Perfect for your dissertation! 🎓`);
+      // Scroll to the thesis structure component
+      setTimeout(() => {
+        const thesisElement = document.querySelector('[data-component="thesis-structure"]');
+        if (thesisElement) {
+          thesisElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
 
     } catch (error: any) {
       console.error('Error generating thesis chapter:', error);
@@ -693,16 +696,15 @@ Perfect for your dissertation! 🎓`);
       const data = await response.json();
       setPhdAnalysisData(data);
 
-      alert(`🔍 Literature gap analysis complete!
+      console.log('🔍 Gap analysis generated successfully:', data);
 
-✅ Identified:
-• Research Gaps in Literature
-• Methodology Opportunities
-• Temporal Research Trends
-• Cross-Domain Connections
-• Future Research Directions
-
-Great for identifying your research contribution! 🎯`);
+      // Scroll to the gap analysis component
+      setTimeout(() => {
+        const gapElement = document.querySelector('[data-component="gap-analysis"]');
+        if (gapElement) {
+          gapElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
 
     } catch (error: any) {
       console.error('Error generating gap analysis:', error);
@@ -741,16 +743,15 @@ Great for identifying your research contribution! 🎯`);
       const data = await response.json();
       setPhdAnalysisData(data);
 
-      alert(`🧪 Methodology synthesis complete!
+      console.log('🧪 Methodology synthesis generated successfully:', data);
 
-✅ Analyzed:
-• Research Method Classifications
-• Statistical Approaches Used
-• Experimental Design Patterns
-• Methodology Effectiveness
-• Best Practice Recommendations
-
-Perfect for your methods chapter! 📊`);
+      // Scroll to the methodology synthesis component
+      setTimeout(() => {
+        const methodologyElement = document.querySelector('[data-component="methodology-synthesis"]');
+        if (methodologyElement) {
+          methodologyElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
 
     } catch (error: any) {
       console.error('Error generating methodology synthesis:', error);
@@ -1832,73 +1833,101 @@ Perfect for your methods chapter! 📊`);
           </div>
         </div>
 
-        {/* Comprehensive Summary Results */}
+        {/* PhD Enhanced Comprehensive Summary */}
         {comprehensiveSummary && (
-          <div className="bg-white rounded-lg shadow p-6 mb-8">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Comprehensive Project Analysis</h2>
-              <p className="text-gray-600 mb-4">Generated on {new Date(comprehensiveSummary.generated_at).toLocaleDateString()}</p>
+          <PhDEnhancedSummary
+            data={{
+              analysis_type: 'comprehensive_summary',
+              timestamp: comprehensiveSummary.generated_at,
+              project_id: projectId,
+              base_analysis: comprehensiveSummary.analysis_results,
+              phd_enhancements: comprehensiveSummary.phd_enhancements,
+              processing_time_seconds: comprehensiveSummary.processing_time_seconds,
+              agents_executed: comprehensiveSummary.agents_executed,
+              metadata: comprehensiveSummary.metadata
+            }}
+            onRegenerateSection={(section) => {
+              console.log('Regenerating section:', section);
+              // TODO: Implement section regeneration
+            }}
+            onExportSummary={() => {
+              console.log('Exporting summary');
+              // TODO: Implement export functionality
+            }}
+            className="mb-8"
+          />
+        )}
 
-              {/* Executive Summary */}
-              {comprehensiveSummary.analysis_results?.synthesis?.executive_summary && (
-                <div className="bg-blue-50 p-4 rounded-lg mb-6">
-                  <h3 className="font-semibold text-blue-900 mb-2">Executive Summary</h3>
-                  <p className="text-blue-800 text-sm leading-relaxed">
-                    {comprehensiveSummary.analysis_results.synthesis.executive_summary}
-                  </p>
-                </div>
-              )}
-
-              {/* Key Achievements */}
-              {comprehensiveSummary.analysis_results?.synthesis?.key_achievements && (
-                <div className="mb-6">
-                  <h3 className="font-semibold text-gray-900 mb-3">Key Achievements</h3>
-                  <ul className="space-y-2">
-                    {comprehensiveSummary.analysis_results.synthesis.key_achievements.map((achievement: string, idx: number) => (
-                      <li key={idx} className="flex items-start">
-                        <span className="text-green-500 mr-2">✓</span>
-                        <span className="text-gray-700 text-sm">{achievement}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Strategic Recommendations */}
-              {comprehensiveSummary.analysis_results?.synthesis?.strategic_recommendations && (
-                <div className="mb-6">
-                  <h3 className="font-semibold text-gray-900 mb-3">Strategic Recommendations</h3>
-                  <ul className="space-y-2">
-                    {comprehensiveSummary.analysis_results.synthesis.strategic_recommendations.map((rec: string, idx: number) => (
-                      <li key={idx} className="flex items-start">
-                        <span className="text-blue-500 mr-2">→</span>
-                        <span className="text-gray-700 text-sm">{rec}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Project Metrics */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-gray-900">{comprehensiveSummary.metadata?.total_reports || 0}</div>
-                  <div className="text-sm text-gray-600">Reports</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-gray-900">{comprehensiveSummary.metadata?.total_deep_dives || 0}</div>
-                  <div className="text-sm text-gray-600">Deep Dives</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-gray-900">{comprehensiveSummary.metadata?.total_annotations || 0}</div>
-                  <div className="text-sm text-gray-600">Annotations</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-gray-900">{comprehensiveSummary.metadata?.project_duration_days || 0}</div>
-                  <div className="text-sm text-gray-600">Days Active</div>
-                </div>
+        {/* Individual PhD Analysis Results */}
+        {phdAnalysisData && (
+          <div className="space-y-8 mb-8">
+            {/* Thesis Chapter Structure */}
+            {(phdAnalysisData?.phd_outputs?.thesis_structure || generatingThesisChapter) && (
+              <div data-component="thesis-structure">
+                <ThesisChapterStructure
+                  chapters={phdAnalysisData?.phd_outputs?.thesis_structure?.chapters || []}
+                  totalEstimatedWords={phdAnalysisData?.phd_outputs?.thesis_structure?.total_words}
+                  completionPercentage={phdAnalysisData?.phd_outputs?.thesis_structure?.completion_percentage}
+                  loading={generatingThesisChapter}
+                  error={phdAnalysisData?.error}
+                  onRetry={() => handleThesisChapter()}
+                  onChapterClick={(chapter) => {
+                    console.log('Chapter clicked:', chapter);
+                    // TODO: Implement chapter detail view
+                  }}
+                  onEditChapter={(chapter) => {
+                    console.log('Edit chapter:', chapter);
+                    // TODO: Implement chapter editing
+                  }}
+                />
               </div>
-            </div>
+            )}
+
+            {/* Literature Gap Analysis */}
+            {(phdAnalysisData?.agent_results?.gap_analysis || generatingGapAnalysis) && (
+              <div data-component="gap-analysis">
+                <LiteratureGapAnalysis
+                  gaps={phdAnalysisData?.agent_results?.gap_analysis?.identified_gaps || []}
+                  totalPapersAnalyzed={phdAnalysisData?.agent_results?.gap_analysis?.papers_analyzed}
+                  analysisDate={phdAnalysisData?.timestamp}
+                  researchDomains={phdAnalysisData?.agent_results?.gap_analysis?.research_domains || []}
+                  loading={generatingGapAnalysis}
+                  error={phdAnalysisData?.error}
+                  onRetry={() => handleGapAnalysis()}
+                  onGapClick={(gap) => {
+                    console.log('Gap clicked:', gap);
+                    // TODO: Implement gap detail view
+                  }}
+                  onExploreOpportunity={(gap) => {
+                    console.log('Explore opportunity:', gap);
+                    // TODO: Implement opportunity exploration
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Methodology Synthesis */}
+            {(phdAnalysisData?.agent_results?.methodology_synthesis || generatingMethodologySynthesis) && (
+              <div data-component="methodology-synthesis">
+                <MethodologySynthesis
+                  methodologies={phdAnalysisData?.agent_results?.methodology_synthesis?.methodologies || []}
+                  comparisons={phdAnalysisData?.agent_results?.methodology_synthesis?.comparisons || []}
+                  totalPapersAnalyzed={phdAnalysisData?.agent_results?.methodology_synthesis?.papers_analyzed}
+                  recommendedCombinations={phdAnalysisData?.agent_results?.methodology_synthesis?.recommended_combinations || []}
+                  loading={generatingMethodologySynthesis}
+                  error={phdAnalysisData?.error}
+                  onRetry={() => handleMethodologySynthesis()}
+                  onMethodologyClick={(methodology) => {
+                    console.log('Methodology clicked:', methodology);
+                    // TODO: Implement methodology detail view
+                  }}
+                  onCompareMethodologies={(methodA, methodB) => {
+                    console.log('Compare methodologies:', methodA, methodB);
+                    // TODO: Implement methodology comparison
+                  }}
+                />
+              </div>
+            )}
           </div>
         )}
 
