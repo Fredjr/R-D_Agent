@@ -1,0 +1,19 @@
+# Railway Deployment Trigger File
+# This file is used to trigger Railway deployments from GitHub
+# Timestamp: 2025-10-02T22:45:00Z
+
+DEPLOYMENT_VERSION=v2.1.0
+DEPLOYMENT_REASON=Fix missing backend methods for PhD analysis
+MISSING_METHODS_FIXED=_extract_research_domains,_generate_methodology_comparisons,_format_gaps_for_ui,_format_methodologies_for_ui
+
+# Changes in this deployment:
+# 1. Fixed ResearchGapAgent._extract_research_domains method
+# 2. Fixed MethodologySynthesisAgent._generate_methodology_comparisons method  
+# 3. Added error handling for missing UI formatting methods
+# 4. Optimized Docker image size with .dockerignore
+# 5. Added runtime model downloading to avoid 1GB slug limit
+
+# Expected fixes:
+# - Gap Analysis should show actual research gaps instead of 502 errors
+# - Methodology Synthesis should show research methodologies instead of empty state
+# - Thesis chapters should show contextual data instead of placeholder content
