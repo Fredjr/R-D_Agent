@@ -62,7 +62,7 @@ from deep_dive_agents import (
     run_enhanced_model_pipeline_with_context, run_methods_pipeline_with_context, run_results_pipeline_with_context,
     run_enhanced_model_pipeline_with_contract, run_methods_pipeline_with_contract, run_results_pipeline_with_contract
 )
-from project_summary_agents import ProjectSummaryOrchestrator, ContextEnhancedProjectSummaryOrchestrator
+from project_summary_agents import ProjectSummaryOrchestrator, ContextEnhancedProjectSummaryOrchestrator, ContractEnhancedProjectSummaryOrchestrator
 from langchain.agents import AgentType, initialize_agent
 from scoring import calculate_publication_score
 
@@ -10472,8 +10472,36 @@ async def generate_comprehensive_project_summary(
                 # Graceful fallback - continue without context assembly
                 context_pack = None
 
-            # Use context-enhanced orchestrator if context is available
-            if context_pack:
+            # 🚀 ENHANCEMENT: OutputContract Integration for Comprehensive Analysis
+            output_contract = None
+            try:
+                from phd_thesis_agents import OutputContract
+                output_contract = OutputContract.get_academic_contract("gap_analysis")
+                log_event({
+                    "event": "comprehensive_analysis_output_contract_loaded",
+                    "contract_requirements": {
+                        "required_quotes": output_contract.get("required_quotes", 0),
+                        "required_entities": output_contract.get("required_entities", 0),
+                        "min_gaps_identified": output_contract.get("min_gaps_identified", 0)
+                    },
+                    "project_id": project_id
+                })
+            except Exception as e:
+                log_event({
+                    "event": "comprehensive_analysis_output_contract_error",
+                    "error": str(e),
+                    "project_id": project_id
+                })
+                output_contract = None
+
+            # Use triple-tier orchestrator selection with context and contract enhancement
+            if context_pack and output_contract:
+                # Create contract-enhanced comprehensive analysis
+                orchestrator = ContractEnhancedProjectSummaryOrchestrator(llm, context_pack, output_contract)
+                summary_results = await orchestrator.generate_comprehensive_summary(project_data)
+
+                analysis_type = "contract_enhanced_comprehensive"
+            elif context_pack:
                 # Create context-enhanced comprehensive analysis
                 orchestrator = ContextEnhancedProjectSummaryOrchestrator(llm, context_pack)
                 summary_results = await orchestrator.generate_comprehensive_summary(project_data)
@@ -10494,10 +10522,20 @@ async def generate_comprehensive_project_summary(
                 "generated_by": current_user,
                 "summary_type": analysis_type,
                 "analysis_results": summary_results,
-                "context_enhancement": {
-                    "enabled": context_pack is not None,
+                "quality_enhancement": {
+                    "context_assembly": context_pack is not None,
+                    "output_contract": output_contract is not None,
+                    "enhancement_level": "context_and_contract" if (context_pack and output_contract) else
+                                       "context_only" if context_pack else
+                                       "contract_only" if output_contract else "standard",
                     "papers_analyzed": len(papers_data) if context_pack else 0,
-                    "context_dimensions": len(context_pack) if context_pack else 0
+                    "context_dimensions": len(context_pack) if context_pack else 0,
+                    "contract_requirements": {
+                        "required_quotes": output_contract.get("required_quotes", 0) if output_contract else 0,
+                        "required_entities": output_contract.get("required_entities", 0) if output_contract else 0,
+                        "gap_identification": output_contract.get("require_gap_identification", False) if output_contract else False,
+                        "evidence_assessment": output_contract.get("require_evidence_assessment", False) if output_contract else False
+                    } if output_contract else None
                 },
                 "metadata": {
                     "total_reports": len(reports),
