@@ -2503,11 +2503,68 @@ def _mark_seen(top_article: Optional[dict], seen_pmids: set[str], seen_titles: s
 def _time_left(deadline: float) -> float:
     return max(0.0, deadline - time.time())
 
-def _build_query_plan(objective: str, memories_text: str, deadline: float, molecule: Optional[str] = None) -> dict:
-    """Return a dict of queries. Prefer deterministic planner; optionally try LLM strategist when enabled."""
+def _build_query_plan(objective: str, memories_text: str, deadline: float, molecule: Optional[str] = None, context_pack: dict = None) -> dict:
+    """Return a dict of queries. Enhanced with context assembly for PhD-level literature synthesis."""
     if _time_left(deadline) < 1.0:
         return {}
-    strategist_template = """
+
+    # 🚀 ENHANCED STRATEGIST TEMPLATE with Context Assembly
+    if context_pack:
+        # Use context-aware template when context is available
+        strategist_template = """
+You are a Senior Literature Review Specialist with expertise in {research_domain} and {experience_level} research methodology.
+
+CONTEXT PACK:
+USER PROFILE: {research_domain}, {experience_level}, {project_phase}, {key_constraints}
+PROJECT CONTEXT: {project_objective}, {research_questions}, {theoretical_framework}, {previous_findings}
+LITERATURE LANDSCAPE: {total_papers} papers, {date_range}, {key_authors}, {dominant_methods}
+
+ACADEMIC STANDARDS (MANDATORY - PhD Dissertation Level):
+✅ Generate queries that target high-impact literature with theoretical depth
+✅ Include mechanism-specific queries with methodological precision
+✅ Target recent reviews and seminal papers in {research_domain}
+✅ Include clinical translation queries when applicable
+✅ Generate broad conceptual queries for comprehensive coverage
+
+OUTPUT ONLY a JSON object with EXACTLY these keys:
+review_query, mechanism_query, clinical_query, broad_query, web_query.
+
+- review_query: Target recent high-impact review articles in {research_domain} with theoretical frameworks
+- mechanism_query: PubMed fielded query using [tiab] targeting core mechanisms with methodological precision
+- clinical_query: Clinical trials/human studies with translational relevance
+- broad_query: Broadened conceptual query covering related theoretical frameworks
+- web_query: Google search optimized for recent research developments and expert perspectives
+
+Objective: {objective}
+Molecule (if any): {molecule}
+Prior Context: {memories}
+        """
+
+        # Extract context variables with fallbacks
+        user_profile = context_pack.get("user_profile", {})
+        project_context = context_pack.get("project_context", {})
+        literature_landscape = context_pack.get("literature_landscape", {})
+
+        template_vars = {
+            "objective": objective,
+            "molecule": molecule or "",
+            "memories": memories_text,
+            "research_domain": user_profile.get("research_domain", "biomedical_research"),
+            "experience_level": user_profile.get("experience_level", "intermediate"),
+            "project_phase": user_profile.get("project_phase", "literature_review"),
+            "key_constraints": ", ".join(user_profile.get("key_constraints", [])),
+            "project_objective": project_context.get("objective", objective),
+            "research_questions": ", ".join(project_context.get("research_questions", [objective])),
+            "theoretical_framework": project_context.get("theoretical_framework", "evidence_based_medicine"),
+            "previous_findings": " | ".join(project_context.get("previous_findings", [])),
+            "total_papers": literature_landscape.get("total_papers", "unknown"),
+            "date_range": literature_landscape.get("date_range", "recent"),
+            "key_authors": ", ".join(literature_landscape.get("key_authors", [])),
+            "dominant_methods": ", ".join(literature_landscape.get("dominant_methods", []))
+        }
+    else:
+        # Fallback to original template when no context available
+        strategist_template = """
 You are a master research strategist at a biotech firm. Given the user's objective and prior context, output ONLY a JSON object with EXACTLY these keys:
 review_query, mechanism_query, clinical_query, broad_query, web_query.
 - review_query: recent high-impact review articles
@@ -2519,21 +2576,52 @@ review_query, mechanism_query, clinical_query, broad_query, web_query.
 Objective: {objective}
 Molecule (if any): {molecule}
 Prior Context: {memories}
-"""
-    # Prefer deterministic per-corpus plan. Optionally augment with LLM strategist if enabled and valid.
+        """
+
+        template_vars = {
+            "objective": objective,
+            "molecule": molecule or "",
+            "memories": memories_text
+        }
+    # Enhanced LLM strategist with context assembly
     llm_plan: Optional[dict] = None
     if STRATEGIST_LLM_ENABLED:
         try:
-            prompt = PromptTemplate(template=strategist_template, input_variables=["objective", "memories", "molecule"])
+            # Use context-aware template variables or fallback to basic variables
+            if context_pack:
+                input_variables = list(template_vars.keys())
+                # Truncate long variables for LLM efficiency
+                truncated_vars = {}
+                for k, v in template_vars.items():
+                    if isinstance(v, str):
+                        truncated_vars[k] = v[:400] if k in ["objective", "memories"] else v[:200]
+                    else:
+                        truncated_vars[k] = str(v)[:200]
+            else:
+                input_variables = ["objective", "memories", "molecule"]
+                truncated_vars = {
+                    "objective": objective[:400],
+                    "memories": memories_text[:400],
+                    "molecule": (molecule or "")[:200]
+                }
+
+            prompt = PromptTemplate(template=strategist_template, input_variables=input_variables)
             chain = LLMChain(llm=get_llm_analyzer(), prompt=prompt)
-            out = chain.invoke({"objective": objective[:400], "memories": memories_text[:400], "molecule": (molecule or "")[:200]})
+            out = chain.invoke(truncated_vars)
             txt = out.get("text", out) if isinstance(out, dict) else str(out)
             if "```" in txt:
                 txt = txt.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
             candidate = json.loads(txt)
             if isinstance(candidate, dict):
                 llm_plan = candidate
-        except Exception:
+        except Exception as e:
+            # Log context assembly errors for debugging
+            if context_pack:
+                log_event({
+                    "event": "context_aware_strategist_error",
+                    "error": str(e),
+                    "has_context": bool(context_pack)
+                })
             llm_plan = None
     # Deterministic fallback (default path)
     obj = _normalize_entities(objective or "").strip()
@@ -3127,7 +3215,7 @@ Abstract: {abstract}
         })
     return extracted_results
 
-async def orchestrate_v2(request, memories: list[dict]) -> dict:
+async def orchestrate_v2(request, memories: list[dict], context_pack: dict = None) -> dict:
     deadline = time.time() + TOTAL_BUDGET_S
     # Timings
     plan_ms = 0
@@ -3135,10 +3223,10 @@ async def orchestrate_v2(request, memories: list[dict]) -> dict:
     triage_ms = 0
     deepdive_ms = 0
 
-    # Strategist
+    # Strategist - Enhanced with Context Assembly
     mem_txt = " | ".join(m.get("text", "")[:200] for m in memories) if memories else ""
     _t0 = _now_ms()
-    plan = _build_query_plan(request.objective, mem_txt, deadline, getattr(request, "molecule", None))
+    plan = _build_query_plan(request.objective, mem_txt, deadline, getattr(request, "molecule", None), context_pack)
     plan = _inject_molecule_into_plan(plan, getattr(request, "molecule", None))
     # Apply OA/full-text filters when requested
     try:
@@ -10202,7 +10290,7 @@ async def get_job_status(job_id: str, request: Request, db: Session = Depends(ge
 async def generate_review_internal(request: ReviewRequest, db: Session, current_user: str = None):
     req_start = _now_ms()
     _metrics_inc("requests_total", 1)
-    
+
     # Dynamic timeout based on preference: 30min for recall, 20min for precision
     preference = getattr(request, "preference", "precision") or "precision"
     timeout_budget = 1800 if preference.lower() == "recall" else 1200  # 30min vs 20min
@@ -10210,6 +10298,7 @@ async def generate_review_internal(request: ReviewRequest, db: Session, current_
 
     def time_left_s() -> float:
         return max(0.0, deadline - time.time())
+
     # Response cache lookup
     cache_key = None
     if ENABLE_CACHING:
@@ -10231,6 +10320,7 @@ async def generate_review_internal(request: ReviewRequest, db: Session, current_
                 return cached
         except Exception:
             pass
+
     # Retrieve memory if available
     memories = _retrieve_memories(request.project_id, request.objective)
     memory_hint = ""
@@ -10238,10 +10328,53 @@ async def generate_review_internal(request: ReviewRequest, db: Session, current_
         hints = " | ".join(m.get("text", "")[:200] for m in memories)
         memory_hint = f"\nContext: Prior relevant topics for project {request.project_id}: {hints}\n"
 
+    # 🚀 ENHANCEMENT: Context Assembly for Generate-Review
+    context_pack = None
+    try:
+        # Import ContextAssembler from PhD agents
+        from phd_thesis_agents import ContextAssembler
+
+        # Create context assembler instance
+        context_assembler = ContextAssembler()
+
+        # Assemble rich context for generate-review
+        context_pack = await context_assembler.assemble_context(
+            user_profile={
+                "user_id": current_user or "default_user",
+                "research_domain": "biomedical_research",  # Default, can be enhanced with user data
+                "experience_level": "intermediate",  # Default, can be enhanced with user data
+                "project_phase": "literature_review",
+                "key_constraints": ["time_sensitive", "evidence_based"]
+            },
+            project_context={
+                "project_id": request.project_id,
+                "objective": request.objective,
+                "research_questions": [request.objective],  # Can be enhanced
+                "theoretical_framework": "evidence_based_medicine",
+                "previous_findings": [m.get("text", "")[:200] for m in memories] if memories else []
+            },
+            papers_data=[]  # Will be populated after paper retrieval
+        )
+
+        log_event({
+            "event": "context_assembly_success",
+            "project_id": request.project_id,
+            "context_dimensions": len(context_pack) if context_pack else 0
+        })
+
+    except Exception as e:
+        log_event({
+            "event": "context_assembly_error",
+            "error": str(e),
+            "project_id": request.project_id
+        })
+        # Graceful fallback - continue without context assembly
+        context_pack = None
+
     # Branch to V2 orchestrated flow when enabled
     if MULTISOURCE_ENABLED and not getattr(request, "dag_mode", False):
         try:
-            v2 = await orchestrate_v2(request, memories)
+            v2 = await orchestrate_v2(request, memories, context_pack)
             resp = {
                 "molecule": request.molecule,
                 "objective": request.objective,
