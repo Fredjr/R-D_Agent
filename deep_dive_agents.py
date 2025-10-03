@@ -3,7 +3,7 @@ import re
 import urllib.request
 import urllib.parse
 import xml.etree.ElementTree as ET
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
@@ -544,3 +544,282 @@ def _extract_model_section(full_text: str, max_chars: int = 30000) -> str:
 
     # Fallback: take first portion (likely contains introduction + methods)
     return full_text[:max_chars]
+
+
+# 🚀 CONTEXT-ENHANCED DEEP-DIVE ANALYSIS PROMPTS
+# Enhanced versions of the analysis prompts that use context assembly
+
+CONTEXT_ENHANCED_METHODS_PROMPT = PromptTemplate(
+    template=(
+        "You are a Senior Research Methodology Expert specializing in {research_domain} with expertise in experimental design and statistical analysis.\n\n"
+        "CONTEXT PACK:\n"
+        "USER PROFILE: {research_domain}, {experience_level}, {project_phase}\n"
+        "PROJECT CONTEXT: {project_objective}, {research_questions}\n"
+        "PAPER CONTEXT: {paper_title}, {journal}, {year}, {authors}\n\n"
+        "ACADEMIC STANDARDS (MANDATORY - PhD Dissertation Level):\n"
+        "✅ Comprehensive methodology analysis with statistical validation\n"
+        "✅ Domain-specific expertise in {research_domain} methodologies\n"
+        "✅ Critical assessment of experimental design and controls\n"
+        "✅ Reproducibility analysis with sample size adequacy\n"
+        "✅ Methodological innovation identification\n\n"
+        "ANALYSIS REQUIREMENTS:\n"
+        "1. Identify ALL experimental techniques with {research_domain}-specific context\n"
+        "2. Extract parameters with statistical rigor assessment\n"
+        "3. Evaluate methodological appropriateness for {project_objective}\n"
+        "4. Assess controls and validation with domain expertise\n"
+        "5. Identify methodological innovations and limitations\n\n"
+        "Return a JSON array of objects with these fields:\n"
+        "- technique: Method name with domain-specific classification\n"
+        "- measurement: What is measured with precision and accuracy assessment\n"
+        "- role_in_study: Purpose within research framework and {project_objective}\n"
+        "- parameters: Conditions with statistical power assessment\n"
+        "- controls_validation: Control experiments with adequacy evaluation\n"
+        "- limitations_reproducibility: Limitations with severity scoring\n"
+        "- validation: Statistical validation with effect size assessment\n"
+        "- domain_relevance: Relevance to {research_domain} and {project_objective}\n"
+        "- methodological_innovation: Novel aspects and improvements\n"
+        "- accession_ids: Database identifiers and references\n\n"
+        "Focus on: {objective}\n\n"
+        "Article Text: {full_text}"
+    ),
+    input_variables=[
+        "research_domain", "experience_level", "project_phase",
+        "project_objective", "research_questions", "paper_title",
+        "journal", "year", "authors", "objective", "full_text"
+    ],
+)
+
+CONTEXT_ENHANCED_RESULTS_PROMPT = PromptTemplate(
+    template=(
+        "You are a Senior Data Analysis Expert specializing in {research_domain} with expertise in statistical interpretation and evidence synthesis.\n\n"
+        "CONTEXT PACK:\n"
+        "USER PROFILE: {research_domain}, {experience_level}, {project_phase}\n"
+        "PROJECT CONTEXT: {project_objective}, {research_questions}\n"
+        "PAPER CONTEXT: {paper_title}, {journal}, {year}, {authors}\n\n"
+        "ACADEMIC STANDARDS (MANDATORY - PhD Dissertation Level):\n"
+        "✅ Comprehensive results interpretation with effect sizes\n"
+        "✅ Statistical significance with clinical/practical significance\n"
+        "✅ Domain-specific interpretation in {research_domain} context\n"
+        "✅ Evidence strength assessment with confidence intervals\n"
+        "✅ Bias identification and limitation analysis\n\n"
+        "ANALYSIS REQUIREMENTS:\n"
+        "1. Evaluate hypothesis alignment with {project_objective}\n"
+        "2. Extract quantitative results with {research_domain}-specific interpretation\n"
+        "3. Assess statistical and clinical significance\n"
+        "4. Identify biases and confounding factors\n"
+        "5. Evaluate translational potential and practical implications\n\n"
+        "Return a JSON object with these fields:\n"
+        "- hypothesis_alignment: Alignment with {project_objective} (support/refute/mixed)\n"
+        "- key_results: Array of findings with domain-specific interpretation:\n"
+        "  * metric: Measurement with {research_domain} context\n"
+        "  * value: Result with precision and confidence intervals\n"
+        "  * unit: Units with standardization assessment\n"
+        "  * effect_size: Effect size with clinical significance\n"
+        "  * statistical_significance: p-values with multiple testing correction\n"
+        "  * clinical_significance: Practical importance in {research_domain}\n"
+        "  * confidence_interval: 95% CI with interpretation\n"
+        "- statistical_methods: Methods with appropriateness assessment\n"
+        "- sample_characteristics: Demographics with representativeness\n"
+        "- limitations_biases_in_results: Biases with severity scoring\n"
+        "- evidence_strength: Overall strength with GRADE assessment\n"
+        "- translational_potential: Clinical/practical applications\n"
+        "- domain_implications: Implications for {research_domain}\n"
+        "- future_research: Recommendations aligned with {project_objective}\n\n"
+        "Focus on: {objective}\n\n"
+        "Article Text: {full_text}"
+    ),
+    input_variables=[
+        "research_domain", "experience_level", "project_phase",
+        "project_objective", "research_questions", "paper_title",
+        "journal", "year", "authors", "objective", "full_text"
+    ],
+)
+
+CONTEXT_ENHANCED_MODEL_PROMPT = PromptTemplate(
+    template=(
+        "You are a Senior Experimental Design Expert specializing in {research_domain} with expertise in study design and model validation.\n\n"
+        "CONTEXT PACK:\n"
+        "USER PROFILE: {research_domain}, {experience_level}, {project_phase}\n"
+        "PROJECT CONTEXT: {project_objective}, {research_questions}\n"
+        "PAPER CONTEXT: {paper_title}, {journal}, {year}, {authors}\n\n"
+        "ACADEMIC STANDARDS (MANDATORY - PhD Dissertation Level):\n"
+        "✅ Comprehensive experimental design analysis\n"
+        "✅ Model validity assessment with {research_domain} expertise\n"
+        "✅ Population representativeness evaluation\n"
+        "✅ Bias identification with severity assessment\n"
+        "✅ Translational relevance to {project_objective}\n\n"
+        "ANALYSIS REQUIREMENTS:\n"
+        "1. Characterize experimental model with {research_domain} context\n"
+        "2. Evaluate study design rigor and appropriateness\n"
+        "3. Assess population characteristics and representativeness\n"
+        "4. Identify biases and confounding factors\n"
+        "5. Evaluate translational relevance to {project_objective}\n\n"
+        "Return a JSON object with these fields:\n"
+        "- experimental_model: Model type with {research_domain} classification\n"
+        "- study_design: Design with rigor assessment\n"
+        "- study_design_taxonomy: Formal classification\n"
+        "- population_characteristics: Demographics with representativeness\n"
+        "- sample_size_analysis: Power analysis and adequacy\n"
+        "- randomization_blinding: Methods with bias prevention\n"
+        "- inclusion_exclusion_criteria: Criteria with selection bias assessment\n"
+        "- potential_biases: Biases with severity and mitigation\n"
+        "- model_validity: Internal and external validity assessment\n"
+        "- translational_relevance: Relevance to {research_domain} and {project_objective}\n"
+        "- protocol_summary: Summary with methodological strengths\n"
+        "- domain_appropriateness: Suitability for {research_domain} research\n\n"
+        "Focus on: {objective}\n\n"
+        "Article Text: {full_text}"
+    ),
+    input_variables=[
+        "research_domain", "experience_level", "project_phase",
+        "project_objective", "research_questions", "paper_title",
+        "journal", "year", "authors", "objective", "full_text"
+    ],
+)
+
+
+# 🚀 CONTEXT-ENHANCED PIPELINE FUNCTIONS
+# Enhanced versions that use context assembly for PhD-level analysis
+
+def run_methods_pipeline_with_context(full_text: str, objective: str, llm, context_pack: dict) -> List[Dict[str, Any]]:
+    """Enhanced methods analysis pipeline with context assembly"""
+    try:
+        # Extract context variables with fallbacks
+        user_profile = context_pack.get("user_profile", {})
+        project_context = context_pack.get("project_context", {})
+        papers_data = context_pack.get("papers_data", [{}])
+        paper_info = papers_data[0] if papers_data else {}
+
+        # Prepare context variables
+        context_vars = {
+            "research_domain": user_profile.get("research_domain", "biomedical_research"),
+            "experience_level": user_profile.get("experience_level", "intermediate"),
+            "project_phase": user_profile.get("project_phase", "deep_analysis"),
+            "project_objective": project_context.get("objective", objective),
+            "research_questions": ", ".join(project_context.get("research_questions", [objective])),
+            "paper_title": paper_info.get("title", "Unknown Title"),
+            "journal": paper_info.get("journal", "Unknown Journal"),
+            "year": str(paper_info.get("year", "Unknown Year")),
+            "authors": ", ".join(paper_info.get("authors", [])),
+            "objective": objective,
+            "full_text": full_text
+        }
+
+        # Use context-enhanced prompt
+        chain = LLMChain(llm=llm, prompt=CONTEXT_ENHANCED_METHODS_PROMPT)
+        result = chain.invoke(context_vars)
+
+        # Parse and return result
+        import json
+        text_result = result.get("text", result) if isinstance(result, dict) else str(result)
+
+        # Clean JSON formatting
+        if "```" in text_result:
+            text_result = text_result.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
+
+        try:
+            parsed_result = json.loads(text_result)
+            return parsed_result if isinstance(parsed_result, list) else [parsed_result]
+        except json.JSONDecodeError:
+            # Fallback to original pipeline if JSON parsing fails
+            return run_methods_pipeline(full_text, objective, llm)
+
+    except Exception:
+        # Graceful fallback to original pipeline
+        return run_methods_pipeline(full_text, objective, llm)
+
+
+def run_results_pipeline_with_context(full_text: str, objective: str, llm, pmid: str, context_pack: dict) -> Dict[str, Any]:
+    """Enhanced results analysis pipeline with context assembly"""
+    try:
+        # Extract context variables with fallbacks
+        user_profile = context_pack.get("user_profile", {})
+        project_context = context_pack.get("project_context", {})
+        papers_data = context_pack.get("papers_data", [{}])
+        paper_info = papers_data[0] if papers_data else {}
+
+        # Prepare context variables
+        context_vars = {
+            "research_domain": user_profile.get("research_domain", "biomedical_research"),
+            "experience_level": user_profile.get("experience_level", "intermediate"),
+            "project_phase": user_profile.get("project_phase", "deep_analysis"),
+            "project_objective": project_context.get("objective", objective),
+            "research_questions": ", ".join(project_context.get("research_questions", [objective])),
+            "paper_title": paper_info.get("title", "Unknown Title"),
+            "journal": paper_info.get("journal", "Unknown Journal"),
+            "year": str(paper_info.get("year", "Unknown Year")),
+            "authors": ", ".join(paper_info.get("authors", [])),
+            "objective": objective,
+            "full_text": full_text
+        }
+
+        # Use context-enhanced prompt
+        chain = LLMChain(llm=llm, prompt=CONTEXT_ENHANCED_RESULTS_PROMPT)
+        result = chain.invoke(context_vars)
+
+        # Parse and return result
+        import json
+        text_result = result.get("text", result) if isinstance(result, dict) else str(result)
+
+        # Clean JSON formatting
+        if "```" in text_result:
+            text_result = text_result.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
+
+        try:
+            parsed_result = json.loads(text_result)
+            return parsed_result if isinstance(parsed_result, dict) else {}
+        except json.JSONDecodeError:
+            # Fallback to original pipeline if JSON parsing fails
+            return run_results_pipeline(full_text, objective, llm, pmid)
+
+    except Exception:
+        # Graceful fallback to original pipeline
+        return run_results_pipeline(full_text, objective, llm, pmid)
+
+
+def run_enhanced_model_pipeline_with_context(full_text: str, objective: str, llm, context_pack: dict) -> Dict[str, Any]:
+    """Enhanced model analysis pipeline with context assembly"""
+    try:
+        # Extract context variables with fallbacks
+        user_profile = context_pack.get("user_profile", {})
+        project_context = context_pack.get("project_context", {})
+        papers_data = context_pack.get("papers_data", [{}])
+        paper_info = papers_data[0] if papers_data else {}
+
+        # Prepare context variables
+        context_vars = {
+            "research_domain": user_profile.get("research_domain", "biomedical_research"),
+            "experience_level": user_profile.get("experience_level", "intermediate"),
+            "project_phase": user_profile.get("project_phase", "deep_analysis"),
+            "project_objective": project_context.get("objective", objective),
+            "research_questions": ", ".join(project_context.get("research_questions", [objective])),
+            "paper_title": paper_info.get("title", "Unknown Title"),
+            "journal": paper_info.get("journal", "Unknown Journal"),
+            "year": str(paper_info.get("year", "Unknown Year")),
+            "authors": ", ".join(paper_info.get("authors", [])),
+            "objective": objective,
+            "full_text": full_text
+        }
+
+        # Use context-enhanced prompt
+        chain = LLMChain(llm=llm, prompt=CONTEXT_ENHANCED_MODEL_PROMPT)
+        result = chain.invoke(context_vars)
+
+        # Parse and return result
+        import json
+        text_result = result.get("text", result) if isinstance(result, dict) else str(result)
+
+        # Clean JSON formatting
+        if "```" in text_result:
+            text_result = text_result.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
+
+        try:
+            parsed_result = json.loads(text_result)
+            return parsed_result if isinstance(parsed_result, dict) else {}
+        except json.JSONDecodeError:
+            # Fallback to original pipeline if JSON parsing fails
+            return run_enhanced_model_pipeline(full_text, objective, llm)
+
+    except Exception:
+        # Graceful fallback to original pipeline
+        return run_enhanced_model_pipeline(full_text, objective, llm)
