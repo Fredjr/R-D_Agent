@@ -1012,11 +1012,12 @@ class LiteratureReviewAgent:
 
 
 class MethodologySynthesisAgent:
-    """Specialized agent for research methodology extraction and synthesis"""
+    """Enhanced agent for research methodology extraction and synthesis with context awareness"""
 
     def __init__(self, llm, embeddings=None):
         self.llm = llm
         self.embeddings = embeddings
+        self.context_assembler = ContextAssembler()
 
         # Initialize SciBERT classifier if available
         if HUGGINGFACE_AVAILABLE:
@@ -1032,8 +1033,167 @@ class MethodologySynthesisAgent:
         else:
             self.methodology_classifier = None
 
-    async def synthesize_methodologies(self, project_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Main methodology synthesis method"""
+    ENHANCED_METHODOLOGY_PROMPT = PromptTemplate(
+        template="""
+        You are a Senior Research Methodology Expert specializing in {research_domain} with extensive experience in systematic methodology reviews and meta-analyses. You are known for producing comprehensive, evidence-based methodology syntheses that meet the highest academic standards.
+
+        CONTEXT PACK:
+        USER PROFILE:
+        - Research Domain: {research_domain}
+        - Experience Level: {experience_level}
+        - Project Phase: {project_phase}
+        - Methodology Preferences: {methodology_preferences}
+
+        PROJECT CONTEXT:
+        - Research Objective: {project_objective}
+        - Research Questions: {research_questions}
+        - Target Population: {target_population}
+        - Resource Constraints: {resource_constraints}
+
+        METHODOLOGY LANDSCAPE:
+        - Total Papers Analyzed: {total_papers}
+        - Methodology Distribution: {methodology_distribution}
+        - Statistical Methods Identified: {statistical_methods}
+        - Temporal Span: {temporal_span}
+        - Quality Assessment: {quality_indicators}
+
+        ACADEMIC STANDARDS (MANDATORY - PhD Dissertation Level):
+        ✅ Analyze ≥20 methodological approaches with sample characteristics and effect sizes
+        ✅ Provide statistical power analysis for each quantitative method
+        ✅ Include validity and reliability assessments for each approach
+        ✅ Compare methodologies with evidence-based pros/cons using exact quotes ≥15 words
+        ✅ Identify ≥5 methodological innovations with implementation details
+        ✅ Assess methodological rigor using established quality frameworks
+        ✅ Provide sample size calculations and statistical assumptions
+        ✅ Include ≥3 methodological limitations with mitigation strategies
+        ✅ End with 5 specific methodology recommendations tied to research constraints
+
+        PAPERS DATA: {papers_data}
+
+        REQUIRED OUTPUT STRUCTURE (JSON):
+        {{
+          "methodology_synthesis": {{
+            "quantitative_methods": [
+              {{
+                "method_name": "Statistical method name",
+                "papers_using": ["{{"title": "", "sample_size": "", "effect_size": "", "confidence_interval": "", "statistical_power": ""}}"],
+                "typical_sample_sizes": {{"min": 0, "max": 0, "median": 0, "recommended": 0}},
+                "statistical_assumptions": ["assumption1", "assumption2"],
+                "validity_evidence": ["{{"type": "internal/external/construct", "evidence": "", "strength": "strong/moderate/weak"}}"],
+                "reliability_metrics": ["{{"type": "cronbach_alpha/test_retest", "typical_values": "", "acceptable_threshold": ""}}"],
+                "implementation_complexity": "Low/Medium/High",
+                "resource_requirements": ["{{"type": "time/cost/expertise", "requirement": "", "justification": ""}}"],
+                "strengths": ["strength with supporting quote and source"],
+                "limitations": ["limitation with mitigation strategy"],
+                "appropriateness_for_research": "High/Medium/Low with detailed justification"
+              }}
+            ],
+            "qualitative_methods": [
+              {{
+                "method_name": "Qualitative method name",
+                "papers_using": ["{{"title": "", "sample_size": "", "data_saturation": "", "coding_approach": ""}}"],
+                "typical_sample_sizes": {{"min": 0, "max": 0, "saturation_point": 0}},
+                "data_collection_approaches": ["interviews", "observations", "documents"],
+                "analysis_frameworks": ["thematic", "grounded_theory", "phenomenological"],
+                "validity_strategies": ["{{"strategy": "triangulation/member_checking", "implementation": ""}}"],
+                "reliability_approaches": ["{{"approach": "inter_rater/audit_trail", "details": ""}}"],
+                "implementation_complexity": "Low/Medium/High",
+                "strengths": ["strength with supporting evidence"],
+                "limitations": ["limitation with mitigation strategy"],
+                "appropriateness_for_research": "High/Medium/Low with detailed justification"
+              }}
+            ],
+            "mixed_methods": [
+              {{
+                "design_type": "Sequential/Concurrent/Transformative",
+                "integration_approach": "How QUAN and QUAL are integrated",
+                "papers_using": ["{{"title": "", "quan_sample": "", "qual_sample": "", "integration_quality": ""}}"],
+                "implementation_sequence": ["Phase 1: QUAN", "Phase 2: QUAL", "Phase 3: Integration"],
+                "validity_considerations": ["mixed methods validity threats and mitigation"],
+                "complexity_assessment": "High/Medium/Low with justification",
+                "appropriateness_for_research": "Assessment with rationale"
+              }}
+            ]
+          }},
+          "methodological_innovations": [
+            {{
+              "innovation": "Novel methodological approach",
+              "papers_introducing": ["{{"title": "", "authors": "", "year": "", "innovation_description": ""}}"],
+              "implementation_details": "Step-by-step implementation guide",
+              "validation_evidence": "Evidence of effectiveness",
+              "adoption_barriers": ["barrier1", "barrier2"],
+              "potential_for_research": "High/Medium/Low with justification"
+            }}
+          ],
+          "quality_assessment": {{
+            "methodological_rigor_analysis": [
+              {{
+                "quality_dimension": "Internal validity/External validity/Construct validity",
+                "assessment_criteria": ["criterion1", "criterion2"],
+                "papers_meeting_criteria": ["{{"title": "", "score": "", "justification": ""}}"],
+                "overall_quality": "High/Medium/Low",
+                "improvement_recommendations": ["specific recommendation"]
+              }}
+            ],
+            "risk_of_bias_assessment": [
+              {{
+                "bias_type": "Selection/Performance/Detection/Attrition",
+                "prevalence": "High/Medium/Low",
+                "affected_studies": ["{{"title": "", "bias_description": "", "impact": ""}}"],
+                "mitigation_strategies": ["strategy1", "strategy2"]
+              }}
+            ]
+          }},
+          "comparative_analysis": [
+            {{
+              "comparison_dimension": "Sample size/Effect size/Statistical power",
+              "methods_compared": ["method1", "method2"],
+              "comparison_results": ["{{"metric": "", "method1_value": "", "method2_value": "", "significance": ""}}"],
+              "practical_implications": "What this means for methodology selection",
+              "recommendation": "Which method to prefer and why"
+            }}
+          ],
+          "implementation_guidance": {{
+            "methodology_selection_framework": [
+              {{
+                "research_question_type": "Descriptive/Explanatory/Exploratory",
+                "recommended_methods": ["{{"method": "", "rationale": "", "implementation_steps": []}}"],
+                "sample_size_guidance": {{"minimum": 0, "optimal": 0, "justification": ""}},
+                "timeline_considerations": "Expected duration and phases",
+                "resource_allocation": {{"personnel": "", "equipment": "", "budget_estimate": ""}}
+              }}
+            ],
+            "quality_assurance_protocols": [
+              {{
+                "protocol_name": "Data quality/Analysis quality/Reporting quality",
+                "implementation_steps": ["step1", "step2"],
+                "success_metrics": ["metric1", "metric2"],
+                "common_pitfalls": ["pitfall with avoidance strategy"]
+              }}
+            ]
+          }},
+          "research_recommendations": [
+            {{
+              "recommendation": "Specific methodological recommendation",
+              "rationale": "Evidence-based justification with quotes and sources",
+              "implementation_timeline": "When and how to implement",
+              "resource_requirements": "What resources are needed",
+              "success_metrics": "How to measure success",
+              "risk_mitigation": "How to address potential challenges"
+            }}
+          ]
+        }}
+        """,
+        input_variables=[
+            "research_domain", "experience_level", "project_phase", "methodology_preferences",
+            "project_objective", "research_questions", "target_population", "resource_constraints",
+            "total_papers", "methodology_distribution", "statistical_methods", "temporal_span", "quality_indicators",
+            "papers_data"
+        ]
+    )
+
+    async def synthesize_methodologies(self, project_data: Dict[str, Any], user_profile: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Enhanced methodology synthesis method with context awareness"""
         try:
             papers = self._extract_papers_from_project(project_data)
 
@@ -1045,31 +1205,130 @@ class MethodologySynthesisAgent:
                     "experimental_designs": []
                 }
 
-            # Extract methodologies from papers
+            # Assemble rich context using ContextAssembler
+            context_pack = self.context_assembler.assemble_phd_context(
+                project_data=project_data,
+                papers=papers,
+                user_profile=user_profile,
+                analysis_type="methodology"
+            )
+
+            # Extract methodologies from papers (existing logic)
             methodologies = await self._extract_methodologies(papers)
             statistical_methods = await self._extract_statistical_methods(papers)
             experimental_designs = await self._analyze_experimental_designs(papers)
 
-            # Format methodologies for UI components
-            try:
-                formatted_methodologies = self._format_methodologies_for_ui(methodologies, statistical_methods, papers)
-            except AttributeError as e:
-                logger.error(f"_format_methodologies_for_ui method not found: {e}")
-                # Fallback formatting
-                formatted_methodologies = []
-                for i, method in enumerate(methodologies[:5]):
-                    formatted_methodologies.append({
-                        "id": f"method_{i+1}",
-                        "name": method.get('category', 'Unknown Method'),
-                        "category": method.get('category', 'general'),
-                        "description": f"Research methodology identified in papers",
-                        "frequency": method.get('count', 1),
-                        "advantages": ["Systematic approach", "Reproducible results"],
-                        "limitations": ["May require specific expertise", "Time-intensive"],
-                        "typical_applications": ["Academic research", "Data analysis"]
+            # Prepare enhanced analysis context for the prompt
+            analysis_context = {
+                # User profile
+                "research_domain": context_pack["user_profile"]["research_domain"],
+                "experience_level": context_pack["user_profile"]["experience_level"],
+                "project_phase": context_pack["user_profile"]["current_project_phase"],
+                "methodology_preferences": json.dumps(context_pack["user_profile"].get("methodology_preferences", [])),
+
+                # Project context
+                "project_objective": context_pack["project_context"]["project_objective"],
+                "research_questions": json.dumps(context_pack["project_context"]["research_questions"]),
+                "target_population": context_pack["project_context"].get("target_population", "General population"),
+                "resource_constraints": json.dumps(context_pack["user_profile"]["key_constraints"]),
+
+                # Methodology landscape
+                "total_papers": context_pack["literature_landscape"]["total_papers"],
+                "methodology_distribution": json.dumps(context_pack["methodology_landscape"]["methodology_distribution"]),
+                "statistical_methods": json.dumps(context_pack["methodology_landscape"]["statistical_methods"]),
+                "temporal_span": json.dumps(context_pack["temporal_context"]),
+                "quality_indicators": json.dumps({"methodologies_found": len(methodologies), "statistical_methods_found": len(statistical_methods)}),
+
+                # Papers data (limit for processing)
+                "papers_data": json.dumps(papers[:25])  # Reduced for better processing
+            }
+
+            # Use enhanced prompt with LLM if available
+            if self.llm:
+                try:
+                    # Format the prompt with context
+                    formatted_prompt = self.ENHANCED_METHODOLOGY_PROMPT.format(**analysis_context)
+
+                    # Use LLM directly (modern approach)
+                    result = await self.llm.ainvoke(formatted_prompt)
+                    enhanced_result = self._parse_enhanced_methodology_result(result)
+
+                    # Merge with existing extraction results for backward compatibility
+                    enhanced_result.update({
+                        "methodology_categories": methodologies,
+                        "statistical_methods": statistical_methods,
+                        "experimental_designs": experimental_designs,
+                        "formatted_methodologies": self._format_methodologies_for_ui(methodologies, statistical_methods, papers) if hasattr(self, '_format_methodologies_for_ui') else []
                     })
-            methodology_comparisons = self._generate_methodology_comparisons(formatted_methodologies)
-            recommended_combinations = self._generate_recommended_combinations(formatted_methodologies)
+
+                    return enhanced_result
+
+                except Exception as e:
+                    logger.warning(f"Enhanced methodology synthesis failed, using fallback: {e}")
+                    return await self._fallback_methodology_synthesis(methodologies, statistical_methods, experimental_designs, papers)
+            else:
+                return await self._fallback_methodology_synthesis(methodologies, statistical_methods, experimental_designs, papers)
+
+        except Exception as e:
+            logger.error(f"Enhanced methodology synthesis failed: {e}")
+            return {
+                "error": str(e),
+                "methodology_categories": [],
+                "statistical_methods": [],
+                "experimental_designs": []
+            }
+
+    def _parse_enhanced_methodology_result(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse enhanced methodology synthesis result with error handling"""
+        try:
+            # Extract text from LLM result
+            text = result.get("text", result) if isinstance(result, dict) else str(result)
+
+            # Clean and parse JSON
+            if "```json" in text:
+                text = text.split("```json")[1].split("```")[0].strip()
+            elif "```" in text:
+                text = text.split("```")[1].split("```")[0].strip()
+
+            # Parse JSON
+            parsed_result = json.loads(text)
+
+            # Validate required structure
+            required_keys = [
+                "methodology_synthesis", "methodological_innovations", "quality_assessment",
+                "comparative_analysis", "implementation_guidance", "research_recommendations"
+            ]
+
+            for key in required_keys:
+                if key not in parsed_result:
+                    parsed_result[key] = {}
+
+            return parsed_result
+
+        except (json.JSONDecodeError, KeyError, IndexError) as e:
+            logger.warning(f"Failed to parse enhanced methodology result: {e}")
+            # Return structured fallback
+            return {
+                "methodology_synthesis": {"quantitative_methods": [], "qualitative_methods": [], "mixed_methods": []},
+                "methodological_innovations": [],
+                "quality_assessment": {"methodological_rigor_analysis": [], "risk_of_bias_assessment": []},
+                "comparative_analysis": [],
+                "implementation_guidance": {"methodology_selection_framework": [], "quality_assurance_protocols": []},
+                "research_recommendations": [],
+                "parsing_error": str(e),
+                "raw_output": str(result)[:500]  # First 500 chars for debugging
+            }
+
+    async def _fallback_methodology_synthesis(self, methodologies: List, statistical_methods: List,
+                                            experimental_designs: List, papers: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Fallback methodology synthesis when enhanced prompts fail"""
+        try:
+            # Format methodologies for UI components
+            formatted_methodologies = self._format_methodologies_for_ui(methodologies, statistical_methods, papers) if hasattr(self, '_format_methodologies_for_ui') else []
+
+            # Generate comparisons and recommendations
+            methodology_comparisons = self._generate_methodology_comparisons(formatted_methodologies) if hasattr(self, '_generate_methodology_comparisons') else []
+            recommended_combinations = self._generate_recommended_combinations(formatted_methodologies) if hasattr(self, '_generate_recommended_combinations') else []
 
             return {
                 "methodologies": formatted_methodologies,
@@ -1080,17 +1339,16 @@ class MethodologySynthesisAgent:
                 "methodology_categories": methodologies,
                 "statistical_methods": statistical_methods,
                 "experimental_designs": experimental_designs,
-                "synthesis_summary": self._generate_methodology_synthesis(methodologies, statistical_methods, experimental_designs),
-                "recommendations": self._generate_methodology_recommendations(methodologies)
+                "synthesis_summary": self._generate_methodology_synthesis(methodologies, statistical_methods, experimental_designs) if hasattr(self, '_generate_methodology_synthesis') else "Methodology synthesis completed",
+                "recommendations": self._generate_methodology_recommendations(methodologies) if hasattr(self, '_generate_methodology_recommendations') else []
             }
-
         except Exception as e:
-            logger.error(f"Methodology synthesis failed: {e}")
+            logger.error(f"Fallback methodology synthesis failed: {e}")
             return {
-                "error": str(e),
-                "methodology_categories": [],
-                "statistical_methods": [],
-                "experimental_designs": []
+                "error": f"Fallback synthesis failed: {str(e)}",
+                "methodology_categories": methodologies,
+                "statistical_methods": statistical_methods,
+                "experimental_designs": experimental_designs
             }
 
     def _extract_papers_from_project(self, project_data: Dict[str, Any]) -> List[Dict[str, Any]]:
