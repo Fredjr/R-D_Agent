@@ -547,10 +547,11 @@ logger.info(f"🔍 PhD Agents Version: {PHD_AGENTS_VERSION}")
 
 class LiteratureReviewAgent:
     """Specialized agent for systematic literature review using semantic analysis"""
-    
+
     def __init__(self, llm, embeddings=None):
         self.llm = llm
         self.embeddings = embeddings
+        self.context_assembler = ContextAssembler()
         
         # Literature analysis tools
         self.tools = [
@@ -585,41 +586,134 @@ class LiteratureReviewAgent:
                 logger.warning(f"Could not create LangChain agent: {e}")
                 self.agent_executor = None
     
-    PROMPT_TEMPLATE = PromptTemplate(
+    ENHANCED_PROMPT_TEMPLATE = PromptTemplate(
         template="""
-        You are a Literature Review Specialist for PhD research. Conduct systematic analysis of research literature.
-        
-        Project Context: {project_context}
-        Papers Collection: {papers_data}
-        Research Domain: {research_domain}
-        Analysis Focus: {analysis_focus}
-        
-        Your tasks:
-        1. Identify key theoretical frameworks and their evolution
-        2. Map literature development timeline with major milestones
-        3. Cluster papers by thematic similarity
-        4. Extract seminal works and their influence
-        5. Identify literature review gaps and opportunities
-        
-        Use available tools for semantic analysis and clustering when possible.
-        
-        Return a comprehensive literature review analysis with:
-        - theoretical_frameworks: array of frameworks with key papers and evolution
-        - literature_timeline: chronological development with milestones
-        - thematic_clusters: semantic groupings with themes and representative papers
-        - seminal_works: foundational papers with influence metrics
-        - review_gaps: areas needing more comprehensive coverage
-        - synthesis_recommendations: suggestions for literature synthesis
+        You are a Senior PhD Literature Review Expert specializing in {research_domain}. You have extensive experience in systematic reviews and are known for producing evidence-dense, theoretically sophisticated analyses that meet the highest academic standards.
+
+        CONTEXT PACK:
+        USER PROFILE:
+        - Research Domain: {research_domain}
+        - Experience Level: {experience_level}
+        - Project Phase: {project_phase}
+        - Key Constraints: {key_constraints}
+
+        PROJECT CONTEXT:
+        - Objective: {project_objective}
+        - Research Questions: {research_questions}
+        - Theoretical Framework: {theoretical_framework}
+        - Previous Findings: {previous_findings}
+
+        LITERATURE LANDSCAPE:
+        - Total Papers: {total_papers}
+        - Date Range: {date_range}
+        - Key Authors: {key_authors}
+        - Dominant Methods: {dominant_methods}
+        - Entity Cards: {entity_cards}
+
+        ACADEMIC STANDARDS (MANDATORY - PhD Dissertation Level):
+        ✅ Cite ≥15 sources with proper academic format [Author, Year] - 'exact quote ≥15 words' [source_id]
+        ✅ Identify ≥5 theoretical frameworks with evolution timeline and key contributors
+        ✅ Extract ≥10 methodological approaches with sample sizes and statistical power
+        ✅ Create thematic synthesis with cross-references between papers
+        ✅ Quantify research gaps with evidence and opportunity assessment
+        ✅ Provide methodological critique with alternative approaches
+        ✅ Include ≥3 counter-examples or contradictory findings with explanations
+        ✅ End with 5 actionable recommendations tied to user's research constraints
+
+        PAPERS COLLECTION: {papers_data}
+
+        REQUIRED OUTPUT STRUCTURE (JSON):
+        {{
+          "theoretical_landscape": {{
+            "dominant_frameworks": [
+              {{
+                "name": "Framework name",
+                "key_papers": ["{{"title": "", "authors": "", "year": "", "contribution": ""}}"],
+                "evolution_timeline": ["{{"period": "", "development": "", "key_contributors": []}}"],
+                "current_status": "emerging/established/declining",
+                "relevance_to_research": "High/Medium/Low with justification"
+              }}
+            ],
+            "emerging_theories": [],
+            "framework_synthesis": "How frameworks relate and complement each other",
+            "theoretical_gaps": ["{{"gap": "", "evidence": "", "opportunity": ""}}"]
+          }},
+          "methodological_analysis": {{
+            "quantitative_approaches": [
+              {{
+                "method": "Statistical method name",
+                "papers_using": ["{{"title": "", "sample_size": "", "effect_size": "", "statistical_power": ""}}"],
+                "strengths": [],
+                "limitations": [],
+                "appropriateness_for_research": "assessment"
+              }}
+            ],
+            "qualitative_approaches": [],
+            "mixed_methods": [],
+            "methodological_innovations": [],
+            "methodological_gaps": []
+          }},
+          "research_evolution": {{
+            "chronological_timeline": [
+              {{
+                "period": "Year range",
+                "milestone": "Key development",
+                "key_papers": [],
+                "paradigm_shift": "Description of change",
+                "impact_on_field": "Assessment"
+              }}
+            ],
+            "citation_patterns": [],
+            "influence_networks": []
+          }},
+          "evidence_synthesis": [
+            {{
+              "claim": "Major finding or pattern",
+              "supporting_evidence": ["{{"paper": "", "quote": "≥15 words", "source_id": ""}}"],
+              "contradictory_evidence": [],
+              "strength_of_evidence": "Strong/Moderate/Weak with justification",
+              "implications": ""
+            }}
+          ],
+          "gap_analysis": {{
+            "theoretical_gaps": ["{{"gap": "", "evidence": "", "opportunity": "", "difficulty": "High/Medium/Low"}}"],
+            "methodological_gaps": [],
+            "empirical_gaps": [],
+            "synthesis_gaps": [],
+            "gap_prioritization": "Ranking with rationale"
+          }},
+          "dissertation_implications": {{
+            "positioning_in_field": "How this research fits in the landscape",
+            "contribution_potential": "Unique contribution this research can make",
+            "methodology_recommendations": ["{{"approach": "", "rationale": "", "considerations": ""}}"],
+            "chapter_structure_suggestions": [],
+            "timeline_considerations": "Based on user constraints"
+          }},
+          "actionable_recommendations": [
+            {{
+              "recommendation": "Specific action",
+              "rationale": "Why this is important",
+              "timeline": "When to implement",
+              "resources_needed": "What's required",
+              "success_metrics": "How to measure progress"
+            }}
+          ]
+        }}
         """,
-        input_variables=["project_context", "papers_data", "research_domain", "analysis_focus"]
+        input_variables=[
+            "research_domain", "experience_level", "project_phase", "key_constraints",
+            "project_objective", "research_questions", "theoretical_framework", "previous_findings",
+            "total_papers", "date_range", "key_authors", "dominant_methods", "entity_cards",
+            "papers_data"
+        ]
     )
     
-    async def analyze_literature(self, project_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Main literature analysis method"""
+    async def analyze_literature(self, project_data: Dict[str, Any], user_profile: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Enhanced literature analysis method with context awareness"""
         try:
             # Extract papers from project data
             papers = self._extract_papers_from_project(project_data)
-            
+
             if not papers:
                 return {
                     "error": "No papers found in project data",
@@ -629,28 +723,57 @@ class LiteratureReviewAgent:
                     "seminal_works": [],
                     "review_gaps": []
                 }
-            
-            # Prepare analysis context
+
+            # Assemble rich context using ContextAssembler
+            context_pack = self.context_assembler.assemble_phd_context(
+                project_data=project_data,
+                papers=papers,
+                user_profile=user_profile,
+                analysis_type="literature_review"
+            )
+
+            # Prepare enhanced analysis context for the prompt
             analysis_context = {
-                "project_context": json.dumps({
-                    "project_name": project_data.get("project_name", ""),
-                    "description": project_data.get("description", ""),
-                    "research_objective": project_data.get("research_objective", "")
-                }),
-                "papers_data": json.dumps(papers[:50]),  # Limit for processing
-                "research_domain": self._infer_research_domain(papers),
-                "analysis_focus": "comprehensive_literature_review"
+                # User profile
+                "research_domain": context_pack["user_profile"]["research_domain"],
+                "experience_level": context_pack["user_profile"]["experience_level"],
+                "project_phase": context_pack["user_profile"]["current_project_phase"],
+                "key_constraints": json.dumps(context_pack["user_profile"]["key_constraints"]),
+
+                # Project context
+                "project_objective": context_pack["project_context"]["project_objective"],
+                "research_questions": json.dumps(context_pack["project_context"]["research_questions"]),
+                "theoretical_framework": context_pack["project_context"]["theoretical_framework"],
+                "previous_findings": json.dumps(context_pack["project_context"]["previous_findings"]),
+
+                # Literature landscape
+                "total_papers": context_pack["literature_landscape"]["total_papers"],
+                "date_range": json.dumps(context_pack["literature_landscape"]["date_range"]),
+                "key_authors": json.dumps(context_pack["literature_landscape"]["top_authors"]),
+                "dominant_methods": json.dumps(context_pack["methodology_landscape"]["statistical_methods"]),
+                "entity_cards": json.dumps(context_pack["entity_cards"]),
+
+                # Papers data (limit for processing)
+                "papers_data": json.dumps(papers[:30])  # Reduced for better processing
             }
-            
-            # Use agent executor if available, otherwise fallback
-            if self.agent_executor:
-                result = await self.agent_executor.ainvoke(analysis_context)
-                return self._parse_agent_result(result)
+
+            # Use enhanced prompt with modern LangChain approach
+            if self.llm:
+                try:
+                    # Format the prompt with context
+                    formatted_prompt = self.ENHANCED_PROMPT_TEMPLATE.format(**analysis_context)
+
+                    # Use LLM directly (modern approach)
+                    result = await self.llm.ainvoke(formatted_prompt)
+                    return self._parse_enhanced_result(result)
+                except Exception as e:
+                    logger.warning(f"Enhanced prompt failed, using fallback: {e}")
+                    return await self._fallback_literature_analysis(papers, context_pack)
             else:
-                return await self._fallback_literature_analysis(papers, analysis_context)
-                
+                return await self._fallback_literature_analysis(papers, context_pack)
+
         except Exception as e:
-            logger.error(f"Literature analysis failed: {e}")
+            logger.error(f"Enhanced literature analysis failed: {e}")
             return {
                 "error": str(e),
                 "theoretical_frameworks": [],
@@ -844,6 +967,48 @@ class LiteratureReviewAgent:
             except json.JSONDecodeError:
                 return {'analysis': result['output']}
         return {'analysis': str(result)}
+
+    def _parse_enhanced_result(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse enhanced LLM result with error handling"""
+        try:
+            # Extract text from LLM result
+            text = result.get("text", result) if isinstance(result, dict) else str(result)
+
+            # Clean and parse JSON
+            if "```json" in text:
+                text = text.split("```json")[1].split("```")[0].strip()
+            elif "```" in text:
+                text = text.split("```")[1].split("```")[0].strip()
+
+            # Parse JSON
+            parsed_result = json.loads(text)
+
+            # Validate required structure
+            required_keys = [
+                "theoretical_landscape", "methodological_analysis", "research_evolution",
+                "evidence_synthesis", "gap_analysis", "dissertation_implications", "actionable_recommendations"
+            ]
+
+            for key in required_keys:
+                if key not in parsed_result:
+                    parsed_result[key] = {}
+
+            return parsed_result
+
+        except (json.JSONDecodeError, KeyError, IndexError) as e:
+            logger.warning(f"Failed to parse enhanced result: {e}")
+            # Return structured fallback
+            return {
+                "theoretical_landscape": {"dominant_frameworks": [], "emerging_theories": []},
+                "methodological_analysis": {"quantitative_approaches": [], "qualitative_approaches": []},
+                "research_evolution": {"chronological_timeline": []},
+                "evidence_synthesis": [],
+                "gap_analysis": {"theoretical_gaps": [], "methodological_gaps": []},
+                "dissertation_implications": {"positioning_in_field": "", "contribution_potential": ""},
+                "actionable_recommendations": [],
+                "parsing_error": str(e),
+                "raw_output": str(result)[:500]  # First 500 chars for debugging
+            }
 
 
 class MethodologySynthesisAgent:
