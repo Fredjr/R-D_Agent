@@ -304,15 +304,221 @@ def test_enhanced_literature_agent():
         traceback.print_exc()
         return False
 
+def test_enhanced_methodology_agent():
+    """Test the enhanced Methodology Synthesis Agent"""
+    print("\n🧪 Testing Enhanced Methodology Synthesis Agent...")
+
+    try:
+        from phd_thesis_agents import MethodologySynthesisAgent
+
+        # Mock LLM for testing
+        class MockLLM:
+            def __init__(self):
+                pass
+
+            async def ainvoke(self, prompt_input):
+                # Return a mock JSON response
+                return {
+                    "text": """```json
+                    {
+                        "methodology_synthesis": {
+                            "quantitative_methods": [
+                                {
+                                    "method_name": "Randomized Controlled Trial",
+                                    "papers_using": [{"title": "RCT Study", "sample_size": "200", "effect_size": "0.75", "confidence_interval": "0.65-0.85", "statistical_power": "0.90"}],
+                                    "typical_sample_sizes": {"min": 50, "max": 500, "median": 200, "recommended": 250},
+                                    "statistical_assumptions": ["Normal distribution", "Independence of observations"],
+                                    "validity_evidence": [{"type": "internal", "evidence": "Randomization ensures internal validity", "strength": "strong"}],
+                                    "reliability_metrics": [{"type": "test_retest", "typical_values": "0.85-0.95", "acceptable_threshold": "0.70"}],
+                                    "implementation_complexity": "High",
+                                    "resource_requirements": [{"type": "time", "requirement": "12-18 months", "justification": "Recruitment and follow-up"}],
+                                    "strengths": ["Gold standard for causal inference - Smith et al. (2023) demonstrate 'RCTs provide strongest evidence for treatment effects' [source_1]"],
+                                    "limitations": ["High cost and complexity with mitigation: careful planning and pilot studies"],
+                                    "appropriateness_for_research": "High - ideal for testing interventions with clear outcomes"
+                                }
+                            ],
+                            "qualitative_methods": [
+                                {
+                                    "method_name": "Semi-structured Interviews",
+                                    "papers_using": [{"title": "Interview Study", "sample_size": "25", "data_saturation": "achieved at 20", "coding_approach": "thematic"}],
+                                    "typical_sample_sizes": {"min": 12, "max": 30, "saturation_point": 20},
+                                    "data_collection_approaches": ["interviews", "observations"],
+                                    "analysis_frameworks": ["thematic", "grounded_theory"],
+                                    "validity_strategies": [{"strategy": "triangulation", "implementation": "Multiple data sources and member checking"}],
+                                    "reliability_approaches": [{"approach": "inter_rater", "details": "Two independent coders with 85% agreement"}],
+                                    "implementation_complexity": "Medium",
+                                    "strengths": ["Rich contextual data and participant perspectives"],
+                                    "limitations": ["Potential interviewer bias with mitigation: structured protocols"],
+                                    "appropriateness_for_research": "High - excellent for exploring experiences and perceptions"
+                                }
+                            ],
+                            "mixed_methods": [
+                                {
+                                    "design_type": "Sequential",
+                                    "integration_approach": "QUAN findings inform QUAL interview guide",
+                                    "papers_using": [{"title": "Mixed Methods Study", "quan_sample": "300", "qual_sample": "20", "integration_quality": "high"}],
+                                    "implementation_sequence": ["Phase 1: QUAN survey", "Phase 2: QUAL interviews", "Phase 3: Integration and interpretation"],
+                                    "validity_considerations": ["Convergent validity through triangulation", "Complementarity of findings"],
+                                    "complexity_assessment": "High - requires expertise in both paradigms",
+                                    "appropriateness_for_research": "Medium - good for comprehensive understanding but resource-intensive"
+                                }
+                            ]
+                        },
+                        "methodological_innovations": [
+                            {
+                                "innovation": "AI-assisted data collection",
+                                "papers_introducing": [{"title": "AI in Research", "authors": "Johnson et al.", "year": 2023, "innovation_description": "Machine learning for automated data coding"}],
+                                "implementation_details": "1. Train ML model on coded data, 2. Apply to new data, 3. Human verification",
+                                "validation_evidence": "95% accuracy compared to human coding",
+                                "adoption_barriers": ["Technical expertise required", "Initial setup costs"],
+                                "potential_for_research": "High - can significantly reduce analysis time"
+                            }
+                        ],
+                        "quality_assessment": {
+                            "methodological_rigor_analysis": [
+                                {
+                                    "quality_dimension": "Internal validity",
+                                    "assessment_criteria": ["Randomization", "Blinding", "Control groups"],
+                                    "papers_meeting_criteria": [{"title": "High Quality RCT", "score": "9/10", "justification": "Met all criteria except participant blinding"}],
+                                    "overall_quality": "High",
+                                    "improvement_recommendations": ["Implement participant blinding where possible"]
+                                }
+                            ],
+                            "risk_of_bias_assessment": [
+                                {
+                                    "bias_type": "Selection",
+                                    "prevalence": "Medium",
+                                    "affected_studies": [{"title": "Biased Study", "bias_description": "Non-random sampling", "impact": "Limits generalizability"}],
+                                    "mitigation_strategies": ["Use random sampling", "Report sampling methods clearly"]
+                                }
+                            ]
+                        },
+                        "comparative_analysis": [
+                            {
+                                "comparison_dimension": "Effect size",
+                                "methods_compared": ["RCT", "Observational"],
+                                "comparison_results": [{"metric": "Cohen's d", "method1_value": "0.75", "method2_value": "0.45", "significance": "p<0.001"}],
+                                "practical_implications": "RCTs show larger effect sizes but may not reflect real-world conditions",
+                                "recommendation": "Use RCTs for efficacy, observational for effectiveness"
+                            }
+                        ],
+                        "implementation_guidance": {
+                            "methodology_selection_framework": [
+                                {
+                                    "research_question_type": "Explanatory",
+                                    "recommended_methods": [{"method": "RCT", "rationale": "Best for causal inference", "implementation_steps": ["Design protocol", "Recruit participants", "Randomize", "Collect data", "Analyze"]}],
+                                    "sample_size_guidance": {"minimum": 100, "optimal": 250, "justification": "Power analysis for medium effect size"},
+                                    "timeline_considerations": "18 months including recruitment and follow-up",
+                                    "resource_allocation": {"personnel": "2 FTE researchers", "equipment": "Data collection tools", "budget_estimate": "$150,000"}
+                                }
+                            ],
+                            "quality_assurance_protocols": [
+                                {
+                                    "protocol_name": "Data quality",
+                                    "implementation_steps": ["Double data entry", "Range checks", "Logic checks"],
+                                    "success_metrics": ["<5% missing data", ">95% data accuracy"],
+                                    "common_pitfalls": ["Incomplete data collection with avoidance: regular monitoring"]
+                                }
+                            ]
+                        },
+                        "research_recommendations": [
+                            {
+                                "recommendation": "Implement mixed-methods sequential design",
+                                "rationale": "Combines strengths of quantitative rigor with qualitative depth - Brown et al. (2023) show 'mixed methods provide 40% more comprehensive understanding' [source_2]",
+                                "implementation_timeline": "Phase 1: 6 months QUAN, Phase 2: 4 months QUAL, Phase 3: 2 months integration",
+                                "resource_requirements": "Mixed methods expertise, survey platform, interview transcription",
+                                "success_metrics": "Convergent findings across methods, data saturation achieved",
+                                "risk_mitigation": "Pilot both phases, ensure adequate sample sizes, plan for integration challenges"
+                            }
+                        ]
+                    }
+                    ```"""
+                }
+
+        # Create agent with mock LLM
+        agent = MethodologySynthesisAgent(llm=MockLLM())
+        print("✅ Enhanced Methodology Synthesis Agent created successfully")
+
+        # Test data
+        project_data = {
+            "objective": "Evaluate effectiveness of educational interventions",
+            "research_questions": ["What methods work best for measuring learning outcomes?"],
+            "reports": [
+                {
+                    "papers": [
+                        {
+                            "title": "RCT of Educational Intervention",
+                            "abstract": "Randomized controlled trial using ANOVA statistical analysis with 200 participants",
+                            "year": 2023,
+                            "authors": ["Smith, J."],
+                            "journal": "Education Research"
+                        },
+                        {
+                            "title": "Qualitative Study of Student Experiences",
+                            "abstract": "Semi-structured interviews with thematic analysis of 25 students",
+                            "year": 2022,
+                            "authors": ["Brown, A."],
+                            "journal": "Qualitative Education"
+                        }
+                    ]
+                }
+            ]
+        }
+
+        user_profile = {
+            "research_domain": "education",
+            "experience_level": "PhD_candidate",
+            "project_phase": "methodology_design"
+        }
+
+        # Test enhanced analysis
+        import asyncio
+        result = asyncio.run(agent.synthesize_methodologies(project_data, user_profile))
+
+        print("✅ Enhanced methodology synthesis completed successfully")
+
+        # Verify enhanced structure
+        enhanced_keys = [
+            "methodology_synthesis", "methodological_innovations", "quality_assessment",
+            "comparative_analysis", "implementation_guidance", "research_recommendations"
+        ]
+
+        for key in enhanced_keys:
+            if key in result:
+                print(f"✅ {key}: Present")
+            else:
+                print(f"❌ {key}: Missing")
+
+        # Test specific enhanced features
+        if "methodology_synthesis" in result:
+            quant_methods = result["methodology_synthesis"].get("quantitative_methods", [])
+            qual_methods = result["methodology_synthesis"].get("qualitative_methods", [])
+            print(f"📊 Quantitative methods identified: {len(quant_methods)}")
+            print(f"📝 Qualitative methods identified: {len(qual_methods)}")
+
+        if "research_recommendations" in result:
+            recommendations = result["research_recommendations"]
+            print(f"🎯 Research recommendations: {len(recommendations)}")
+
+        print("🎉 Enhanced Methodology Synthesis Agent test passed!")
+        return True
+
+    except Exception as e:
+        print(f"❌ Enhanced Methodology Synthesis Agent test failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 if __name__ == "__main__":
     print("🚀 Starting Context Assembly and Enhanced Agent Tests\n")
 
     success1 = test_context_assembly()
     success2 = test_output_contract()
     success3 = test_enhanced_literature_agent()
+    success4 = test_enhanced_methodology_agent()
 
-    if success1 and success2 and success3:
-        print("\n🎉 ALL TESTS PASSED! Enhanced Literature Review Agent is ready.")
+    if success1 and success2 and success3 and success4:
+        print("\n🎉 ALL TESTS PASSED! Enhanced Literature Review and Methodology Synthesis Agents are ready.")
         sys.exit(0)
     else:
         print("\n❌ Some tests failed. Please check the implementation.")
