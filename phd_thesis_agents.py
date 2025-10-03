@@ -824,6 +824,26 @@ class MethodologySynthesisAgent:
 
         return comparisons[:3]  # Return top 3 comparisons
 
+    def _generate_recommended_combinations(self, methodologies: List[Dict[str, Any]]) -> List[str]:
+        """Generate recommended methodology combinations"""
+        combinations = []
+
+        method_names = [m['name'] for m in methodologies]
+
+        if 'Experimental' in method_names and 'Observational' in method_names:
+            combinations.append("Combine experimental and observational approaches for comprehensive evidence")
+
+        if 'Theoretical' in method_names and any('Experimental' in name or 'Observational' in name for name in method_names):
+            combinations.append("Use theoretical framework to guide empirical research design")
+
+        if 'Computational' in method_names:
+            combinations.append("Apply computational methods to analyze large-scale patterns in your data")
+
+        if len(methodologies) >= 3:
+            combinations.append("Consider mixed-methods approach to leverage multiple methodology strengths")
+
+        return combinations[:4]
+
 
 class ResearchGapAgent:
     """Specialized agent for identifying research gaps using semantic analysis"""
@@ -1723,7 +1743,7 @@ class ThesisStructureAgent:
 
         return formatted_gaps
 
-    def _extract_research_domains(self, papers: List[Dict[str, Any]]) -> List[str]:
+    async def _create_chapter_outlines(self, chapters: List[Dict[str, Any]], analysis_results: Dict[str, Any]) -> Dict[str, Any]:
         """Extract research domains from papers"""
         domains = set()
         domain_keywords = {
@@ -1983,26 +2003,6 @@ class ThesisStructureAgent:
             conflicts.append("No major conflicts identified")
 
         return conflicts[:2]
-
-    def _generate_recommended_combinations(self, methodologies: List[Dict[str, Any]]) -> List[str]:
-        """Generate recommended methodology combinations"""
-        combinations = []
-
-        method_names = [m['name'] for m in methodologies]
-
-        if 'Experimental' in method_names and 'Observational' in method_names:
-            combinations.append("Combine experimental and observational approaches for comprehensive evidence")
-
-        if 'Theoretical' in method_names and any('Experimental' in name or 'Observational' in name for name in method_names):
-            combinations.append("Use theoretical framework to guide empirical research design")
-
-        if 'Computational' in method_names:
-            combinations.append("Apply computational methods to analyze large-scale patterns in your data")
-
-        if len(methodologies) >= 3:
-            combinations.append("Consider mixed-methods approach to leverage multiple methodology strengths")
-
-        return combinations[:4]
 
     async def _create_chapter_outlines(self, chapters: List[Dict[str, Any]], analysis_results: Dict[str, Any]) -> Dict[str, Any]:
         """Create detailed outlines for each chapter"""
