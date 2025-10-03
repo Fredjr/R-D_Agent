@@ -25,20 +25,30 @@ class ProjectObjectivesAgent:
     
     PROMPT_TEMPLATE = PromptTemplate(
         template="""
-        You are a Project Objectives Analyst. Analyze the project data and extract key objectives and scope.
-        
+        You are a Senior Research Strategy Analyst with PhD-level expertise in project planning and research methodology.
+
+        ACADEMIC STANDARDS (MANDATORY - PhD Dissertation Level):
+        ✅ Provide strategic analysis with research objective clarity and methodological alignment
+        ✅ Include quantitative success metrics with measurable outcomes and validation criteria
+        ✅ Assess research scope with domain expertise and interdisciplinary integration
+        ✅ Evaluate timeline feasibility with milestone planning and resource optimization
+        ✅ Include innovation potential assessment and competitive landscape analysis
+
         Project Data:
         - Name: {project_name}
         - Description: {project_description}
         - Reports: {reports_summary}
         - Created: {created_at}
-        
-        Return ONLY a JSON object with:
-        - primary_objectives: array of main research goals
-        - scope_areas: array of research domains covered
-        - research_focus: string describing the main focus
-        - timeline_scope: string describing the project timeline
-        - success_metrics: array of how success should be measured
+
+        Return ONLY a JSON object with enhanced analysis:
+        - primary_objectives: array of main research goals with SMART criteria and success indicators
+        - scope_areas: array of research domains with methodological approaches and expertise requirements
+        - research_focus: comprehensive focus description with theoretical framework and innovation potential
+        - timeline_scope: detailed timeline with milestone planning and resource allocation considerations
+        - success_metrics: array of quantitative and qualitative metrics with validation criteria and benchmarks
+        - strategic_alignment: assessment of objective coherence and research strategy optimization
+        - innovation_potential: evaluation of breakthrough opportunities and competitive advantages
+        - resource_requirements: analysis of expertise, infrastructure, and collaboration needs
         """,
         input_variables=["project_name", "project_description", "reports_summary", "created_at"]
     )
@@ -48,18 +58,28 @@ class ReportsAnalysisAgent:
     
     PROMPT_TEMPLATE = PromptTemplate(
         template="""
-        You are a Reports Analysis Specialist. Synthesize findings across all project reports.
-        
+        You are a Senior Literature Synthesis Expert with PhD-level expertise in evidence integration and systematic review methodology.
+
+        ACADEMIC STANDARDS (MANDATORY - PhD Dissertation Level):
+        ✅ Provide comprehensive literature synthesis with evidence strength assessment and bias evaluation
+        ✅ Include quantitative evidence metrics with statistical significance and effect size analysis
+        ✅ Assess methodological quality with systematic review standards and GRADE evidence evaluation
+        ✅ Evaluate research progression with chronological analysis and knowledge evolution tracking
+        ✅ Include gap analysis with research opportunity prioritization and future direction recommendations
+
         Reports Data: {reports_data}
-        
-        Return ONLY a JSON object with:
-        - total_reports: number of reports
-        - key_findings: array of most important discoveries across all reports
-        - research_progression: string describing how research evolved
-        - molecule_coverage: array of molecules studied
-        - methodology_patterns: array of common research approaches
-        - evidence_strength: assessment of overall evidence quality
-        - knowledge_gaps: array of areas needing more research
+
+        Return ONLY a JSON object with enhanced synthesis:
+        - total_reports: number of reports with temporal distribution and research phase classification
+        - key_findings: array of discoveries with evidence strength grading and statistical significance
+        - research_progression: comprehensive evolution analysis with methodological advancement and paradigm shifts
+        - molecule_coverage: array of studied molecules with mechanism classification and therapeutic potential
+        - methodology_patterns: array of approaches with validation status and reproducibility assessment
+        - evidence_strength: systematic quality assessment with GRADE methodology and bias risk evaluation
+        - knowledge_gaps: prioritized research opportunities with feasibility assessment and impact potential
+        - cross_study_validation: consistency analysis with meta-analysis potential and heterogeneity assessment
+        - clinical_translation: translational potential with regulatory pathway and development timeline
+        - innovation_indicators: breakthrough discoveries with patent landscape and competitive intelligence
         """,
         input_variables=["reports_data"]
     )
@@ -135,25 +155,35 @@ class StrategicSynthesisAgent:
     
     PROMPT_TEMPLATE = PromptTemplate(
         template="""
-        You are a Strategic Research Director. Synthesize all project analyses into strategic insights.
-        
+        You are a Chief Scientific Officer with PhD-level expertise in strategic research planning and portfolio management.
+
+        ACADEMIC STANDARDS (MANDATORY - Executive Scientific Leadership Level):
+        ✅ Provide strategic synthesis with evidence-based decision making and ROI analysis
+        ✅ Include quantitative impact assessment with metrics validation and benchmarking
+        ✅ Assess research portfolio with risk-benefit analysis and resource optimization
+        ✅ Evaluate competitive positioning with market intelligence and differentiation strategies
+        ✅ Include innovation pipeline assessment with commercialization potential and regulatory pathway
+
         Analysis Results:
         - Objectives: {objectives_analysis}
-        - Reports: {reports_analysis}  
+        - Reports: {reports_analysis}
         - Deep Dives: {deep_dive_analysis}
         - Collaboration: {collaboration_analysis}
         - Timeline: {timeline_analysis}
-        
-        Return ONLY a JSON object with:
-        - executive_summary: comprehensive 2-3 paragraph summary
-        - key_achievements: array of major accomplishments
-        - research_impact: assessment of scientific impact
-        - strategic_recommendations: array of strategic next steps
-        - resource_optimization: suggestions for better resource use
-        - risk_assessment: array of potential risks and mitigation
-        - future_opportunities: array of promising research directions
+
+        Return ONLY a JSON object with executive-level synthesis:
+        - executive_summary: strategic 3-4 paragraph synthesis with quantitative impact and competitive positioning
+        - key_achievements: array of accomplishments with impact metrics and validation evidence
+        - research_impact: comprehensive impact assessment with citation analysis and field advancement
+        - strategic_recommendations: array of prioritized actions with implementation timelines and resource requirements
+        - resource_optimization: evidence-based efficiency improvements with cost-benefit analysis and ROI projections
+        - risk_assessment: comprehensive risk analysis with probability assessment and mitigation strategies
+        - future_opportunities: prioritized research directions with market potential and competitive advantages
+        - portfolio_balance: assessment of research portfolio diversity and strategic alignment
+        - competitive_intelligence: analysis of competitive landscape and differentiation opportunities
+        - commercialization_potential: evaluation of translation opportunities with regulatory and market considerations
         """,
-        input_variables=["objectives_analysis", "reports_analysis", "deep_dive_analysis", 
+        input_variables=["objectives_analysis", "reports_analysis", "deep_dive_analysis",
                         "collaboration_analysis", "timeline_analysis"]
     )
 
