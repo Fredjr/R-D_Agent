@@ -726,6 +726,104 @@ class MethodologySynthesisAgent:
 
         return recommendations
 
+    def _format_methodologies_for_ui(self, methodologies: List, statistical_methods: List, papers: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Format methodologies for UI component consumption"""
+        formatted_methodologies = []
+        method_id = 1
+
+        # Define methodology categories and their characteristics
+        methodology_info = {
+            'experimental': {
+                'category': 'experimental',
+                'advantages': [
+                    'Establishes causal relationships',
+                    'Controls for confounding variables',
+                    'Provides strong evidence for hypotheses'
+                ],
+                'limitations': [
+                    'May lack external validity',
+                    'Ethical constraints in some contexts',
+                    'Resource intensive'
+                ],
+                'applications': ['Clinical trials', 'Laboratory studies', 'A/B testing']
+            },
+            'observational': {
+                'category': 'observational',
+                'advantages': [
+                    'Studies real-world phenomena',
+                    'Ethically feasible',
+                    'Cost-effective'
+                ],
+                'limitations': [
+                    'Cannot establish causation',
+                    'Potential for confounding',
+                    'Selection bias'
+                ],
+                'applications': ['Cohort studies', 'Case-control studies', 'Cross-sectional surveys']
+            },
+            'qualitative': {
+                'category': 'qualitative',
+                'advantages': [
+                    'Provides deep insights',
+                    'Explores complex phenomena',
+                    'Generates new theories'
+                ],
+                'limitations': [
+                    'Limited generalizability',
+                    'Subjective interpretation',
+                    'Time-intensive analysis'
+                ],
+                'applications': ['Interviews', 'Focus groups', 'Ethnographic studies']
+            }
+        }
+
+        # Format methodologies
+        for method in methodologies[:5]:  # Top 5 methodologies
+            method_type = method.get('category', 'general').lower()
+            info = methodology_info.get(method_type, methodology_info['observational'])
+
+            formatted_methodologies.append({
+                "id": f"method_{method_id}",
+                "name": method.get('name', f"Methodology {method_id}"),
+                "category": info['category'],
+                "description": method.get('description', f"Research methodology identified in {method.get('frequency', 1)} papers"),
+                "frequency": method.get('frequency', 1),
+                "advantages": info['advantages'],
+                "limitations": info['limitations'],
+                "typical_applications": info['applications'],
+                "statistical_methods": [sm.get('name', 'Unknown') for sm in statistical_methods[:3]],
+                "complexity": "medium",
+                "time_estimate": "3-6 months"
+            })
+            method_id += 1
+
+        return formatted_methodologies
+
+    def _generate_methodology_comparisons(self, methodologies: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Generate methodology comparisons"""
+        comparisons = []
+
+        for i, method1 in enumerate(methodologies[:3]):
+            for method2 in methodologies[i+1:4]:
+                comparison = {
+                    "id": f"comparison_{i+1}_{methodologies.index(method2)+1}",
+                    "method1": method1.get('name', 'Method 1'),
+                    "method2": method2.get('name', 'Method 2'),
+                    "similarities": [
+                        "Both provide systematic approaches to research",
+                        "Both can generate valuable insights"
+                    ],
+                    "differences": [
+                        f"{method1.get('name', 'Method 1')} focuses on {method1.get('category', 'general')} approaches",
+                        f"{method2.get('name', 'Method 2')} emphasizes {method2.get('category', 'general')} methods"
+                    ],
+                    "complementarity": f"Combining {method1.get('name', 'Method 1')} and {method2.get('name', 'Method 2')} could provide comprehensive insights",
+                    "recommendation": "Consider mixed-methods approach for robust findings"
+                }
+                comparisons.append(comparison)
+
+        return comparisons[:3]  # Return top 3 comparisons
+
 
 class ResearchGapAgent:
     """Specialized agent for identifying research gaps using semantic analysis"""
@@ -1044,6 +1142,79 @@ class ResearchGapAgent:
             opportunities.append("Literature coverage appears comprehensive - consider novel theoretical frameworks or emerging methodologies")
 
         return opportunities
+
+    def _format_gaps_for_ui(self, semantic_gaps: List, methodology_gaps: List, temporal_gaps: List, cross_domain_gaps: List) -> List[Dict[str, Any]]:
+        """Format gaps for UI component consumption"""
+        formatted_gaps = []
+        gap_id = 1
+
+        # Format semantic gaps
+        for gap in semantic_gaps[:3]:  # Top 3 semantic gaps
+            formatted_gaps.append({
+                "id": f"semantic_{gap_id}",
+                "title": f"Semantic Relevance Gap",
+                "description": f"Research area with limited connection to your objective (similarity: {gap.get('similarity_score', 0):.2f})",
+                "gap_type": "theoretical",
+                "severity": "medium" if gap.get('similarity_score', 0) < 0.2 else "low",
+                "research_opportunity": "Explore connections between this research area and your objective to identify novel insights",
+                "potential_impact": "Could reveal unexplored theoretical connections and broaden research scope",
+                "suggested_approaches": ["Literature synthesis", "Theoretical framework development", "Conceptual mapping"]
+            })
+            gap_id += 1
+
+        # Format methodology gaps
+        for gap in methodology_gaps[:2]:  # Top 2 methodology gaps
+            formatted_gaps.append({
+                "id": f"methodology_{gap_id}",
+                "title": f"Methodological Gap: {gap.get('methodology', 'Unknown Method')}",
+                "description": f"Underrepresented methodology in current literature (frequency: {gap.get('frequency', 0)})",
+                "gap_type": "methodological",
+                "severity": "high" if gap.get('frequency', 0) == 0 else "medium",
+                "research_opportunity": f"Apply {gap.get('methodology', 'this methodology')} to address research questions in novel ways",
+                "potential_impact": "Could provide new analytical perspectives and strengthen research validity",
+                "suggested_approaches": ["Methodological innovation", "Mixed-methods design", "Comparative analysis"]
+            })
+            gap_id += 1
+
+        # Format temporal gaps
+        for gap in temporal_gaps[:2]:  # Top 2 temporal gaps
+            formatted_gaps.append({
+                "id": f"temporal_{gap_id}",
+                "title": f"Temporal Research Gap",
+                "description": f"Limited recent research in this area (last significant work: {gap.get('year', 'unknown')})",
+                "gap_type": "temporal",
+                "severity": "medium",
+                "research_opportunity": "Conduct contemporary research to update understanding with current context",
+                "potential_impact": "Could provide updated insights reflecting recent developments and changes",
+                "suggested_approaches": ["Longitudinal studies", "Contemporary replication", "Trend analysis"]
+            })
+            gap_id += 1
+
+        return formatted_gaps[:5]  # Return top 5 gaps
+
+    def _extract_research_domains(self, papers: List[Dict[str, Any]]) -> List[str]:
+        """Extract research domains from papers"""
+        domains = set()
+        domain_keywords = {
+            'Machine Learning': ['machine learning', 'deep learning', 'neural network', 'artificial intelligence'],
+            'Natural Language Processing': ['nlp', 'natural language', 'text mining', 'language model'],
+            'Computer Vision': ['computer vision', 'image processing', 'object detection', 'image recognition'],
+            'Data Science': ['data science', 'data analysis', 'big data', 'analytics'],
+            'Software Engineering': ['software engineering', 'software development', 'programming', 'code'],
+            'Human-Computer Interaction': ['hci', 'user interface', 'user experience', 'usability'],
+            'Cybersecurity': ['security', 'cybersecurity', 'encryption', 'privacy'],
+            'Database Systems': ['database', 'sql', 'data storage', 'data management'],
+            'Distributed Systems': ['distributed', 'cloud computing', 'microservices', 'scalability'],
+            'Algorithms': ['algorithm', 'optimization', 'complexity', 'computational']
+        }
+
+        for paper in papers:
+            text = f"{paper.get('title', '')} {paper.get('abstract', '')}".lower()
+            for domain, keywords in domain_keywords.items():
+                if any(keyword in text for keyword in keywords):
+                    domains.add(domain)
+
+        return list(domains)[:6]
 
 
 class ThesisStructureAgent:
@@ -1463,7 +1634,7 @@ class ThesisStructureAgent:
 
         return list(validations)[:4]
 
-    def _format_gaps_for_ui(self, semantic_gaps: List, methodology_gaps: List, temporal_gaps: List, cross_domain_gaps: List) -> List[Dict[str, Any]]:
+    async def _create_chapter_outlines(self, chapters: List[Dict[str, Any]], analysis_results: Dict[str, Any]) -> Dict[str, Any]:
         """Format gaps for UI component consumption"""
         formatted_gaps = []
         gap_id = 1
