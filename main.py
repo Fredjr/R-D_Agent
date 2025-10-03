@@ -59,7 +59,8 @@ from experimental_methods_analyst import analyze_experimental_methods
 from results_interpretation_analyst import analyze_results_interpretation
 from deep_dive_agents import (
     run_enhanced_model_pipeline, run_methods_pipeline, run_results_pipeline,
-    run_enhanced_model_pipeline_with_context, run_methods_pipeline_with_context, run_results_pipeline_with_context
+    run_enhanced_model_pipeline_with_context, run_methods_pipeline_with_context, run_results_pipeline_with_context,
+    run_enhanced_model_pipeline_with_contract, run_methods_pipeline_with_contract, run_results_pipeline_with_contract
 )
 from project_summary_agents import ProjectSummaryOrchestrator, ContextEnhancedProjectSummaryOrchestrator
 from langchain.agents import AgentType, initialize_agent
@@ -3414,8 +3415,35 @@ async def orchestrate_v2(request, memories: list[dict], context_pack: dict = Non
             "source": "primary",
             "memories_used": len(memories or []),
         })
-    # Strategic synthesis via specialist analysts
-    executive_summary = _synthesize_executive_summary(request.objective, results_sections, time.time() + 6.0)
+    # 🚀 ENHANCEMENT: OutputContract Integration for Generate-Review
+    output_contract = None
+    try:
+        from phd_thesis_agents import OutputContract
+        output_contract = OutputContract.get_academic_contract("literature_review")
+        log_event({
+            "event": "generate_review_output_contract_loaded",
+            "contract_requirements": {
+                "required_quotes": output_contract.get("required_quotes", 0),
+                "required_entities": output_contract.get("required_entities", 0),
+                "min_papers_synthesized": output_contract.get("min_papers_synthesized", 0)
+            }
+        })
+    except Exception as e:
+        log_event({
+            "event": "generate_review_output_contract_error",
+            "error": str(e)
+        })
+        output_contract = None
+
+    # Strategic synthesis via specialist analysts with quality enforcement
+    if output_contract and context_pack:
+        # Enhanced executive summary with OutputContract enforcement
+        executive_summary = _synthesize_executive_summary_with_contract(
+            request.objective, results_sections, time.time() + 6.0, output_contract, context_pack
+        )
+    else:
+        # Fallback to standard executive summary
+        executive_summary = _synthesize_executive_summary(request.objective, results_sections, time.time() + 6.0)
 
     diagnostics = {
         "pool_size": len(norm),
@@ -3428,6 +3456,13 @@ async def orchestrate_v2(request, memories: list[dict], context_pack: dict = Non
             "deepdive_ms": int(deepdive_ms),
         },
         "pool_caps": {"pubmed": PUBMED_POOL_MAX, "trials": TRIALS_POOL_MAX, "patents": PATENTS_POOL_MAX},
+        "quality_enhancement": {
+            "context_assembly": context_pack is not None,
+            "output_contract": output_contract is not None,
+            "enhancement_level": "context_and_contract" if (context_pack and output_contract) else
+                               "context_only" if context_pack else
+                               "contract_only" if output_contract else "standard"
+        }
     }
     return {
         "queries": [v for k, v in plan.items() if isinstance(v, str)],
@@ -3842,6 +3877,112 @@ def _synthesize_executive_summary(objective: str, results_sections: list[dict], 
     except Exception:
         return ""
     return ""
+
+
+def _synthesize_executive_summary_with_contract(objective: str, results_sections: list[dict], deadline: float,
+                                               output_contract: dict, context_pack: dict) -> str:
+    """Enhanced executive summary with OutputContract quality enforcement"""
+
+    if not results_sections or _time_left(deadline) < 3.0:
+        return ""
+
+    # Extract context for enhanced analysis
+    user_profile = context_pack.get("user_profile", {})
+    project_context = context_pack.get("project_context", {})
+    literature_landscape = context_pack.get("literature_landscape", {})
+
+    findings = _collect_findings(results_sections)
+    plan = _build_synthesis_plan(objective)
+
+    # Enhanced contract-aware synthesis template
+    contract_synthesis_template = """
+    You are a Senior Research Synthesis Expert specializing in {research_domain} with expertise in evidence-based literature review.
+
+    CONTEXT PACK:
+    USER PROFILE: {research_domain}, {experience_level}, {project_phase}
+    PROJECT CONTEXT: {project_objective}, {research_questions}
+    LITERATURE LANDSCAPE: {total_papers} papers, {key_authors}, {dominant_methods}
+
+    OUTPUT CONTRACT (MANDATORY REQUIREMENTS):
+    ✅ Include ≥{required_quotes} direct quotes with exact citations
+    ✅ Extract ≥{required_entities} entities (authors, methods, tools, frameworks)
+    ✅ Synthesize ≥{min_papers_synthesized} papers with evidence integration
+    ✅ Include Evidence, Limitations, and Implications sections
+    ✅ Provide counter-analysis and quantitative metrics
+    ✅ Include ≥{min_actionable_steps} actionable recommendations
+
+    ACADEMIC STANDARDS (MANDATORY - PhD Dissertation Level):
+    ✅ Theoretical framework integration with domain expertise
+    ✅ Chronological analysis with research progression
+    ✅ Gap identification with research opportunities
+    ✅ Statistical validation and sample size adequacy
+    ✅ Reproducibility assessment with methodological rigor
+
+    Research Objective: {objective}
+
+    Literature Findings:
+    {findings}
+
+    Return a comprehensive literature synthesis that meets ALL contract requirements and academic standards.
+    Structure your response with clear sections: Evidence, Analysis, Limitations, Implications, Recommendations.
+    """
+
+    try:
+        # Create enhanced synthesis prompt
+        enhanced_prompt = PromptTemplate(
+            template=contract_synthesis_template,
+            input_variables=[
+                "research_domain", "experience_level", "project_phase",
+                "project_objective", "research_questions", "total_papers",
+                "key_authors", "dominant_methods", "required_quotes",
+                "required_entities", "min_papers_synthesized", "min_actionable_steps",
+                "objective", "findings"
+            ]
+        )
+
+        # Prepare context variables
+        context_vars = {
+            "research_domain": user_profile.get("research_domain", "biomedical_research"),
+            "experience_level": user_profile.get("experience_level", "intermediate"),
+            "project_phase": user_profile.get("project_phase", "literature_review"),
+            "project_objective": project_context.get("objective", objective),
+            "research_questions": ", ".join(project_context.get("research_questions", [])),
+            "total_papers": str(literature_landscape.get("total_papers", len(results_sections))),
+            "key_authors": ", ".join(literature_landscape.get("key_authors", [])),
+            "dominant_methods": ", ".join(literature_landscape.get("dominant_methods", [])),
+            "required_quotes": str(output_contract.get("required_quotes", 5)),
+            "required_entities": str(output_contract.get("required_entities", 8)),
+            "min_papers_synthesized": str(output_contract.get("min_papers_synthesized", 15)),
+            "min_actionable_steps": str(output_contract.get("min_actionable_steps", 3)),
+            "objective": objective,
+            "findings": findings
+        }
+
+        # Generate contract-enhanced synthesis
+        enhanced_chain = LLMChain(llm=get_llm_summary(), prompt=enhanced_prompt)
+        result = enhanced_chain.invoke(context_vars)
+
+        enhanced_summary = str(result.get("text", "")).strip()
+
+        # Log contract compliance attempt
+        log_event({
+            "event": "generate_review_contract_synthesis_success",
+            "contract_requirements_applied": True,
+            "context_enhanced": True,
+            "summary_length": len(enhanced_summary)
+        })
+
+        return enhanced_summary
+
+    except Exception as e:
+        # Graceful fallback to standard synthesis
+        log_event({
+            "event": "generate_review_contract_synthesis_fallback",
+            "error": str(e),
+            "fallback_to": "standard_synthesis"
+        })
+
+        return _synthesize_executive_summary(objective, results_sections, deadline)
 
 
 # Objective deconstruction to guide specialist routing
@@ -9618,10 +9759,40 @@ async def deep_dive(request: DeepDiveRequest, db: Session = Depends(get_db), htt
             # Graceful fallback - continue without context assembly
             context_pack = None
 
-        # Run three specialist modules in parallel with context enhancement
+        # 🚀 ENHANCEMENT: OutputContract Integration for Deep-Dive Analysis
+        output_contract = None
         try:
-            # Module 1 with timeout - Enhanced model analysis with context
-            if context_pack:
+            from phd_thesis_agents import OutputContract
+            output_contract = OutputContract.get_academic_contract("methodology")
+            log_event({
+                "event": "deep_dive_output_contract_loaded",
+                "contract_requirements": {
+                    "required_quotes": output_contract.get("required_quotes", 0),
+                    "required_entities": output_contract.get("required_entities", 0),
+                    "require_statistical_details": output_contract.get("require_statistical_details", False)
+                },
+                "pmid": request.pmid
+            })
+        except Exception as e:
+            log_event({
+                "event": "deep_dive_output_contract_error",
+                "error": str(e),
+                "pmid": request.pmid
+            })
+            output_contract = None
+
+        # Run three specialist modules in parallel with context and contract enhancement
+        try:
+            # Module 1 with timeout - Enhanced model analysis with context and contract
+            if context_pack and output_contract:
+                # Use contract-enhanced model analysis
+                md_structured = await _with_timeout(
+                    run_in_threadpool(run_enhanced_model_pipeline_with_contract, text, request.objective, get_llm_analyzer(), context_pack, output_contract),
+                    120.0,  # 2 minutes for enhanced analysis
+                    "DeepDiveModelContract",
+                    retries=0,
+                )
+            elif context_pack:
                 # Use context-enhanced model analysis
                 md_structured = await _with_timeout(
                     run_in_threadpool(run_enhanced_model_pipeline_with_context, text, request.objective, get_llm_analyzer(), context_pack),
@@ -9644,8 +9815,22 @@ async def deep_dive(request: DeepDiveRequest, db: Session = Depends(get_db), htt
                 "fact_anchors": [],
             }
 
-            # Modules 2 and 3 with enhanced timeouts and context-aware processing
-            if context_pack:
+            # Modules 2 and 3 with enhanced timeouts and context/contract-aware processing
+            if context_pack and output_contract:
+                # Use contract-enhanced pipelines
+                mth_task = _with_timeout(
+                    run_in_threadpool(run_methods_pipeline_with_contract, text, request.objective, get_llm_analyzer(), context_pack, output_contract),
+                    120.0,  # Increased to 2 minutes for enhanced content processing
+                    "DeepDiveMethodsContract",
+                    retries=0,
+                )
+                res_task = _with_timeout(
+                    run_in_threadpool(run_results_pipeline_with_contract, text, request.objective, get_llm_analyzer(), request.pmid, context_pack, output_contract),
+                    120.0,  # Increased to 2 minutes for enhanced content processing
+                    "DeepDiveResultsContract",
+                    retries=0,
+                )
+            elif context_pack:
                 # Use context-enhanced pipelines
                 mth_task = _with_timeout(
                     run_in_threadpool(run_methods_pipeline_with_context, text, request.objective, get_llm_analyzer(), context_pack),
@@ -9718,6 +9903,19 @@ async def deep_dive(request: DeepDiveRequest, db: Session = Depends(get_db), htt
                 if grounding == "full_text"
                 else "⚠️ Abstract-only analysis - results based on limited content. For richer analysis, try providing a PMC URL or PDF upload."
             ),
+            "quality_enhancement": {
+                "context_assembly": context_pack is not None,
+                "output_contract": output_contract is not None,
+                "enhancement_level": "context_and_contract" if (context_pack and output_contract) else
+                                   "context_only" if context_pack else
+                                   "contract_only" if output_contract else "standard",
+                "contract_requirements": {
+                    "required_quotes": output_contract.get("required_quotes", 0) if output_contract else 0,
+                    "required_entities": output_contract.get("required_entities", 0) if output_contract else 0,
+                    "statistical_details": output_contract.get("require_statistical_details", False) if output_contract else False
+                } if output_contract else None,
+                "context_dimensions": len(context_pack) if context_pack else 0
+            },
             **({k: v for k, v in (meta or {}).items() if v is not None}),
         }
         
