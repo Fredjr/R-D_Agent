@@ -4442,7 +4442,11 @@ async def health_check():
 async def debug_methods():
     """Debug endpoint to check if PhD agent methods exist"""
     try:
+        import phd_thesis_agents
         from phd_thesis_agents import ResearchGapAgent, MethodologySynthesisAgent
+
+        # Get version info
+        version = getattr(phd_thesis_agents, 'PHD_AGENTS_VERSION', 'unknown')
 
         # Check ResearchGapAgent methods
         gap_agent = ResearchGapAgent(llm=None)
@@ -4461,9 +4465,14 @@ async def debug_methods():
             hasattr(method_agent, '_generate_recommended_combinations')
         ]
 
+        # Get all methods for debugging
+        gap_all_methods = [method for method in dir(gap_agent) if method.startswith('_')]
+        method_all_methods = [method for method in dir(method_agent) if method.startswith('_')]
+
         return {
             "status": "success",
             "timestamp": datetime.utcnow().isoformat(),
+            "phd_agents_version": version,
             "gap_agent_methods": {
                 "_extract_research_domains": gap_methods[0],
                 "_format_gaps_for_ui": gap_methods[1],
@@ -4475,7 +4484,11 @@ async def debug_methods():
                 "_format_methodologies_for_ui": method_methods[1],
                 "_generate_recommended_combinations": method_methods[2]
             },
-            "all_methods_available": all(gap_methods + method_methods)
+            "all_methods_available": all(gap_methods + method_methods),
+            "debug_info": {
+                "gap_agent_all_private_methods": gap_all_methods,
+                "method_agent_all_private_methods": method_all_methods
+            }
         }
     except Exception as e:
         return {

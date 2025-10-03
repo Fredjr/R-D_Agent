@@ -158,6 +158,10 @@ def get_phd_models():
 # PHD-SPECIFIC AGENT CLASSES
 # =============================================================================
 
+# Version marker for deployment debugging
+PHD_AGENTS_VERSION = "2025-10-03-v2.1-with-missing-methods"
+logger.info(f"🔍 PhD Agents Version: {PHD_AGENTS_VERSION}")
+
 class LiteratureReviewAgent:
     """Specialized agent for systematic literature review using semantic analysis"""
     
