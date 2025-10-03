@@ -823,3 +823,301 @@ def run_enhanced_model_pipeline_with_context(full_text: str, objective: str, llm
     except Exception:
         # Graceful fallback to original pipeline
         return run_enhanced_model_pipeline(full_text, objective, llm)
+
+
+# 🚀 OUTPUT CONTRACT-ENHANCED PIPELINE FUNCTIONS
+# Enhanced versions that enforce academic quality standards with OutputContract
+
+def run_methods_pipeline_with_contract(full_text: str, objective: str, llm, context_pack: dict, output_contract: dict) -> List[Dict[str, Any]]:
+    """Enhanced methods analysis pipeline with OutputContract quality enforcement"""
+    try:
+        # Extract context variables with fallbacks
+        user_profile = context_pack.get("user_profile", {})
+        project_context = context_pack.get("project_context", {})
+        papers_data = context_pack.get("papers_data", [{}])
+        paper_info = papers_data[0] if papers_data else {}
+
+        # Create contract-enhanced prompt template
+        contract_enhanced_methods_prompt = PromptTemplate(
+            template=(
+                "You are a Senior Research Methodology Expert specializing in {research_domain} with expertise in experimental design and statistical analysis.\n\n"
+                "CONTEXT PACK:\n"
+                "USER PROFILE: {research_domain}, {experience_level}, {project_phase}\n"
+                "PROJECT CONTEXT: {project_objective}, {research_questions}\n"
+                "PAPER CONTEXT: {paper_title}, {journal}, {year}, {authors}\n\n"
+                "OUTPUT CONTRACT (MANDATORY REQUIREMENTS):\n"
+                "✅ Include ≥{required_quotes} direct quotes with exact citations\n"
+                "✅ Extract ≥{required_entities} entities (methods, tools, statistical approaches)\n"
+                "✅ Provide quantitative metrics and sample characteristics\n"
+                "✅ Include counter-analysis and limitation assessment\n"
+                "✅ Provide ≥{min_actionable_steps} actionable methodological recommendations\n\n"
+                "ACADEMIC STANDARDS (MANDATORY - PhD Dissertation Level):\n"
+                "✅ Comprehensive methodology analysis with statistical validation\n"
+                "✅ Domain-specific expertise in {research_domain} methodologies\n"
+                "✅ Critical assessment of experimental design and controls\n"
+                "✅ Reproducibility analysis with sample size adequacy\n"
+                "✅ Methodological innovation identification\n"
+                "✅ Bias assessment and validity evaluation\n\n"
+                "Research Objective: {objective}\n\n"
+                "Full Text to Analyze:\n{full_text}\n\n"
+                "Return ONLY a JSON array of methodology analysis objects. Each object must include:\n"
+                "- method_name: string (specific methodology name)\n"
+                "- description: string (detailed methodology description with quotes)\n"
+                "- statistical_approach: string (statistical methods used)\n"
+                "- sample_characteristics: object (sample size, demographics, inclusion criteria)\n"
+                "- validity_assessment: string (internal/external validity evaluation)\n"
+                "- reproducibility_score: number (1-10 reproducibility assessment)\n"
+                "- limitations: array of strings (methodological limitations)\n"
+                "- innovations: array of strings (novel methodological aspects)\n"
+                "- actionable_recommendations: array of strings (implementation recommendations)\n"
+                "- evidence_quotes: array of objects with {quote, source_section}\n"
+                "- extracted_entities: array of strings (methods, tools, frameworks)\n"
+            ),
+            input_variables=[
+                "research_domain", "experience_level", "project_phase",
+                "project_objective", "research_questions", "paper_title",
+                "journal", "year", "authors", "required_quotes", "required_entities",
+                "min_actionable_steps", "objective", "full_text"
+            ],
+        )
+
+        # Prepare context variables with contract requirements
+        context_vars = {
+            "research_domain": user_profile.get("research_domain", "biomedical_research"),
+            "experience_level": user_profile.get("experience_level", "intermediate"),
+            "project_phase": user_profile.get("project_phase", "methodology_analysis"),
+            "project_objective": project_context.get("objective", objective),
+            "research_questions": ", ".join(project_context.get("research_questions", [])),
+            "paper_title": paper_info.get("title", "Unknown Title"),
+            "journal": paper_info.get("journal", "Unknown Journal"),
+            "year": str(paper_info.get("year", "Unknown")),
+            "authors": ", ".join(paper_info.get("authors", [])) if isinstance(paper_info.get("authors"), list) else str(paper_info.get("authors", "Unknown")),
+            "required_quotes": str(output_contract.get("required_quotes", 2)),
+            "required_entities": str(output_contract.get("required_entities", 5)),
+            "min_actionable_steps": str(output_contract.get("min_actionable_steps", 3)),
+            "objective": objective,
+            "full_text": full_text[:8000]  # Truncate for prompt efficiency
+        }
+
+        # Use contract-enhanced prompt
+        chain = LLMChain(llm=llm, prompt=contract_enhanced_methods_prompt)
+        result = chain.invoke(context_vars)
+
+        # Parse and return result with JSON cleaning
+        text_result = result.get("text", result) if isinstance(result, dict) else str(result)
+        if "```" in text_result:
+            text_result = text_result.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
+
+        try:
+            parsed_result = json.loads(text_result)
+            return parsed_result if isinstance(parsed_result, list) else [parsed_result]
+        except json.JSONDecodeError:
+            # Try to extract JSON from text
+            import re
+            json_match = re.search(r'\[.*\]', text_result, re.DOTALL)
+            if json_match:
+                try:
+                    return json.loads(json_match.group())
+                except:
+                    pass
+            return [{"error": "Failed to parse contract-enhanced methods analysis", "raw_output": text_result[:500]}]
+
+    except Exception:
+        # Graceful fallback to context-enhanced pipeline
+        return run_methods_pipeline_with_context(full_text, objective, llm, context_pack)
+
+def run_results_pipeline_with_contract(full_text: str, objective: str, llm, pmid: str, context_pack: dict, output_contract: dict) -> List[Dict[str, Any]]:
+    """Enhanced results analysis pipeline with OutputContract quality enforcement"""
+    try:
+        # Extract context variables with fallbacks
+        user_profile = context_pack.get("user_profile", {})
+        project_context = context_pack.get("project_context", {})
+        papers_data = context_pack.get("papers_data", [{}])
+        paper_info = papers_data[0] if papers_data else {}
+
+        # Create contract-enhanced prompt template
+        contract_enhanced_results_prompt = PromptTemplate(
+            template=(
+                "You are a Senior Research Results Analyst specializing in {research_domain} with expertise in statistical interpretation and evidence synthesis.\n\n"
+                "CONTEXT PACK:\n"
+                "USER PROFILE: {research_domain}, {experience_level}, {project_phase}\n"
+                "PROJECT CONTEXT: {project_objective}, {research_questions}\n"
+                "PAPER CONTEXT: {paper_title}, {journal}, {year}\n\n"
+                "OUTPUT CONTRACT (MANDATORY REQUIREMENTS):\n"
+                "✅ Include ≥{required_quotes} direct quotes with exact statistical results\n"
+                "✅ Extract ≥{required_entities} quantitative entities (metrics, p-values, effect sizes)\n"
+                "✅ Provide quantitative metrics with confidence intervals\n"
+                "✅ Include counter-analysis and alternative interpretations\n"
+                "✅ Provide ≥{min_actionable_steps} actionable clinical recommendations\n\n"
+                "ACADEMIC STANDARDS (MANDATORY - PhD Dissertation Level):\n"
+                "✅ Rigorous statistical interpretation with effect size analysis\n"
+                "✅ Clinical significance assessment beyond statistical significance\n"
+                "✅ Hypothesis alignment and research question answering\n"
+                "✅ Bias detection and confounding variable analysis\n"
+                "✅ Generalizability assessment and population applicability\n"
+                "✅ Evidence strength grading and recommendation formulation\n\n"
+                "Research Objective: {objective}\n\n"
+                "Full Text to Analyze:\n{full_text}\n\n"
+                "Return ONLY a JSON array of results analysis objects. Each object must include:\n"
+                "- finding_name: string (specific result or finding)\n"
+                "- statistical_result: string (exact statistical values with quotes)\n"
+                "- effect_size: object (magnitude and clinical significance)\n"
+                "- confidence_intervals: string (statistical confidence bounds)\n"
+                "- hypothesis_alignment: string (how results address research questions)\n"
+                "- clinical_significance: string (practical importance assessment)\n"
+                "- limitations: array of strings (result interpretation limitations)\n"
+                "- alternative_interpretations: array of strings (counter-analysis)\n"
+                "- actionable_recommendations: array of strings (clinical applications)\n"
+                "- evidence_quotes: array of objects with {quote, statistical_value, source_section}\n"
+                "- extracted_entities: array of strings (metrics, biomarkers, outcomes)\n"
+                "- evidence_strength: string (GRADE or similar evidence assessment)\n"
+            ),
+            input_variables=[
+                "research_domain", "experience_level", "project_phase",
+                "project_objective", "research_questions", "paper_title",
+                "journal", "year", "required_quotes", "required_entities",
+                "min_actionable_steps", "objective", "full_text"
+            ],
+        )
+
+        # Prepare context variables with contract requirements
+        context_vars = {
+            "research_domain": user_profile.get("research_domain", "biomedical_research"),
+            "experience_level": user_profile.get("experience_level", "intermediate"),
+            "project_phase": user_profile.get("project_phase", "results_analysis"),
+            "project_objective": project_context.get("objective", objective),
+            "research_questions": ", ".join(project_context.get("research_questions", [])),
+            "paper_title": paper_info.get("title", "Unknown Title"),
+            "journal": paper_info.get("journal", "Unknown Journal"),
+            "year": str(paper_info.get("year", "Unknown")),
+            "required_quotes": str(output_contract.get("required_quotes", 2)),
+            "required_entities": str(output_contract.get("required_entities", 5)),
+            "min_actionable_steps": str(output_contract.get("min_actionable_steps", 3)),
+            "objective": objective,
+            "full_text": full_text[:8000]  # Truncate for prompt efficiency
+        }
+
+        # Use contract-enhanced prompt
+        chain = LLMChain(llm=llm, prompt=contract_enhanced_results_prompt)
+        result = chain.invoke(context_vars)
+
+        # Parse and return result with JSON cleaning
+        text_result = result.get("text", result) if isinstance(result, dict) else str(result)
+        if "```" in text_result:
+            text_result = text_result.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
+
+        try:
+            parsed_result = json.loads(text_result)
+            return parsed_result if isinstance(parsed_result, list) else [parsed_result]
+        except json.JSONDecodeError:
+            # Try to extract JSON from text
+            import re
+            json_match = re.search(r'\[.*\]', text_result, re.DOTALL)
+            if json_match:
+                try:
+                    return json.loads(json_match.group())
+                except:
+                    pass
+            return [{"error": "Failed to parse contract-enhanced results analysis", "raw_output": text_result[:500]}]
+
+    except Exception:
+        # Graceful fallback to context-enhanced pipeline
+        return run_results_pipeline_with_context(full_text, objective, llm, pmid, context_pack)
+
+def run_enhanced_model_pipeline_with_contract(full_text: str, objective: str, llm, context_pack: dict, output_contract: dict) -> List[Dict[str, Any]]:
+    """Enhanced model analysis pipeline with OutputContract quality enforcement"""
+    try:
+        # Extract context variables with fallbacks
+        user_profile = context_pack.get("user_profile", {})
+        project_context = context_pack.get("project_context", {})
+        papers_data = context_pack.get("papers_data", [{}])
+        paper_info = papers_data[0] if papers_data else {}
+
+        # Create contract-enhanced prompt template
+        contract_enhanced_model_prompt = PromptTemplate(
+            template=(
+                "You are a Senior Scientific Model Analyst specializing in {research_domain} with expertise in experimental design and theoretical frameworks.\n\n"
+                "CONTEXT PACK:\n"
+                "USER PROFILE: {research_domain}, {experience_level}, {project_phase}\n"
+                "PROJECT CONTEXT: {project_objective}, {research_questions}\n"
+                "PAPER CONTEXT: {paper_title}, {journal}, {year}\n\n"
+                "OUTPUT CONTRACT (MANDATORY REQUIREMENTS):\n"
+                "✅ Include ≥{required_quotes} direct quotes with exact model descriptions\n"
+                "✅ Extract ≥{required_entities} model entities (frameworks, assumptions, variables)\n"
+                "✅ Provide quantitative model parameters and validation metrics\n"
+                "✅ Include counter-analysis and model limitation assessment\n"
+                "✅ Provide ≥{min_actionable_steps} actionable model improvement recommendations\n\n"
+                "ACADEMIC STANDARDS (MANDATORY - PhD Dissertation Level):\n"
+                "✅ Comprehensive model architecture analysis with theoretical grounding\n"
+                "✅ Assumption validation and constraint identification\n"
+                "✅ Predictive capability assessment with validation metrics\n"
+                "✅ Theoretical framework alignment and innovation assessment\n"
+                "✅ Generalizability analysis and boundary condition identification\n"
+                "✅ Model comparison and benchmarking against established approaches\n\n"
+                "Research Objective: {objective}\n\n"
+                "Full Text to Analyze:\n{full_text}\n\n"
+                "Return ONLY a JSON array of model analysis objects. Each object must include:\n"
+                "- model_name: string (specific model or framework name)\n"
+                "- theoretical_framework: string (underlying theoretical basis with quotes)\n"
+                "- key_assumptions: array of strings (critical model assumptions)\n"
+                "- model_parameters: object (quantitative parameters and settings)\n"
+                "- validation_metrics: object (performance measures and benchmarks)\n"
+                "- predictive_capability: string (model prediction accuracy and scope)\n"
+                "- limitations: array of strings (model constraints and boundary conditions)\n"
+                "- innovations: array of strings (novel aspects and contributions)\n"
+                "- actionable_recommendations: array of strings (model improvement suggestions)\n"
+                "- evidence_quotes: array of objects with {quote, model_aspect, source_section}\n"
+                "- extracted_entities: array of strings (frameworks, algorithms, variables)\n"
+                "- theoretical_alignment: string (alignment with established theories)\n"
+            ),
+            input_variables=[
+                "research_domain", "experience_level", "project_phase",
+                "project_objective", "research_questions", "paper_title",
+                "journal", "year", "required_quotes", "required_entities",
+                "min_actionable_steps", "objective", "full_text"
+            ],
+        )
+
+        # Prepare context variables with contract requirements
+        context_vars = {
+            "research_domain": user_profile.get("research_domain", "biomedical_research"),
+            "experience_level": user_profile.get("experience_level", "intermediate"),
+            "project_phase": user_profile.get("project_phase", "model_analysis"),
+            "project_objective": project_context.get("objective", objective),
+            "research_questions": ", ".join(project_context.get("research_questions", [])),
+            "paper_title": paper_info.get("title", "Unknown Title"),
+            "journal": paper_info.get("journal", "Unknown Journal"),
+            "year": str(paper_info.get("year", "Unknown")),
+            "required_quotes": str(output_contract.get("required_quotes", 2)),
+            "required_entities": str(output_contract.get("required_entities", 5)),
+            "min_actionable_steps": str(output_contract.get("min_actionable_steps", 3)),
+            "objective": objective,
+            "full_text": full_text[:8000]  # Truncate for prompt efficiency
+        }
+
+        # Use contract-enhanced prompt
+        chain = LLMChain(llm=llm, prompt=contract_enhanced_model_prompt)
+        result = chain.invoke(context_vars)
+
+        # Parse and return result with JSON cleaning
+        text_result = result.get("text", result) if isinstance(result, dict) else str(result)
+        if "```" in text_result:
+            text_result = text_result.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
+
+        try:
+            parsed_result = json.loads(text_result)
+            return parsed_result if isinstance(parsed_result, list) else [parsed_result]
+        except json.JSONDecodeError:
+            # Try to extract JSON from text
+            import re
+            json_match = re.search(r'\[.*\]', text_result, re.DOTALL)
+            if json_match:
+                try:
+                    return json.loads(json_match.group())
+                except:
+                    pass
+            return [{"error": "Failed to parse contract-enhanced model analysis", "raw_output": text_result[:500]}]
+
+    except Exception:
+        # Graceful fallback to context-enhanced pipeline
+        return run_enhanced_model_pipeline_with_context(full_text, objective, llm, context_pack)
