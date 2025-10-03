@@ -57,7 +57,10 @@ from tools import PubMedSearchTool, WebSearchTool, PatentsSearchTool
 from scientific_model_analyst import analyze_scientific_model
 from experimental_methods_analyst import analyze_experimental_methods
 from results_interpretation_analyst import analyze_results_interpretation
-from deep_dive_agents import run_enhanced_model_pipeline, run_methods_pipeline, run_results_pipeline
+from deep_dive_agents import (
+    run_enhanced_model_pipeline, run_methods_pipeline, run_results_pipeline,
+    run_enhanced_model_pipeline_with_context, run_methods_pipeline_with_context, run_results_pipeline_with_context
+)
 from project_summary_agents import ProjectSummaryOrchestrator
 from langchain.agents import AgentType, initialize_agent
 from scoring import calculate_publication_score
@@ -9518,9 +9521,14 @@ async def deep_dive_async(request: DeepDiveRequest, http_request: Request, db: S
     }
 
 @app.post("/deep-dive")
-async def deep_dive(request: DeepDiveRequest, db: Session = Depends(get_db)):
+async def deep_dive(request: DeepDiveRequest, db: Session = Depends(get_db), http_request: Request = None):
     t0 = _now_ms()
     try:
+        # 🚀 ENHANCEMENT: Extract user context for deep-dive analysis
+        current_user = None
+        if http_request:
+            current_user = http_request.headers.get("User-ID", "default_user")
+
         source_info = {"url": request.url, "pmid": request.pmid, "title": request.title}
         # Ingestion: strictly from provided article
         text = ""
@@ -9555,33 +9563,116 @@ async def deep_dive(request: DeepDiveRequest, db: Session = Depends(get_db)):
                 meta = _verify_source_match(request.title, request.pmid, {}, landing_html)
         except Exception:
             meta = {}
-        # Run three specialist modules in parallel
+
+        # 🚀 ENHANCEMENT: Context Assembly for Deep-Dive Analysis
+        context_pack = None
         try:
-            # Module 1 with timeout - Enhanced model analysis
-            md_structured = await _with_timeout(
-                run_in_threadpool(run_enhanced_model_pipeline, text, request.objective, get_llm_analyzer()),
-                120.0,  # 2 minutes for enhanced analysis
-                "DeepDiveModel",
-                retries=0,
+            # Import ContextAssembler from PhD agents
+            from phd_thesis_agents import ContextAssembler
+
+            # Create context assembler instance
+            context_assembler = ContextAssembler()
+
+            # Prepare paper data for context assembly
+            paper_data = [{
+                "title": request.title or "Unknown Title",
+                "pmid": request.pmid,
+                "url": request.url,
+                "abstract": text[:500] if len(text) > 500 else text,  # First 500 chars as abstract proxy
+                "full_text_available": grounding == "full_text",
+                "grounding_source": grounding_source
+            }]
+
+            # Assemble rich context for deep-dive analysis
+            context_pack = await context_assembler.assemble_context(
+                user_profile={
+                    "user_id": current_user or "default_user",
+                    "research_domain": "biomedical_research",  # Can be enhanced with user data
+                    "experience_level": "intermediate",  # Can be enhanced with user data
+                    "project_phase": "deep_analysis",
+                    "key_constraints": ["single_paper_focus", "methodology_emphasis"]
+                },
+                project_context={
+                    "project_id": getattr(request, "project_id", None),
+                    "objective": request.objective,
+                    "research_questions": [request.objective],
+                    "theoretical_framework": "evidence_based_medicine",
+                    "previous_findings": []  # Single paper analysis
+                },
+                papers_data=paper_data
             )
+
+            log_event({
+                "event": "deep_dive_context_assembly_success",
+                "pmid": request.pmid,
+                "grounding": grounding,
+                "context_dimensions": len(context_pack) if context_pack else 0
+            })
+
+        except Exception as e:
+            log_event({
+                "event": "deep_dive_context_assembly_error",
+                "error": str(e),
+                "pmid": request.pmid
+            })
+            # Graceful fallback - continue without context assembly
+            context_pack = None
+
+        # Run three specialist modules in parallel with context enhancement
+        try:
+            # Module 1 with timeout - Enhanced model analysis with context
+            if context_pack:
+                # Use context-enhanced model analysis
+                md_structured = await _with_timeout(
+                    run_in_threadpool(run_enhanced_model_pipeline_with_context, text, request.objective, get_llm_analyzer(), context_pack),
+                    120.0,  # 2 minutes for enhanced analysis
+                    "DeepDiveModelContextual",
+                    retries=0,
+                )
+            else:
+                # Fallback to original model analysis
+                md_structured = await _with_timeout(
+                    run_in_threadpool(run_enhanced_model_pipeline, text, request.objective, get_llm_analyzer()),
+                    120.0,  # 2 minutes for enhanced analysis
+                    "DeepDiveModel",
+                    retries=0,
+                )
+
             md_json = {
                 "summary": md_structured.get("protocol_summary", ""),
                 "relevance_justification": "",
                 "fact_anchors": [],
             }
-            # Modules 2 and 3 with enhanced timeouts and processing
-            mth_task = _with_timeout(
-                run_in_threadpool(run_methods_pipeline, text, request.objective, get_llm_analyzer()),
-                120.0,  # Increased to 2 minutes for enhanced content processing
-                "DeepDiveMethods",
-                retries=0,
-            )
-            res_task = _with_timeout(
-                run_in_threadpool(run_results_pipeline, text, request.objective, get_llm_analyzer(), request.pmid),
-                120.0,  # Increased to 2 minutes for enhanced content processing
-                "DeepDiveResults",
-                retries=0,
-            )
+
+            # Modules 2 and 3 with enhanced timeouts and context-aware processing
+            if context_pack:
+                # Use context-enhanced pipelines
+                mth_task = _with_timeout(
+                    run_in_threadpool(run_methods_pipeline_with_context, text, request.objective, get_llm_analyzer(), context_pack),
+                    120.0,  # Increased to 2 minutes for enhanced content processing
+                    "DeepDiveMethodsContextual",
+                    retries=0,
+                )
+                res_task = _with_timeout(
+                    run_in_threadpool(run_results_pipeline_with_context, text, request.objective, get_llm_analyzer(), request.pmid, context_pack),
+                    120.0,  # Increased to 2 minutes for enhanced content processing
+                    "DeepDiveResultsContextual",
+                    retries=0,
+                )
+            else:
+                # Fallback to original pipelines
+                mth_task = _with_timeout(
+                    run_in_threadpool(run_methods_pipeline, text, request.objective, get_llm_analyzer()),
+                    120.0,  # Increased to 2 minutes for enhanced content processing
+                    "DeepDiveMethods",
+                    retries=0,
+                )
+                res_task = _with_timeout(
+                    run_in_threadpool(run_results_pipeline, text, request.objective, get_llm_analyzer(), request.pmid),
+                    120.0,  # Increased to 2 minutes for enhanced content processing
+                    "DeepDiveResults",
+                    retries=0,
+                )
             mth, res = await asyncio.gather(mth_task, res_task)
 
             # Fallback population when full text is available but analyzers return empty
