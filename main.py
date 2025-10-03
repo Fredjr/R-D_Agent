@@ -4438,6 +4438,52 @@ async def health_check():
         "features": ["increased_recommendation_limits", "author_fixes", "citation_opportunities"]
     }
 
+@app.get("/debug/methods")
+async def debug_methods():
+    """Debug endpoint to check if PhD agent methods exist"""
+    try:
+        from phd_thesis_agents import ResearchGapAgent, MethodologySynthesisAgent
+
+        # Check ResearchGapAgent methods
+        gap_agent = ResearchGapAgent(llm=None)
+        gap_methods = [
+            hasattr(gap_agent, '_extract_research_domains'),
+            hasattr(gap_agent, '_format_gaps_for_ui'),
+            hasattr(gap_agent, '_generate_gap_summary'),
+            hasattr(gap_agent, '_generate_research_opportunities')
+        ]
+
+        # Check MethodologySynthesisAgent methods
+        method_agent = MethodologySynthesisAgent(llm=None)
+        method_methods = [
+            hasattr(method_agent, '_generate_methodology_comparisons'),
+            hasattr(method_agent, '_format_methodologies_for_ui'),
+            hasattr(method_agent, '_generate_recommended_combinations')
+        ]
+
+        return {
+            "status": "success",
+            "timestamp": datetime.utcnow().isoformat(),
+            "gap_agent_methods": {
+                "_extract_research_domains": gap_methods[0],
+                "_format_gaps_for_ui": gap_methods[1],
+                "_generate_gap_summary": gap_methods[2],
+                "_generate_research_opportunities": gap_methods[3]
+            },
+            "method_agent_methods": {
+                "_generate_methodology_comparisons": method_methods[0],
+                "_format_methodologies_for_ui": method_methods[1],
+                "_generate_recommended_combinations": method_methods[2]
+            },
+            "all_methods_available": all(gap_methods + method_methods)
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
 @app.get("/debug/llm-status")
 async def debug_llm_status():
     """Debug endpoint to check LLM initialization status"""
