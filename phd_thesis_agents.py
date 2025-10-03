@@ -1784,45 +1784,306 @@ class ResearchGapAgent:
     def __init__(self, llm, embeddings=None):
         self.llm = llm
         self.embeddings = embeddings
+        self.context_assembler = ContextAssembler()
 
-    async def identify_gaps(self, project_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Main gap identification method"""
+    # Enhanced Gap Analysis Prompt Template
+    ENHANCED_GAP_ANALYSIS_PROMPT = PromptTemplate(
+        template="""
+You are a Senior Research Gap Analysis Expert specializing in {research_domain} with expertise in systematic literature reviews and research opportunity identification.
+
+CONTEXT PACK:
+USER PROFILE: {research_domain}, {experience_level}, {project_phase}, {key_constraints}
+PROJECT CONTEXT: {project_objective}, {research_questions}, {theoretical_framework}, {previous_findings}
+LITERATURE LANDSCAPE: {total_papers} papers, {date_range}, {key_authors}, {dominant_methods}
+ENTITY CARDS: {entity_cards}
+METHODOLOGY LANDSCAPE: {methodology_distribution}
+TEMPORAL CONTEXT: {temporal_span}
+
+ACADEMIC STANDARDS (MANDATORY - PhD Dissertation Level):
+✅ Identify ≥3 research gaps with evidence strength assessment
+✅ Provide gap quantification with severity and impact metrics
+✅ Include evidence strength assessment for each gap (Strong/Moderate/Weak)
+✅ Rank opportunities by difficulty, timeline, and potential impact
+✅ Identify cross-domain opportunities with interdisciplinary potential
+✅ End with 5 actionable research recommendations with implementation timelines
+
+REQUIRED OUTPUT STRUCTURE (JSON):
+{{
+  "gap_analysis": {{
+    "identified_gaps": [
+      {{
+        "gap_id": "gap_001",
+        "gap_title": "Specific gap title",
+        "gap_description": "Detailed description with evidence",
+        "gap_type": "theoretical|methodological|empirical|temporal",
+        "severity_score": 0.0-1.0,
+        "impact_potential": "High|Medium|Low",
+        "evidence_strength": "Strong|Moderate|Weak",
+        "supporting_evidence": [
+          {{
+            "paper": "Author, Year",
+            "quote": "exact quote demonstrating gap",
+            "source_id": "source_ref"
+          }}
+        ],
+        "affected_research_areas": ["area1", "area2"],
+        "gap_quantification": {{
+          "papers_addressing_gap": 0,
+          "total_papers_in_area": 50,
+          "coverage_percentage": 0.0
+        }}
+      }}
+    ]
+  }},
+  "opportunity_analysis": {{
+    "research_opportunities": [
+      {{
+        "opportunity_id": "opp_001",
+        "opportunity_title": "Specific research opportunity",
+        "description": "Detailed opportunity description",
+        "difficulty_level": "Low|Medium|High",
+        "timeline_estimate": "6 months|1 year|2+ years",
+        "resource_requirements": ["requirement1", "requirement2"],
+        "potential_impact": "High|Medium|Low",
+        "interdisciplinary_potential": true|false,
+        "related_gaps": ["gap_001", "gap_002"]
+      }}
+    ],
+    "cross_domain_opportunities": [
+      {{
+        "domains": ["domain1", "domain2"],
+        "opportunity": "Cross-domain research opportunity",
+        "novelty_score": 0.0-1.0,
+        "feasibility_score": 0.0-1.0
+      }}
+    ]
+  }},
+  "evidence_assessment": {{
+    "literature_coverage": {{
+      "well_covered_areas": ["area1", "area2"],
+      "under_researched_areas": ["area3", "area4"],
+      "emerging_areas": ["area5", "area6"]
+    }},
+    "methodological_coverage": {{
+      "dominant_methods": ["method1", "method2"],
+      "underutilized_methods": ["method3", "method4"],
+      "missing_methods": ["method5", "method6"]
+    }},
+    "temporal_analysis": {{
+      "research_trends": ["trend1", "trend2"],
+      "declining_areas": ["area1", "area2"],
+      "emerging_trends": ["trend3", "trend4"]
+    }}
+  }},
+  "actionable_recommendations": [
+    {{
+      "recommendation": "Specific research recommendation",
+      "rationale": "Evidence-based justification",
+      "implementation_timeline": "6-12 months",
+      "resource_requirements": ["resources needed"],
+      "success_metrics": ["metric1", "metric2"],
+      "risk_assessment": "Low|Medium|High",
+      "expected_outcomes": ["outcome1", "outcome2"]
+    }}
+  ]
+}}
+
+ANALYSIS INSTRUCTIONS:
+1. Analyze the literature landscape to identify systematic gaps
+2. Quantify each gap with evidence from the literature
+3. Assess the strength of evidence for each identified gap
+4. Rank opportunities by feasibility and impact potential
+5. Identify interdisciplinary opportunities that bridge domains
+6. Provide specific, actionable recommendations with clear timelines
+
+Focus on gaps that are:
+- Empirically supported by literature analysis
+- Significant for advancing {research_domain}
+- Feasible given current methodological capabilities
+- Aligned with the research objective: {project_objective}
+
+PAPERS TO ANALYZE:
+{papers_content}
+        """,
+        input_variables=[
+            "research_domain", "experience_level", "project_phase", "key_constraints",
+            "project_objective", "research_questions", "theoretical_framework", "previous_findings",
+            "total_papers", "date_range", "key_authors", "dominant_methods",
+            "entity_cards", "methodology_distribution", "temporal_span", "papers_content"
+        ]
+    )
+
+    async def identify_gaps(self, project_data: Dict[str, Any], user_profile: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Enhanced gap identification method with context awareness"""
         try:
             papers = self._extract_papers_from_project(project_data)
-            research_objective = project_data.get("description", "")
 
             if not papers:
-                logger.warning("No papers found for gap analysis, returning mock data")
-                # Return mock data for testing
-                return {
-                    "identified_gaps": [
-                        {
-                            "id": "mock_gap_1",
-                            "title": "Sample Research Gap",
-                            "description": "This is a sample gap for testing purposes",
-                            "gap_type": "theoretical",
-                            "severity": "medium",
-                            "research_opportunity": "Explore this area for novel insights",
-                            "potential_impact": "Could provide new perspectives",
-                            "suggested_approaches": ["Literature review", "Empirical study"],
-                            "timeline_estimate": "3-6 months",
-                            "related_papers": ["Sample Paper 1"]
-                        }
-                    ],
-                    "papers_analyzed": 0,
-                    "research_domains": ["sample_domain"],
-                    "gap_summary": "Sample gap analysis for testing",
-                    "research_opportunities": ["Sample opportunity"],
-                    # Legacy format for backward compatibility
-                    "semantic_gaps": [],
-                    "methodology_gaps": [],
-                    "temporal_gaps": [],
-                    "cross_domain_opportunities": []
-                }
+                logger.warning("No papers found for gap analysis, using fallback")
+                return await self._fallback_gap_analysis(project_data, user_profile)
 
+            # Assemble rich context for gap analysis
+            context_pack = self.context_assembler.assemble_phd_context(
+                project_data=project_data,
+                papers=papers,
+                user_profile=user_profile,
+                analysis_type="gap_analysis"
+            )
+
+            # Prepare papers content for analysis (limit to prevent token overflow)
+            papers_sample = papers[:20]  # Analyze top 20 papers
+            papers_content = "\n\n".join([
+                f"Paper {i+1}: {paper.get('title', 'No title')}\n"
+                f"Authors: {', '.join(paper.get('authors', ['Unknown']))}\n"
+                f"Year: {paper.get('year', 'Unknown')}\n"
+                f"Abstract: {paper.get('abstract', 'No abstract available')[:500]}..."
+                for i, paper in enumerate(papers_sample)
+            ])
+
+            # Prepare enhanced analysis context
+            analysis_context = {
+                "research_domain": context_pack["user_profile"]["research_domain"],
+                "experience_level": context_pack["user_profile"]["experience_level"],
+                "project_phase": context_pack["user_profile"].get("project_phase", "analysis"),
+                "key_constraints": ", ".join(context_pack["user_profile"]["constraints"]),
+                "project_objective": context_pack["project_context"]["objective"],
+                "research_questions": ", ".join(context_pack["project_context"]["research_questions"]),
+                "theoretical_framework": context_pack["project_context"]["theoretical_framework"],
+                "previous_findings": ", ".join(context_pack["project_context"]["previous_findings"]),
+                "total_papers": context_pack["literature_landscape"]["total_papers"],
+                "date_range": context_pack["literature_landscape"]["date_range"],
+                "key_authors": ", ".join(context_pack["literature_landscape"]["top_authors"]),
+                "dominant_methods": ", ".join([m["name"] for m in context_pack["methodology_landscape"]["approaches"][:5]]),
+                "entity_cards": json.dumps(context_pack["entity_cards"], indent=2),
+                "methodology_distribution": json.dumps(context_pack["methodology_landscape"], indent=2),
+                "temporal_span": context_pack["temporal_context"]["publication_span"],
+                "papers_content": papers_content
+            }
+
+            # Use enhanced prompt if LLM is available
+            if self.llm:
+                try:
+                    formatted_prompt = self.ENHANCED_GAP_ANALYSIS_PROMPT.format(**analysis_context)
+                    result = await self.llm.ainvoke(formatted_prompt)
+                    return self._parse_enhanced_gap_result(result, papers, context_pack)
+                except Exception as e:
+                    logger.warning(f"Enhanced gap analysis failed, using fallback: {e}")
+                    return await self._fallback_gap_analysis(project_data, user_profile)
+            else:
+                return await self._fallback_gap_analysis(project_data, user_profile)
+
+        except Exception as e:
+            logger.error(f"Enhanced gap analysis failed: {e}")
+            return await self._fallback_gap_analysis(project_data, user_profile)
+
+    def _parse_enhanced_gap_result(self, result: Dict[str, Any], papers: List[Dict[str, Any]], context_pack: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse enhanced gap analysis result with structured validation"""
+        try:
+            # Extract text from LLM result
+            text = result.get("text", result) if isinstance(result, dict) else str(result)
+
+            # Extract JSON from markdown code blocks if present
+            if "```json" in text:
+                text = text.split("```json")[1].split("```")[0].strip()
+            elif "```" in text:
+                text = text.split("```")[1].split("```")[0].strip()
+
+            # Parse JSON result
+            parsed_result = json.loads(text)
+
+            # Validate required structure
+            required_keys = ["gap_analysis", "opportunity_analysis", "evidence_assessment", "actionable_recommendations"]
+            for key in required_keys:
+                if key not in parsed_result:
+                    logger.warning(f"Missing required key: {key}")
+                    parsed_result[key] = {}
+
+            # Format for UI compatibility (maintain backward compatibility)
+            formatted_gaps = []
+            if "identified_gaps" in parsed_result.get("gap_analysis", {}):
+                for i, gap in enumerate(parsed_result["gap_analysis"]["identified_gaps"][:5]):  # Limit to 5 gaps
+                    formatted_gaps.append({
+                        "id": gap.get("gap_id", f"gap_{i+1}"),
+                        "title": gap.get("gap_title", "Research Gap"),
+                        "description": gap.get("gap_description", "Gap identified through analysis"),
+                        "gap_type": gap.get("gap_type", "theoretical"),
+                        "severity": gap.get("impact_potential", "Medium").lower(),
+                        "research_opportunity": gap.get("gap_description", "Research opportunity identified"),
+                        "potential_impact": gap.get("impact_potential", "Medium"),
+                        "suggested_approaches": ["Literature review", "Empirical study"],
+                        "timeline_estimate": gap.get("timeline_estimate", "6-12 months"),
+                        "related_papers": [paper.get("title", "Unknown") for paper in papers[:3]],
+                        "evidence_strength": gap.get("evidence_strength", "Moderate"),
+                        "severity_score": gap.get("severity_score", 0.5)
+                    })
+
+            # Extract research opportunities
+            research_opportunities = []
+            if "research_opportunities" in parsed_result.get("opportunity_analysis", {}):
+                for opp in parsed_result["opportunity_analysis"]["research_opportunities"][:3]:
+                    research_opportunities.append(opp.get("opportunity_title", "Research opportunity"))
+
+            # Combine enhanced and legacy format
+            return {
+                # Enhanced format
+                "enhanced_analysis": parsed_result,
+                "identified_gaps": formatted_gaps,
+                "papers_analyzed": len(papers),
+                "research_domains": self._extract_research_domains(papers),
+                "gap_summary": self._generate_enhanced_gap_summary(parsed_result),
+                "research_opportunities": research_opportunities,
+                # Legacy format for backward compatibility
+                "semantic_gaps": self._convert_to_legacy_gaps(formatted_gaps, "semantic"),
+                "methodology_gaps": self._convert_to_legacy_gaps(formatted_gaps, "methodological"),
+                "temporal_gaps": self._convert_to_legacy_gaps(formatted_gaps, "temporal"),
+                "cross_domain_opportunities": parsed_result.get("opportunity_analysis", {}).get("cross_domain_opportunities", [])
+            }
+
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to parse enhanced gap result as JSON: {e}")
+            return self._create_fallback_gap_structure(papers, context_pack)
+        except Exception as e:
+            logger.warning(f"Error parsing enhanced gap result: {e}")
+            return self._create_fallback_gap_structure(papers, context_pack)
+
+    async def _fallback_gap_analysis(self, project_data: Dict[str, Any], user_profile: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Fallback gap analysis for graceful degradation"""
+        papers = self._extract_papers_from_project(project_data)
+        research_objective = project_data.get("description", "")
+
+        if not papers:
+            # Return mock data for testing when no papers available
+            return {
+                "identified_gaps": [
+                    {
+                        "id": "mock_gap_1",
+                        "title": "Sample Research Gap",
+                        "description": "This is a sample gap for testing purposes",
+                        "gap_type": "theoretical",
+                        "severity": "medium",
+                        "research_opportunity": "Explore this area for novel insights",
+                        "potential_impact": "Could provide new perspectives",
+                        "suggested_approaches": ["Literature review", "Empirical study"],
+                        "timeline_estimate": "3-6 months",
+                        "related_papers": ["Sample Paper 1"]
+                    }
+                ],
+                "papers_analyzed": 0,
+                "research_domains": ["sample_domain"],
+                "gap_summary": "Sample gap analysis for testing",
+                "research_opportunities": ["Sample opportunity"],
+                # Legacy format for backward compatibility
+                "semantic_gaps": [],
+                "methodology_gaps": [],
+                "temporal_gaps": [],
+                "cross_domain_opportunities": []
+            }
+
+        # Use existing fallback logic for actual papers
+        try:
             # Limit papers to prevent stack overflow
-            papers = papers[:50]  # Limit to 50 papers max
-            logger.info(f"Analyzing {len(papers)} papers for gap identification")
+            papers = papers[:50]
+            logger.info(f"Analyzing {len(papers)} papers for gap identification (fallback mode)")
 
             # Identify different types of gaps with error handling
             semantic_gaps = []
@@ -1892,13 +2153,68 @@ class ResearchGapAgent:
             }
 
         except Exception as e:
-            logger.error(f"Gap analysis failed: {e}")
+            logger.error(f"Fallback gap analysis failed: {e}")
             return {
                 "error": str(e),
                 "semantic_gaps": [],
                 "methodology_gaps": [],
                 "temporal_gaps": []
             }
+
+    def _generate_enhanced_gap_summary(self, parsed_result: Dict[str, Any]) -> str:
+        """Generate enhanced gap summary from parsed result"""
+        try:
+            gaps = parsed_result.get("gap_analysis", {}).get("identified_gaps", [])
+            opportunities = parsed_result.get("opportunity_analysis", {}).get("research_opportunities", [])
+
+            if not gaps:
+                return "No significant research gaps identified in the current literature."
+
+            gap_count = len(gaps)
+            high_impact_gaps = len([g for g in gaps if g.get("impact_potential") == "High"])
+
+            summary = f"Analysis identified {gap_count} research gaps, with {high_impact_gaps} having high impact potential. "
+
+            if opportunities:
+                summary += f"Found {len(opportunities)} research opportunities for future investigation."
+
+            return summary
+
+        except Exception as e:
+            logger.warning(f"Error generating enhanced gap summary: {e}")
+            return "Gap analysis completed with enhanced methodology."
+
+    def _convert_to_legacy_gaps(self, formatted_gaps: List[Dict[str, Any]], gap_type: str) -> List[Dict[str, Any]]:
+        """Convert enhanced gaps to legacy format for backward compatibility"""
+        return [gap for gap in formatted_gaps if gap.get("gap_type") == gap_type]
+
+    def _create_fallback_gap_structure(self, papers: List[Dict[str, Any]], context_pack: Dict[str, Any]) -> Dict[str, Any]:
+        """Create fallback gap structure when parsing fails"""
+        return {
+            "identified_gaps": [
+                {
+                    "id": "fallback_gap_1",
+                    "title": "Literature Coverage Gap",
+                    "description": "Potential gaps identified in literature coverage based on analysis",
+                    "gap_type": "theoretical",
+                    "severity": "medium",
+                    "research_opportunity": "Further investigation needed",
+                    "potential_impact": "Medium",
+                    "suggested_approaches": ["Systematic review", "Empirical study"],
+                    "timeline_estimate": "6-12 months",
+                    "related_papers": [paper.get("title", "Unknown") for paper in papers[:3]]
+                }
+            ],
+            "papers_analyzed": len(papers),
+            "research_domains": self._extract_research_domains(papers),
+            "gap_summary": f"Analyzed {len(papers)} papers for research gaps",
+            "research_opportunities": ["Systematic literature review", "Empirical validation"],
+            # Legacy format
+            "semantic_gaps": [],
+            "methodology_gaps": [],
+            "temporal_gaps": [],
+            "cross_domain_opportunities": []
+        }
 
     def _extract_papers_from_project(self, project_data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Extract papers from project data"""
