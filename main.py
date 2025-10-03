@@ -3932,7 +3932,7 @@ def _synthesize_executive_summary(objective: str, results_sections: list[dict], 
 
 def _synthesize_executive_summary_with_contract(objective: str, results_sections: list[dict], deadline: float,
                                                output_contract: dict, context_pack: dict) -> str:
-    """Enhanced executive summary with OutputContract quality enforcement"""
+    """Enhanced executive summary with OutputContract quality enforcement + Phase 2 enhancements"""
 
     if not results_sections or _time_left(deadline) < 3.0:
         return ""
@@ -3942,11 +3942,49 @@ def _synthesize_executive_summary_with_contract(objective: str, results_sections
     project_context = context_pack.get("project_context", {})
     literature_landscape = context_pack.get("literature_landscape", {})
 
+    # 🚀 PHASE 2 ENHANCEMENT: Style Exemplars and Reference-First Generation
+    try:
+        from style_exemplars_system import style_exemplars_system
+        from reference_first_generation import reference_first_generator
+
+        # Find relevant style exemplars (synchronous version for now)
+        research_domain = user_profile.get("research_domain", "biomedical_research")
+        query_context = f"{objective}"  # Use objective for context matching
+
+        # For now, use a simplified synchronous approach
+        # TODO: Make this async when the calling function is made async
+        style_exemplars = []
+        try:
+            # Get exemplars by type and domain without async
+            type_candidates = style_exemplars_system.type_index.get("generate_review", [])
+            domain_candidates = style_exemplars_system.domain_index.get(research_domain, [])
+
+            # Get intersection for best matches
+            candidates = list(set(type_candidates) & set(domain_candidates))
+            if not candidates:
+                candidates = type_candidates[:2]  # Fallback to type matches
+
+            # Get top quality exemplars
+            for exemplar_id in candidates[:2]:
+                if exemplar_id in style_exemplars_system.exemplars:
+                    exemplar = style_exemplars_system.exemplars[exemplar_id]
+                    if exemplar.quality_score >= 7.5:
+                        style_exemplars.append(exemplar)
+        except Exception as e:
+            logger.warning(f"Style exemplar retrieval failed: {e}")
+            style_exemplars = []
+
+        logger.info(f"Found {len(style_exemplars)} style exemplars for generate-review synthesis")
+
+    except Exception as e:
+        logger.warning(f"Phase 2 style exemplars failed: {e}")
+        style_exemplars = []
+
     findings = _collect_findings(results_sections)
     plan = _build_synthesis_plan(objective)
 
-    # Enhanced contract-aware synthesis template
-    contract_synthesis_template = """
+    # 🚀 PHASE 2: Enhanced contract-aware synthesis template with style exemplars
+    base_contract_template = """
     You are a Senior Research Synthesis Expert specializing in {research_domain} with expertise in evidence-based literature review.
 
     CONTEXT PACK:
@@ -3975,8 +4013,16 @@ def _synthesize_executive_summary_with_contract(objective: str, results_sections
     {findings}
 
     Return a comprehensive literature synthesis that meets ALL contract requirements and academic standards.
-    Structure your response with clear sections: Evidence, Analysis, Limitations, Implications, Recommendations.
     """
+
+    # Enhance template with style exemplars if available
+    if style_exemplars:
+        contract_synthesis_template = style_exemplars_system.create_style_enhanced_prompt(
+            base_contract_template, style_exemplars, max_exemplar_length=800
+        )
+        logger.info(f"Enhanced synthesis template with {len(style_exemplars)} style exemplars")
+    else:
+        contract_synthesis_template = base_contract_template
 
     try:
         # Create enhanced synthesis prompt
@@ -10859,6 +10905,40 @@ async def generate_review_internal(request: ReviewRequest, db: Session, current_
         })
         # Graceful fallback - continue without context assembly
         context_pack = None
+
+    # 🚀 PHASE 2 ENHANCEMENT: Style Exemplars and Reference-First Generation
+    style_enhanced_prompt = None
+    reference_enhanced_prompt = None
+    available_sources = []
+    try:
+        # Import Phase 2 systems
+        from style_exemplars_system import style_exemplars_system, enhance_prompt_with_style
+        from reference_first_generation import reference_first_generator, enhance_prompt_with_references
+
+        # Prepare available sources for reference requirements
+        if memories:
+            for memory in memories[:20]:  # Limit to top 20 for reference system
+                available_sources.append({
+                    "title": memory.get("title", "Unknown Title"),
+                    "authors": memory.get("authors", ["Unknown Author"]),
+                    "year": memory.get("year", "Unknown Year"),
+                    "pmid": memory.get("pmid", memory.get("id", "Unknown ID")),
+                    "content": memory.get("text", "")
+                })
+
+        log_event({
+            "event": "phase2_enhancement_initialized",
+            "project_id": request.project_id,
+            "available_sources": len(available_sources)
+        })
+
+    except Exception as e:
+        logger.warning(f"Phase 2 enhancement initialization failed: {e}")
+        log_event({
+            "event": "phase2_enhancement_failed",
+            "project_id": request.project_id,
+            "error": str(e)
+        })
 
     # Branch to V2 orchestrated flow when enabled
     if MULTISOURCE_ENABLED and not getattr(request, "dag_mode", False):
