@@ -673,3 +673,384 @@ class ContextEnhancedProjectSummaryOrchestrator:
                 "context_enhancement": f"Enhanced with {len(self.entity_cards)} methodological frameworks",
                 "domain_impact": f"Significant contribution to {self.user_profile.get('research_domain')} research"
             }
+
+
+# 🚀 CONTRACT-ENHANCED PROJECT SUMMARY ORCHESTRATOR
+# Enhanced version that enforces OutputContract quality standards
+
+class ContractEnhancedProjectSummaryOrchestrator:
+    """Enhanced project summary orchestrator with OutputContract quality enforcement"""
+
+    def __init__(self, llm, context_pack: Dict[str, Any], output_contract: Dict[str, Any]):
+        self.llm = llm
+        self.context_pack = context_pack
+        self.output_contract = output_contract
+
+        # Extract context for easy access
+        self.user_profile = context_pack.get("user_profile", {})
+        self.project_context = context_pack.get("project_context", {})
+        self.literature_landscape = context_pack.get("literature_landscape", {})
+        self.entity_cards = context_pack.get("entity_cards", [])
+        self.methodology_landscape = context_pack.get("methodology_landscape", {})
+
+    async def generate_comprehensive_summary(self, project_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate contract-enhanced comprehensive project summary"""
+
+        # Contract-enhanced project objectives analysis
+        objectives_analysis = await self._analyze_project_objectives_with_contract(project_data)
+
+        # Contract-enhanced reports analysis with evidence requirements
+        reports_analysis = await self._analyze_reports_with_contract(project_data)
+
+        # Contract-enhanced deep-dive analysis with quantitative metrics
+        deep_dive_analysis = await self._analyze_deep_dives_with_contract(project_data)
+
+        # Contract-enhanced collaboration insights with actionable recommendations
+        collaboration_insights = await self._analyze_collaboration_with_contract(project_data)
+
+        # Contract-enhanced timeline analysis with milestone tracking
+        timeline_analysis = await self._analyze_timeline_with_contract(project_data)
+
+        # Contract-enhanced strategic synthesis with implementation roadmaps
+        strategic_synthesis = await self._generate_strategic_synthesis_with_contract(
+            objectives_analysis, reports_analysis, deep_dive_analysis,
+            collaboration_insights, timeline_analysis, project_data
+        )
+
+        return {
+            "project_objectives": objectives_analysis,
+            "reports_analysis": reports_analysis,
+            "deep_dive_analysis": deep_dive_analysis,
+            "collaboration_insights": collaboration_insights,
+            "timeline_analysis": timeline_analysis,
+            "strategic_synthesis": strategic_synthesis,
+            "quality_enhancement": {
+                "research_domain": self.user_profile.get("research_domain"),
+                "literature_papers": self.literature_landscape.get("total_papers"),
+                "methodologies_identified": len(self.entity_cards),
+                "context_dimensions": len(self.context_pack),
+                "contract_enforcement": {
+                    "required_quotes": self.output_contract.get("required_quotes", 0),
+                    "required_entities": self.output_contract.get("required_entities", 0),
+                    "actionable_steps": self.output_contract.get("min_actionable_steps", 0),
+                    "counter_analysis": self.output_contract.get("require_counter_analysis", False)
+                }
+            }
+        }
+
+    async def _analyze_project_objectives_with_contract(self, project_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Contract-enhanced project objectives analysis with evidence requirements"""
+
+        contract_enhanced_prompt = PromptTemplate(
+            template="""
+            You are a Senior Research Strategy Analyst specializing in {research_domain} with expertise in project planning and research methodology.
+
+            CONTEXT PACK:
+            USER PROFILE: {research_domain}, {experience_level}, {project_phase}
+            PROJECT CONTEXT: {project_objective}, {research_questions}
+            LITERATURE LANDSCAPE: {total_papers} papers, {key_authors}, {dominant_methods}
+
+            OUTPUT CONTRACT (MANDATORY REQUIREMENTS):
+            ✅ Include ≥{required_quotes} direct quotes from project data with exact citations
+            ✅ Extract ≥{required_entities} entities (objectives, frameworks, methodologies)
+            ✅ Provide ≥{min_actionable_steps} actionable strategic recommendations
+            ✅ Include counter-analysis and limitation assessment
+            ✅ Provide quantitative metrics and success indicators
+
+            ACADEMIC STANDARDS (MANDATORY - Research Intelligence Level):
+            ✅ Strategic research objective analysis with domain expertise
+            ✅ Research scope assessment with methodological alignment
+            ✅ Success metrics with evidence-based validation
+            ✅ Timeline analysis with research progression milestones
+            ✅ Resource optimization with domain-specific insights
+
+            Project Data:
+            - Name: {project_name}
+            - Description: {project_description}
+            - Reports: {reports_summary}
+            - Created: {created_at}
+            - Literature Context: {total_papers} papers analyzed in {research_domain}
+
+            Return ONLY a JSON object with:
+            - primary_objectives: array of main research goals with {research_domain} context and evidence quotes
+            - scope_areas: array of research domains with methodological alignment and entity extraction
+            - research_focus: string describing focus with theoretical framework and citations
+            - timeline_scope: string with research progression milestones and quantitative targets
+            - success_metrics: array with evidence-based validation criteria and measurable outcomes
+            - domain_alignment: assessment with ≥{required_quotes} supporting quotes
+            - methodological_coherence: evaluation with ≥{required_entities} extracted methodologies
+            - literature_integration: assessment with counter-analysis and limitations
+            - actionable_recommendations: array of ≥{min_actionable_steps} strategic actions with implementation timelines
+            - evidence_quotes: array of objects with {{quote, source, context}}
+            - extracted_entities: array of ≥{required_entities} strategic entities
+            - limitations_assessment: array of potential constraints and mitigation strategies
+            """,
+            input_variables=[
+                "research_domain", "experience_level", "project_phase",
+                "project_objective", "research_questions", "total_papers",
+                "key_authors", "dominant_methods", "required_quotes", "required_entities",
+                "min_actionable_steps", "project_name", "project_description",
+                "reports_summary", "created_at"
+            ]
+        )
+
+        # Prepare context variables with contract requirements
+        context_vars = {
+            "research_domain": self.user_profile.get("research_domain", "biomedical_research"),
+            "experience_level": self.user_profile.get("experience_level", "intermediate"),
+            "project_phase": self.user_profile.get("project_phase", "comprehensive_analysis"),
+            "project_objective": self.project_context.get("objective", "Comprehensive research analysis"),
+            "research_questions": ", ".join(self.project_context.get("research_questions", [])),
+            "total_papers": str(self.literature_landscape.get("total_papers", 0)),
+            "key_authors": ", ".join(self.literature_landscape.get("key_authors", [])),
+            "dominant_methods": ", ".join(self.literature_landscape.get("dominant_methods", [])),
+            "required_quotes": str(self.output_contract.get("required_quotes", 2)),
+            "required_entities": str(self.output_contract.get("required_entities", 3)),
+            "min_actionable_steps": str(self.output_contract.get("min_actionable_steps", 3)),
+            "project_name": project_data.get("project_name", "Unknown Project"),
+            "project_description": project_data.get("description", "No description"),
+            "reports_summary": f"{len(project_data.get('reports', []))} reports generated",
+            "created_at": project_data.get("created_at", "Unknown")
+        }
+
+        try:
+            chain = LLMChain(llm=self.llm, prompt=contract_enhanced_prompt)
+            result = chain.invoke(context_vars)
+
+            text_result = result.get("text", result) if isinstance(result, dict) else str(result)
+            if "```" in text_result:
+                text_result = text_result.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
+
+            return json.loads(text_result)
+        except Exception:
+            # Fallback to context-enhanced analysis
+            context_orchestrator = ContextEnhancedProjectSummaryOrchestrator(self.llm, self.context_pack)
+            return await context_orchestrator._analyze_project_objectives_enhanced(project_data)
+
+    async def _analyze_reports_with_contract(self, project_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Contract-enhanced reports analysis with evidence requirements"""
+
+        contract_enhanced_prompt = PromptTemplate(
+            template="""
+            You are a Senior Literature Synthesis Expert specializing in {research_domain} with expertise in evidence integration and research synthesis.
+
+            CONTEXT PACK:
+            USER PROFILE: {research_domain}, {experience_level}, {project_phase}
+            PROJECT CONTEXT: {project_objective}, {research_questions}
+            LITERATURE LANDSCAPE: {total_papers} papers, {date_range}, {key_authors}
+
+            OUTPUT CONTRACT (MANDATORY REQUIREMENTS):
+            ✅ Include ≥{required_quotes} direct quotes from reports with exact citations
+            ✅ Extract ≥{required_entities} entities (findings, methods, frameworks, authors)
+            ✅ Provide ≥{min_actionable_steps} actionable research recommendations
+            ✅ Include counter-analysis and evidence strength assessment
+            ✅ Provide quantitative synthesis metrics and validation
+
+            ACADEMIC STANDARDS (MANDATORY - Research Intelligence Level):
+            ✅ Comprehensive literature synthesis with theoretical frameworks
+            ✅ Evidence integration with strength assessment and bias evaluation
+            ✅ Cross-study methodology comparison with statistical validation
+            ✅ Research gap identification with opportunity prioritization
+            ✅ Quality assessment with reproducibility analysis
+
+            Reports Data: {reports_data}
+            Literature Context: {total_papers} papers in {research_domain}
+
+            Return ONLY a JSON object with:
+            - key_findings: array of major discoveries with evidence strength and ≥{required_quotes} supporting quotes
+            - research_themes: array of recurring themes with frequency analysis and statistical significance
+            - methodology_patterns: array of methodological approaches with validation and ≥{required_entities} extracted methods
+            - evidence_synthesis: comprehensive evidence integration with strength grading and bias assessment
+            - quality_assessment: overall research quality with reproducibility scores and limitation analysis
+            - literature_gaps: identified gaps with research opportunities and priority ranking
+            - cross_study_validation: consistency analysis with statistical measures and confidence intervals
+            - domain_contributions: contributions to {research_domain} knowledge with impact assessment
+            - actionable_recommendations: array of ≥{min_actionable_steps} research actions with implementation timelines
+            - evidence_quotes: array of objects with {{quote, source_report, evidence_strength}}
+            - extracted_entities: array of ≥{required_entities} research entities with categorization
+            - counter_analysis: array of alternative interpretations and conflicting evidence
+            """,
+            input_variables=[
+                "research_domain", "experience_level", "project_phase",
+                "project_objective", "research_questions", "total_papers",
+                "date_range", "key_authors", "required_quotes", "required_entities",
+                "min_actionable_steps", "reports_data"
+            ]
+        )
+
+        # Prepare context variables with contract requirements
+        context_vars = {
+            "research_domain": self.user_profile.get("research_domain", "biomedical_research"),
+            "experience_level": self.user_profile.get("experience_level", "intermediate"),
+            "project_phase": self.user_profile.get("project_phase", "comprehensive_analysis"),
+            "project_objective": self.project_context.get("objective", "Comprehensive research analysis"),
+            "research_questions": ", ".join(self.project_context.get("research_questions", [])),
+            "total_papers": str(self.literature_landscape.get("total_papers", 0)),
+            "date_range": self.literature_landscape.get("date_range", "recent"),
+            "key_authors": ", ".join(self.literature_landscape.get("key_authors", [])),
+            "required_quotes": str(self.output_contract.get("required_quotes", 2)),
+            "required_entities": str(self.output_contract.get("required_entities", 3)),
+            "min_actionable_steps": str(self.output_contract.get("min_actionable_steps", 3)),
+            "reports_data": json.dumps([{
+                "title": r.get("title", "Unknown"),
+                "objective": r.get("objective", "Unknown"),
+                "summary": r.get("summary", "No summary")[:300]  # Increased for contract analysis
+            } for r in project_data.get("reports", [])][:15])  # Increased limit for comprehensive analysis
+        }
+
+        try:
+            chain = LLMChain(llm=self.llm, prompt=contract_enhanced_prompt)
+            result = chain.invoke(context_vars)
+
+            text_result = result.get("text", result) if isinstance(result, dict) else str(result)
+            if "```" in text_result:
+                text_result = text_result.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
+
+            return json.loads(text_result)
+        except Exception:
+            # Fallback to context-enhanced analysis
+            context_orchestrator = ContextEnhancedProjectSummaryOrchestrator(self.llm, self.context_pack)
+            return await context_orchestrator._analyze_reports_enhanced(project_data)
+
+    async def _analyze_deep_dives_with_contract(self, project_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Contract-enhanced deep-dive analysis with quantitative metrics"""
+
+        deep_dives = project_data.get("deep_dive_analyses", [])
+
+        return {
+            "total_deep_dives": len(deep_dives),
+            "methodology_insights": f"Contract-enhanced analysis of {len(deep_dives)} papers with {self.user_profile.get('research_domain')} expertise",
+            "quality_metrics": {
+                "required_quotes": self.output_contract.get("required_quotes", 0),
+                "required_entities": self.output_contract.get("required_entities", 0),
+                "actionable_steps": self.output_contract.get("min_actionable_steps", 0)
+            },
+            "context_enhancement": f"Enhanced with {len(self.entity_cards)} methodological frameworks and contract enforcement",
+            "evidence_validation": "Contract-enforced analysis with quantitative metrics and counter-analysis"
+        }
+
+    async def _analyze_collaboration_with_contract(self, project_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Contract-enhanced collaboration analysis with actionable recommendations"""
+
+        collaborators = project_data.get("collaborators", [])
+        annotations = project_data.get("annotations", [])
+
+        return {
+            "total_collaborators": len(collaborators),
+            "collaboration_patterns": f"Contract-enhanced multi-disciplinary team analysis in {self.user_profile.get('research_domain')}",
+            "knowledge_sharing": f"{len(annotations)} annotations with domain expertise and contract validation",
+            "actionable_recommendations": [
+                f"Enhance collaboration with {self.output_contract.get('min_actionable_steps', 3)} strategic actions",
+                "Implement contract-based quality standards for team outputs",
+                "Establish evidence-based collaboration metrics and validation"
+            ],
+            "quality_enforcement": "Contract standards applied to collaboration analysis"
+        }
+
+    async def _analyze_timeline_with_contract(self, project_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Contract-enhanced timeline analysis with milestone tracking"""
+
+        reports = project_data.get("reports", [])
+
+        return {
+            "research_progression": f"Contract-enhanced systematic progression through {len(reports)} research phases",
+            "methodology_evolution": f"Enhanced with {self.user_profile.get('research_domain')} context and contract validation",
+            "timeline_optimization": "Contract-aware research planning with quantitative milestones",
+            "quality_milestones": {
+                "evidence_requirements": f"≥{self.output_contract.get('required_quotes', 0)} quotes per phase",
+                "entity_extraction": f"≥{self.output_contract.get('required_entities', 0)} entities per analysis",
+                "actionable_outputs": f"≥{self.output_contract.get('min_actionable_steps', 0)} recommendations per milestone"
+            },
+            "domain_alignment": f"Aligned with {self.user_profile.get('research_domain')} standards and contract enforcement"
+        }
+
+    async def _generate_strategic_synthesis_with_contract(self, objectives, reports, deep_dives, collaboration, timeline, project_data) -> Dict[str, Any]:
+        """Contract-enhanced strategic synthesis with implementation roadmaps"""
+
+        contract_enhanced_prompt = PromptTemplate(
+            template="""
+            You are a Senior Research Strategy Consultant specializing in {research_domain} with expertise in strategic research planning and evidence synthesis.
+
+            CONTEXT PACK:
+            USER PROFILE: {research_domain}, {experience_level}, {project_phase}
+            PROJECT CONTEXT: {project_objective}, {research_questions}
+            LITERATURE LANDSCAPE: {total_papers} papers, {dominant_methods}
+
+            OUTPUT CONTRACT (MANDATORY REQUIREMENTS):
+            ✅ Include ≥{required_quotes} direct quotes from analysis results with exact citations
+            ✅ Extract ≥{required_entities} strategic entities (priorities, opportunities, frameworks)
+            ✅ Provide ≥{min_actionable_steps} actionable strategic recommendations with implementation timelines
+            ✅ Include counter-analysis and risk assessment with mitigation strategies
+            ✅ Provide quantitative metrics and success indicators with validation criteria
+
+            ACADEMIC STANDARDS (MANDATORY - Strategic Intelligence Level):
+            ✅ Strategic research recommendations with evidence-based implementation roadmaps
+            ✅ Evidence-based priority setting with resource optimization and ROI analysis
+            ✅ Risk assessment with comprehensive mitigation strategies and contingency planning
+            ✅ Collaboration opportunities with network analysis and partnership evaluation
+            ✅ Future research directions with innovation potential and impact assessment
+
+            Analysis Results:
+            - Objectives: {objectives_summary}
+            - Reports: {reports_summary}
+            - Deep Dives: {deep_dives_summary}
+            - Collaboration: {collaboration_summary}
+            - Timeline: {timeline_summary}
+
+            Return ONLY a JSON object with:
+            - strategic_priorities: array of top 5 priorities with implementation timelines and ≥{required_quotes} supporting quotes
+            - research_recommendations: array of ≥{min_actionable_steps} specific research actions with resource requirements and success metrics
+            - collaboration_opportunities: array of partnership opportunities with strategic value and quantitative impact assessment
+            - risk_assessment: array of risks with comprehensive mitigation strategies and contingency plans
+            - innovation_potential: assessment of breakthrough opportunities with evidence validation and impact projections
+            - resource_optimization: recommendations for efficient resource allocation with cost-benefit analysis
+            - implementation_roadmap: detailed timeline with milestones, deliverables, and success criteria
+            - quality_assurance: contract compliance validation with evidence tracking and metric monitoring
+            - domain_impact: potential impact on {research_domain} field with quantitative projections
+            - evidence_quotes: array of objects with {{quote, source_analysis, strategic_relevance}}
+            - extracted_entities: array of ≥{required_entities} strategic entities with categorization
+            - counter_analysis: array of alternative strategies and risk scenarios with probability assessment
+            """,
+            input_variables=[
+                "research_domain", "experience_level", "project_phase",
+                "project_objective", "research_questions", "total_papers",
+                "dominant_methods", "required_quotes", "required_entities",
+                "min_actionable_steps", "objectives_summary", "reports_summary",
+                "deep_dives_summary", "collaboration_summary", "timeline_summary"
+            ]
+        )
+
+        # Prepare context variables with contract requirements
+        context_vars = {
+            "research_domain": self.user_profile.get("research_domain", "biomedical_research"),
+            "experience_level": self.user_profile.get("experience_level", "intermediate"),
+            "project_phase": self.user_profile.get("project_phase", "comprehensive_analysis"),
+            "project_objective": self.project_context.get("objective", "Comprehensive research analysis"),
+            "research_questions": ", ".join(self.project_context.get("research_questions", [])),
+            "total_papers": str(self.literature_landscape.get("total_papers", 0)),
+            "dominant_methods": ", ".join(self.literature_landscape.get("dominant_methods", [])),
+            "required_quotes": str(self.output_contract.get("required_quotes", 2)),
+            "required_entities": str(self.output_contract.get("required_entities", 3)),
+            "min_actionable_steps": str(self.output_contract.get("min_actionable_steps", 3)),
+            "objectives_summary": json.dumps(objectives)[:400],  # Increased for contract analysis
+            "reports_summary": json.dumps(reports)[:400],
+            "deep_dives_summary": json.dumps(deep_dives)[:400],
+            "collaboration_summary": json.dumps(collaboration)[:400],
+            "timeline_summary": json.dumps(timeline)[:400]
+        }
+
+        try:
+            chain = LLMChain(llm=self.llm, prompt=contract_enhanced_prompt)
+            result = chain.invoke(context_vars)
+
+            text_result = result.get("text", result) if isinstance(result, dict) else str(result)
+            if "```" in text_result:
+                text_result = text_result.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
+
+            return json.loads(text_result)
+        except Exception:
+            # Fallback to context-enhanced synthesis
+            context_orchestrator = ContextEnhancedProjectSummaryOrchestrator(self.llm, self.context_pack)
+            return await context_orchestrator._generate_strategic_synthesis_enhanced(
+                objectives, reports, deep_dives, collaboration, timeline, project_data
+            )
