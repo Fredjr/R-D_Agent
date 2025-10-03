@@ -4438,6 +4438,52 @@ async def health_check():
         "features": ["increased_recommendation_limits", "author_fixes", "citation_opportunities"]
     }
 
+@app.get("/debug/test-methodology")
+async def debug_test_methodology():
+    """Debug endpoint to test methodology synthesis directly"""
+    try:
+        from phd_thesis_agents import MethodologySynthesisAgent
+
+        # Create agent instance
+        method_agent = MethodologySynthesisAgent(llm=None)
+
+        # Test the problematic method directly
+        test_methodologies = [
+            {"name": "Experimental", "category": "experimental"},
+            {"name": "Observational", "category": "observational"}
+        ]
+
+        # Try to call the method
+        try:
+            result = method_agent._generate_recommended_combinations(test_methodologies)
+            return {
+                "status": "success",
+                "method_exists": True,
+                "method_result": result,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        except AttributeError as e:
+            return {
+                "status": "method_missing",
+                "error": str(e),
+                "method_exists": False,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        except Exception as e:
+            return {
+                "status": "method_error",
+                "error": str(e),
+                "method_exists": True,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+
+    except Exception as e:
+        return {
+            "status": "import_error",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
 @app.get("/debug/methods")
 async def debug_methods():
     """Debug endpoint to check if PhD agent methods exist"""
