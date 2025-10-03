@@ -2492,34 +2492,485 @@ class ThesisStructureAgent:
     def __init__(self, llm, summarizer=None):
         self.llm = llm
         self.summarizer = summarizer
+        self.context_assembler = ContextAssembler()
 
-    async def structure_thesis(self, project_data: Dict[str, Any], analysis_results: Dict[str, Any]) -> Dict[str, Any]:
-        """Main thesis structuring method"""
+    # Enhanced Thesis Structure Prompt Template
+    ENHANCED_THESIS_STRUCTURE_PROMPT = PromptTemplate(
+        template="""
+You are a Senior PhD Thesis Structure Expert specializing in {research_domain} with expertise in academic writing standards and dissertation organization.
+
+CONTEXT PACK:
+USER PROFILE: {research_domain}, {experience_level}, {project_phase}, {key_constraints}
+PROJECT CONTEXT: {project_objective}, {research_questions}, {theoretical_framework}, {previous_findings}
+LITERATURE LANDSCAPE: {total_papers} papers, {date_range}, {key_authors}, {dominant_methods}
+ENTITY CARDS: {entity_cards}
+METHODOLOGY LANDSCAPE: {methodology_distribution}
+TEMPORAL CONTEXT: {temporal_span}
+
+ACADEMIC STANDARDS (MANDATORY - PhD Dissertation Level):
+✅ Create context-aware chapter organization based on research content
+✅ Provide academic writing guidelines with style standards
+✅ Include word count estimates with justification
+✅ Consider timeline with milestones and dependencies
+✅ Generate detailed chapter outlines with section descriptions
+✅ End with 5 writing quality assurance protocols
+
+REQUIRED OUTPUT STRUCTURE (JSON):
+{{
+  "thesis_structure": {{
+    "chapters": [
+      {{
+        "chapter_number": 1,
+        "title": "Chapter title based on research content",
+        "sections": [
+          {{
+            "section_title": "Section title",
+            "description": "Detailed section description",
+            "estimated_words": 1500,
+            "key_content": ["content_point_1", "content_point_2"],
+            "writing_guidelines": "Specific writing guidance for this section"
+          }}
+        ],
+        "estimated_pages": 25,
+        "estimated_words": 6000,
+        "completion_timeline": "4-6 weeks",
+        "dependencies": ["literature_review_complete", "methodology_finalized"],
+        "quality_criteria": ["criterion_1", "criterion_2"],
+        "chapter_rationale": "Why this chapter is essential for the dissertation"
+      }}
+    ],
+    "total_estimated_words": 80000,
+    "total_estimated_pages": 300,
+    "completion_timeline": "12-18 months"
+  }},
+  "writing_framework": {{
+    "academic_style_guide": {{
+      "citation_style": "APA|MLA|Chicago",
+      "voice_and_tone": "Academic, objective, scholarly",
+      "sentence_structure": "Complex but clear, varied length",
+      "paragraph_organization": "Topic sentence, evidence, analysis, transition",
+      "terminology_consistency": "Maintain consistent technical vocabulary"
+    }},
+    "chapter_integration": {{
+      "narrative_flow": "How chapters connect and build upon each other",
+      "cross_references": "Strategic internal referencing system",
+      "argument_progression": "Logical development of thesis argument",
+      "evidence_distribution": "How evidence is distributed across chapters"
+    }},
+    "quality_standards": {{
+      "minimum_word_counts": {{"chapter": 8000, "section": 1500}},
+      "citation_requirements": {{"per_page": 3, "total_minimum": 150}},
+      "evidence_density": "Minimum 2 pieces of evidence per major claim",
+      "originality_threshold": "Minimum 30% original contribution"
+    }}
+  }},
+  "implementation_guidance": {{
+    "writing_schedule": [
+      {{
+        "phase": "Chapter 1 - Introduction",
+        "duration": "4-6 weeks",
+        "milestones": ["outline_complete", "first_draft", "revision_complete"],
+        "daily_word_target": 300,
+        "weekly_goals": ["goal_1", "goal_2"]
+      }}
+    ],
+    "resource_requirements": [
+      {{
+        "resource_type": "Reference management",
+        "specific_tools": ["Zotero", "EndNote", "Mendeley"],
+        "usage_guidelines": "Organize by chapter and theme"
+      }}
+    ],
+    "collaboration_framework": {{
+      "supervisor_meetings": "Bi-weekly chapter reviews",
+      "peer_review_schedule": "Monthly writing group sessions",
+      "expert_consultations": "Quarterly methodology reviews"
+    }}
+  }},
+  "quality_assurance": [
+    {{
+      "protocol": "Chapter coherence review",
+      "description": "Ensure each chapter contributes to overall argument",
+      "frequency": "After each chapter completion",
+      "success_criteria": ["clear_contribution", "logical_flow", "evidence_support"]
+    }},
+    {{
+      "protocol": "Academic writing standards check",
+      "description": "Verify adherence to academic writing conventions",
+      "frequency": "Weekly during writing phases",
+      "success_criteria": ["proper_citations", "academic_tone", "clear_argumentation"]
+    }},
+    {{
+      "protocol": "Originality and contribution assessment",
+      "description": "Evaluate novel contributions and originality",
+      "frequency": "Mid-point and final reviews",
+      "success_criteria": ["novel_insights", "theoretical_contribution", "practical_implications"]
+    }},
+    {{
+      "protocol": "Methodology-findings alignment",
+      "description": "Ensure methodology supports findings and conclusions",
+      "frequency": "After results and discussion chapters",
+      "success_criteria": ["method_appropriateness", "findings_validity", "conclusion_support"]
+    }},
+    {{
+      "protocol": "Comprehensive literature integration",
+      "description": "Verify thorough integration of relevant literature",
+      "frequency": "Continuous throughout writing",
+      "success_criteria": ["comprehensive_coverage", "critical_analysis", "gap_identification"]
+    }}
+  ]
+}}
+
+STRUCTURING INSTRUCTIONS:
+1. Analyze the research content to determine optimal chapter organization
+2. Create chapters that build logically toward the research contribution
+3. Ensure each chapter has clear purpose and contribution to overall argument
+4. Provide specific, actionable writing guidance for each section
+5. Include realistic timelines based on chapter complexity and dependencies
+6. Establish quality assurance protocols for maintaining academic standards
+
+Focus on creating a structure that:
+- Reflects the specific research domain: {research_domain}
+- Addresses the research objective: {project_objective}
+- Integrates findings from {total_papers} papers analyzed
+- Supports the theoretical framework and methodology chosen
+- Provides clear pathway to original contribution
+
+RESEARCH CONTENT TO STRUCTURE:
+{papers_content}
+
+ANALYSIS RESULTS TO INTEGRATE:
+{analysis_results}
+        """,
+        input_variables=[
+            "research_domain", "experience_level", "project_phase", "key_constraints",
+            "project_objective", "research_questions", "theoretical_framework", "previous_findings",
+            "total_papers", "date_range", "key_authors", "dominant_methods",
+            "entity_cards", "methodology_distribution", "temporal_span",
+            "papers_content", "analysis_results"
+        ]
+    )
+
+    async def structure_thesis(self, project_data: Dict[str, Any], analysis_results: Dict[str, Any] = None, user_profile: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Enhanced thesis structuring method with context awareness"""
         try:
-            # Extract research components
             papers = self._extract_papers_from_project(project_data)
-            research_objective = project_data.get("description", "")
+            analysis_results = analysis_results or {}
 
-            # Generate thesis structure
-            thesis_chapters = await self._generate_thesis_chapters(papers, research_objective, analysis_results)
-            chapter_outlines = await self._create_chapter_outlines(thesis_chapters, analysis_results)
-            writing_guidelines = self._generate_writing_guidelines()
+            if not papers:
+                logger.warning("No papers found for thesis structuring, using fallback")
+                return await self._fallback_thesis_structure(project_data, analysis_results, user_profile)
+
+            # Assemble rich context for thesis structuring
+            context_pack = self.context_assembler.assemble_phd_context(
+                project_data=project_data,
+                papers=papers,
+                user_profile=user_profile,
+                analysis_type="thesis_structure"
+            )
+
+            # Prepare papers content for analysis (limit to prevent token overflow)
+            papers_sample = papers[:15]  # Analyze top 15 papers for structure
+            papers_content = "\n\n".join([
+                f"Paper {i+1}: {paper.get('title', 'No title')}\n"
+                f"Authors: {', '.join(paper.get('authors', ['Unknown']))}\n"
+                f"Year: {paper.get('year', 'Unknown')}\n"
+                f"Key findings: {paper.get('abstract', 'No abstract available')[:300]}..."
+                for i, paper in enumerate(papers_sample)
+            ])
+
+            # Prepare analysis results summary
+            analysis_summary = json.dumps({
+                "literature_review": analysis_results.get("agent_results", {}).get("literature_review", {}),
+                "methodology_synthesis": analysis_results.get("agent_results", {}).get("methodology_synthesis", {}),
+                "research_gaps": analysis_results.get("agent_results", {}).get("research_gap", {}),
+                "key_findings": analysis_results.get("key_findings", [])
+            }, indent=2)
+
+            # Prepare enhanced analysis context
+            analysis_context = {
+                "research_domain": context_pack["user_profile"]["research_domain"],
+                "experience_level": context_pack["user_profile"]["experience_level"],
+                "project_phase": context_pack["user_profile"].get("project_phase", "thesis_writing"),
+                "key_constraints": ", ".join(context_pack["user_profile"].get("constraints", [])),
+                "project_objective": context_pack["project_context"]["objective"],
+                "research_questions": ", ".join(context_pack["project_context"]["research_questions"]),
+                "theoretical_framework": context_pack["project_context"]["theoretical_framework"],
+                "previous_findings": ", ".join(context_pack["project_context"]["previous_findings"]),
+                "total_papers": context_pack["literature_landscape"]["total_papers"],
+                "date_range": context_pack["literature_landscape"]["date_range"],
+                "key_authors": ", ".join(context_pack["literature_landscape"]["top_authors"]),
+                "dominant_methods": ", ".join([m["name"] for m in context_pack["methodology_landscape"]["approaches"][:5]]),
+                "entity_cards": json.dumps(context_pack["entity_cards"], indent=2),
+                "methodology_distribution": json.dumps(context_pack["methodology_landscape"], indent=2),
+                "temporal_span": context_pack["temporal_context"]["publication_span"],
+                "papers_content": papers_content,
+                "analysis_results": analysis_summary
+            }
+
+            # Use enhanced prompt if LLM is available
+            if self.llm:
+                try:
+                    formatted_prompt = self.ENHANCED_THESIS_STRUCTURE_PROMPT.format(**analysis_context)
+                    result = await self.llm.ainvoke(formatted_prompt)
+                    return self._parse_enhanced_structure_result(result, papers, analysis_results, context_pack)
+                except Exception as e:
+                    logger.warning(f"Enhanced thesis structuring failed, using fallback: {e}")
+                    return await self._fallback_thesis_structure(project_data, analysis_results, user_profile)
+            else:
+                return await self._fallback_thesis_structure(project_data, analysis_results, user_profile)
+
+        except Exception as e:
+            logger.error(f"Enhanced thesis structuring failed: {e}")
+            return await self._fallback_thesis_structure(project_data, analysis_results, user_profile)
+
+    def _parse_enhanced_structure_result(self, result: Dict[str, Any], papers: List[Dict[str, Any]],
+                                       analysis_results: Dict[str, Any], context_pack: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse enhanced thesis structure result with structured validation"""
+        try:
+            # Extract text from LLM result
+            text = result.get("text", result) if isinstance(result, dict) else str(result)
+
+            # Extract JSON from markdown code blocks if present
+            if "```json" in text:
+                text = text.split("```json")[1].split("```")[0].strip()
+            elif "```" in text:
+                text = text.split("```")[1].split("```")[0].strip()
+
+            # Parse JSON result
+            parsed_result = json.loads(text)
+
+            # Validate required structure
+            required_keys = ["thesis_structure", "writing_framework", "implementation_guidance", "quality_assurance"]
+            for key in required_keys:
+                if key not in parsed_result:
+                    logger.warning(f"Missing required key: {key}")
+                    parsed_result[key] = {}
+
+            # Extract thesis chapters for backward compatibility
+            thesis_chapters = []
+            if "chapters" in parsed_result.get("thesis_structure", {}):
+                for chapter in parsed_result["thesis_structure"]["chapters"]:
+                    # Convert enhanced format to legacy format
+                    legacy_chapter = {
+                        "chapter_number": chapter.get("chapter_number", 1),
+                        "title": chapter.get("title", "Chapter Title"),
+                        "sections": [section.get("section_title", "Section") for section in chapter.get("sections", [])],
+                        "estimated_pages": chapter.get("estimated_pages", 20),
+                        "estimated_words": chapter.get("estimated_words", 5000),
+                        "completion_status": "not_started",
+                        "completion_timeline": chapter.get("completion_timeline", "4-6 weeks"),
+                        "dependencies": chapter.get("dependencies", []),
+                        "quality_criteria": chapter.get("quality_criteria", []),
+                        "chapter_rationale": chapter.get("chapter_rationale", "Essential chapter for dissertation"),
+                        "key_content": {
+                            "sections_detail": chapter.get("sections", []),
+                            "writing_guidelines": chapter.get("writing_guidelines", "Follow academic standards")
+                        }
+                    }
+                    thesis_chapters.append(legacy_chapter)
+
+            # Extract writing guidelines
+            writing_guidelines = parsed_result.get("writing_framework", {}).get("academic_style_guide", {})
+
+            # Extract implementation guidance
+            implementation = parsed_result.get("implementation_guidance", {})
+
+            # Combine enhanced and legacy format
+            return {
+                # Enhanced format
+                "enhanced_structure": parsed_result,
+                "thesis_chapters": thesis_chapters,
+                "chapter_outlines": self._create_chapter_outlines_from_enhanced(thesis_chapters),
+                "writing_guidelines": writing_guidelines,
+                "estimated_word_counts": self._extract_word_counts_from_enhanced(parsed_result),
+                "completion_timeline": parsed_result.get("thesis_structure", {}).get("completion_timeline", "12-18 months"),
+                "implementation_guidance": implementation,
+                "quality_assurance_protocols": parsed_result.get("quality_assurance", []),
+                # Legacy compatibility
+                "total_estimated_words": parsed_result.get("thesis_structure", {}).get("total_estimated_words", 80000),
+                "total_estimated_pages": parsed_result.get("thesis_structure", {}).get("total_estimated_pages", 300)
+            }
+
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to parse enhanced structure result as JSON: {e}")
+            return self._create_fallback_structure(papers, analysis_results, context_pack)
+        except Exception as e:
+            logger.warning(f"Error parsing enhanced structure result: {e}")
+            return self._create_fallback_structure(papers, analysis_results, context_pack)
+
+    async def _fallback_thesis_structure(self, project_data: Dict[str, Any], analysis_results: Dict[str, Any] = None, user_profile: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Fallback thesis structuring for graceful degradation"""
+        papers = self._extract_papers_from_project(project_data)
+        research_objective = project_data.get("description", "")
+        analysis_results = analysis_results or {}
+
+        try:
+            # Create basic thesis structure
+            thesis_chapters = [
+                {
+                    "chapter_number": 1,
+                    "title": "Introduction",
+                    "sections": ["Background", "Problem Statement", "Research Questions", "Thesis Structure"],
+                    "estimated_pages": 20,
+                    "estimated_words": 5000,
+                    "completion_status": "not_started",
+                    "completion_timeline": "4-6 weeks"
+                },
+                {
+                    "chapter_number": 2,
+                    "title": "Literature Review",
+                    "sections": ["Theoretical Framework", "Previous Research", "Research Gaps"],
+                    "estimated_pages": 25,
+                    "estimated_words": 6250,
+                    "completion_status": "not_started",
+                    "completion_timeline": "6-8 weeks"
+                },
+                {
+                    "chapter_number": 3,
+                    "title": "Methodology",
+                    "sections": ["Research Design", "Data Collection", "Analysis Methods"],
+                    "estimated_pages": 20,
+                    "estimated_words": 5000,
+                    "completion_status": "not_started",
+                    "completion_timeline": "4-6 weeks"
+                },
+                {
+                    "chapter_number": 4,
+                    "title": "Results",
+                    "sections": ["Data Presentation", "Statistical Analysis", "Key Findings"],
+                    "estimated_pages": 25,
+                    "estimated_words": 6250,
+                    "completion_status": "not_started",
+                    "completion_timeline": "6-8 weeks"
+                },
+                {
+                    "chapter_number": 5,
+                    "title": "Discussion",
+                    "sections": ["Interpretation", "Implications", "Limitations"],
+                    "estimated_pages": 20,
+                    "estimated_words": 5000,
+                    "completion_status": "not_started",
+                    "completion_timeline": "4-6 weeks"
+                },
+                {
+                    "chapter_number": 6,
+                    "title": "Conclusion",
+                    "sections": ["Summary", "Contributions", "Future Research"],
+                    "estimated_pages": 15,
+                    "estimated_words": 3750,
+                    "completion_status": "not_started",
+                    "completion_timeline": "3-4 weeks"
+                }
+            ]
+
+            chapter_outlines = {}
+            for chapter in thesis_chapters:
+                chapter_key = f"chapter_{chapter['chapter_number']}"
+                chapter_outlines[chapter_key] = {
+                    "title": chapter["title"],
+                    "sections": chapter["sections"],
+                    "estimated_words": chapter["estimated_words"],
+                    "completion_timeline": chapter["completion_timeline"]
+                }
+
+            writing_guidelines = {
+                "citation_style": "APA",
+                "voice_and_tone": "Academic, objective",
+                "minimum_word_counts": {"chapter": 5000, "section": 1000}
+            }
 
             return {
                 "thesis_chapters": thesis_chapters,
                 "chapter_outlines": chapter_outlines,
                 "writing_guidelines": writing_guidelines,
-                "estimated_word_counts": self._estimate_word_counts(thesis_chapters),
-                "completion_timeline": self._generate_completion_timeline(thesis_chapters)
+                "estimated_word_counts": {"total_words": 31250, "total_pages": 125},
+                "completion_timeline": "12-15 months"
             }
 
         except Exception as e:
-            logger.error(f"Thesis structuring failed: {e}")
+            logger.error(f"Fallback thesis structuring failed: {e}")
             return {
                 "error": str(e),
                 "thesis_chapters": [],
                 "chapter_outlines": {}
             }
+
+    def _create_chapter_outlines_from_enhanced(self, thesis_chapters: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Create chapter outlines from enhanced thesis chapters"""
+        outlines = {}
+        for chapter in thesis_chapters:
+            chapter_key = f"chapter_{chapter.get('chapter_number', 1)}"
+            outlines[chapter_key] = {
+                "title": chapter.get("title", "Chapter Title"),
+                "sections": chapter.get("sections", []),
+                "key_content": chapter.get("key_content", {}),
+                "estimated_words": chapter.get("estimated_words", 5000),
+                "completion_timeline": chapter.get("completion_timeline", "4-6 weeks"),
+                "dependencies": chapter.get("dependencies", []),
+                "quality_criteria": chapter.get("quality_criteria", [])
+            }
+        return outlines
+
+    def _extract_word_counts_from_enhanced(self, parsed_result: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract word counts from enhanced result"""
+        thesis_structure = parsed_result.get("thesis_structure", {})
+        word_counts = {
+            "total_words": thesis_structure.get("total_estimated_words", 80000),
+            "total_pages": thesis_structure.get("total_estimated_pages", 300),
+            "chapters": {}
+        }
+
+        for chapter in thesis_structure.get("chapters", []):
+            chapter_key = f"chapter_{chapter.get('chapter_number', 1)}"
+            word_counts["chapters"][chapter_key] = {
+                "words": chapter.get("estimated_words", 5000),
+                "pages": chapter.get("estimated_pages", 20)
+            }
+
+        return word_counts
+
+    def _create_fallback_structure(self, papers: List[Dict[str, Any]], analysis_results: Dict[str, Any], context_pack: Dict[str, Any]) -> Dict[str, Any]:
+        """Create fallback thesis structure when parsing fails"""
+        return {
+            "thesis_chapters": [
+                {
+                    "chapter_number": 1,
+                    "title": "Introduction",
+                    "sections": ["Background", "Problem Statement", "Research Questions", "Thesis Structure"],
+                    "estimated_pages": 20,
+                    "estimated_words": 5000,
+                    "completion_status": "not_started",
+                    "completion_timeline": "4-6 weeks"
+                },
+                {
+                    "chapter_number": 2,
+                    "title": "Literature Review",
+                    "sections": ["Theoretical Framework", "Previous Research", "Research Gaps"],
+                    "estimated_pages": 25,
+                    "estimated_words": 6250,
+                    "completion_status": "not_started",
+                    "completion_timeline": "6-8 weeks"
+                },
+                {
+                    "chapter_number": 3,
+                    "title": "Methodology",
+                    "sections": ["Research Design", "Data Collection", "Analysis Methods"],
+                    "estimated_pages": 20,
+                    "estimated_words": 5000,
+                    "completion_status": "not_started",
+                    "completion_timeline": "4-6 weeks"
+                }
+            ],
+            "chapter_outlines": {},
+            "writing_guidelines": {
+                "citation_style": "APA",
+                "voice_and_tone": "Academic, objective",
+                "minimum_word_counts": {"chapter": 5000, "section": 1000}
+            },
+            "estimated_word_counts": {"total_words": 80000, "total_pages": 300},
+            "completion_timeline": "12-18 months"
+        }
 
     def _extract_papers_from_project(self, project_data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Extract papers from project data"""
