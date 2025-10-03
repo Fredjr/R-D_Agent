@@ -61,7 +61,7 @@ from deep_dive_agents import (
     run_enhanced_model_pipeline, run_methods_pipeline, run_results_pipeline,
     run_enhanced_model_pipeline_with_context, run_methods_pipeline_with_context, run_results_pipeline_with_context
 )
-from project_summary_agents import ProjectSummaryOrchestrator
+from project_summary_agents import ProjectSummaryOrchestrator, ContextEnhancedProjectSummaryOrchestrator
 from langchain.agents import AgentType, initialize_agent
 from scoring import calculate_publication_score
 
@@ -10196,18 +10196,111 @@ async def generate_comprehensive_project_summary(
             }
 
         else:
-            # Standard comprehensive analysis
-            orchestrator = ProjectSummaryOrchestrator(llm)
-            summary_results = await orchestrator.generate_comprehensive_summary(project_data)
+            # 🚀 ENHANCED: Context-Aware Comprehensive Analysis
+            context_pack = None
+            try:
+                # Import ContextAssembler from PhD agents
+                from phd_thesis_agents import ContextAssembler
 
-            # Return the standard comprehensive analysis
+                # Create context assembler instance
+                context_assembler = ContextAssembler()
+
+                # Prepare papers data from reports and deep-dive analyses
+                papers_data = []
+
+                # Extract papers from reports
+                for report in reports:
+                    if report.content:
+                        try:
+                            content_data = json.loads(report.content) if isinstance(report.content, str) else report.content
+                            if isinstance(content_data, dict) and "results" in content_data:
+                                for result in content_data["results"]:
+                                    if isinstance(result, dict) and "articles" in result:
+                                        for article in result["articles"]:
+                                            papers_data.append({
+                                                "title": article.get("title", "Unknown Title"),
+                                                "pmid": article.get("pmid"),
+                                                "abstract": article.get("abstract", ""),
+                                                "authors": article.get("authors", []),
+                                                "journal": article.get("journal", ""),
+                                                "year": article.get("pub_year"),
+                                                "report_id": report.report_id
+                                            })
+                        except:
+                            pass
+
+                # Extract papers from deep-dive analyses
+                for analysis in deep_dive_analyses:
+                    papers_data.append({
+                        "title": analysis.article_title or "Unknown Title",
+                        "pmid": analysis.article_pmid,
+                        "url": analysis.article_url,
+                        "analysis_id": analysis.analysis_id,
+                        "deep_dive_available": True
+                    })
+
+                # Assemble rich context for comprehensive analysis
+                context_pack = await context_assembler.assemble_context(
+                    user_profile={
+                        "user_id": current_user,
+                        "research_domain": "biomedical_research",  # Can be enhanced with user data
+                        "experience_level": "intermediate",  # Can be enhanced with user data
+                        "project_phase": "comprehensive_analysis",
+                        "key_constraints": ["multi_report_synthesis", "project_wide_insights"]
+                    },
+                    project_context={
+                        "project_id": project_id,
+                        "objective": project.description or "Comprehensive research analysis",
+                        "research_questions": [r.objective for r in reports if r.objective],
+                        "theoretical_framework": "evidence_based_medicine",
+                        "previous_findings": [r.summary for r in reports if r.summary]
+                    },
+                    papers_data=papers_data[:50]  # Limit to 50 papers for performance
+                )
+
+                log_event({
+                    "event": "comprehensive_analysis_context_assembly_success",
+                    "project_id": project_id,
+                    "papers_count": len(papers_data),
+                    "context_dimensions": len(context_pack) if context_pack else 0
+                })
+
+            except Exception as e:
+                log_event({
+                    "event": "comprehensive_analysis_context_assembly_error",
+                    "error": str(e),
+                    "project_id": project_id
+                })
+                # Graceful fallback - continue without context assembly
+                context_pack = None
+
+            # Use context-enhanced orchestrator if context is available
+            if context_pack:
+                # Create context-enhanced comprehensive analysis
+                orchestrator = ContextEnhancedProjectSummaryOrchestrator(llm, context_pack)
+                summary_results = await orchestrator.generate_comprehensive_summary(project_data)
+
+                analysis_type = "context_enhanced_comprehensive"
+            else:
+                # Fallback to standard comprehensive analysis
+                orchestrator = ProjectSummaryOrchestrator(llm)
+                summary_results = await orchestrator.generate_comprehensive_summary(project_data)
+
+                analysis_type = "comprehensive"
+
+            # Return the enhanced comprehensive analysis
             return {
                 "project_id": project_id,
                 "project_name": project.project_name,
                 "generated_at": datetime.utcnow().isoformat(),
                 "generated_by": current_user,
-                "summary_type": "comprehensive",
+                "summary_type": analysis_type,
                 "analysis_results": summary_results,
+                "context_enhancement": {
+                    "enabled": context_pack is not None,
+                    "papers_analyzed": len(papers_data) if context_pack else 0,
+                    "context_dimensions": len(context_pack) if context_pack else 0
+                },
                 "metadata": {
                     "total_reports": len(reports),
                     "total_collaborators": len(collaborators),
