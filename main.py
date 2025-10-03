@@ -4438,6 +4438,61 @@ async def health_check():
         "features": ["increased_recommendation_limits", "author_fixes", "citation_opportunities"]
     }
 
+@app.get("/debug/test-methodology-extraction")
+async def debug_test_methodology_extraction():
+    """Debug endpoint to test methodology extraction with sample papers"""
+    try:
+        from phd_thesis_agents import MethodologySynthesisAgent
+
+        # Create agent instance
+        method_agent = MethodologySynthesisAgent(llm=None)
+
+        # Test papers with clear methodology keywords
+        test_papers = [
+            {
+                "title": "A Randomized Controlled Trial of Statistical Analysis Methods",
+                "abstract": "This experimental study uses quantitative methods including regression analysis and t-tests to evaluate treatment effectiveness in a controlled trial setting."
+            },
+            {
+                "title": "Qualitative Interview Study of Patient Experiences",
+                "abstract": "This qualitative research employs thematic analysis of semi-structured interviews to explore patient perspectives using ethnographic approaches."
+            },
+            {
+                "title": "Computational Modeling of Neural Networks",
+                "abstract": "This study presents a computational approach using machine learning algorithms and simulation techniques to model neural network behavior."
+            }
+        ]
+
+        # Test methodology extraction
+        try:
+            methodologies = await method_agent._extract_methodologies(test_papers)
+            statistical_methods = await method_agent._extract_statistical_methods(test_papers)
+
+            return {
+                "status": "success",
+                "scibert_available": method_agent.methodology_classifier is not None,
+                "methodologies_found": len(methodologies),
+                "methodologies": methodologies,
+                "statistical_methods_found": len(statistical_methods),
+                "statistical_methods": statistical_methods,
+                "test_papers_count": len(test_papers),
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        except Exception as e:
+            return {
+                "status": "extraction_error",
+                "error": str(e),
+                "scibert_available": method_agent.methodology_classifier is not None,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+
+    except Exception as e:
+        return {
+            "status": "import_error",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
 @app.get("/debug/test-methodology")
 async def debug_test_methodology():
     """Debug endpoint to test methodology synthesis directly"""
