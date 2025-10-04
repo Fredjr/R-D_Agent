@@ -3475,12 +3475,50 @@ async def orchestrate_v2(request, memories: list[dict], context_pack: dict = Non
     # Strategic synthesis via specialist analysts with quality enforcement
     if output_contract and context_pack:
         # Enhanced executive summary with OutputContract enforcement
-        executive_summary = _synthesize_executive_summary_with_contract(
+        initial_summary = _synthesize_executive_summary_with_contract(
             request.objective, results_sections, time.time() + 6.0, output_contract, context_pack
         )
     else:
         # Fallback to standard executive summary
-        executive_summary = _synthesize_executive_summary(request.objective, results_sections, time.time() + 6.0)
+        initial_summary = _synthesize_executive_summary(request.objective, results_sections, time.time() + 6.0)
+
+    # 🚀 PHASE 2.3 ENHANCEMENT: Draft-Critique-Revise Loop for PhD Quality
+    executive_summary = initial_summary  # Default fallback
+    try:
+        from critique_revise_system import enhance_analysis_quality
+
+        # Enhance summary through critique-revise loop
+        revision_result = await enhance_analysis_quality(
+            content=initial_summary or "",
+            query=request.objective,
+            llm=get_llm_summary,
+            analysis_type="generate_review",
+            context={
+                "context_pack": context_pack,
+                "output_contract": output_contract,
+                "results_sections": len(results_sections),
+                "compressed_memories": compressed_memories is not None
+            },
+            sources=len(memories) if memories else 0
+        )
+
+        executive_summary = revision_result.revised_content
+
+        logger.info(f"🎯 Critique-revise enhancement: {revision_result.revision_score:.3f} final score after {revision_result.iteration_count} iterations")
+
+        log_event({
+            "event": "critique_revise_enhancement",
+            "project_id": request.project_id,
+            "initial_length": len(initial_summary or ""),
+            "final_length": len(executive_summary),
+            "final_score": revision_result.revision_score,
+            "iterations": revision_result.iteration_count,
+            "improvements_made": len(revision_result.improvements_made)
+        })
+
+    except Exception as e:
+        logger.warning(f"Critique-revise enhancement failed, using initial summary: {e}")
+        executive_summary = initial_summary
 
     # 🚀 PHASE 2.2 ENHANCEMENT: Quality Monitoring and Drift Detection
     try:
