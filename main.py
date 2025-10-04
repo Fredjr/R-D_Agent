@@ -2716,6 +2716,43 @@ def _harvest_pubmed(query: str, deadline: float) -> list[dict]:
                     except Exception:
                         pass
                     a["source_query"] = query
+
+            # 🚀 PHASE 2.2 ENHANCEMENT: Cross-Encoder Reranking for Precision
+            try:
+                from cross_encoder_reranking import rerank_retrieved_chunks
+
+                # Prepare chunks for reranking
+                chunks_for_reranking = []
+                for art in arts:
+                    if isinstance(art, dict):
+                        # Create chunk format for reranking
+                        content = f"{art.get('title', '')} {art.get('abstract', '')}"
+                        chunk = {
+                            'id': art.get('pmid', art.get('id', 'unknown')),
+                            'content': content,
+                            'score': 1.0,  # Default score
+                            'metadata': art
+                        }
+                        chunks_for_reranking.append(chunk)
+
+                # Rerank based on query relevance
+                if chunks_for_reranking:
+                    reranked_chunks = rerank_retrieved_chunks(query, chunks_for_reranking, top_k=min(PUBMED_RETMAX, len(chunks_for_reranking)))
+
+                    # Convert back to article format with rerank scores
+                    reranked_arts = []
+                    for ranked_chunk in reranked_chunks:
+                        art = ranked_chunk.metadata.copy()
+                        art['rerank_score'] = ranked_chunk.rerank_score
+                        art['original_score'] = ranked_chunk.original_score
+                        reranked_arts.append(art)
+
+                    logger.info(f"🎯 Cross-encoder reranked {len(arts)} → {len(reranked_arts)} articles for query: {query[:50]}...")
+                    return reranked_arts
+
+            except Exception as e:
+                logger.warning(f"Cross-encoder reranking failed, using original results: {e}")
+
             return arts
         return []
     except Exception:
@@ -3444,6 +3481,29 @@ async def orchestrate_v2(request, memories: list[dict], context_pack: dict = Non
     else:
         # Fallback to standard executive summary
         executive_summary = _synthesize_executive_summary(request.objective, results_sections, time.time() + 6.0)
+
+    # 🚀 PHASE 2.2 ENHANCEMENT: Quality Monitoring and Drift Detection
+    try:
+        from quality_monitoring_system import record_analysis_quality
+
+        # Record quality metrics for this analysis
+        quality_metrics = record_analysis_quality(
+            analysis_id=f"generate_review_{int(time.time())}",
+            analysis_type="generate_review",
+            content=executive_summary or "",
+            query=request.objective,
+            context={
+                "context_pack_available": context_pack is not None,
+                "output_contract_used": output_contract is not None,
+                "results_sections_count": len(results_sections),
+                "compressed_memories": compressed_memories is not None
+            }
+        )
+
+        logger.info(f"📊 Quality metrics recorded: {quality_metrics}")
+
+    except Exception as e:
+        logger.warning(f"Quality monitoring failed: {e}")
 
     diagnostics = {
         "pool_size": len(norm),
@@ -10906,6 +10966,55 @@ async def generate_review_internal(request: ReviewRequest, db: Session, current_
         # Graceful fallback - continue without context assembly
         context_pack = None
 
+    # 🚀 PHASE 2.2 ENHANCEMENT: Contextual Compression for Focused Context
+    compressed_memories = None
+    try:
+        if memories:
+            from contextual_compression import compress_retrieved_chunks
+
+            # Prepare memory chunks for compression
+            memory_chunks = []
+            for i, memory in enumerate(memories[:20]):  # Limit to top 20 for compression
+                chunk = {
+                    'id': f"memory_{i}",
+                    'content': memory.get("text", ""),
+                    'score': memory.get("score", 1.0),
+                    'metadata': {
+                        'title': memory.get("title", "Unknown Title"),
+                        'pmid': memory.get("pmid", memory.get("id", "unknown")),
+                        'source': 'memory'
+                    }
+                }
+                memory_chunks.append(chunk)
+
+            # Compress memories to extract query-relevant content
+            if memory_chunks:
+                compressed_chunks = compress_retrieved_chunks(request.objective, memory_chunks, get_llm_summary)
+
+                # Create compressed context string
+                from contextual_compression import contextual_compressor
+                compressed_memories = contextual_compressor.create_compressed_context(
+                    compressed_chunks, max_total_chars=4000
+                )
+
+                logger.info(f"🗜️ Compressed {len(memories)} memories → {len(compressed_chunks)} focused chunks")
+
+                log_event({
+                    "event": "contextual_compression_success",
+                    "project_id": request.project_id,
+                    "original_chunks": len(memories),
+                    "compressed_chunks": len(compressed_chunks),
+                    "compression_ratio": len(compressed_memories) / sum(len(m.get("text", "")) for m in memories) if memories else 0
+                })
+
+    except Exception as e:
+        logger.warning(f"Contextual compression failed: {e}")
+        log_event({
+            "event": "contextual_compression_failed",
+            "project_id": request.project_id,
+            "error": str(e)
+        })
+
     # 🚀 PHASE 2 ENHANCEMENT: Style Exemplars and Reference-First Generation
     style_enhanced_prompt = None
     reference_enhanced_prompt = None
@@ -10914,6 +11023,7 @@ async def generate_review_internal(request: ReviewRequest, db: Session, current_
         # Import Phase 2 systems
         from style_exemplars_system import style_exemplars_system, enhance_prompt_with_style
         from reference_first_generation import reference_first_generator, enhance_prompt_with_references
+        from quality_monitoring_system import record_analysis_quality
 
         # Prepare available sources for reference requirements
         if memories:
