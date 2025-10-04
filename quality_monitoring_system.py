@@ -15,6 +15,33 @@ from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
+# 🚀 PHASE 2.5 ENHANCEMENT: TruLens Integration
+try:
+    from trulens_evaluation_system import evaluate_phd_response, get_trulens_stats
+    TRULENS_INTEGRATION_AVAILABLE = True
+    logger.info("✅ TruLens integration available for quality monitoring")
+except ImportError as e:
+    TRULENS_INTEGRATION_AVAILABLE = False
+    logger.warning(f"⚠️ TruLens integration not available: {e}")
+
+    # Mock functions for compatibility
+    def evaluate_phd_response(query, response, context, metadata=None):
+        from trulens_evaluation_system import EvaluationResult
+        return EvaluationResult(
+            groundedness_score=0.5,
+            answer_relevance_score=0.5,
+            context_relevance_score=0.5,
+            citation_accuracy_score=0.5,
+            specificity_score=0.5,
+            overall_quality_score=0.5,
+            hallucination_detected=False,
+            evaluation_time=0.0,
+            feedback_details={'status': 'mock'}
+        )
+
+    def get_trulens_stats():
+        return {'status': 'unavailable'}
+
 @dataclass
 class QualityMetric:
     """Represents a quality metric measurement"""
@@ -114,13 +141,68 @@ class QualityMonitor:
         timestamp = datetime.now()
         
         try:
-            # Calculate quality metrics
+            # Calculate traditional quality metrics
             metrics["context_coverage"] = self._calculate_context_coverage(generated_content, query, context_data)
             metrics["specificity_score"] = self._calculate_specificity_score(generated_content)
             metrics["evidence_density"] = self._calculate_evidence_density(generated_content)
             metrics["novelty_score"] = self._calculate_novelty_score(generated_content)
             metrics["academic_credibility"] = self._calculate_academic_credibility(generated_content)
             metrics["response_coherence"] = self._calculate_response_coherence(generated_content)
+
+            # 🚀 PHASE 2.5 ENHANCEMENT: TruLens Evaluation Integration
+            if TRULENS_INTEGRATION_AVAILABLE:
+                try:
+                    # Prepare context for TruLens evaluation
+                    context_list = []
+                    if context_data:
+                        if isinstance(context_data, dict):
+                            # Extract text content from context data
+                            for key, value in context_data.items():
+                                if isinstance(value, str) and len(value) > 10:
+                                    context_list.append(value)
+                                elif isinstance(value, list):
+                                    for item in value:
+                                        if isinstance(item, str) and len(item) > 10:
+                                            context_list.append(item)
+                        elif isinstance(context_data, list):
+                            context_list = [str(item) for item in context_data if len(str(item)) > 10]
+
+                    # Run TruLens evaluation
+                    trulens_result = evaluate_phd_response(
+                        query=query,
+                        response=generated_content,
+                        context=context_list,
+                        metadata={
+                            'analysis_id': analysis_id,
+                            'analysis_type': analysis_type,
+                            'timestamp': timestamp.isoformat()
+                        }
+                    )
+
+                    # Add TruLens metrics to quality metrics
+                    metrics["trulens_groundedness"] = trulens_result.groundedness_score
+                    metrics["trulens_answer_relevance"] = trulens_result.answer_relevance_score
+                    metrics["trulens_context_relevance"] = trulens_result.context_relevance_score
+                    metrics["trulens_citation_accuracy"] = trulens_result.citation_accuracy_score
+                    metrics["trulens_specificity"] = trulens_result.specificity_score
+                    metrics["trulens_overall_quality"] = trulens_result.overall_quality_score
+                    metrics["trulens_hallucination_detected"] = 1.0 if trulens_result.hallucination_detected else 0.0
+
+                    logger.info(f"✅ TruLens evaluation completed: {trulens_result.overall_quality_score:.3f} quality score")
+
+                    if trulens_result.hallucination_detected:
+                        logger.warning(f"🚨 TruLens detected potential hallucination in analysis {analysis_id}")
+
+                except Exception as e:
+                    logger.warning(f"⚠️ TruLens evaluation failed for analysis {analysis_id}: {e}")
+                    # Add neutral TruLens scores on failure
+                    metrics["trulens_groundedness"] = 0.5
+                    metrics["trulens_answer_relevance"] = 0.5
+                    metrics["trulens_context_relevance"] = 0.5
+                    metrics["trulens_citation_accuracy"] = 0.5
+                    metrics["trulens_specificity"] = 0.5
+                    metrics["trulens_overall_quality"] = 0.5
+                    metrics["trulens_hallucination_detected"] = 0.0
             
             # Store metrics
             for metric_name, value in metrics.items():
