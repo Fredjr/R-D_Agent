@@ -12456,6 +12456,58 @@ Objective: {objective}
                 quality_metrics["mode_depth"] = 0.6 if processing_mode == "lightweight" else 1.0
                 quality_metrics["complexity_match"] = mode_detection_result.confidence_score
 
+            # 🚀 PHASE 2.6 ENHANCEMENT: Entity Relationship Graph Integration
+            try:
+                from entity_relationship_graph import enhance_synthesis_with_graph
+
+                # Prepare documents for graph analysis
+                graph_documents = []
+                for result in results:
+                    if result.get("content"):
+                        graph_documents.append({
+                            'id': f"section_{result.get('section', 'unknown')}",
+                            'content': result.get("content", "")
+                        })
+
+                # Add query context as a document
+                if request.objective:
+                    graph_documents.append({
+                        'id': 'query_context',
+                        'content': f"Research objective: {request.objective}. Molecule: {request.molecule or 'Not specified'}"
+                    })
+
+                if graph_documents:
+                    # Enhance synthesis with entity relationship graph
+                    graph_enhancement = enhance_synthesis_with_graph(
+                        documents=graph_documents,
+                        query=request.objective or f"Analysis of {request.molecule}",
+                        project_id=request.project_id or "default"
+                    )
+
+                    # Add graph insights to analysis results
+                    analysis_results["entity_graph_insights"] = {
+                        "matching_entities": len(graph_enhancement.get("graph_insights", {}).get("matching_entities", [])),
+                        "synthesis_enhancements": len(graph_enhancement.get("synthesis_enhancements", [])),
+                        "cross_document_patterns": len(graph_enhancement.get("cross_document_patterns", [])),
+                        "entity_connections": len(graph_enhancement.get("entity_connections", [])),
+                        "knowledge_gaps": len(graph_enhancement.get("knowledge_gaps", []))
+                    }
+
+                    # Add graph-based quality metrics
+                    quality_metrics["cross_document_intelligence"] = min(
+                        analysis_results["entity_graph_insights"]["matching_entities"] / 10.0, 1.0
+                    )
+                    quality_metrics["synthesis_enhancement"] = min(
+                        analysis_results["entity_graph_insights"]["synthesis_enhancements"] / 5.0, 1.0
+                    )
+
+                    logger.info(f"🕸️ Entity graph analysis: {analysis_results['entity_graph_insights']['matching_entities']} entities, "
+                               f"{analysis_results['entity_graph_insights']['synthesis_enhancements']} enhancements")
+
+            except Exception as e:
+                logger.warning(f"⚠️ Entity relationship graph not available: {e}")
+                analysis_results["entity_graph_insights"] = {"status": "unavailable"}
+
             # Complete iteration tracking
             completion_result = complete_iteration_tracking(
                 iteration_id=iteration_id,
