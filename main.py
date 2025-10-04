@@ -3474,6 +3474,34 @@ async def orchestrate_v2(request, memories: list[dict], context_pack: dict = Non
 
     # Strategic synthesis via specialist analysts with quality enforcement
     if output_contract and context_pack:
+        # 🚀 PHASE 2.4 ENHANCEMENT: Persona Conditioning for Domain Expertise
+        try:
+            from persona_conditioning_system import condition_prompt_with_persona
+
+            # Determine research domain from context
+            research_domain = "general"
+            if context_pack and hasattr(context_pack, 'user_profile'):
+                research_domain = getattr(context_pack.user_profile, 'research_domain', 'general')
+
+            # Get persona-conditioned prompt for executive summary
+            base_prompt = f"Synthesize an executive summary for: {request.objective}"
+            persona_conditioned_prompt = condition_prompt_with_persona(
+                prompt=base_prompt,
+                analysis_type="generate_review",
+                domain=research_domain,
+                context={
+                    "domain": research_domain,
+                    "analysis_type": "generate_review",
+                    "has_context_pack": True,
+                    "has_output_contract": True
+                }
+            )
+
+            logger.info(f"🎭 Persona conditioning applied for domain: {research_domain}")
+
+        except Exception as e:
+            logger.warning(f"Persona conditioning failed, using standard approach: {e}")
+
         # Enhanced executive summary with OutputContract enforcement
         initial_summary = _synthesize_executive_summary_with_contract(
             request.objective, results_sections, time.time() + 6.0, output_contract, context_pack
@@ -3543,10 +3571,33 @@ async def orchestrate_v2(request, memories: list[dict], context_pack: dict = Non
     except Exception as e:
         logger.warning(f"Quality monitoring failed: {e}")
 
+    # 🚀 PHASE 2.4 ENHANCEMENT: Human Feedback Collection Setup
+    analysis_id = f"generate_review_{request.project_id}_{int(time.time())}"
+    try:
+        # Store analysis metadata for potential feedback collection
+        log_event({
+            "event": "analysis_ready_for_feedback",
+            "analysis_id": analysis_id,
+            "project_id": request.project_id,
+            "analysis_type": "generate_review",
+            "query": request.objective,
+            "content_length": len(executive_summary or ""),
+            "quality_score": revision_result.revision_score if 'revision_result' in locals() else 0.0,
+            "enhancement_level": "context_and_contract" if (context_pack and output_contract) else
+                               "context_only" if context_pack else
+                               "contract_only" if output_contract else "standard"
+        })
+
+        logger.info(f"📝 Analysis ready for feedback collection: {analysis_id}")
+
+    except Exception as e:
+        logger.warning(f"Feedback setup failed: {e}")
+
     diagnostics = {
         "pool_size": len(norm),
         "shortlist_size": len(shortlist),
         "deep_dive_count": len(results_sections),
+        "analysis_id": analysis_id,  # Include analysis ID for feedback collection
         "timings_ms": {
             "plan_ms": int(plan_ms),
             "harvest_ms": int(harvest_ms),
@@ -3557,6 +3608,7 @@ async def orchestrate_v2(request, memories: list[dict], context_pack: dict = Non
         "quality_enhancement": {
             "context_assembly": context_pack is not None,
             "output_contract": output_contract is not None,
+            "critique_revise": 'revision_result' in locals(),
             "enhancement_level": "context_and_contract" if (context_pack and output_contract) else
                                "context_only" if context_pack else
                                "contract_only" if output_contract else "standard"
@@ -3567,6 +3619,7 @@ async def orchestrate_v2(request, memories: list[dict], context_pack: dict = Non
         "results": _apply_diversity_quota(results_sections),
         "diagnostics": diagnostics,
         "executive_summary": executive_summary,
+        "analysis_id": analysis_id,  # Include analysis ID for feedback collection
     }
 
 
@@ -16006,4 +16059,174 @@ async def get_citation_opportunities(
 
     except Exception as e:
         logger.error(f"Error getting Citation Opportunities: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+# 🚀 PHASE 2.4: HUMAN FEEDBACK SYSTEM API ENDPOINTS
+
+@app.post("/analysis/{analysis_id}/feedback")
+async def collect_analysis_feedback(
+    analysis_id: str,
+    feedback_data: dict,
+    user_id: str = "anonymous"
+):
+    """Collect user feedback on analysis quality"""
+    try:
+        from human_feedback_system import collect_user_feedback
+
+        # Extract feedback components
+        quality_ratings = {
+            "overall_quality": feedback_data.get("overall_quality", 5),
+            "specificity": feedback_data.get("specificity", 5),
+            "evidence_quality": feedback_data.get("evidence_quality", 5),
+            "analytical_depth": feedback_data.get("analytical_depth", 5),
+            "academic_rigor": feedback_data.get("academic_rigor", 5),
+            "coherence": feedback_data.get("coherence", 5)
+        }
+
+        qualitative_feedback = {
+            "strengths": feedback_data.get("strengths", []),
+            "weaknesses": feedback_data.get("weaknesses", []),
+            "specific_improvements": feedback_data.get("specific_improvements", []),
+            "general_comments": feedback_data.get("general_comments", "")
+        }
+
+        context = {
+            "query": feedback_data.get("query", ""),
+            "analysis_type": feedback_data.get("analysis_type", "generate_review"),
+            "analysis_content": feedback_data.get("analysis_content", "")
+        }
+
+        user_metadata = {
+            "expertise": feedback_data.get("user_expertise", "unknown"),
+            "domain": feedback_data.get("research_domain", "unknown"),
+            "source": "api"
+        }
+
+        # Collect feedback
+        feedback_id = collect_user_feedback(
+            analysis_id=analysis_id,
+            user_id=user_id,
+            ratings=quality_ratings,
+            feedback=qualitative_feedback,
+            context=context,
+            user_info=user_metadata
+        )
+
+        logger.info(f"📝 Feedback collected: {feedback_id} for analysis {analysis_id}")
+
+        return {
+            "status": "success",
+            "feedback_id": feedback_id,
+            "message": "Feedback collected successfully"
+        }
+
+    except Exception as e:
+        logger.error(f"Error collecting feedback: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+@app.get("/quality/dashboard")
+async def get_quality_dashboard():
+    """Get comprehensive quality dashboard with feedback analytics"""
+    try:
+        from human_feedback_system import get_quality_dashboard
+        from quality_monitoring_system import quality_monitor
+
+        # Get human feedback analytics
+        feedback_dashboard = get_quality_dashboard()
+
+        # Get system quality metrics
+        system_dashboard = quality_monitor.get_quality_dashboard()
+
+        # Combine dashboards
+        combined_dashboard = {
+            "human_feedback": feedback_dashboard,
+            "system_metrics": system_dashboard,
+            "overall_status": {
+                "feedback_available": feedback_dashboard["summary"]["total_feedback_collected"] > 0,
+                "system_monitoring": len(system_dashboard.get("recent_metrics", [])) > 0,
+                "quality_trend": feedback_dashboard["summary"].get("quality_trend", "no_data")
+            }
+        }
+
+        return combined_dashboard
+
+    except Exception as e:
+        logger.error(f"Error getting quality dashboard: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+@app.get("/feedback/trends")
+async def get_feedback_trends(days_back: int = 30):
+    """Get feedback trends and analytics"""
+    try:
+        from human_feedback_system import get_feedback_analytics
+
+        analytics = get_feedback_analytics(days_back)
+
+        return {
+            "status": "success",
+            "analytics": {
+                "period": {
+                    "start_date": analytics.period_start.isoformat(),
+                    "end_date": analytics.period_end.isoformat(),
+                    "days": days_back
+                },
+                "summary": {
+                    "total_feedback": analytics.total_feedback_count,
+                    "average_quality": analytics.avg_overall_quality,
+                    "quality_trend": analytics.quality_trend
+                },
+                "quality_dimensions": {
+                    "specificity": analytics.avg_specificity,
+                    "evidence_quality": analytics.avg_evidence_quality,
+                    "analytical_depth": analytics.avg_analytical_depth,
+                    "academic_rigor": analytics.avg_academic_rigor,
+                    "coherence": analytics.avg_coherence
+                },
+                "insights": {
+                    "common_strengths": analytics.common_strengths,
+                    "common_weaknesses": analytics.common_weaknesses,
+                    "improvement_priorities": analytics.improvement_priorities
+                },
+                "user_segments": {
+                    "by_expertise": analytics.feedback_by_expertise,
+                    "by_domain": analytics.feedback_by_domain
+                }
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting feedback trends: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+@app.get("/personas/available")
+async def get_available_personas():
+    """Get available research personas"""
+    try:
+        from persona_conditioning_system import get_persona_system
+
+        system = get_persona_system()
+
+        personas_info = []
+        for persona_type, persona in system.personas.items():
+            personas_info.append({
+                "type": persona_type.value,
+                "name": persona.name,
+                "description": persona.description,
+                "expertise_areas": persona.expertise_areas,
+                "thinking_style": persona.thinking_style,
+                "communication_style": persona.communication_style
+            })
+
+        return {
+            "status": "success",
+            "personas": personas_info,
+            "domain_mapping": system.domain_persona_mapping
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting personas: {e}")
         return {"status": "error", "error": str(e)}
