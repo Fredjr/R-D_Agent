@@ -11071,6 +11071,43 @@ async def generate_review_internal(request: ReviewRequest, db: Session, current_
         logger.warning(f"⚠️ Dual-mode orchestration not available: {e}")
         processing_mode = "adaptive"
 
+    # 🚀 PHASE 2.6 ENHANCEMENT: Navigation History Intelligence Integration
+    navigation_session_id = None
+    try:
+        from navigation_history_intelligence import start_user_session, record_user_navigation
+
+        # Start navigation session
+        navigation_session_id = start_user_session(
+            user_id=current_user or "anonymous",
+            context={
+                "request_type": "generate_review",
+                "molecule": request.molecule,
+                "preference": preference,
+                "project_id": request.project_id
+            }
+        )
+
+        # Record query submission
+        record_user_navigation(
+            session_id=navigation_session_id,
+            action="query_submission",
+            context={
+                "objective": request.objective or "Research analysis",
+                "molecule": request.molecule,
+                "preference": preference,
+                "query_length": len(request.objective or ""),
+                "has_molecule": bool(request.molecule)
+            },
+            query=request.objective or f"Analysis of {request.molecule}",
+            success=None  # Will be determined later
+        )
+
+        logger.info(f"👤 Started navigation session: {navigation_session_id}")
+
+    except Exception as e:
+        logger.warning(f"⚠️ Navigation history intelligence not available: {e}")
+        navigation_session_id = None
+
     # 🚀 PHASE 2.6 ENHANCEMENT: Iteration Memory System Integration
     iteration_id = None
     try:
@@ -11079,7 +11116,7 @@ async def generate_review_internal(request: ReviewRequest, db: Session, current_
         # Start iteration tracking
         iteration_id = start_iteration_tracking(
             project_id=request.project_id,
-            session_id=f"session_{int(time.time())}",
+            session_id=navigation_session_id or f"session_{int(time.time())}",
             user_id=current_user or "anonymous",
             query=request.objective or "Research analysis",
             analysis_type="generate_review",
@@ -11087,7 +11124,8 @@ async def generate_review_internal(request: ReviewRequest, db: Session, current_
                 "molecule": request.molecule,
                 "preference": preference,
                 "timeout_budget": timeout_budget,
-                "request_timestamp": req_start
+                "request_timestamp": req_start,
+                "navigation_session": navigation_session_id
             }
         )
 
@@ -12536,6 +12574,40 @@ Objective: {objective}
 
         except Exception as e:
             logger.warning(f"⚠️ Failed to complete iteration tracking: {e}")
+
+    # 🚀 PHASE 2.6 ENHANCEMENT: Complete Navigation History Tracking
+    if navigation_session_id:
+        try:
+            from navigation_history_intelligence import record_user_navigation, end_user_session, adapt_response_for_user
+
+            # Record analysis completion
+            record_user_navigation(
+                session_id=navigation_session_id,
+                action="result_view",
+                context={
+                    "sections_generated": len(results),
+                    "processing_time_ms": took,
+                    "analysis_success": len(results) > 0,
+                    "executive_summary_generated": bool(resp.get("executive_summary")),
+                    "total_queries_processed": len(resp.get("queries", [])),
+                    "processing_mode": processing_mode or "unknown"
+                },
+                time_spent=took / 1000.0,  # Convert to seconds
+                success=len(results) > 0
+            )
+
+            # Adapt response for user personalization
+            resp = adapt_response_for_user(current_user or "anonymous", resp)
+
+            # End navigation session
+            session_analysis = end_user_session(navigation_session_id)
+
+            logger.info(f"👤 Completed navigation session: {navigation_session_id} "
+                       f"(intent: {session_analysis.get('primary_intent')}, "
+                       f"quality: {session_analysis.get('quality_score', 0):.2f})")
+
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to complete navigation tracking: {e}")
 
     return resp
 
