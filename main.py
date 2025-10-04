@@ -11033,6 +11033,44 @@ async def generate_review_internal(request: ReviewRequest, db: Session, current_
     def time_left_s() -> float:
         return max(0.0, deadline - time.time())
 
+    # 🚀 PHASE 2.6 ENHANCEMENT: Dual-Mode Orchestration Integration
+    processing_mode = None
+    mode_detection_result = None
+    try:
+        from dual_mode_orchestrator import get_processing_mode_recommendation
+
+        # Map existing preference to dual-mode preferences
+        dual_mode_preferences = {
+            "processing_mode": "quality" if preference.lower() == "recall" else "fast"
+        }
+
+        # Get mode recommendation
+        mode_detection_result = get_processing_mode_recommendation(
+            query=request.objective or "Research analysis",
+            objective=f"Analysis of {request.molecule}" if request.molecule else request.objective or "Research analysis",
+            preferences=dual_mode_preferences
+        )
+
+        processing_mode = mode_detection_result.recommended_mode.value
+
+        logger.info(f"🎯 Dual-mode detection: {processing_mode} "
+                   f"(complexity: {mode_detection_result.complexity_level.value}, "
+                   f"confidence: {mode_detection_result.confidence_score:.2f})")
+
+        # Adjust timeout based on mode recommendation
+        if processing_mode == "heavyweight" and timeout_budget < 1800:
+            timeout_budget = min(timeout_budget * 1.5, 1800)  # Extend timeout for heavyweight
+            deadline = time.time() + timeout_budget
+            logger.info(f"🕒 Extended timeout to {timeout_budget}s for heavyweight processing")
+        elif processing_mode == "lightweight" and timeout_budget > 600:
+            timeout_budget = max(timeout_budget * 0.7, 600)  # Reduce timeout for lightweight
+            deadline = time.time() + timeout_budget
+            logger.info(f"🕒 Reduced timeout to {timeout_budget}s for lightweight processing")
+
+    except Exception as e:
+        logger.warning(f"⚠️ Dual-mode orchestration not available: {e}")
+        processing_mode = "adaptive"
+
     # 🚀 PHASE 2.6 ENHANCEMENT: Iteration Memory System Integration
     iteration_id = None
     try:
@@ -12406,6 +12444,18 @@ Objective: {objective}
                 "fallback_ratio": 1.0 - (sum(1 for r in results if r.get("source") == "fallback") / max(len(results), 1))
             }
 
+            # Add dual-mode orchestration results
+            if processing_mode and mode_detection_result:
+                analysis_results["processing_mode"] = processing_mode
+                analysis_results["complexity_level"] = mode_detection_result.complexity_level.value
+                analysis_results["mode_confidence"] = mode_detection_result.confidence_score
+                analysis_results["estimated_time"] = mode_detection_result.estimated_time
+
+                # Add mode-specific quality metrics
+                quality_metrics["mode_efficiency"] = 1.0 if processing_mode == "lightweight" else 0.7
+                quality_metrics["mode_depth"] = 0.6 if processing_mode == "lightweight" else 1.0
+                quality_metrics["complexity_match"] = mode_detection_result.confidence_score
+
             # Complete iteration tracking
             completion_result = complete_iteration_tracking(
                 iteration_id=iteration_id,
@@ -12415,6 +12465,22 @@ Objective: {objective}
             )
 
             logger.info(f"🧠 Completed iteration tracking: {iteration_id} (success: {completion_result.get('success_score', 0):.3f})")
+
+            # Record dual-mode orchestration decision
+            if processing_mode:
+                from iteration_memory_system import record_user_decision
+                record_user_decision(
+                    iteration_id=iteration_id,
+                    decision_type="processing_mode_selection",
+                    decision_content=f"Selected {processing_mode} mode based on complexity analysis",
+                    context={
+                        "complexity_level": mode_detection_result.complexity_level.value if mode_detection_result else "unknown",
+                        "confidence": mode_detection_result.confidence_score if mode_detection_result else 0.5,
+                        "user_preference": preference
+                    },
+                    rationale=mode_detection_result.reasoning if mode_detection_result else "Automatic mode selection",
+                    confidence=mode_detection_result.confidence_score if mode_detection_result else 0.5
+                )
 
         except Exception as e:
             logger.warning(f"⚠️ Failed to complete iteration tracking: {e}")
