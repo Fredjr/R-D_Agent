@@ -2701,23 +2701,70 @@ def _harvest_pubmed(query: str, deadline: float) -> list[dict]:
     if _time_left(deadline) <= 0.5:
         return []
     try:
-        tool = PubMedSearchTool()
-        raw = tool._run(_normalize_entities(query))
-        import json as _json
-        arts = _json.loads(raw) if isinstance(raw, str) else (raw or [])
-        if isinstance(arts, list):
-            # Annotate with source query for transparency/debugging
-            for a in arts:
-                if isinstance(a, dict):
-                    # Normalize entities in harvested titles to improve downstream matching
-                    try:
-                        if a.get("title"):
-                            a["title"] = _normalize_entities(a["title"])
-                    except Exception:
-                        pass
-                    a["source_query"] = query
+        # 🚀 PHASE 2.5 ENHANCEMENT: Vespa.ai Hybrid Search Integration
+        # Replace FAISS-only search with semantic+symbolic hybrid retrieval
+        try:
+            from vespa_hybrid_search import hybrid_search_pubmed
 
-            # 🚀 PHASE 2.2 ENHANCEMENT: Cross-Encoder Reranking for Precision
+            # First get initial results from PubMed API
+            tool = PubMedSearchTool()
+            raw = tool._run(_normalize_entities(query))
+            import json as _json
+            initial_arts = _json.loads(raw) if isinstance(raw, str) else (raw or [])
+
+            if isinstance(initial_arts, list) and initial_arts:
+                # Annotate with source query for transparency/debugging
+                for a in initial_arts:
+                    if isinstance(a, dict):
+                        # Normalize entities in harvested titles to improve downstream matching
+                        try:
+                            if a.get("title"):
+                                a["title"] = _normalize_entities(a["title"])
+                        except Exception:
+                            pass
+                        a["source_query"] = query
+
+                # 🚀 VESPA HYBRID SEARCH: Apply semantic+symbolic hybrid retrieval
+                logger.info(f"🔍 Applying Vespa hybrid search to {len(initial_arts)} initial results")
+
+                # Apply hybrid search for enhanced relevance
+                pubmed_retmax = int(os.getenv("PUBMED_RETMAX", "25"))
+                hybrid_arts = hybrid_search_pubmed(
+                    query=query,
+                    documents=initial_arts,
+                    top_k=min(pubmed_retmax, len(initial_arts))
+                )
+
+                logger.info(f"🎯 Vespa hybrid search: {len(initial_arts)} → {len(hybrid_arts)} articles with enhanced relevance")
+                arts = hybrid_arts
+
+            else:
+                arts = initial_arts or []
+
+        except Exception as e:
+            logger.warning(f"⚠️ Vespa hybrid search failed: {e}, falling back to standard search")
+
+            # Fallback to original PubMed search
+            tool = PubMedSearchTool()
+            raw = tool._run(_normalize_entities(query))
+            import json as _json
+            arts = _json.loads(raw) if isinstance(raw, str) else (raw or [])
+
+            if isinstance(arts, list):
+                # Annotate with source query for transparency/debugging
+                for a in arts:
+                    if isinstance(a, dict):
+                        # Normalize entities in harvested titles to improve downstream matching
+                        try:
+                            if a.get("title"):
+                                a["title"] = _normalize_entities(a["title"])
+                        except Exception:
+                            pass
+                        a["source_query"] = query
+
+        # 🚀 PHASE 2.2 ENHANCEMENT: Cross-Encoder Reranking for Precision
+        # (Maintained for additional precision on top of hybrid search)
+        if isinstance(arts, list) and arts:
             try:
                 from cross_encoder_reranking import rerank_retrieved_chunks
 
@@ -2730,14 +2777,15 @@ def _harvest_pubmed(query: str, deadline: float) -> list[dict]:
                         chunk = {
                             'id': art.get('pmid', art.get('id', 'unknown')),
                             'content': content,
-                            'score': 1.0,  # Default score
+                            'score': art.get('vespa_relevance_score', 1.0),  # Use Vespa score if available
                             'metadata': art
                         }
                         chunks_for_reranking.append(chunk)
 
                 # Rerank based on query relevance
                 if chunks_for_reranking:
-                    reranked_chunks = rerank_retrieved_chunks(query, chunks_for_reranking, top_k=min(PUBMED_RETMAX, len(chunks_for_reranking)))
+                    pubmed_retmax = int(os.getenv("PUBMED_RETMAX", "25"))
+                    reranked_chunks = rerank_retrieved_chunks(query, chunks_for_reranking, top_k=min(pubmed_retmax, len(chunks_for_reranking)))
 
                     # Convert back to article format with rerank scores
                     reranked_arts = []
@@ -2751,10 +2799,10 @@ def _harvest_pubmed(query: str, deadline: float) -> list[dict]:
                     return reranked_arts
 
             except Exception as e:
-                logger.warning(f"Cross-encoder reranking failed, using original results: {e}")
+                logger.warning(f"⚠️ Cross-encoder reranking failed: {e}, using hybrid search results")
 
-            return arts
-        return []
+        pubmed_retmax = int(os.getenv("PUBMED_RETMAX", "25"))
+        return arts[:pubmed_retmax] if isinstance(arts, list) else []
     except Exception:
         return []
 
