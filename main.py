@@ -11033,6 +11033,32 @@ async def generate_review_internal(request: ReviewRequest, db: Session, current_
     def time_left_s() -> float:
         return max(0.0, deadline - time.time())
 
+    # 🚀 PHASE 2.6 ENHANCEMENT: Iteration Memory System Integration
+    iteration_id = None
+    try:
+        from iteration_memory_system import start_iteration_tracking
+
+        # Start iteration tracking
+        iteration_id = start_iteration_tracking(
+            project_id=request.project_id,
+            session_id=f"session_{int(time.time())}",
+            user_id=current_user or "anonymous",
+            query=request.objective or "Research analysis",
+            analysis_type="generate_review",
+            context={
+                "molecule": request.molecule,
+                "preference": preference,
+                "timeout_budget": timeout_budget,
+                "request_timestamp": req_start
+            }
+        )
+
+        logger.info(f"🧠 Started iteration tracking: {iteration_id}")
+
+    except Exception as e:
+        logger.warning(f"⚠️ Iteration memory system not available: {e}")
+        iteration_id = None
+
     # Response cache lookup
     cache_key = None
     if ENABLE_CACHING:
@@ -12356,6 +12382,43 @@ Objective: {objective}
         "latency_ms": took,
         "fallback_sections": sum(1 for r in results if r.get("source") == "fallback"),
     })
+
+    # 🚀 PHASE 2.6 ENHANCEMENT: Complete Iteration Memory Tracking
+    if iteration_id:
+        try:
+            from iteration_memory_system import complete_iteration_tracking
+
+            # Prepare analysis results
+            analysis_results = {
+                "sections_generated": len(results),
+                "executive_summary_length": len(resp.get("executive_summary", "")),
+                "processing_time_ms": took,
+                "fallback_sections": sum(1 for r in results if r.get("source") == "fallback"),
+                "total_queries": len(resp.get("queries", [])),
+                "molecule": request.molecule,
+                "objective_length": len(request.objective or "")
+            }
+
+            # Prepare quality metrics (from existing quality monitoring if available)
+            quality_metrics = {
+                "response_time_score": min(1.0, 30000 / max(took, 1000)),  # Better score for faster responses
+                "content_completeness": min(1.0, len(results) / 8.0),  # Target 8+ sections
+                "fallback_ratio": 1.0 - (sum(1 for r in results if r.get("source") == "fallback") / max(len(results), 1))
+            }
+
+            # Complete iteration tracking
+            completion_result = complete_iteration_tracking(
+                iteration_id=iteration_id,
+                results=analysis_results,
+                quality=quality_metrics,
+                satisfaction=None  # Could be enhanced with user feedback
+            )
+
+            logger.info(f"🧠 Completed iteration tracking: {iteration_id} (success: {completion_result.get('success_score', 0):.3f})")
+
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to complete iteration tracking: {e}")
+
     return resp
 
 
