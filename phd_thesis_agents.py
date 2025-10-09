@@ -2071,7 +2071,7 @@ PAPERS TO ANALYZE:
                 "papers_analyzed": 0,
                 "research_domains": ["sample_domain"],
                 "gap_summary": "Sample gap analysis for testing",
-                "research_opportunities": ["Sample opportunity"],
+                "research_opportunities": [{"opportunity": "Sample opportunity", "priority": "high", "feasibility": "moderate"}],
                 # Legacy format for backward compatibility
                 "semantic_gaps": [],
                 "methodology_gaps": [],
