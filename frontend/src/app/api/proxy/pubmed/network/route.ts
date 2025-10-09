@@ -186,13 +186,24 @@ async function findRelatedArticles(pmid: string, linkType: string, limit: number
         if (linksetdb.linkname === linkType) {
           const links = linksetdb.links || [];
           console.log(`✅ Found ${links.length} links for ${linkType}`);
+          console.log(`🔍 First 5 raw links:`, links.slice(0, 5));
+          console.log(`🔍 Source PMID to exclude: "${pmid}" (type: ${typeof pmid})`);
 
           const filteredLinks = links
-            .filter((id: string) => id.toString() !== pmid) // Exclude self
+            .filter((id: string) => {
+              const idStr = id.toString();
+              const pmidStr = pmid.toString();
+              const shouldExclude = idStr === pmidStr;
+              if (shouldExclude) {
+                console.log(`🚫 Excluding self-reference: ${idStr}`);
+              }
+              return !shouldExclude;
+            })
             .slice(0, limit)
             .map((id: string) => id.toString());
 
-          console.log(`📊 Returning ${filteredLinks.length} filtered links (excluded self, limited to ${limit})`);
+          console.log(`📊 After filtering: ${filteredLinks.length} links (excluded self, limited to ${limit})`);
+          console.log(`🔍 First 5 filtered links:`, filteredLinks.slice(0, 5));
           return filteredLinks;
         }
       }
