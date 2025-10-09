@@ -67,7 +67,7 @@ async function generateFallbackCitationNetwork(pmid: string) {
     }
 
     // Generate a meaningful fallback network
-    const nodes = [
+    const nodes: any[] = [
       {
         id: pmid,
         label: articleData?.title || `Article ${pmid}`,
@@ -86,7 +86,7 @@ async function generateFallbackCitationNetwork(pmid: string) {
       }
     ];
 
-    const edges = [];
+    const edges: any[] = [];
 
     // Add related articles based on similar topics or authors
     if (articleData?.authors && articleData.authors.length > 0) {
@@ -149,8 +149,8 @@ async function generateFallbackCitationNetwork(pmid: string) {
 
 // Generate related articles based on authors
 function generateRelatedArticlesByAuthor(authors: string[], sourcePmid: string) {
-  const nodes = [];
-  const edges = [];
+  const nodes: any[] = [];
+  const edges: any[] = [];
 
   // Create up to 3 related articles based on authors
   for (let i = 0; i < Math.min(3, authors.length); i++) {
@@ -191,8 +191,8 @@ function generateRelatedArticlesByAuthor(authors: string[], sourcePmid: string) 
 
 // Generate related articles based on topic
 function generateRelatedArticlesByTopic(title: string, sourcePmid: string) {
-  const nodes = [];
-  const edges = [];
+  const nodes: any[] = [];
+  const edges: any[] = [];
 
   // Extract key terms from title for related articles
   const keyTerms = extractKeyTerms(title);

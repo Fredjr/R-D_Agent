@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import ArticleCard from '@/components/ArticleCard';
 import type { SearchResult } from '@/lib/dummy-data';
+import { safeRenderContent } from '@/utils/safeRender';
 
 interface Report {
   report_id: string;
@@ -348,7 +349,7 @@ export default function ReportDetailPage() {
                 <div className="bg-white rounded-lg shadow p-6">
                   <h2 className="text-xl font-semibold text-gray-900 mb-4">Executive Summary</h2>
                   <div className="text-gray-700 whitespace-pre-wrap">
-                    {report.content.executive_summary}
+                    {safeRenderContent(report.content.executive_summary)}
                   </div>
                 </div>
               )}

@@ -67,7 +67,7 @@ async function generateFallbackReferencesNetwork(pmid: string) {
     }
 
     // Generate source node
-    const nodes = [
+    const nodes: any[] = [
       {
         id: pmid,
         label: articleData?.title || `Article ${pmid}`,
@@ -86,7 +86,7 @@ async function generateFallbackReferencesNetwork(pmid: string) {
       }
     ];
 
-    const edges = [];
+    const edges: any[] = [];
 
     // Generate reference nodes (papers this article cites)
     const referenceCount = Math.floor(Math.random() * 5) + 3; // 3-7 references

@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { safeRenderContent } from '@/utils/safeRender';
 
 export interface ReportResult {
   report_id: string;
@@ -233,7 +234,7 @@ export function useResultRenderer(): UseResultRendererReturn {
             <div dangerouslySetInnerHTML={{ __html: report.content }} />
           ) : (
             <pre className="whitespace-pre-wrap text-sm text-gray-700">
-              {JSON.stringify(report.content, null, 2)}
+              {safeRenderContent(report.content)}
             </pre>
           )}
         </div>
@@ -274,7 +275,7 @@ export function useResultRenderer(): UseResultRendererReturn {
                   <div dangerouslySetInnerHTML={{ __html: analysis.scientific_model_analysis }} />
                 ) : (
                   <pre className="whitespace-pre-wrap text-sm text-gray-700">
-                    {JSON.stringify(analysis.scientific_model_analysis, null, 2)}
+                    {safeRenderContent(analysis.scientific_model_analysis)}
                   </pre>
                 )}
               </div>
@@ -292,7 +293,7 @@ export function useResultRenderer(): UseResultRendererReturn {
                   <div dangerouslySetInnerHTML={{ __html: analysis.experimental_methods_analysis }} />
                 ) : (
                   <pre className="whitespace-pre-wrap text-sm text-gray-700">
-                    {JSON.stringify(analysis.experimental_methods_analysis, null, 2)}
+                    {safeRenderContent(analysis.experimental_methods_analysis)}
                   </pre>
                 )}
               </div>
@@ -310,7 +311,7 @@ export function useResultRenderer(): UseResultRendererReturn {
                   <div dangerouslySetInnerHTML={{ __html: analysis.results_interpretation_analysis }} />
                 ) : (
                   <pre className="whitespace-pre-wrap text-sm text-gray-700">
-                    {JSON.stringify(analysis.results_interpretation_analysis, null, 2)}
+                    {safeRenderContent(analysis.results_interpretation_analysis)}
                   </pre>
                 )}
               </div>

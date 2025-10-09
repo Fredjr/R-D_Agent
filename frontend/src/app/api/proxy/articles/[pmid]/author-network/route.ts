@@ -67,8 +67,8 @@ export async function GET(
 
 // Transform backend author network data to standard network format
 function transformAuthorNetworkData(backendData: any, pmid: string) {
-  const nodes = [];
-  const edges = [];
+  const nodes: any[] = [];
+  const edges: any[] = [];
 
   // Add source article node
   nodes.push({
@@ -160,8 +160,8 @@ async function generateFallbackAuthorNetwork(pmid: string) {
       articleData = await articleResponse.json();
     }
 
-    const nodes = [];
-    const edges = [];
+    const nodes: any[] = [];
+    const edges: any[] = [];
 
     // Add source article node
     nodes.push({
