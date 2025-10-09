@@ -16693,8 +16693,7 @@ async def generate_summary_endpoint(
             api_key = os.getenv("OPENAI_API_KEY") or os.getenv("GOOGLE_GENAI_API_KEY")
             model_manager = CuttingEdgeModelManager(api_key=api_key)
             llm = await model_manager.get_best_available_model(
-                use_case="phd_content_generation",
-                fallback_to_standard=True
+                use_case="premium_phd"
             )
 
             # Initialize PhD orchestrator
@@ -16808,8 +16807,7 @@ async def generate_thesis_chapters_endpoint(
             api_key = os.getenv("OPENAI_API_KEY") or os.getenv("GOOGLE_GENAI_API_KEY")
             model_manager = CuttingEdgeModelManager(api_key=api_key)
             llm = await model_manager.get_best_available_model(
-                use_case="phd_content_generation",
-                fallback_to_standard=True
+                use_case="premium_phd"
             )
 
             # Initialize thesis structure agent
@@ -16945,8 +16943,7 @@ async def analyze_literature_gaps_endpoint(
             api_key = os.getenv("OPENAI_API_KEY") or os.getenv("GOOGLE_GENAI_API_KEY")
             model_manager = CuttingEdgeModelManager(api_key=api_key)
             llm = await model_manager.get_best_available_model(
-                use_case="phd_content_generation",
-                fallback_to_standard=True
+                use_case="premium_phd"
             )
 
             # Initialize research gap agent
@@ -17091,8 +17088,7 @@ async def synthesize_methodologies_endpoint(
             api_key = os.getenv("OPENAI_API_KEY") or os.getenv("GOOGLE_GENAI_API_KEY")
             model_manager = CuttingEdgeModelManager(api_key=api_key)
             llm = await model_manager.get_best_available_model(
-                use_case="phd_content_generation",
-                fallback_to_standard=True
+                use_case="premium_phd"
             )
 
             # Initialize methodology synthesis agent
