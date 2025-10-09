@@ -1,5 +1,6 @@
 import React from 'react';
 import { ChartBarIcon, ExclamationTriangleIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { safeRenderContent } from '@/utils/safeRender';
 
 interface FactAnchor {
   claim: string;
@@ -73,13 +74,19 @@ export default function ResultsInterpretationCard({ data, className = '' }: Resu
             <label className="block text-sm font-medium text-gray-700 mb-2">Hypothesis Alignment</label>
             <div className="p-4 bg-gray-50 rounded-lg">
               <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium mb-2 ${getAlignmentColor(data.hypothesis_alignment)}`}>
-                {data.hypothesis_alignment.split(':')[0] || data.hypothesis_alignment}
+                {(() => {
+                  const alignmentStr = safeRenderContent(data.hypothesis_alignment);
+                  return alignmentStr.includes(':') ? alignmentStr.split(':')[0] : alignmentStr;
+                })()}
               </span>
-              {data.hypothesis_alignment.includes(':') && (
-                <p className="text-sm text-gray-900 mt-2">
-                  {data.hypothesis_alignment.split(':').slice(1).join(':').trim()}
-                </p>
-              )}
+              {(() => {
+                const alignmentStr = safeRenderContent(data.hypothesis_alignment);
+                return alignmentStr.includes(':') && (
+                  <p className="text-sm text-gray-900 mt-2">
+                    {alignmentStr.split(':').slice(1).join(':').trim()}
+                  </p>
+                );
+              })()}
             </div>
           </div>
         )}
