@@ -4979,7 +4979,7 @@ async def health_check():
         "status": "healthy",
         "service": "R&D Agent Backend - GPT-5/O3 Enhanced",
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "2.0-gpt5-o3-enhanced-verified",
+        "version": "2.0-gpt5-o3-enhanced-final-fixed",
         "deployment_date": "2025-10-09",
         "features": [
             "gpt5_o3_model_integration",
