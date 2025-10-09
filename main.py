@@ -16699,16 +16699,17 @@ async def generate_summary_endpoint(
             # Initialize PhD orchestrator
             phd_orchestrator = PhDThesisOrchestrator(llm)
 
-            # Generate comprehensive summary
-            summary_result = await phd_orchestrator.generate_comprehensive_summary(
-                project_data=project_data,
-                objective=request.objective,
-                summary_type=request.summary_type,
-                academic_level=request.academic_level,
-                include_methodology=request.include_methodology,
-                include_gaps=request.include_gaps,
-                target_length=request.target_length
-            )
+            # Generate PhD analysis
+            analysis_config = {
+                'analysis_type': 'comprehensive_phd',
+                'objective': request.objective,
+                'summary_type': request.summary_type,
+                'academic_level': request.academic_level,
+                'include_methodology': request.include_methodology,
+                'include_gaps': request.include_gaps,
+                'target_length': request.target_length
+            }
+            summary_result = await phd_orchestrator.generate_phd_analysis(project_data, analysis_config)
 
             processing_time = f"{(time.time() - start_time):.2f}s"
 
@@ -17011,7 +17012,7 @@ async def analyze_literature_gaps_endpoint(
 
             return LiteratureGapAnalysisResponse(
                 identified_gaps=fallback_gaps,
-                research_opportunities=[gap["research_opportunity"] for gap in fallback_gaps],
+                research_opportunities=[{"opportunity": gap["research_opportunity"], "priority": "high", "feasibility": "moderate"} for gap in fallback_gaps],
                 methodology_gaps=[gap for gap in fallback_gaps if gap["gap_type"] == "methodological"],
                 theoretical_gaps=[gap for gap in fallback_gaps if gap["gap_type"] == "theoretical"],
                 empirical_gaps=[gap for gap in fallback_gaps if gap["gap_type"] == "empirical"],
