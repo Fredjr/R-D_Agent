@@ -10,6 +10,8 @@ import ResultsList from '@/components/ResultsList';
 import NetworkViewWithSidebar from '@/components/NetworkViewWithSidebar';
 import MultiColumnNetworkView from '@/components/MultiColumnNetworkView';
 import Collections from '@/components/Collections';
+import ProjectAnalysisPanel from '@/components/project/ProjectAnalysisPanel';
+import CollectionsPanel from '@/components/project/CollectionsPanel';
 import { useAsyncJob } from '@/hooks/useAsyncJob';
 import { startReviewJob, startDeepDiveJob } from '../../../lib/api';
 import AsyncJobProgress from '@/components/AsyncJobProgress';
@@ -141,7 +143,7 @@ export default function ProjectPage() {
   } | null>(null);
 
   // Tab navigation state
-  const [activeTab, setActiveTab] = useState<'overview' | 'collections' | 'network' | 'activity'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'collections' | 'network' | 'activity' | 'phd-analysis'>('overview');
 
   // Report generation results (same as Welcome Page)
   const [reportResults, setReportResults] = useState<any[]>([]);
@@ -1169,7 +1171,7 @@ Perfect for your dissertation chapters! 🎓`);
         <div className="py-4">
           <SpotifyProjectTabs
             activeTab={activeTab}
-            onTabChange={(tab) => setActiveTab(tab as 'overview' | 'collections' | 'network' | 'activity')}
+            onTabChange={(tab) => setActiveTab(tab as 'overview' | 'collections' | 'network' | 'activity' | 'phd-analysis')}
             tabs={[
               {
                 id: 'overview',
@@ -1193,6 +1195,12 @@ Perfect for your dissertation chapters! 🎓`);
                 label: 'Activity & Notes',
                 icon: '📝',
                 count: (project as any).annotations?.length || 0
+              },
+              {
+                id: 'phd-analysis',
+                label: 'PhD Analysis',
+                icon: '🎓',
+                count: 4 // Number of analysis types available
               }
             ]}
           />
@@ -2063,13 +2071,30 @@ Perfect for your dissertation chapters! 🎓`);
 
         {/* Collections Tab */}
         {activeTab === 'collections' && (
-          <div className="mb-8">
+          <div className="mb-8 space-y-6">
+            {/* Enhanced Collections Panel */}
+            <CollectionsPanel
+              projectId={projectId}
+              userId={user?.email || 'default_user'}
+            />
+
+            {/* Original Collections Component */}
             <Collections
               projectId={projectId}
               onRefresh={fetchProjectData}
               onGenerateReview={handleGenerateReviewFromNetwork}
               onDeepDive={handleDeepDiveFromNetwork}
               onExploreCluster={handleExploreClusterFromNetwork}
+            />
+          </div>
+        )}
+
+        {/* PhD Analysis Tab */}
+        {activeTab === 'phd-analysis' && (
+          <div className="mb-8">
+            <ProjectAnalysisPanel
+              projectId={projectId}
+              userId={user?.email || 'default_user'}
             />
           </div>
         )}
