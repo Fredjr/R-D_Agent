@@ -34,56 +34,56 @@ interface SkeletonProps {
   animated?: boolean;
 }
 
-export const Skeleton = memo<SkeletonProps>(({ className = '', animated = true }) => (
-  <div 
+export const ProfessionalSkeleton = memo<SkeletonProps>(({ className = '', animated = true }) => (
+  <div
     className={`bg-gray-200 rounded ${animated ? 'animate-pulse' : ''} ${className}`}
     style={{ minHeight: '1rem' }}
   />
 ));
 
-Skeleton.displayName = 'Skeleton';
+ProfessionalSkeleton.displayName = 'ProfessionalSkeleton';
 
 export const PhDAnalysisLoadingSkeleton = memo(() => (
   <div className="w-full space-y-6 p-6 bg-white rounded-lg border border-gray-200">
     {/* Header */}
     <div className="flex items-center justify-between">
       <div className="flex items-center space-x-3">
-        <Skeleton className="w-8 h-8 rounded-full" />
-        <Skeleton className="w-48 h-6" />
+        <ProfessionalSkeleton className="w-8 h-8 rounded-full" />
+        <ProfessionalSkeleton className="w-48 h-6" />
       </div>
-      <Skeleton className="w-24 h-8 rounded-md" />
+      <ProfessionalSkeleton className="w-24 h-8 rounded-md" />
     </div>
-    
+
     {/* Progress indicator */}
     <div className="space-y-2">
       <div className="flex justify-between">
-        <Skeleton className="w-32 h-4" />
-        <Skeleton className="w-16 h-4" />
+        <ProfessionalSkeleton className="w-32 h-4" />
+        <ProfessionalSkeleton className="w-16 h-4" />
       </div>
       <div className="w-full bg-gray-200 rounded-full h-2">
         <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{ width: '45%' }} />
       </div>
     </div>
-    
+
     {/* Content sections */}
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {[...Array(4)].map((_, i) => (
         <div key={i} className="p-4 border border-gray-100 rounded-lg space-y-3">
-          <Skeleton className="w-3/4 h-5" />
-          <Skeleton className="w-full h-4" />
-          <Skeleton className="w-5/6 h-4" />
+          <ProfessionalSkeleton className="w-3/4 h-5" />
+          <ProfessionalSkeleton className="w-full h-4" />
+          <ProfessionalSkeleton className="w-5/6 h-4" />
           <div className="flex justify-between items-center">
-            <Skeleton className="w-20 h-6 rounded-full" />
-            <Skeleton className="w-16 h-4" />
+            <ProfessionalSkeleton className="w-20 h-6 rounded-full" />
+            <ProfessionalSkeleton className="w-16 h-4" />
           </div>
         </div>
       ))}
     </div>
-    
+
     {/* Action buttons */}
     <div className="flex justify-center space-x-3">
-      <Skeleton className="w-32 h-10 rounded-md" />
-      <Skeleton className="w-28 h-10 rounded-md" />
+      <ProfessionalSkeleton className="w-32 h-10 rounded-md" />
+      <ProfessionalSkeleton className="w-28 h-10 rounded-md" />
     </div>
   </div>
 ));
@@ -427,7 +427,7 @@ ProfessionalStatusIndicator.displayName = 'ProfessionalStatusIndicator';
 
 // Export all components
 export {
-  Skeleton,
+  ProfessionalSkeleton,
   PhDAnalysisLoadingSkeleton,
   ProfessionalErrorDisplay,
   ResponsiveContainer,
