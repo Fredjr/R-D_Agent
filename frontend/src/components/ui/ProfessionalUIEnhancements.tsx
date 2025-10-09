@@ -34,7 +34,7 @@ interface SkeletonProps {
   animated?: boolean;
 }
 
-export const ProfessionalSkeleton = memo<SkeletonProps>(({ className = '', animated = true }) => (
+const ProfessionalSkeleton = memo<SkeletonProps>(({ className = '', animated = true }) => (
   <div
     className={`bg-gray-200 rounded ${animated ? 'animate-pulse' : ''} ${className}`}
     style={{ minHeight: '1rem' }}
@@ -43,7 +43,7 @@ export const ProfessionalSkeleton = memo<SkeletonProps>(({ className = '', anima
 
 ProfessionalSkeleton.displayName = 'ProfessionalSkeleton';
 
-export const PhDAnalysisLoadingSkeleton = memo(() => (
+const PhDAnalysisLoadingSkeleton = memo(() => (
   <div className="w-full space-y-6 p-6 bg-white rounded-lg border border-gray-200">
     {/* Header */}
     <div className="flex items-center justify-between">
@@ -103,7 +103,7 @@ interface ErrorDisplayProps {
   type?: 'error' | 'warning' | 'info';
 }
 
-export const ProfessionalErrorDisplay = memo<ErrorDisplayProps>(({
+const ProfessionalErrorDisplay = memo<ErrorDisplayProps>(({
   error,
   onRetry,
   retryLabel = 'Try Again',
@@ -207,7 +207,7 @@ interface ResponsiveContainerProps {
   padding?: 'none' | 'sm' | 'md' | 'lg';
 }
 
-export const ResponsiveContainer = memo<ResponsiveContainerProps>(({
+const ResponsiveContainer = memo<ResponsiveContainerProps>(({
   children,
   className = '',
   maxWidth = 'xl',
@@ -251,7 +251,7 @@ interface ExpandableCardProps {
   className?: string;
 }
 
-export const ExpandableCard = memo<ExpandableCardProps>(({
+const ExpandableCard = memo<ExpandableCardProps>(({
   title,
   children,
   defaultExpanded = false,
@@ -304,7 +304,7 @@ interface QualityIndicatorProps {
   className?: string;
 }
 
-export const PhDQualityIndicator = memo<QualityIndicatorProps>(({
+const PhDQualityIndicator = memo<QualityIndicatorProps>(({
   score,
   maxScore = 10,
   label = 'Quality Score',
@@ -376,7 +376,7 @@ interface StatusIndicatorProps {
   className?: string;
 }
 
-export const ProfessionalStatusIndicator = memo<StatusIndicatorProps>(({
+const ProfessionalStatusIndicator = memo<StatusIndicatorProps>(({
   status,
   message,
   showIcon = true,
