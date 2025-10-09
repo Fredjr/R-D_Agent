@@ -7,6 +7,7 @@ import ScientificModelCard from '@/components/ScientificModelCard';
 import ExperimentalMethodsTable from '@/components/ExperimentalMethodsTable';
 import ResultsInterpretationCard from '@/components/ResultsInterpretationCard';
 import ContentQualityIndicator from '@/components/ContentQualityIndicator';
+import { safeRenderContent } from '@/utils/safeRender';
 
 interface Analysis {
   analysis_id: string;

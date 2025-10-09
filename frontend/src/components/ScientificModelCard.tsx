@@ -46,10 +46,12 @@ export default function ScientificModelCard({ data, className = '' }: Scientific
   // Robust data handling
   const safeData = data || {};
 
-  const splitStringToArray = (str: string): string[] => {
+  const splitStringToArray = (str: any): string[] => {
     if (!str) return [];
+    // Ensure str is a string before calling split
+    const stringValue = typeof str === 'string' ? str : String(str);
     // Try to split by common delimiters
-    return str.split(/[;,\n]/).map(s => s.trim()).filter(s => s.length > 0);
+    return stringValue.split(/[;,\n]/).map(s => s.trim()).filter(s => s.length > 0);
   };
 
   // Helper function to safely get values
