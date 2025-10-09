@@ -16689,7 +16689,9 @@ async def generate_summary_endpoint(
             from cutting_edge_model_manager import CuttingEdgeModelManager
 
             # Initialize model manager
-            model_manager = CuttingEdgeModelManager()
+            import os
+            api_key = os.getenv("OPENAI_API_KEY") or os.getenv("GOOGLE_GENAI_API_KEY")
+            model_manager = CuttingEdgeModelManager(api_key=api_key)
             llm = await model_manager.get_best_available_model(
                 use_case="phd_content_generation",
                 fallback_to_standard=True
@@ -16802,7 +16804,9 @@ async def generate_thesis_chapters_endpoint(
             from cutting_edge_model_manager import CuttingEdgeModelManager
 
             # Initialize model manager
-            model_manager = CuttingEdgeModelManager()
+            import os
+            api_key = os.getenv("OPENAI_API_KEY") or os.getenv("GOOGLE_GENAI_API_KEY")
+            model_manager = CuttingEdgeModelManager(api_key=api_key)
             llm = await model_manager.get_best_available_model(
                 use_case="phd_content_generation",
                 fallback_to_standard=True
@@ -16937,7 +16941,9 @@ async def analyze_literature_gaps_endpoint(
             from cutting_edge_model_manager import CuttingEdgeModelManager
 
             # Initialize model manager
-            model_manager = CuttingEdgeModelManager()
+            import os
+            api_key = os.getenv("OPENAI_API_KEY") or os.getenv("GOOGLE_GENAI_API_KEY")
+            model_manager = CuttingEdgeModelManager(api_key=api_key)
             llm = await model_manager.get_best_available_model(
                 use_case="phd_content_generation",
                 fallback_to_standard=True
@@ -17081,7 +17087,9 @@ async def synthesize_methodologies_endpoint(
             from cutting_edge_model_manager import CuttingEdgeModelManager
 
             # Initialize model manager
-            model_manager = CuttingEdgeModelManager()
+            import os
+            api_key = os.getenv("OPENAI_API_KEY") or os.getenv("GOOGLE_GENAI_API_KEY")
+            model_manager = CuttingEdgeModelManager(api_key=api_key)
             llm = await model_manager.get_best_available_model(
                 use_case="phd_content_generation",
                 fallback_to_standard=True
