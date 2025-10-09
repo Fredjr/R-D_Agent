@@ -4977,11 +4977,18 @@ async def health_check():
     # as it can cause deployment failures
     return {
         "status": "healthy",
-        "service": "R&D Agent Backend",
+        "service": "R&D Agent Backend - GPT-5/O3 Enhanced",
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "1.1-enhanced-limits",
-        "deployment_date": "2025-09-29",
-        "features": ["increased_recommendation_limits", "author_fixes", "citation_opportunities"]
+        "version": "2.0-gpt5-o3-enhanced",
+        "deployment_date": "2025-10-09",
+        "features": [
+            "gpt5_o3_model_integration",
+            "phd_committee_simulation",
+            "multi_agent_architecture",
+            "8_10_quality_enhancement",
+            "backward_compatibility",
+            "cutting_edge_model_manager"
+        ]
     }
 
 @app.get("/debug/test-methodology-extraction")
