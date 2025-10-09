@@ -195,7 +195,7 @@ export function useResultRenderer(): UseResultRendererReturn {
         {/* Header */}
         <div className="border-b border-gray-200 pb-4 mb-6">
           <h1 className="text-2xl font-bold text-gray-900">{report.title}</h1>
-          <p className="text-gray-600 mt-2">{report.objective}</p>
+          <p className="text-gray-600 mt-2">{safeRenderContent(report.objective)}</p>
           
           <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
             <div className="flex items-center space-x-4">

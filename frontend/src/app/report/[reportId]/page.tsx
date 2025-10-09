@@ -224,9 +224,9 @@ export default function ReportDetailPage() {
         // Check if it has the expected structure
         if (content.results && Array.isArray(content.results)) {
           return content.results.map((result: any, index: number) => ({
-            query: result.query || `Query ${index + 1}`,
+            query: safeRenderContent(result.query) || `Query ${index + 1}`,
             result: result.result || {
-              summary: result.summary || 'No summary available',
+              summary: safeRenderContent(result.summary) || 'No summary available',
               confidence_score: result.confidence_score || 0,
               methodologies: result.methodologies || [],
               publication_score: result.publication_score || 0,
@@ -239,9 +239,9 @@ export default function ReportDetailPage() {
 
         // Fallback: create a single result from the content
         return [{
-          query: content.objective || 'Report Analysis',
+          query: safeRenderContent(content.objective) || 'Report Analysis',
           result: {
-            summary: content.executive_summary || content.summary || 'Report content available',
+            summary: safeRenderContent(content.executive_summary || content.summary) || 'Report content available',
             confidence_score: 85,
             methodologies: content.methodologies || ['Report Analysis'],
             publication_score: 80,
@@ -309,7 +309,7 @@ export default function ReportDetailPage() {
               </button>
             </div>
           </div>
-          <p className="text-gray-600 mb-4">{report.objective}</p>
+          <p className="text-gray-600 mb-4">{safeRenderContent(report.objective)}</p>
           <div className="flex items-center gap-4 text-sm text-gray-500">
             <span>Created by {report.created_by}</span>
             <span>•</span>

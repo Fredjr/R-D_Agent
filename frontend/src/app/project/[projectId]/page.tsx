@@ -39,6 +39,7 @@ import {
   SpotifyReportCard,
   DeletableReportCard
 } from '@/components/ui';
+import { safeRenderContent } from '@/utils/safeRender';
 
 interface Project {
   project_id: string;
@@ -1680,7 +1681,7 @@ Perfect for your dissertation chapters! 🎓`);
                   <DeletableReportCard
                     key={report.report_id}
                     title={report.title}
-                    objective={report.objective}
+                    objective={safeRenderContent(report.objective)}
                     status="completed"
                     createdAt={new Date(report.created_at).toLocaleDateString()}
                     reportId={report.report_id}
@@ -1733,7 +1734,7 @@ Perfect for your dissertation chapters! 🎓`);
                         </span>
                       </div>
                       <h4 className="font-medium text-[var(--spotify-white)] text-sm mb-1 line-clamp-2">{report.title}</h4>
-                      <p className="text-xs text-[var(--spotify-light-text)] line-clamp-2">{report.objective}</p>
+                      <p className="text-xs text-[var(--spotify-light-text)] line-clamp-2">{safeRenderContent(report.objective)}</p>
                       {index === 0 && (
                         <div className="absolute top-2 right-2">
                           <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded bg-[var(--spotify-green)] text-black">
