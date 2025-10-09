@@ -16645,9 +16645,17 @@ async def generate_summary_endpoint(
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
 
-        # Get project articles and collections
-        articles = db.query(Article).filter(Article.project_id == request.project_id).all()
+        # Get project collections and their articles
         collections = db.query(Collection).filter(Collection.project_id == request.project_id).all()
+
+        # Get articles from collections (via ArticleCollection junction table)
+        article_collections = db.query(ArticleCollection).join(Collection).filter(
+            Collection.project_id == request.project_id
+        ).all()
+
+        # Get unique articles from the collections
+        article_pmids = list(set([ac.article_pmid for ac in article_collections if ac.article_pmid]))
+        articles = db.query(Article).filter(Article.pmid.in_(article_pmids)).all() if article_pmids else []
 
         # Prepare project data for PhD agents
         project_data = {
@@ -16661,14 +16669,14 @@ async def generate_summary_endpoint(
                     "abstract": article.abstract,
                     "authors": article.authors,
                     "journal": article.journal,
-                    "publication_date": article.publication_date
+                    "publication_year": article.publication_year
                 }
                 for article in articles
             ],
             "collections": [
                 {
                     "collection_id": collection.collection_id,
-                    "name": collection.name,
+                    "name": collection.collection_name,
                     "description": collection.description
                 }
                 for collection in collections
@@ -16763,8 +16771,13 @@ async def generate_thesis_chapters_endpoint(
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
 
-        # Get project articles
-        articles = db.query(Article).filter(Article.project_id == request.project_id).all()
+        # Get project articles via collections
+        collections = db.query(Collection).filter(Collection.project_id == request.project_id).all()
+        article_collections = db.query(ArticleCollection).join(Collection).filter(
+            Collection.project_id == request.project_id
+        ).all()
+        article_pmids = list(set([ac.article_pmid for ac in article_collections if ac.article_pmid]))
+        articles = db.query(Article).filter(Article.pmid.in_(article_pmids)).all() if article_pmids else []
 
         # Prepare project data
         project_data = {
@@ -16893,8 +16906,13 @@ async def analyze_literature_gaps_endpoint(
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
 
-        # Get project articles
-        articles = db.query(Article).filter(Article.project_id == request.project_id).all()
+        # Get project articles via collections
+        collections = db.query(Collection).filter(Collection.project_id == request.project_id).all()
+        article_collections = db.query(ArticleCollection).join(Collection).filter(
+            Collection.project_id == request.project_id
+        ).all()
+        article_pmids = list(set([ac.article_pmid for ac in article_collections if ac.article_pmid]))
+        articles = db.query(Article).filter(Article.pmid.in_(article_pmids)).all() if article_pmids else []
 
         # Prepare project data
         project_data = {
@@ -17032,8 +17050,13 @@ async def synthesize_methodologies_endpoint(
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
 
-        # Get project articles
-        articles = db.query(Article).filter(Article.project_id == request.project_id).all()
+        # Get project articles via collections
+        collections = db.query(Collection).filter(Collection.project_id == request.project_id).all()
+        article_collections = db.query(ArticleCollection).join(Collection).filter(
+            Collection.project_id == request.project_id
+        ).all()
+        article_pmids = list(set([ac.article_pmid for ac in article_collections if ac.article_pmid]))
+        articles = db.query(Article).filter(Article.pmid.in_(article_pmids)).all() if article_pmids else []
 
         # Prepare project data
         project_data = {
