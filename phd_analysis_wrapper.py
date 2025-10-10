@@ -3,11 +3,15 @@ PhD Analysis Module Wrapper
 Handles conditional imports and provides fallback functionality
 """
 
-import logging
 import os
 from typing import Dict, Any, List
 
-logger = logging.getLogger(__name__)
+# Simple logging replacement to avoid logger issues
+def log_info(message):
+    print(f"INFO: {message}")
+
+def log_warning(message):
+    print(f"WARNING: {message}")
 
 # Global flags for module availability
 SCIENTIFIC_MODEL_AVAILABLE = False
@@ -20,33 +24,33 @@ CUTTING_EDGE_MODEL_AVAILABLE = False
 try:
     from scientific_model_analyst import analyze_scientific_model as _analyze_scientific_model
     SCIENTIFIC_MODEL_AVAILABLE = True
-    logger.info("✅ Scientific model analyst imported successfully")
+    log_info("✅ Scientific model analyst imported successfully")
 except ImportError as e:
-    logger.warning(f"⚠️ Scientific model analyst not available: {e}")
+    log_warning(f"⚠️ Scientific model analyst not available: {e}")
     _analyze_scientific_model = None
 
 try:
     from experimental_methods_analyst import analyze_experimental_methods as _analyze_experimental_methods
     EXPERIMENTAL_METHODS_AVAILABLE = True
-    logger.info("✅ Experimental methods analyst imported successfully")
+    log_info("✅ Experimental methods analyst imported successfully")
 except ImportError as e:
-    logger.warning(f"⚠️ Experimental methods analyst not available: {e}")
+    log_warning(f"⚠️ Experimental methods analyst not available: {e}")
     _analyze_experimental_methods = None
 
 try:
     from results_interpretation_analyst import analyze_results_interpretation as _analyze_results_interpretation
     RESULTS_INTERPRETATION_AVAILABLE = True
-    logger.info("✅ Results interpretation analyst imported successfully")
+    log_info("✅ Results interpretation analyst imported successfully")
 except ImportError as e:
-    logger.warning(f"⚠️ Results interpretation analyst not available: {e}")
+    log_warning(f"⚠️ Results interpretation analyst not available: {e}")
     _analyze_results_interpretation = None
 
 try:
     from phd_thesis_agents import PhDThesisOrchestrator, ResearchGapAgent, MethodologySynthesisAgent, ThesisStructureAgent
     PHD_THESIS_AGENTS_AVAILABLE = True
-    logger.info("✅ PhD thesis agents imported successfully")
+    log_info("✅ PhD thesis agents imported successfully")
 except ImportError as e:
-    logger.warning(f"⚠️ PhD thesis agents not available: {e}")
+    log_warning(f"⚠️ PhD thesis agents not available: {e}")
     PhDThesisOrchestrator = None
     ResearchGapAgent = None
     MethodologySynthesisAgent = None
@@ -55,9 +59,9 @@ except ImportError as e:
 try:
     from cutting_edge_model_manager import CuttingEdgeModelManager
     CUTTING_EDGE_MODEL_AVAILABLE = True
-    logger.info("✅ Cutting edge model manager imported successfully")
+    log_info("✅ Cutting edge model manager imported successfully")
 except ImportError as e:
-    logger.warning(f"⚠️ Cutting edge model manager not available: {e}")
+    log_warning(f"⚠️ Cutting edge model manager not available: {e}")
     CuttingEdgeModelManager = None
 
 # Wrapper functions with fallback logic
@@ -67,7 +71,7 @@ def analyze_scientific_model(full_text: str, objective: str, llm=None) -> Dict[s
         try:
             return _analyze_scientific_model(full_text, objective, llm)
         except Exception as e:
-            logger.error(f"Scientific model analysis failed: {e}")
+            log_warning(f"Scientific model analysis failed: {e}")
     
     # Fallback response
     return {
@@ -107,7 +111,7 @@ def analyze_experimental_methods(full_text: str, objective: str, llm=None) -> Li
         try:
             return _analyze_experimental_methods(full_text, objective, llm)
         except Exception as e:
-            logger.error(f"Experimental methods analysis failed: {e}")
+            log_warning(f"Experimental methods analysis failed: {e}")
     
     # Fallback response
     return [
@@ -142,7 +146,7 @@ def analyze_results_interpretation(full_text: str, objective: str, llm=None) -> 
         try:
             return _analyze_results_interpretation(full_text, objective, llm)
         except Exception as e:
-            logger.error(f"Results interpretation analysis failed: {e}")
+            log_warning(f"Results interpretation analysis failed: {e}")
     
     # Fallback response
     return {

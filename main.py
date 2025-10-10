@@ -4999,7 +4999,7 @@ async def health_check():
         "status": "healthy",
         "service": "R&D Agent Backend - GPT-5/O3 Enhanced",
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "2.0-gpt5-o3-enhanced-wrapper-system",
+        "version": "2.0-gpt5-o3-phd-content-generation-fix",
         "deployment_date": "2025-10-10",
         "features": [
             "gpt5_o3_model_integration",
@@ -15134,19 +15134,57 @@ async def create_global_deep_dive_analysis(
                 db.commit()
                 project_id = default_project.project_id
 
-        # Create new analysis record
+        # 🚀 CRITICAL FIX: Actually perform PhD-level analysis instead of just storing empty data
+        logger.info(f"🔬 [Global Deep Dive Analyses] Starting PhD-level analysis...")
+
+        # Get LLM instance for analysis
+        llm = get_llm_analyzer()
+        if not llm:
+            logger.warning("⚠️ LLM not available - using fallback analysis")
+
+        # Extract analysis parameters
+        pmid = analysis_data.get("pmid") or analysis_data.get("article_pmid", "")
+        title = analysis_data.get("title") or analysis_data.get("article_title", "Unknown Article")
+        objective = analysis_data.get("objective", f"Analyze the research paper: {title}")
+
+        # Create full text for analysis (using title as proxy until we implement paper fetching)
+        full_text = f"Title: {title}\nPMID: {pmid}\n\nThis is a research paper analysis request for: {objective}"
+
+        # Perform actual PhD-level analysis using wrapper functions
+        try:
+            logger.info(f"🔬 Performing scientific model analysis...")
+            scientific_model_analysis = analyze_scientific_model(full_text, objective, llm)
+
+            logger.info(f"🔬 Performing experimental methods analysis...")
+            experimental_methods_analysis = analyze_experimental_methods(full_text, objective, llm)
+
+            logger.info(f"🔬 Performing results interpretation analysis...")
+            results_interpretation_analysis = analyze_results_interpretation(full_text, objective, llm)
+
+            processing_status = "completed"
+            logger.info(f"✅ PhD-level analysis completed successfully")
+
+        except Exception as e:
+            logger.error(f"❌ PhD analysis failed: {e}")
+            # Use fallback analysis
+            scientific_model_analysis = {"error": f"Analysis failed: {str(e)}", "_fallback": True}
+            experimental_methods_analysis = [{"error": f"Analysis failed: {str(e)}", "_fallback": True}]
+            results_interpretation_analysis = {"error": f"Analysis failed: {str(e)}", "_fallback": True}
+            processing_status = "completed_with_errors"
+
+        # Create new analysis record with actual PhD analysis results
         analysis = DeepDiveAnalysis(
             analysis_id=str(uuid.uuid4()),
-            article_pmid=analysis_data.get("pmid") or analysis_data.get("article_pmid"),
-            article_title=analysis_data.get("title") or analysis_data.get("article_title"),
+            article_pmid=pmid,
+            article_title=title,
             project_id=project_id,
             created_by=user_id,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
-            processing_status="completed",
-            scientific_model_analysis=analysis_data.get("results", {}).get("scientific_model_analysis") if analysis_data.get("results") else None,
-            experimental_methods_analysis=analysis_data.get("results", {}).get("experimental_methods_analysis") if analysis_data.get("results") else None,
-            results_interpretation_analysis=analysis_data.get("results", {}).get("results_interpretation_analysis") if analysis_data.get("results") else None
+            processing_status=processing_status,
+            scientific_model_analysis=scientific_model_analysis,
+            experimental_methods_analysis=experimental_methods_analysis,
+            results_interpretation_analysis=results_interpretation_analysis
         )
 
         db.add(analysis)
@@ -16775,18 +16813,15 @@ async def generate_summary_endpoint(
         # Initialize PhD agents if available
         try:
             from phd_thesis_agents import PhDThesisOrchestrator
-            from cutting_edge_model_manager import CuttingEdgeModelManager
 
-            # Initialize model manager
-            import os
-            api_key = os.getenv("OPENAI_API_KEY") or os.getenv("GOOGLE_GENAI_API_KEY")
-            model_manager = CuttingEdgeModelManager(api_key=api_key)
-            llm = await model_manager.get_best_available_model(
-                use_case="premium_phd"
-            )
+            # 🚀 CRITICAL FIX: Use working LLM initialization instead of complex model manager
+            llm = get_llm_analyzer()
+            if not llm:
+                raise ImportError("LLM not available - OpenAI API key not configured")
 
-            # Initialize PhD orchestrator
+            # Initialize PhD orchestrator with working LLM
             phd_orchestrator = PhDThesisOrchestrator(llm)
+            logger.info(f"✅ PhD orchestrator initialized successfully")
 
             # Generate PhD analysis
             analysis_config = {
@@ -16890,18 +16925,15 @@ async def generate_thesis_chapters_endpoint(
         # Initialize PhD agents
         try:
             from phd_thesis_agents import ThesisStructureAgent
-            from cutting_edge_model_manager import CuttingEdgeModelManager
 
-            # Initialize model manager
-            import os
-            api_key = os.getenv("OPENAI_API_KEY") or os.getenv("GOOGLE_GENAI_API_KEY")
-            model_manager = CuttingEdgeModelManager(api_key=api_key)
-            llm = await model_manager.get_best_available_model(
-                use_case="premium_phd"
-            )
+            # 🚀 CRITICAL FIX: Use working LLM initialization
+            llm = get_llm_analyzer()
+            if not llm:
+                raise ImportError("LLM not available - OpenAI API key not configured")
 
-            # Initialize thesis structure agent
+            # Initialize thesis structure agent with working LLM
             thesis_agent = ThesisStructureAgent(llm)
+            logger.info(f"✅ Thesis structure agent initialized successfully")
 
             # Generate thesis structure
             thesis_result = await thesis_agent.structure_thesis(
@@ -17026,18 +17058,15 @@ async def analyze_literature_gaps_endpoint(
         # Initialize PhD agents
         try:
             from phd_thesis_agents import ResearchGapAgent
-            from cutting_edge_model_manager import CuttingEdgeModelManager
 
-            # Initialize model manager
-            import os
-            api_key = os.getenv("OPENAI_API_KEY") or os.getenv("GOOGLE_GENAI_API_KEY")
-            model_manager = CuttingEdgeModelManager(api_key=api_key)
-            llm = await model_manager.get_best_available_model(
-                use_case="premium_phd"
-            )
+            # 🚀 CRITICAL FIX: Use working LLM initialization
+            llm = get_llm_analyzer()
+            if not llm:
+                raise ImportError("LLM not available - OpenAI API key not configured")
 
-            # Initialize research gap agent
+            # Initialize research gap agent with working LLM
             gap_agent = ResearchGapAgent(llm)
+            logger.info(f"✅ Research gap agent initialized successfully")
 
             # Perform gap analysis
             gap_result = await gap_agent.identify_gaps(
@@ -17171,18 +17200,15 @@ async def synthesize_methodologies_endpoint(
         # Initialize PhD agents
         try:
             from phd_thesis_agents import MethodologySynthesisAgent
-            from cutting_edge_model_manager import CuttingEdgeModelManager
 
-            # Initialize model manager
-            import os
-            api_key = os.getenv("OPENAI_API_KEY") or os.getenv("GOOGLE_GENAI_API_KEY")
-            model_manager = CuttingEdgeModelManager(api_key=api_key)
-            llm = await model_manager.get_best_available_model(
-                use_case="premium_phd"
-            )
+            # 🚀 CRITICAL FIX: Use working LLM initialization
+            llm = get_llm_analyzer()
+            if not llm:
+                raise ImportError("LLM not available - OpenAI API key not configured")
 
-            # Initialize methodology synthesis agent
+            # Initialize methodology synthesis agent with working LLM
             methodology_agent = MethodologySynthesisAgent(llm)
+            logger.info(f"✅ Methodology synthesis agent initialized successfully")
 
             # Perform methodology synthesis
             synthesis_result = await methodology_agent.synthesize_methodologies(
