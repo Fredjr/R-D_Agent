@@ -54,9 +54,24 @@ except Exception:
     END = None  # type: ignore
 
 from tools import PubMedSearchTool, WebSearchTool, PatentsSearchTool
-from scientific_model_analyst import analyze_scientific_model
-from experimental_methods_analyst import analyze_experimental_methods
-from results_interpretation_analyst import analyze_results_interpretation
+
+# Conditional imports for PhD analysis modules to prevent Railway deployment crashes
+try:
+    from scientific_model_analyst import analyze_scientific_model
+    from experimental_methods_analyst import analyze_experimental_methods
+    from results_interpretation_analyst import analyze_results_interpretation
+    PHD_ANALYSIS_MODULES_AVAILABLE = True
+    logger.info("✅ PhD analysis modules imported successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ PhD analysis modules not available: {e}")
+    PHD_ANALYSIS_MODULES_AVAILABLE = False
+    # Create placeholder functions to prevent NameError
+    def analyze_scientific_model(*args, **kwargs):
+        return {"error": "PhD analysis modules not available"}
+    def analyze_experimental_methods(*args, **kwargs):
+        return {"error": "PhD analysis modules not available"}
+    def analyze_results_interpretation(*args, **kwargs):
+        return {"error": "PhD analysis modules not available"}
 from deep_dive_agents import (
     run_enhanced_model_pipeline, run_methods_pipeline, run_results_pipeline,
     run_enhanced_model_pipeline_with_context, run_methods_pipeline_with_context, run_results_pipeline_with_context,
@@ -4979,7 +4994,7 @@ async def health_check():
         "status": "healthy",
         "service": "R&D Agent Backend - GPT-5/O3 Enhanced",
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "2.0-gpt5-o3-enhanced-simple-debug",
+        "version": "2.0-gpt5-o3-enhanced-import-fix",
         "deployment_date": "2025-10-10",
         "features": [
             "gpt5_o3_model_integration",
