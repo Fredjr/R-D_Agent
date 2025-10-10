@@ -55,23 +55,28 @@ except Exception:
 
 from tools import PubMedSearchTool, WebSearchTool, PatentsSearchTool
 
-# Conditional imports for PhD analysis modules to prevent Railway deployment crashes
+# Import PhD analysis wrapper with robust fallback mechanisms
 try:
-    from scientific_model_analyst import analyze_scientific_model
-    from experimental_methods_analyst import analyze_experimental_methods
-    from results_interpretation_analyst import analyze_results_interpretation
+    from phd_analysis_wrapper import (
+        analyze_scientific_model,
+        analyze_experimental_methods,
+        analyze_results_interpretation,
+        get_phd_modules_status
+    )
     PHD_ANALYSIS_MODULES_AVAILABLE = True
-    print("✅ PhD analysis modules imported successfully")
+    print("✅ PhD analysis wrapper imported successfully")
 except ImportError as e:
-    print(f"⚠️ PhD analysis modules not available: {e}")
+    print(f"⚠️ PhD analysis wrapper not available: {e}")
     PHD_ANALYSIS_MODULES_AVAILABLE = False
-    # Create placeholder functions to prevent NameError
+    # Ultimate fallback functions
     def analyze_scientific_model(*args, **kwargs):
-        return {"error": "PhD analysis modules not available"}
+        return {"error": "PhD analysis system not available", "_fallback": True}
     def analyze_experimental_methods(*args, **kwargs):
-        return {"error": "PhD analysis modules not available"}
+        return [{"error": "PhD analysis system not available", "_fallback": True}]
     def analyze_results_interpretation(*args, **kwargs):
-        return {"error": "PhD analysis modules not available"}
+        return {"error": "PhD analysis system not available", "_fallback": True}
+    def get_phd_modules_status():
+        return {"overall_status": "SYSTEM_UNAVAILABLE"}
 from deep_dive_agents import (
     run_enhanced_model_pipeline, run_methods_pipeline, run_results_pipeline,
     run_enhanced_model_pipeline_with_context, run_methods_pipeline_with_context, run_results_pipeline_with_context,
@@ -4994,7 +4999,7 @@ async def health_check():
         "status": "healthy",
         "service": "R&D Agent Backend - GPT-5/O3 Enhanced",
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "2.0-gpt5-o3-enhanced-import-fix",
+        "version": "2.0-gpt5-o3-enhanced-wrapper-system",
         "deployment_date": "2025-10-10",
         "features": [
             "gpt5_o3_model_integration",
@@ -5009,20 +5014,45 @@ async def health_check():
 
 @app.get("/debug/analysis-modules")
 async def debug_analysis_modules():
-    """Debug endpoint to check analysis module availability"""
+    """Debug endpoint to check analysis module availability with wrapper system"""
     try:
-        # Simple import test
-        analysis_available = False
-        import_error = "Unknown"
+        # Get PhD modules status from wrapper
+        phd_status = get_phd_modules_status()
+
+        # Test actual analysis functions
+        test_results = {}
+        try:
+            # Test scientific model analysis
+            test_result = analyze_scientific_model("Test article content", "Test objective")
+            test_results["scientific_model"] = {
+                "working": True,
+                "is_fallback": test_result.get("_fallback", False),
+                "has_content": len(str(test_result)) > 100
+            }
+        except Exception as e:
+            test_results["scientific_model"] = {"working": False, "error": str(e)}
 
         try:
-            from scientific_model_analyst import analyze_scientific_model
-            from experimental_methods_analyst import analyze_experimental_methods
-            from results_interpretation_analyst import analyze_results_interpretation
-            analysis_available = True
-            import_error = None
+            # Test experimental methods analysis
+            test_result = analyze_experimental_methods("Test article content", "Test objective")
+            test_results["experimental_methods"] = {
+                "working": True,
+                "is_fallback": test_result[0].get("_fallback", False) if test_result else True,
+                "has_content": len(str(test_result)) > 100
+            }
         except Exception as e:
-            import_error = str(e)
+            test_results["experimental_methods"] = {"working": False, "error": str(e)}
+
+        try:
+            # Test results interpretation analysis
+            test_result = analyze_results_interpretation("Test article content", "Test objective")
+            test_results["results_interpretation"] = {
+                "working": True,
+                "is_fallback": test_result.get("_fallback", False),
+                "has_content": len(str(test_result)) > 100
+            }
+        except Exception as e:
+            test_results["results_interpretation"] = {"working": False, "error": str(e)}
 
         # Environment check
         import os
@@ -5030,15 +5060,17 @@ async def debug_analysis_modules():
             "is_railway": bool(os.getenv('RAILWAY_ENVIRONMENT')),
             "openai_key_set": bool(os.getenv('OPENAI_API_KEY')),
             "google_key_set": bool(os.getenv('GOOGLE_GENAI_API_KEY')),
-            "current_dir": os.getcwd()
+            "current_dir": os.getcwd(),
+            "phd_wrapper_available": PHD_ANALYSIS_MODULES_AVAILABLE
         }
 
         return {
             "timestamp": datetime.utcnow().isoformat(),
-            "analysis_modules_available": analysis_available,
-            "import_error": import_error,
+            "phd_modules_status": phd_status,
+            "function_tests": test_results,
             "environment": env_info,
-            "status": "SUCCESS" if analysis_available else "FAILED"
+            "overall_status": "WORKING" if all(t.get("working", False) for t in test_results.values()) else "PARTIAL",
+            "content_generation_ready": not any(t.get("is_fallback", True) for t in test_results.values() if t.get("working"))
         }
 
     except Exception as e:
