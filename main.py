@@ -61,9 +61,9 @@ try:
     from experimental_methods_analyst import analyze_experimental_methods
     from results_interpretation_analyst import analyze_results_interpretation
     PHD_ANALYSIS_MODULES_AVAILABLE = True
-    logger.info("✅ PhD analysis modules imported successfully")
+    print("✅ PhD analysis modules imported successfully")
 except ImportError as e:
-    logger.warning(f"⚠️ PhD analysis modules not available: {e}")
+    print(f"⚠️ PhD analysis modules not available: {e}")
     PHD_ANALYSIS_MODULES_AVAILABLE = False
     # Create placeholder functions to prevent NameError
     def analyze_scientific_model(*args, **kwargs):
