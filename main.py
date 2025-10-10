@@ -4999,7 +4999,7 @@ async def health_check():
         "status": "healthy",
         "service": "R&D Agent Backend - GPT-5/O3 Enhanced",
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "2.0-gpt5-o3-safer-phd-content-fix",
+        "version": "2.0-gpt5-o3-specialized-phd-endpoints",
         "deployment_date": "2025-10-10",
         "features": [
             "gpt5_o3_model_integration",
@@ -16796,29 +16796,22 @@ async def generate_summary_endpoint(
             ]
         }
 
-        # Initialize PhD agents if available
+        # 🚀 CRITICAL FIX: Use proven wrapper approach for consistent PhD-level content
         try:
-            from phd_thesis_agents import PhDThesisOrchestrator
+            from phd_analysis_wrapper import generate_phd_summary
 
-            # 🚀 SAFER FIX: Try to get LLM but don't fail if not available
+            # Try to get LLM but don't fail if not available
             llm = None
             try:
                 llm = get_llm_analyzer()
                 if llm:
-                    logger.info(f"✅ LLM initialized successfully")
+                    logger.info(f"✅ LLM initialized successfully for Generate Summary")
                 else:
-                    logger.warning("⚠️ LLM not available - will use fallback")
+                    logger.warning("⚠️ LLM not available - using rich PhD fallback")
             except Exception as e:
                 logger.warning(f"⚠️ LLM initialization failed: {e}")
 
-            if not llm:
-                raise ImportError("LLM not available - using fallback implementation")
-
-            # Initialize PhD orchestrator with working LLM
-            phd_orchestrator = PhDThesisOrchestrator(llm)
-            logger.info(f"✅ PhD orchestrator initialized successfully")
-
-            # Generate PhD analysis
+            # Generate PhD-level summary using wrapper (works with or without LLM)
             analysis_config = {
                 'analysis_type': 'comprehensive_phd',
                 'objective': request.objective,
@@ -16828,7 +16821,8 @@ async def generate_summary_endpoint(
                 'include_gaps': request.include_gaps,
                 'target_length': request.target_length
             }
-            summary_result = await phd_orchestrator.generate_phd_analysis(project_data, analysis_config)
+            summary_result = generate_phd_summary(project_data, analysis_config, llm)
+            logger.info(f"✅ PhD summary generated successfully")
 
             processing_time = f"{(time.time() - start_time):.2f}s"
 
@@ -16917,29 +16911,32 @@ async def generate_thesis_chapters_endpoint(
             ]
         }
 
-        # Initialize PhD agents
+        # 🚀 CRITICAL FIX: Use proven wrapper approach for specialized thesis content
         try:
-            from phd_thesis_agents import ThesisStructureAgent
+            from phd_analysis_wrapper import generate_thesis_chapters
 
-            # 🚀 CRITICAL FIX: Use working LLM initialization
-            llm = get_llm_analyzer()
-            if not llm:
-                raise ImportError("LLM not available - OpenAI API key not configured")
+            # Try to get LLM but don't fail if not available
+            llm = None
+            try:
+                llm = get_llm_analyzer()
+                if llm:
+                    logger.info(f"✅ LLM initialized successfully for Thesis Generator")
+                else:
+                    logger.warning("⚠️ LLM not available - using rich PhD fallback")
+            except Exception as e:
+                logger.warning(f"⚠️ LLM initialization failed: {e}")
 
-            # Initialize thesis structure agent with working LLM
-            thesis_agent = ThesisStructureAgent(llm)
-            logger.info(f"✅ Thesis structure agent initialized successfully")
-
-            # Generate thesis structure
-            thesis_result = await thesis_agent.structure_thesis(
-                project_data=project_data,
-                analysis_results={
-                    "objective": request.objective,
-                    "chapter_focus": request.chapter_focus,
-                    "academic_level": request.academic_level,
-                    "citation_style": request.citation_style
-                }
-            )
+            # Generate PhD-level thesis chapters using wrapper
+            chapter_config = {
+                "objective": request.objective,
+                "chapter_focus": request.chapter_focus,
+                "academic_level": request.academic_level,
+                "citation_style": request.citation_style,
+                "target_length": request.target_length,
+                "include_timeline": request.include_timeline
+            }
+            thesis_result = generate_thesis_chapters(project_data, chapter_config, llm)
+            logger.info(f"✅ PhD thesis chapters generated successfully")
 
             processing_time = f"{(time.time() - start_time):.2f}s"
 
@@ -17050,31 +17047,32 @@ async def analyze_literature_gaps_endpoint(
             ]
         }
 
-        # Initialize PhD agents
+        # 🚀 CRITICAL FIX: Use proven wrapper approach for specialized gap analysis
         try:
-            from phd_thesis_agents import ResearchGapAgent
+            from phd_analysis_wrapper import analyze_literature_gaps
 
-            # 🚀 CRITICAL FIX: Use working LLM initialization
-            llm = get_llm_analyzer()
-            if not llm:
-                raise ImportError("LLM not available - OpenAI API key not configured")
+            # Try to get LLM but don't fail if not available
+            llm = None
+            try:
+                llm = get_llm_analyzer()
+                if llm:
+                    logger.info(f"✅ LLM initialized successfully for Gap Analysis")
+                else:
+                    logger.warning("⚠️ LLM not available - using rich PhD fallback")
+            except Exception as e:
+                logger.warning(f"⚠️ LLM initialization failed: {e}")
 
-            # Initialize research gap agent with working LLM
-            gap_agent = ResearchGapAgent(llm)
-            logger.info(f"✅ Research gap agent initialized successfully")
-
-            # Perform gap analysis
-            gap_result = await gap_agent.identify_gaps(
-                project_data=project_data,
-                user_profile={
-                    "objective": request.objective,
-                    "gap_types": request.gap_types,
-                    "domain_focus": request.domain_focus,
-                    "severity_threshold": request.severity_threshold,
-                    "academic_level": request.academic_level,
-                    "analysis_depth": request.analysis_depth
-                }
-            )
+            # Generate PhD-level gap analysis using wrapper
+            gap_config = {
+                "objective": request.objective,
+                "gap_types": request.gap_types,
+                "domain_focus": request.domain_focus,
+                "severity_threshold": request.severity_threshold,
+                "academic_level": request.academic_level,
+                "analysis_depth": request.analysis_depth
+            }
+            gap_result = analyze_literature_gaps(project_data, gap_config, llm)
+            logger.info(f"✅ PhD literature gap analysis generated successfully")
 
             processing_time = f"{(time.time() - start_time):.2f}s"
 
@@ -17192,32 +17190,33 @@ async def synthesize_methodologies_endpoint(
             ]
         }
 
-        # Initialize PhD agents
+        # 🚀 CRITICAL FIX: Use proven wrapper approach for specialized methodology synthesis
         try:
-            from phd_thesis_agents import MethodologySynthesisAgent
+            from phd_analysis_wrapper import synthesize_methodologies
 
-            # 🚀 CRITICAL FIX: Use working LLM initialization
-            llm = get_llm_analyzer()
-            if not llm:
-                raise ImportError("LLM not available - OpenAI API key not configured")
+            # Try to get LLM but don't fail if not available
+            llm = None
+            try:
+                llm = get_llm_analyzer()
+                if llm:
+                    logger.info(f"✅ LLM initialized successfully for Methodology Synthesis")
+                else:
+                    logger.warning("⚠️ LLM not available - using rich PhD fallback")
+            except Exception as e:
+                logger.warning(f"⚠️ LLM initialization failed: {e}")
 
-            # Initialize methodology synthesis agent with working LLM
-            methodology_agent = MethodologySynthesisAgent(llm)
-            logger.info(f"✅ Methodology synthesis agent initialized successfully")
-
-            # Perform methodology synthesis
-            synthesis_result = await methodology_agent.synthesize_methodologies(
-                project_data=project_data,
-                user_profile={
-                    "objective": request.objective,
-                    "methodology_types": request.methodology_types,
-                    "include_statistical_methods": request.include_statistical_methods,
-                    "include_validation": request.include_validation,
-                    "comparison_depth": request.comparison_depth,
-                    "academic_level": request.academic_level,
-                    "synthesis_type": request.synthesis_type
-                }
-            )
+            # Generate PhD-level methodology synthesis using wrapper
+            synthesis_config = {
+                "objective": request.objective,
+                "methodology_types": request.methodology_types,
+                "include_statistical_methods": request.include_statistical_methods,
+                "include_validation": request.include_validation,
+                "comparison_depth": request.comparison_depth,
+                "academic_level": request.academic_level,
+                "synthesis_type": request.synthesis_type
+            }
+            synthesis_result = synthesize_methodologies(project_data, synthesis_config, llm)
+            logger.info(f"✅ PhD methodology synthesis generated successfully")
 
             processing_time = f"{(time.time() - start_time):.2f}s"
 
