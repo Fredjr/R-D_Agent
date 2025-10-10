@@ -5012,6 +5012,43 @@ async def health_check():
         ]
     }
 
+@app.get("/debug/test-wrapper-functions")
+async def debug_test_wrapper_functions():
+    """Test wrapper functions directly"""
+    try:
+        from phd_analysis_wrapper import generate_thesis_chapters, generate_phd_summary
+
+        # Test data
+        project_data = {'articles': [{'title': 'Test Article'}], 'project_name': 'Test Project'}
+
+        # Test thesis chapters
+        chapter_config = {'objective': 'Test thesis', 'chapter_focus': 'methodology'}
+        chapters_result = generate_thesis_chapters(project_data, chapter_config, None)
+
+        # Test summary
+        summary_config = {'objective': 'Test summary', 'academic_level': 'phd'}
+        summary_result = generate_phd_summary(project_data, summary_config, None)
+
+        return {
+            "thesis_chapters_test": {
+                "success": True,
+                "chapters_count": len(chapters_result.get("chapters", [])),
+                "is_fallback": chapters_result.get("_fallback", False),
+                "result_type": str(type(chapters_result))
+            },
+            "summary_test": {
+                "success": True,
+                "content_length": len(summary_result.get("summary_content", "")),
+                "is_fallback": summary_result.get("_fallback", False),
+                "result_type": str(type(summary_result))
+            }
+        }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "error_type": str(type(e))
+        }
+
 @app.get("/debug/analysis-modules")
 async def debug_analysis_modules():
     """Debug endpoint to check analysis module availability with wrapper system"""
