@@ -1222,7 +1222,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   });
 
   return (
-    <div className={`network-view-container relative h-96 bg-white rounded-lg border ${className} overflow-hidden`}>
+    <div className={`network-view-container relative bg-white rounded-lg border ${className} overflow-hidden`} style={{ height: '600px', minHeight: '600px' }}>
       <ReactFlow
         key={`network-${nodes.length}-${edges.length}`}
         nodes={nodes}
