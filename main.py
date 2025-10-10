@@ -4979,7 +4979,7 @@ async def health_check():
         "status": "healthy",
         "service": "R&D Agent Backend - GPT-5/O3 Enhanced",
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "2.0-gpt5-o3-enhanced-deepdive-fixed",
+        "version": "2.0-gpt5-o3-enhanced-deepdive-debug",
         "deployment_date": "2025-10-10",
         "features": [
             "gpt5_o3_model_integration",
@@ -4990,6 +4990,40 @@ async def health_check():
             "backward_compatibility",
             "cutting_edge_model_manager"
         ]
+    }
+
+@app.get("/debug/analysis-modules")
+async def debug_analysis_modules():
+    """Debug endpoint to check analysis module availability"""
+    try:
+        from scientific_model_analyst import analyze_scientific_model
+        from experimental_methods_analyst import analyze_experimental_methods
+        from results_interpretation_analyst import analyze_results_interpretation
+        analysis_available = True
+        import_error = None
+    except ImportError as e:
+        analysis_available = False
+        import_error = str(e)
+
+    # Check LLM availability
+    llm_available = False
+    llm_error = None
+    try:
+        from langchain_openai import ChatOpenAI
+        import os
+        api_key = os.getenv('GOOGLE_GENAI_API_KEY')
+        llm_available = bool(api_key)
+        if not api_key:
+            llm_error = "GOOGLE_GENAI_API_KEY not found"
+    except Exception as e:
+        llm_error = str(e)
+
+    return {
+        "analysis_modules_available": analysis_available,
+        "import_error": import_error,
+        "llm_available": llm_available,
+        "llm_error": llm_error,
+        "timestamp": datetime.utcnow().isoformat()
     }
 
 @app.get("/debug/test-methodology-extraction")
