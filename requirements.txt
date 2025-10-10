@@ -1,5 +1,5 @@
 # Core FastAPI and server dependencies - Python 3.12 compatible
-# RAILWAY DEPLOYMENT v2.3.1 - Deep Dive Analysis Fix - 2025-10-10
+# RAILWAY DEPLOYMENT v2.3.2 - Diagnostic Mode - 2025-10-10
 fastapi>=0.115.0
 uvicorn[standard]>=0.23.2
 gunicorn>=21.2.0
