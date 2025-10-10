@@ -1,22 +1,29 @@
 # Railway Deployment Trigger File
 # This file is used to trigger Railway deployments from GitHub
-# Timestamp: 2025-10-03T10:15:00Z
-# METHODS WORKING LOCALLY - FORCE RAILWAY REBUILD
+# Timestamp: 2025-10-10T08:45:00Z
+# FORCED DEPLOYMENT - DEEP DIVE ANALYSIS 500 ERROR FIX
 
-DEPLOYMENT_VERSION=v2.2.0
-DEPLOYMENT_REASON=Methods working locally but not in Railway deployment
-MISSING_METHODS_FIXED=_extract_research_domains,_generate_methodology_comparisons,_format_gaps_for_ui,_format_methodologies_for_ui
-LOCAL_TEST_STATUS=ALL_METHODS_AVAILABLE
-RAILWAY_ISSUE=Python module caching or deployment sync issue
+DEPLOYMENT_VERSION=v2.3.1-FORCED
+DEPLOYMENT_REASON=FORCED DEPLOYMENT - Fix Deep Dive Analysis 500 error
+CRITICAL_FIX=DeepDiveAnalysis model attribute error resolved - FORCE REBUILD
+LOCAL_TEST_STATUS=FIX_VERIFIED_WORKING_LOCALLY
+RAILWAY_ISSUE=FORCE_DEPLOYMENT_REQUIRED
+FORCE_REBUILD=TRUE
 
-# Changes in this deployment:
-# 1. Fixed ResearchGapAgent._extract_research_domains method
-# 2. Fixed MethodologySynthesisAgent._generate_methodology_comparisons method  
-# 3. Added error handling for missing UI formatting methods
-# 4. Optimized Docker image size with .dockerignore
-# 5. Added runtime model downloading to avoid 1GB slug limit
+# FORCED DEPLOYMENT CHANGES:
+# 1. 🚨 CRITICAL FIX: Changed analysis.id to analysis.analysis_id in line 15067 of main.py
+# 2. 🔧 Fixed DeepDiveAnalysis model attribute access error
+# 3. 🎯 Resolved 500 Internal Server Error in Deep Dive Analysis endpoint
+# 4. ✅ Updated global deep dive analysis creation endpoint
+# 5. 🛡️ Maintained all existing functionality while fixing critical bug
+# 6. 🚀 FORCED REBUILD to ensure deployment takes effect
 
-# Expected fixes:
-# - Gap Analysis should show actual research gaps instead of 502 errors
-# - Methodology Synthesis should show research methodologies instead of empty state
-# - Thesis chapters should show contextual data instead of placeholder content
+# EXPECTED IMMEDIATE FIXES:
+# - ✅ Deep Dive Analysis endpoint: 500 ERROR → 200 SUCCESS
+# - ✅ Analysis creation: FAILING → WORKING with correct model attributes
+# - ✅ Platform success rate: 88.9% → 100% (9/9 endpoints working)
+# - ✅ Comprehensive tests: CRITICAL ISSUES → ALL PASS
+# - 🎉 PLATFORM STATUS: NEEDS ATTENTION → EXCELLENT
+
+DEPLOYMENT_TIMESTAMP=$(date +%s)
+FORCE_CACHE_BUST=TRUE

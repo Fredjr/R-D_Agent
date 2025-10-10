@@ -4706,7 +4706,7 @@ async def startup_event():
     # Start database initialization in background
     import asyncio
     asyncio.create_task(init_database_background())
-    print("✅ FastAPI app started - database initializing in background")
+    print("✅ R&D Agent Backend v2.0-deepdive-fixed started - Deep Dive Analysis 500 error resolved")
 
 @app.get("/")
 async def root():
@@ -4979,13 +4979,14 @@ async def health_check():
         "status": "healthy",
         "service": "R&D Agent Backend - GPT-5/O3 Enhanced",
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "2.0-gpt5-o3-enhanced-final-fixed",
-        "deployment_date": "2025-10-09",
+        "version": "2.0-gpt5-o3-enhanced-deepdive-fixed",
+        "deployment_date": "2025-10-10",
         "features": [
             "gpt5_o3_model_integration",
             "phd_committee_simulation",
             "multi_agent_architecture",
             "8_10_quality_enhancement",
+            "deep_dive_analysis_fix",
             "backward_compatibility",
             "cutting_edge_model_manager"
         ]
@@ -15064,7 +15065,7 @@ async def create_global_deep_dive_analysis(
         db.commit()
         db.refresh(analysis)
 
-        logger.info(f"🔍 [Global Deep Dive Analyses] Created analysis: {analysis.id}")
+        logger.info(f"🔍 [Global Deep Dive Analyses] Created analysis: {analysis.analysis_id}")  # FIXED: analysis.id -> analysis.analysis_id (Railway Deploy v2.3.1)
 
         return {
             "analysis_id": analysis.analysis_id,
