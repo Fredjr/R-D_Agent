@@ -4979,7 +4979,7 @@ async def health_check():
         "status": "healthy",
         "service": "R&D Agent Backend - GPT-5/O3 Enhanced",
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "2.0-gpt5-o3-enhanced-deepdive-debug",
+        "version": "2.0-gpt5-o3-enhanced-comprehensive-debug",
         "deployment_date": "2025-10-10",
         "features": [
             "gpt5_o3_model_integration",
@@ -4995,35 +4995,96 @@ async def health_check():
 @app.get("/debug/analysis-modules")
 async def debug_analysis_modules():
     """Debug endpoint to check analysis module availability"""
-    try:
-        from scientific_model_analyst import analyze_scientific_model
-        from experimental_methods_analyst import analyze_experimental_methods
-        from results_interpretation_analyst import analyze_results_interpretation
-        analysis_available = True
-        import_error = None
-    except ImportError as e:
-        analysis_available = False
-        import_error = str(e)
+    import sys
+    import os
+    from pathlib import Path
+    import importlib
+    import traceback
 
-    # Check LLM availability
-    llm_available = False
-    llm_error = None
-    try:
-        from langchain_openai import ChatOpenAI
-        import os
-        api_key = os.getenv('GOOGLE_GENAI_API_KEY')
-        llm_available = bool(api_key)
-        if not api_key:
-            llm_error = "GOOGLE_GENAI_API_KEY not found"
-    except Exception as e:
-        llm_error = str(e)
+    # Environment info
+    env_info = {
+        "python_version": sys.version,
+        "current_directory": os.getcwd(),
+        "python_path": sys.path,
+        "is_railway": bool(os.getenv('RAILWAY_ENVIRONMENT')),
+        "port": os.getenv('PORT'),
+        "database_url_set": bool(os.getenv('DATABASE_URL'))
+    }
+
+    # Environment variables check
+    env_vars = {}
+    for var in ["OPENAI_API_KEY", "GOOGLE_GENAI_API_KEY", "RAILWAY_ENVIRONMENT"]:
+        value = os.getenv(var)
+        if value and "API_KEY" in var:
+            env_vars[var] = f"{value[:10]}...{value[-5:]}" if len(value) > 15 else "***"
+        else:
+            env_vars[var] = value or "NOT_SET"
+
+    # File existence check
+    files_check = {}
+    current_dir = Path.cwd()
+    for filename in ["scientific_model_analyst.py", "experimental_methods_analyst.py",
+                     "results_interpretation_analyst.py", "phd_thesis_agents.py",
+                     "cutting_edge_model_manager.py"]:
+        file_path = current_dir / filename
+        files_check[filename] = {
+            "exists": file_path.exists(),
+            "size": file_path.stat().st_size if file_path.exists() else 0,
+            "path": str(file_path)
+        }
+
+    # Module import tests
+    modules_to_test = [
+        "scientific_model_analyst",
+        "experimental_methods_analyst",
+        "results_interpretation_analyst",
+        "phd_thesis_agents",
+        "cutting_edge_model_manager",
+        "langchain_openai"
+    ]
+
+    import_results = {}
+    for module_name in modules_to_test:
+        try:
+            module = importlib.import_module(module_name)
+            import_results[module_name] = {
+                "status": "SUCCESS",
+                "location": getattr(module, '__file__', 'Built-in'),
+                "error": None
+            }
+
+            # Test specific functions
+            if module_name == "scientific_model_analyst":
+                try:
+                    from scientific_model_analyst import analyze_scientific_model
+                    import_results[module_name]["analyze_scientific_model"] = "Available"
+                except Exception as e:
+                    import_results[module_name]["analyze_scientific_model"] = f"Error: {e}"
+
+        except Exception as e:
+            import_results[module_name] = {
+                "status": "FAILED",
+                "location": None,
+                "error": str(e),
+                "traceback": traceback.format_exc()
+            }
+
+    # Overall analysis
+    successful_imports = sum(1 for result in import_results.values() if result["status"] == "SUCCESS")
+    total_imports = len(import_results)
 
     return {
-        "analysis_modules_available": analysis_available,
-        "import_error": import_error,
-        "llm_available": llm_available,
-        "llm_error": llm_error,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow().isoformat(),
+        "environment_info": env_info,
+        "environment_variables": env_vars,
+        "file_existence": files_check,
+        "import_results": import_results,
+        "summary": {
+            "successful_imports": successful_imports,
+            "failed_imports": total_imports - successful_imports,
+            "success_rate": f"{(successful_imports / total_imports * 100):.1f}%",
+            "analysis_modules_working": successful_imports >= 5
+        }
     }
 
 @app.get("/debug/test-methodology-extraction")
