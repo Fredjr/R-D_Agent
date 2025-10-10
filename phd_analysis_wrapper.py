@@ -25,44 +25,49 @@ try:
     from scientific_model_analyst import analyze_scientific_model as _analyze_scientific_model
     SCIENTIFIC_MODEL_AVAILABLE = True
     log_info("✅ Scientific model analyst imported successfully")
-except ImportError as e:
+except Exception as e:
     log_warning(f"⚠️ Scientific model analyst not available: {e}")
     _analyze_scientific_model = None
+    SCIENTIFIC_MODEL_AVAILABLE = False
 
 try:
     from experimental_methods_analyst import analyze_experimental_methods as _analyze_experimental_methods
     EXPERIMENTAL_METHODS_AVAILABLE = True
     log_info("✅ Experimental methods analyst imported successfully")
-except ImportError as e:
+except Exception as e:
     log_warning(f"⚠️ Experimental methods analyst not available: {e}")
     _analyze_experimental_methods = None
+    EXPERIMENTAL_METHODS_AVAILABLE = False
 
 try:
     from results_interpretation_analyst import analyze_results_interpretation as _analyze_results_interpretation
     RESULTS_INTERPRETATION_AVAILABLE = True
     log_info("✅ Results interpretation analyst imported successfully")
-except ImportError as e:
+except Exception as e:
     log_warning(f"⚠️ Results interpretation analyst not available: {e}")
     _analyze_results_interpretation = None
+    RESULTS_INTERPRETATION_AVAILABLE = False
 
 try:
     from phd_thesis_agents import PhDThesisOrchestrator, ResearchGapAgent, MethodologySynthesisAgent, ThesisStructureAgent
     PHD_THESIS_AGENTS_AVAILABLE = True
     log_info("✅ PhD thesis agents imported successfully")
-except ImportError as e:
+except Exception as e:
     log_warning(f"⚠️ PhD thesis agents not available: {e}")
     PhDThesisOrchestrator = None
     ResearchGapAgent = None
     MethodologySynthesisAgent = None
     ThesisStructureAgent = None
+    PHD_THESIS_AGENTS_AVAILABLE = False
 
 try:
     from cutting_edge_model_manager import CuttingEdgeModelManager
     CUTTING_EDGE_MODEL_AVAILABLE = True
     log_info("✅ Cutting edge model manager imported successfully")
-except ImportError as e:
+except Exception as e:
     log_warning(f"⚠️ Cutting edge model manager not available: {e}")
     CuttingEdgeModelManager = None
+    CUTTING_EDGE_MODEL_AVAILABLE = False
 
 # Wrapper functions with fallback logic
 def analyze_scientific_model(full_text: str, objective: str, llm=None) -> Dict[str, Any]:
@@ -187,9 +192,8 @@ def analyze_results_interpretation(full_text: str, objective: str, llm=None) -> 
 # Additional specialized PhD analysis functions for other endpoints
 def generate_phd_summary(project_data: Dict[str, Any], analysis_config: Dict[str, Any], llm=None) -> Dict[str, Any]:
     """Generate PhD-level project summary with specialized content"""
-    if PHD_THESIS_AGENTS_AVAILABLE and llm:
+    if PHD_THESIS_AGENTS_AVAILABLE and PhDThesisOrchestrator and llm:
         try:
-            from phd_thesis_agents import PhDThesisOrchestrator
             orchestrator = PhDThesisOrchestrator(llm)
             return orchestrator.generate_phd_analysis(project_data, analysis_config)
         except Exception as e:
@@ -242,9 +246,8 @@ def generate_phd_summary(project_data: Dict[str, Any], analysis_config: Dict[str
 
 def generate_thesis_chapters(project_data: Dict[str, Any], chapter_config: Dict[str, Any], llm=None) -> Dict[str, Any]:
     """Generate PhD-level thesis chapters with specialized content"""
-    if PHD_THESIS_AGENTS_AVAILABLE and llm:
+    if PHD_THESIS_AGENTS_AVAILABLE and ThesisStructureAgent and llm:
         try:
-            from phd_thesis_agents import ThesisStructureAgent
             agent = ThesisStructureAgent(llm)
             return agent.structure_thesis(project_data, chapter_config)
         except Exception as e:
@@ -321,9 +324,8 @@ def generate_thesis_chapters(project_data: Dict[str, Any], chapter_config: Dict[
 
 def analyze_literature_gaps(project_data: Dict[str, Any], gap_config: Dict[str, Any], llm=None) -> Dict[str, Any]:
     """Generate PhD-level literature gap analysis with specialized content"""
-    if PHD_THESIS_AGENTS_AVAILABLE and llm:
+    if PHD_THESIS_AGENTS_AVAILABLE and ResearchGapAgent and llm:
         try:
-            from phd_thesis_agents import ResearchGapAgent
             agent = ResearchGapAgent(llm)
             return agent.identify_gaps(project_data, gap_config)
         except Exception as e:
@@ -414,9 +416,8 @@ def analyze_literature_gaps(project_data: Dict[str, Any], gap_config: Dict[str, 
 
 def synthesize_methodologies(project_data: Dict[str, Any], synthesis_config: Dict[str, Any], llm=None) -> Dict[str, Any]:
     """Generate PhD-level methodology synthesis with specialized content"""
-    if PHD_THESIS_AGENTS_AVAILABLE and llm:
+    if PHD_THESIS_AGENTS_AVAILABLE and MethodologySynthesisAgent and llm:
         try:
-            from phd_thesis_agents import MethodologySynthesisAgent
             agent = MethodologySynthesisAgent(llm)
             return agent.synthesize_methodologies(project_data, synthesis_config)
         except Exception as e:
