@@ -6993,11 +6993,11 @@ async def get_deep_dive_analyses(
                     analysis.experimental_methods_analysis is not None and
                     analysis.results_interpretation_analysis is not None
                 ),
-                # ✅ ADD MISSING CONTENT FIELDS
-                "content": analysis.content,
-                "summary": analysis.summary,
-                "title": analysis.title,
-                "status": analysis.status,
+                # ✅ ADD MISSING CONTENT FIELDS (with safe access)
+                "content": getattr(analysis, 'content', None),
+                "summary": getattr(analysis, 'summary', None),
+                "title": getattr(analysis, 'title', analysis.article_title),  # Fallback to article_title
+                "status": getattr(analysis, 'status', analysis.processing_status),  # Fallback to processing_status
                 "scientific_model_analysis": analysis.scientific_model_analysis,
                 "experimental_methods_analysis": analysis.experimental_methods_analysis,
                 "results_interpretation_analysis": analysis.results_interpretation_analysis,
@@ -7264,11 +7264,11 @@ async def get_analysis_by_id(
         "results_interpretation_analysis": analysis.results_interpretation_analysis,
         "created_at": analysis.created_at,
         "created_by": analysis.created_by,
-        # ✅ ADD MISSING CONTENT FIELDS
-        "content": analysis.content,
-        "summary": analysis.summary,
-        "title": analysis.title,
-        "status": analysis.status,
+        # ✅ ADD MISSING CONTENT FIELDS (with safe access)
+        "content": getattr(analysis, 'content', None),
+        "summary": getattr(analysis, 'summary', None),
+        "title": getattr(analysis, 'title', analysis.article_title),
+        "status": getattr(analysis, 'status', analysis.processing_status),
         "processing_time_seconds": analysis.processing_time_seconds,
         "updated_at": analysis.updated_at
     }
@@ -15219,14 +15219,14 @@ async def get_all_deep_dive_analyses(
                     "has_methods_analysis": bool(analysis.experimental_methods_analysis),
                     "has_results_analysis": bool(analysis.results_interpretation_analysis)
                 },
-                # ✅ ADD MISSING CONTENT FIELDS
-                "content": analysis.content,
-                "summary": analysis.summary,
+                # ✅ ADD MISSING CONTENT FIELDS (with safe access)
+                "content": getattr(analysis, 'content', None),
+                "summary": getattr(analysis, 'summary', None),
                 "scientific_model_analysis": analysis.scientific_model_analysis,
                 "experimental_methods_analysis": analysis.experimental_methods_analysis,
                 "results_interpretation_analysis": analysis.results_interpretation_analysis,
                 "article_url": analysis.article_url,
-                "status": analysis.status,
+                "status": getattr(analysis, 'status', analysis.processing_status),
                 "processing_time_seconds": analysis.processing_time_seconds
             }
             analyses_data.append(analysis_data)
@@ -16288,14 +16288,14 @@ async def get_project_deep_dive_analyses_global(
                 "updated_at": analysis.updated_at.isoformat() if analysis.updated_at else None,
                 "processing_status": analysis.processing_status,
                 "has_results": bool(analysis.scientific_model_analysis or analysis.experimental_methods_analysis or analysis.results_interpretation_analysis),
-                # ✅ ADD MISSING CONTENT FIELDS
-                "content": analysis.content,
-                "summary": analysis.summary,
+                # ✅ ADD MISSING CONTENT FIELDS (with safe access)
+                "content": getattr(analysis, 'content', None),
+                "summary": getattr(analysis, 'summary', None),
                 "scientific_model_analysis": analysis.scientific_model_analysis,
                 "experimental_methods_analysis": analysis.experimental_methods_analysis,
                 "results_interpretation_analysis": analysis.results_interpretation_analysis,
                 "article_url": analysis.article_url,
-                "status": analysis.status,
+                "status": getattr(analysis, 'status', analysis.processing_status),
                 "processing_time_seconds": analysis.processing_time_seconds
             }
             analyses_data.append(analysis_data)
