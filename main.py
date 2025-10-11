@@ -7263,7 +7263,14 @@ async def get_analysis_by_id(
         "experimental_methods_analysis": analysis.experimental_methods_analysis,
         "results_interpretation_analysis": analysis.results_interpretation_analysis,
         "created_at": analysis.created_at,
-        "created_by": analysis.created_by
+        "created_by": analysis.created_by,
+        # ✅ ADD MISSING CONTENT FIELDS
+        "content": analysis.content,
+        "summary": analysis.summary,
+        "title": analysis.title,
+        "status": analysis.status,
+        "processing_time_seconds": analysis.processing_time_seconds,
+        "updated_at": analysis.updated_at
     }
 
 @app.get("/reports/{report_id}")
@@ -15211,7 +15218,16 @@ async def get_all_deep_dive_analyses(
                     "has_model_analysis": bool(analysis.scientific_model_analysis),
                     "has_methods_analysis": bool(analysis.experimental_methods_analysis),
                     "has_results_analysis": bool(analysis.results_interpretation_analysis)
-                }
+                },
+                # ✅ ADD MISSING CONTENT FIELDS
+                "content": analysis.content,
+                "summary": analysis.summary,
+                "scientific_model_analysis": analysis.scientific_model_analysis,
+                "experimental_methods_analysis": analysis.experimental_methods_analysis,
+                "results_interpretation_analysis": analysis.results_interpretation_analysis,
+                "article_url": analysis.article_url,
+                "status": analysis.status,
+                "processing_time_seconds": analysis.processing_time_seconds
             }
             analyses_data.append(analysis_data)
 
@@ -16271,7 +16287,16 @@ async def get_project_deep_dive_analyses_global(
                 "created_at": analysis.created_at.isoformat() if analysis.created_at else None,
                 "updated_at": analysis.updated_at.isoformat() if analysis.updated_at else None,
                 "processing_status": analysis.processing_status,
-                "has_results": bool(analysis.scientific_model_analysis or analysis.experimental_methods_analysis or analysis.results_interpretation_analysis)
+                "has_results": bool(analysis.scientific_model_analysis or analysis.experimental_methods_analysis or analysis.results_interpretation_analysis),
+                # ✅ ADD MISSING CONTENT FIELDS
+                "content": analysis.content,
+                "summary": analysis.summary,
+                "scientific_model_analysis": analysis.scientific_model_analysis,
+                "experimental_methods_analysis": analysis.experimental_methods_analysis,
+                "results_interpretation_analysis": analysis.results_interpretation_analysis,
+                "article_url": analysis.article_url,
+                "status": analysis.status,
+                "processing_time_seconds": analysis.processing_time_seconds
             }
             analyses_data.append(analysis_data)
 
