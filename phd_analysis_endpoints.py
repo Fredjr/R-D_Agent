@@ -164,7 +164,10 @@ async def get_project_data(project_id: str, db: Session) -> Dict[str, Any]:
                 "created_at": report.created_at.isoformat() if report.created_at else None,
                 "status": report.status,
                 "summary": report.summary,
-                "processing_time_seconds": report.processing_time_seconds
+                "content": report.content,  # ✅ ADD MISSING CONTENT FIELD
+                "processing_time_seconds": report.processing_time_seconds,
+                "created_by": report.created_by,
+                "updated_at": report.updated_at.isoformat() if report.updated_at else None
             })
 
         # Get deep dive analyses for this project
@@ -177,7 +180,18 @@ async def get_project_data(project_id: str, db: Session) -> Dict[str, Any]:
                 "analysis_type": analysis.analysis_type,
                 "status": analysis.status,
                 "created_at": analysis.created_at.isoformat() if analysis.created_at else None,
-                "processing_time_seconds": analysis.processing_time_seconds
+                "processing_time_seconds": analysis.processing_time_seconds,
+                # ✅ ADD ALL MISSING CONTENT FIELDS
+                "content": analysis.content,
+                "summary": analysis.summary,
+                "scientific_model_analysis": analysis.scientific_model_analysis,
+                "experimental_methods_analysis": analysis.experimental_methods_analysis,
+                "results_interpretation_analysis": analysis.results_interpretation_analysis,
+                "article_pmid": analysis.article_pmid,
+                "article_url": analysis.article_url,
+                "article_title": analysis.article_title,
+                "created_by": analysis.created_by,
+                "updated_at": analysis.updated_at.isoformat() if analysis.updated_at else None
             })
 
         # Get collections for this project
