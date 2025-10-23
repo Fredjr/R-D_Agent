@@ -21,22 +21,11 @@ except ImportError as e:
     print(f"Email service import failed: {e}")
     email_service = None
 
-# Step 2.2.1: Import LangChain components for prompt-driven chain (OPTIONAL - FALLBACK ENABLED)
-try:
-    from langchain_core.prompts import PromptTemplate
-    from langchain.chains.llm import LLMChain
-    LANGCHAIN_AVAILABLE = True
-    print("✅ LangChain components loaded successfully")
-except ImportError as e:
-    print(f"⚠️ LangChain not available, using fallback: {e}")
-    # Create dummy classes to prevent errors
-    class PromptTemplate:
-        def __init__(self, *args, **kwargs): pass
-        def format(self, *args, **kwargs): return "LangChain not available - using OpenAI directly"
-    class LLMChain:
-        def __init__(self, *args, **kwargs): pass
-        def run(self, *args, **kwargs): return "LangChain not available - using OpenAI directly"
-    LANGCHAIN_AVAILABLE = False
+# Step 2.2.1: Import LangChain components for prompt-driven chain (REQUIRED)
+from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
+LANGCHAIN_AVAILABLE = True
+print("✅ LangChain components loaded successfully")
 import json
 import re
 from typing import List, Optional, Dict, Any
@@ -69,26 +58,76 @@ except ImportError:
 
 from tools import PubMedSearchTool, WebSearchTool, PatentsSearchTool
 
-# Import PhD analysis wrapper - REQUIRED for content generation
-from phd_analysis_wrapper import (
-    analyze_scientific_model,
-    analyze_experimental_methods,
-    analyze_results_interpretation,
-    get_phd_modules_status
-)
-PHD_ANALYSIS_MODULES_AVAILABLE = True
-print("✅ PhD analysis wrapper imported successfully")
-from deep_dive_agents import (
-    run_enhanced_model_pipeline, run_methods_pipeline, run_results_pipeline,
-    run_enhanced_model_pipeline_with_context, run_methods_pipeline_with_context, run_results_pipeline_with_context,
-    run_enhanced_model_pipeline_with_contract, run_methods_pipeline_with_contract, run_results_pipeline_with_contract
-)
-DEEP_DIVE_AGENTS_AVAILABLE = True
-print("✅ Deep dive agents imported successfully")
+# Import PhD analysis wrapper - OPTIONAL with fallback
+try:
+    from phd_analysis_wrapper import (
+        analyze_scientific_model,
+        analyze_experimental_methods,
+        analyze_results_interpretation,
+        get_phd_modules_status
+    )
+    PHD_ANALYSIS_MODULES_AVAILABLE = True
+    print("✅ PhD analysis wrapper imported successfully")
+except ImportError as e:
+    print(f"⚠️ PhD analysis wrapper not available: {e}")
+    PHD_ANALYSIS_MODULES_AVAILABLE = False
+    # Create fallback functions
+    def analyze_scientific_model(*args, **kwargs):
+        return {"error": "PhD analysis system not available", "_fallback": True}
+    def analyze_experimental_methods(*args, **kwargs):
+        return [{"error": "PhD analysis system not available", "_fallback": True}]
+    def analyze_results_interpretation(*args, **kwargs):
+        return {"error": "PhD analysis system not available", "_fallback": True}
+    def get_phd_modules_status():
+        return {"overall_status": "SYSTEM_UNAVAILABLE"}
+try:
+    from deep_dive_agents import (
+        run_enhanced_model_pipeline, run_methods_pipeline, run_results_pipeline,
+        run_enhanced_model_pipeline_with_context, run_methods_pipeline_with_context, run_results_pipeline_with_context,
+        run_enhanced_model_pipeline_with_contract, run_methods_pipeline_with_contract, run_results_pipeline_with_contract
+    )
+    DEEP_DIVE_AGENTS_AVAILABLE = True
+    print("✅ Deep dive agents imported successfully")
+except ImportError as e:
+    print(f"⚠️ Deep dive agents not available: {e}")
+    # Create dummy functions
+    def run_enhanced_model_pipeline(*args, **kwargs):
+        return "Deep dive agents not available"
+    def run_methods_pipeline(*args, **kwargs):
+        return "Deep dive agents not available"
+    def run_results_pipeline(*args, **kwargs):
+        return "Deep dive agents not available"
+    def run_enhanced_model_pipeline_with_context(*args, **kwargs):
+        return "Deep dive agents not available"
+    def run_methods_pipeline_with_context(*args, **kwargs):
+        return "Deep dive agents not available"
+    def run_results_pipeline_with_context(*args, **kwargs):
+        return "Deep dive agents not available"
+    def run_enhanced_model_pipeline_with_contract(*args, **kwargs):
+        return "Deep dive agents not available"
+    def run_methods_pipeline_with_contract(*args, **kwargs):
+        return "Deep dive agents not available"
+    def run_results_pipeline_with_contract(*args, **kwargs):
+        return "Deep dive agents not available"
+    DEEP_DIVE_AGENTS_AVAILABLE = False
 
-from project_summary_agents import ProjectSummaryOrchestrator, ContextEnhancedProjectSummaryOrchestrator, ContractEnhancedProjectSummaryOrchestrator
-PROJECT_SUMMARY_AGENTS_AVAILABLE = True
-print("✅ Project summary agents imported successfully")
+try:
+    from project_summary_agents import ProjectSummaryOrchestrator, ContextEnhancedProjectSummaryOrchestrator, ContractEnhancedProjectSummaryOrchestrator
+    PROJECT_SUMMARY_AGENTS_AVAILABLE = True
+    print("✅ Project summary agents imported successfully")
+except ImportError as e:
+    print(f"⚠️ Project summary agents not available: {e}")
+    # Create dummy classes
+    class ProjectSummaryOrchestrator:
+        def __init__(self, *args, **kwargs): pass
+        def run(self, *args, **kwargs): return "Project summary agents not available"
+    class ContextEnhancedProjectSummaryOrchestrator:
+        def __init__(self, *args, **kwargs): pass
+        def run(self, *args, **kwargs): return "Project summary agents not available"
+    class ContractEnhancedProjectSummaryOrchestrator:
+        def __init__(self, *args, **kwargs): pass
+        def run(self, *args, **kwargs): return "Project summary agents not available"
+    PROJECT_SUMMARY_AGENTS_AVAILABLE = False
 try:
     from langchain.agents import AgentType, initialize_agent
     LANGCHAIN_AGENTS_AVAILABLE = True
@@ -14509,10 +14548,22 @@ class ProjectCreate(BaseModel):
 
 print("🔍 Attempting to import PhD analysis functionality...")
 
-# Import PhD analysis functionality - REQUIRED
-from phd_thesis_agents import create_phd_orchestrator, PhDThesisOrchestrator, initialize_phd_models
-PHD_ANALYSIS_AVAILABLE = True
-logger.info("✅ PhD analysis endpoints loaded successfully")
+# Import PhD analysis functionality - OPTIONAL with fallback
+try:
+    from phd_thesis_agents import create_phd_orchestrator, PhDThesisOrchestrator, initialize_phd_models
+    PHD_ANALYSIS_AVAILABLE = True
+    logger.info("✅ PhD analysis endpoints loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ PhD analysis not available: {e}")
+    PHD_ANALYSIS_AVAILABLE = False
+    # Create dummy functions
+    def create_phd_orchestrator(*args, **kwargs):
+        return None
+    class PhDThesisOrchestrator:
+        def __init__(self, *args, **kwargs): pass
+        def run(self, *args, **kwargs): return "PhD thesis agents not available"
+    def initialize_phd_models(*args, **kwargs):
+        return False
 
 # Define PhD helper functions directly in main.py to avoid import issues
 async def get_phd_project_data(project_id: str, db: Session) -> Dict[str, Any]:
