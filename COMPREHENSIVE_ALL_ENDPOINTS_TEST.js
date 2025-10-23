@@ -19,9 +19,10 @@ class ComprehensiveAllEndpointsTest {
             userId: 'e29e29d3-f87f-4c70-9aeb-424002382195'
         };
         this.backgroundJobs = [];
+        this.emptyReportId = '5494dcd2-653a-42ef-901f-3ae459b2086d'; // Report that should have data but appears empty
         this.testArticles = [
+            { pmid: '33099609', title: 'Finerenone and cardiovascular outcomes in patients with chronic kidney disease and type 2 diabetes', url: 'https://pubmed.ncbi.nlm.nih.gov/33099609/' },
             { pmid: '34567890', title: 'Machine Learning in Healthcare' },
-            { pmid: '23456789', title: 'Deep Learning Applications' },
             { url: 'https://arxiv.org/abs/2301.00001', title: 'Transformer Architecture' }
         ];
     }
@@ -192,14 +193,21 @@ class ComprehensiveAllEndpointsTest {
         
         for (const article of this.testArticles.slice(0, 2)) { // Test 2 articles
             this.log(`Testing Deep Dive for: ${article.title}`, 'info');
-            
+
             const deepDiveData = {
                 project_id: this.projectId,
                 ...(article.pmid ? { pmid: article.pmid } : { url: article.url }),
-                objective: "Comprehensive deep dive analysis for PhD research",
+                objective: article.pmid === '33099609' ?
+                    "Deep dive analysis of finerenone cardiovascular outcomes study - focus on inflammatory mechanisms and HFpEF implications" :
+                    "Comprehensive deep dive analysis for PhD research",
                 analysis_depth: "comprehensive",
                 include_methodology: true,
-                include_citations: true
+                include_citations: true,
+                ...(article.pmid === '33099609' && {
+                    focus_areas: ["cardiovascular outcomes", "chronic kidney disease", "type 2 diabetes", "finerenone mechanisms"],
+                    include_statistical_analysis: true,
+                    include_clinical_implications: true
+                })
             };
             
             const result = await this.makeRequest('/deep-dive', deepDiveData);
@@ -208,9 +216,21 @@ class ComprehensiveAllEndpointsTest {
                 const hasContent = !!(result.data.analysis_content || result.data.deep_dive_analysis);
                 const hasMethodology = !!(result.data.methodology_analysis);
                 const hasCitations = !!(result.data.citations || result.data.references);
-                
+                const contentLength = (result.data.analysis_content || result.data.deep_dive_analysis || '').length;
+
                 this.log(`Deep Dive ${article.title}: SUCCESS`, 'success');
-                this.log(`Deep Dive ${article.title}: Content=${hasContent}, Methodology=${hasMethodology}, Citations=${hasCitations}`, 'info');
+                this.log(`Deep Dive ${article.title}: Content=${hasContent} (${contentLength} chars), Methodology=${hasMethodology}, Citations=${hasCitations}`, 'info');
+
+                // Special validation for the finerenone study
+                if (article.pmid === '33099609') {
+                    const content = result.data.analysis_content || result.data.deep_dive_analysis || '';
+                    const hasFinerenone = content.toLowerCase().includes('finerenone');
+                    const hasCardiovascular = content.toLowerCase().includes('cardiovascular');
+                    const hasKidney = content.toLowerCase().includes('kidney');
+
+                    this.log(`Finerenone Study Validation: Finerenone=${hasFinerenone}, Cardiovascular=${hasCardiovascular}, Kidney=${hasKidney}`,
+                             (hasFinerenone && hasCardiovascular && hasKidney) ? 'success' : 'warning');
+                }
                 
                 deepDiveResults[article.title] = {
                     success: true,
@@ -235,12 +255,14 @@ class ComprehensiveAllEndpointsTest {
         
         const reviewData = {
             project_id: this.projectId,
-            molecule: "machine learning algorithms",
-            objective: "Generate comprehensive review of machine learning applications in healthcare",
+            molecule: "Finerenone",
+            objective: "Summarize the inflammatory mechanism of aldosterone and the anti-inflammatory mechanism of finerenone in the HFpEF",
             review_type: "systematic",
             academic_level: "phd",
             include_methodology: true,
-            target_length: 6000
+            target_length: 6000,
+            focus_areas: ["inflammatory mechanisms", "aldosterone pathways", "HFpEF treatment", "anti-inflammatory effects"],
+            include_molecular_mechanisms: true
         };
         
         const result = await this.makeRequest('/generate-review', reviewData);
@@ -253,10 +275,26 @@ class ComprehensiveAllEndpointsTest {
             
             this.log('Generate Review: SUCCESS', 'success');
             this.log(`Generate Review: Content=${hasReviewContent}, Methodology=${hasMethodology}, References=${hasReferences}`, 'info');
-            
+
             if (qualityScore > 0) {
-                this.log(`Generate Review: Quality Score: ${qualityScore}/10`, 
+                this.log(`Generate Review: Quality Score: ${qualityScore}/10`,
                          qualityScore >= 8 ? 'success' : 'warning');
+            }
+
+            // Validate Finerenone-specific content
+            const reviewContent = result.data.review_content || result.data.comprehensive_review || '';
+            const contentLength = reviewContent.length;
+            const hasFinerenone = reviewContent.toLowerCase().includes('finerenone');
+            const hasAldosterone = reviewContent.toLowerCase().includes('aldosterone');
+            const hasInflammatory = reviewContent.toLowerCase().includes('inflammatory') || reviewContent.toLowerCase().includes('inflammation');
+            const hasHFpEF = reviewContent.toLowerCase().includes('hfpef') || reviewContent.toLowerCase().includes('heart failure');
+
+            this.log(`Finerenone Review Validation: Length=${contentLength} chars`, 'info');
+            this.log(`Content Keywords: Finerenone=${hasFinerenone}, Aldosterone=${hasAldosterone}, Inflammatory=${hasInflammatory}, HFpEF=${hasHFpEF}`,
+                     (hasFinerenone && hasAldosterone && hasInflammatory) ? 'success' : 'warning');
+
+            if (contentLength < 1000) {
+                this.log('⚠️ WARNING: Review content appears too short for comprehensive analysis', 'warning');
             }
             
             return {
@@ -406,6 +444,28 @@ class ComprehensiveAllEndpointsTest {
                     }
                 }
 
+                // Test the specific empty report issue
+                this.log(`Testing specific report: ${this.emptyReportId}`, 'info');
+                const emptyReportResult = await this.makeRequest(`/reports/${this.emptyReportId}`, {}, 'GET');
+                if (emptyReportResult.ok) {
+                    const hasContent = !!(emptyReportResult.data.content &&
+                                         Object.keys(emptyReportResult.data.content).length > 0);
+                    const contentSize = JSON.stringify(emptyReportResult.data.content || {}).length;
+
+                    this.log(`Empty Report Test: ${hasContent ? 'HAS CONTENT' : 'EMPTY'} (${contentSize} chars)`,
+                             hasContent ? 'success' : 'error');
+
+                    if (!hasContent) {
+                        this.log('🚨 EMPTY REPORT DETECTED - This report should contain data but appears empty', 'error');
+                        this.log(`Report Status: ${emptyReportResult.data.status}`, 'info');
+                        this.log(`Report Title: ${emptyReportResult.data.title}`, 'info');
+                        this.log(`Created: ${emptyReportResult.data.created_at}`, 'info');
+                    }
+                } else {
+                    this.log(`Empty Report Test: FAILED TO ACCESS (${emptyReportResult.status})`, 'error');
+                }
+                }
+
                 return {
                     success: true,
                     reportCount: reports.length,
@@ -495,11 +555,12 @@ class ComprehensiveAllEndpointsTest {
         console.log(`User ID: ${this.testUser.userId}`);
         console.log('Testing ALL R&D Agent endpoints:');
         console.log('• PhD Analysis (4 endpoints)');
-        console.log('• Deep Dive Analysis (2 articles)');
-        console.log('• Generate Review (1 endpoint)');
+        console.log('• Deep Dive Analysis - PMID 33099609 (Finerenone study) + 1 more');
+        console.log('• Generate Review - Finerenone inflammatory mechanisms in HFpEF');
         console.log('• Background Jobs (4 endpoints)');
         console.log('• Report Persistence & Accessibility');
         console.log('• UI Integration & Data Parsing');
+        console.log('• Empty Report Investigation (Report ID: 5494dcd2-653a-42ef-901f-3ae459b2086d)');
         console.log('='.repeat(100));
 
         const startTime = Date.now();
