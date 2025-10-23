@@ -5,8 +5,25 @@ import urllib.parse
 import xml.etree.ElementTree as ET
 from typing import List, Dict, Any, Optional
 
-from langchain.chains import LLMChain
-from langchain.prompts import PromptTemplate
+try:
+    from langchain.chains import LLMChain
+    from langchain.prompts import PromptTemplate
+    LANGCHAIN_AVAILABLE = True
+except ImportError:
+    print("⚠️ LangChain not available in deep_dive_agents, using dummy classes")
+    class LLMChain:
+        def __init__(self, *args, **kwargs):
+            pass
+        def run(self, *args, **kwargs):
+            return "LangChain not available"
+
+    class PromptTemplate:
+        def __init__(self, *args, **kwargs):
+            pass
+        def format(self, *args, **kwargs):
+            return "LangChain not available"
+
+    LANGCHAIN_AVAILABLE = False
 
 # Enhanced prompts for sophisticated scientific analysis
 METHODS_BASE_PROMPT = PromptTemplate(
