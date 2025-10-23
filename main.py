@@ -104,12 +104,63 @@ except ImportError as e:
         return {"error": "PhD analysis system not available", "_fallback": True}
     def get_phd_modules_status():
         return {"overall_status": "SYSTEM_UNAVAILABLE"}
-from deep_dive_agents import (
-    run_enhanced_model_pipeline, run_methods_pipeline, run_results_pipeline,
-    run_enhanced_model_pipeline_with_context, run_methods_pipeline_with_context, run_results_pipeline_with_context,
-    run_enhanced_model_pipeline_with_contract, run_methods_pipeline_with_contract, run_results_pipeline_with_contract
-)
-from project_summary_agents import ProjectSummaryOrchestrator, ContextEnhancedProjectSummaryOrchestrator, ContractEnhancedProjectSummaryOrchestrator
+try:
+    from deep_dive_agents import (
+        run_enhanced_model_pipeline, run_methods_pipeline, run_results_pipeline,
+        run_enhanced_model_pipeline_with_context, run_methods_pipeline_with_context, run_results_pipeline_with_context,
+        run_enhanced_model_pipeline_with_contract, run_methods_pipeline_with_contract, run_results_pipeline_with_contract
+    )
+    DEEP_DIVE_AGENTS_AVAILABLE = True
+    print("✅ Deep dive agents imported successfully")
+except ImportError as e:
+    print(f"⚠️ Deep dive agents not available: {e}")
+    # Create dummy functions
+    def run_enhanced_model_pipeline(*args, **kwargs):
+        return "Deep dive agents not available"
+    def run_methods_pipeline(*args, **kwargs):
+        return "Deep dive agents not available"
+    def run_results_pipeline(*args, **kwargs):
+        return "Deep dive agents not available"
+    def run_enhanced_model_pipeline_with_context(*args, **kwargs):
+        return "Deep dive agents not available"
+    def run_methods_pipeline_with_context(*args, **kwargs):
+        return "Deep dive agents not available"
+    def run_results_pipeline_with_context(*args, **kwargs):
+        return "Deep dive agents not available"
+    def run_enhanced_model_pipeline_with_contract(*args, **kwargs):
+        return "Deep dive agents not available"
+    def run_methods_pipeline_with_contract(*args, **kwargs):
+        return "Deep dive agents not available"
+    def run_results_pipeline_with_contract(*args, **kwargs):
+        return "Deep dive agents not available"
+    DEEP_DIVE_AGENTS_AVAILABLE = False
+
+try:
+    from project_summary_agents import ProjectSummaryOrchestrator, ContextEnhancedProjectSummaryOrchestrator, ContractEnhancedProjectSummaryOrchestrator
+    PROJECT_SUMMARY_AGENTS_AVAILABLE = True
+    print("✅ Project summary agents imported successfully")
+except ImportError as e:
+    print(f"⚠️ Project summary agents not available: {e}")
+    # Create dummy classes
+    class ProjectSummaryOrchestrator:
+        def __init__(self, *args, **kwargs):
+            pass
+        def run(self, *args, **kwargs):
+            return "Project summary agents not available"
+
+    class ContextEnhancedProjectSummaryOrchestrator:
+        def __init__(self, *args, **kwargs):
+            pass
+        def run(self, *args, **kwargs):
+            return "Project summary agents not available"
+
+    class ContractEnhancedProjectSummaryOrchestrator:
+        def __init__(self, *args, **kwargs):
+            pass
+        def run(self, *args, **kwargs):
+            return "Project summary agents not available"
+
+    PROJECT_SUMMARY_AGENTS_AVAILABLE = False
 try:
     from langchain.agents import AgentType, initialize_agent
     LANGCHAIN_AGENTS_AVAILABLE = True
