@@ -1,4 +1,14 @@
-from langchain.tools import BaseTool
+try:
+    from langchain.tools import BaseTool
+    LANGCHAIN_TOOLS_AVAILABLE = True
+except ImportError:
+    print("⚠️ LangChain tools not available, using dummy BaseTool")
+    class BaseTool:
+        def __init__(self, *args, **kwargs):
+            pass
+        def run(self, *args, **kwargs):
+            return "LangChain tools not available"
+    LANGCHAIN_TOOLS_AVAILABLE = False
 import requests
 import xml.etree.ElementTree as ET
 from typing import Optional
