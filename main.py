@@ -329,6 +329,45 @@ async def start_background_deep_dive(
             "message": "Failed to start background job"
         }
 
+# PhD Request Models (moved here to be available for background job endpoints)
+class GenerateSummaryRequest(BaseModel):
+    project_id: str = Field(..., description="Project ID")
+    objective: str = Field(..., description="Summary generation objective")
+    summary_type: Optional[str] = Field(default="comprehensive", description="Type of summary")
+    academic_level: Optional[str] = Field(default="phd", description="Academic level")
+    include_methodology: Optional[bool] = Field(default=True, description="Include methodology summary")
+    include_gaps: Optional[bool] = Field(default=True, description="Include research gaps")
+    target_length: Optional[int] = Field(default=5000, description="Target word count")
+
+class LiteratureGapAnalysisRequest(BaseModel):
+    project_id: str = Field(..., description="Project ID")
+    objective: str = Field(..., description="Gap analysis objective")
+    gap_types: Optional[List[str]] = Field(default=["theoretical", "methodological", "empirical"], description="Types of gaps to identify")
+    domain_focus: Optional[str] = Field(default="general", description="Domain focus for gap analysis")
+    severity_threshold: Optional[str] = Field(default="medium", description="Minimum severity threshold")
+    academic_level: Optional[str] = Field(default="phd", description="Academic level")
+    analysis_depth: Optional[str] = Field(default="comprehensive", description="Depth of analysis")
+    include_methodology_gaps: Optional[bool] = Field(default=True, description="Include methodology gaps")
+
+class ThesisChapterRequest(BaseModel):
+    project_id: str = Field(..., description="Project ID")
+    objective: str = Field(..., description="Thesis generation objective")
+    chapter_focus: Optional[str] = Field(default="comprehensive", description="Chapter focus area")
+    academic_level: Optional[str] = Field(default="phd", description="Academic level")
+    citation_style: Optional[str] = Field(default="APA", description="Citation style")
+    target_length: Optional[int] = Field(default=8000, description="Target word count")
+    include_timeline: Optional[bool] = Field(default=True, description="Include research timeline")
+
+class MethodologySynthesisRequest(BaseModel):
+    project_id: str = Field(..., description="Project ID")
+    objective: str = Field(..., description="Methodology synthesis objective")
+    methodology_types: Optional[List[str]] = Field(default=["experimental", "observational", "computational"], description="Methodology types to analyze")
+    include_statistical_methods: Optional[bool] = Field(default=True, description="Include statistical methods")
+    include_validation: Optional[bool] = Field(default=True, description="Include validation approaches")
+    comparison_depth: Optional[str] = Field(default="detailed", description="Depth of methodology comparison")
+    academic_level: Optional[str] = Field(default="phd", description="Academic level")
+    synthesis_type: Optional[str] = Field(default="comprehensive", description="Type of synthesis")
+
 # PhD Background Job Endpoints
 @app.post("/background-jobs/generate-summary")
 async def start_background_generate_summary(
