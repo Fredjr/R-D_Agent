@@ -423,5 +423,323 @@ class BackgroundProcessor:
                 ) for job in jobs
             ]
 
+    async def start_phd_analysis_job(self, job_type: str, user_id: str, project_id: str, input_data: dict) -> str:
+        """Start a background PhD analysis job"""
+        job_id = str(uuid.uuid4())
+
+        # Create job record in database
+        try:
+            with next(get_db()) as db:
+                job_record = BackgroundJob(
+                    job_id=job_id,
+                    job_type=job_type,
+                    user_id=user_id,
+                    project_id=project_id,
+                    status=JobStatus.PENDING.value,
+                    input_data=input_data,
+                    created_at=datetime.utcnow()
+                )
+                db.add(job_record)
+                db.commit()
+                logger.info(f"Created database record for PhD job {job_id}")
+        except Exception as e:
+            logger.warning(f"Failed to create database record for PhD job {job_id}: {e}")
+
+        # Start background task based on job type
+        if job_type == "generate_summary":
+            task = asyncio.create_task(self._process_generate_summary_job(job_id, user_id, project_id, input_data))
+        elif job_type == "literature_gap_analysis":
+            task = asyncio.create_task(self._process_literature_gap_analysis_job(job_id, user_id, project_id, input_data))
+        elif job_type == "thesis_chapter_generator":
+            task = asyncio.create_task(self._process_thesis_chapter_generator_job(job_id, user_id, project_id, input_data))
+        elif job_type == "methodology_synthesis":
+            task = asyncio.create_task(self._process_methodology_synthesis_job(job_id, user_id, project_id, input_data))
+        else:
+            raise ValueError(f"Unknown PhD analysis job type: {job_type}")
+
+        self.active_jobs[job_id] = task
+
+        # Initialize job result
+        self.job_results[job_id] = JobResult(
+            job_id=job_id,
+            status=JobStatus.PENDING,
+            created_at=datetime.utcnow()
+        )
+
+        logger.info(f"🎓 Started background PhD analysis job {job_id} (type: {job_type})")
+        return job_id
+
+    async def _process_generate_summary_job(self, job_id: str, user_id: str, project_id: str, input_data: dict):
+        """Process generate summary job in background"""
+        try:
+            logger.info(f"🎓 Processing generate summary job {job_id}")
+
+            # Update job status to processing
+            self.job_results[job_id].status = JobStatus.PROCESSING
+
+            # Import and call the actual endpoint function
+            from main import generate_summary_endpoint, GenerateSummaryRequest
+            from database import get_db
+
+            # Create request object
+            request = GenerateSummaryRequest(**input_data)
+
+            # Get database session
+            with next(get_db()) as db:
+                # Call the endpoint function
+                result = await generate_summary_endpoint(request, user_id, db)
+
+                # Save result as a report
+                report_id = str(uuid.uuid4())
+                report = Report(
+                    report_id=report_id,
+                    title=f"PhD Summary: {input_data.get('objective', 'Research Summary')}",
+                    objective=input_data.get('objective', 'Generate comprehensive summary'),
+                    project_id=project_id,
+                    created_by=user_id,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                    content=result.dict() if hasattr(result, 'dict') else result,
+                    status="completed"
+                )
+                db.add(report)
+                db.commit()
+
+                # Update job with result
+                job_record = db.query(BackgroundJob).filter(BackgroundJob.job_id == job_id).first()
+                if job_record:
+                    job_record.status = JobStatus.COMPLETED.value
+                    job_record.result_id = report_id
+                    job_record.completed_at = datetime.utcnow()
+                    db.commit()
+
+                # Update in-memory result
+                self.job_results[job_id].status = JobStatus.COMPLETED
+                self.job_results[job_id].result = {"report_id": report_id, "content": result}
+                self.job_results[job_id].completed_at = datetime.utcnow()
+
+                logger.info(f"✅ Generate summary job {job_id} completed successfully")
+
+        except Exception as e:
+            logger.error(f"❌ Generate summary job {job_id} failed: {e}")
+            self.job_results[job_id].status = JobStatus.FAILED
+            self.job_results[job_id].error_message = str(e)
+
+            # Update database
+            try:
+                with next(get_db()) as db:
+                    job_record = db.query(BackgroundJob).filter(BackgroundJob.job_id == job_id).first()
+                    if job_record:
+                        job_record.status = JobStatus.FAILED.value
+                        job_record.error_message = str(e)
+                        job_record.completed_at = datetime.utcnow()
+                        db.commit()
+            except Exception as db_error:
+                logger.error(f"Failed to update job status in database: {db_error}")
+
+    async def _process_literature_gap_analysis_job(self, job_id: str, user_id: str, project_id: str, input_data: dict):
+        """Process literature gap analysis job in background"""
+        try:
+            logger.info(f"🔍 Processing literature gap analysis job {job_id}")
+
+            # Update job status to processing
+            self.job_results[job_id].status = JobStatus.PROCESSING
+
+            # Import and call the actual endpoint function
+            from main import analyze_literature_gaps_endpoint, LiteratureGapAnalysisRequest
+            from database import get_db
+
+            # Create request object
+            request = LiteratureGapAnalysisRequest(**input_data)
+
+            # Get database session
+            with next(get_db()) as db:
+                # Call the endpoint function
+                result = await analyze_literature_gaps_endpoint(request, user_id, db)
+
+                # Save result as a report
+                report_id = str(uuid.uuid4())
+                report = Report(
+                    report_id=report_id,
+                    title=f"Literature Gap Analysis: {input_data.get('objective', 'Gap Analysis')}",
+                    objective=input_data.get('objective', 'Identify research gaps'),
+                    project_id=project_id,
+                    created_by=user_id,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                    content=result.dict() if hasattr(result, 'dict') else result,
+                    status="completed"
+                )
+                db.add(report)
+                db.commit()
+
+                # Update job with result
+                job_record = db.query(BackgroundJob).filter(BackgroundJob.job_id == job_id).first()
+                if job_record:
+                    job_record.status = JobStatus.COMPLETED.value
+                    job_record.result_id = report_id
+                    job_record.completed_at = datetime.utcnow()
+                    db.commit()
+
+                # Update in-memory result
+                self.job_results[job_id].status = JobStatus.COMPLETED
+                self.job_results[job_id].result = {"report_id": report_id, "content": result}
+                self.job_results[job_id].completed_at = datetime.utcnow()
+
+                logger.info(f"✅ Literature gap analysis job {job_id} completed successfully")
+
+        except Exception as e:
+            logger.error(f"❌ Literature gap analysis job {job_id} failed: {e}")
+            self.job_results[job_id].status = JobStatus.FAILED
+            self.job_results[job_id].error_message = str(e)
+
+            # Update database
+            try:
+                with next(get_db()) as db:
+                    job_record = db.query(BackgroundJob).filter(BackgroundJob.job_id == job_id).first()
+                    if job_record:
+                        job_record.status = JobStatus.FAILED.value
+                        job_record.error_message = str(e)
+                        job_record.completed_at = datetime.utcnow()
+                        db.commit()
+            except Exception as db_error:
+                logger.error(f"Failed to update job status in database: {db_error}")
+
+    async def _process_thesis_chapter_generator_job(self, job_id: str, user_id: str, project_id: str, input_data: dict):
+        """Process thesis chapter generator job in background"""
+        try:
+            logger.info(f"📖 Processing thesis chapter generator job {job_id}")
+
+            # Update job status to processing
+            self.job_results[job_id].status = JobStatus.PROCESSING
+
+            # Import and call the actual endpoint function
+            from main import generate_thesis_chapters_endpoint, ThesisChapterRequest
+            from database import get_db
+
+            # Create request object
+            request = ThesisChapterRequest(**input_data)
+
+            # Get database session
+            with next(get_db()) as db:
+                # Call the endpoint function
+                result = await generate_thesis_chapters_endpoint(request, user_id, db)
+
+                # Save result as a report
+                report_id = str(uuid.uuid4())
+                report = Report(
+                    report_id=report_id,
+                    title=f"Thesis Chapters: {input_data.get('objective', 'Chapter Generation')}",
+                    objective=input_data.get('objective', 'Generate thesis chapters'),
+                    project_id=project_id,
+                    created_by=user_id,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                    content=result.dict() if hasattr(result, 'dict') else result,
+                    status="completed"
+                )
+                db.add(report)
+                db.commit()
+
+                # Update job with result
+                job_record = db.query(BackgroundJob).filter(BackgroundJob.job_id == job_id).first()
+                if job_record:
+                    job_record.status = JobStatus.COMPLETED.value
+                    job_record.result_id = report_id
+                    job_record.completed_at = datetime.utcnow()
+                    db.commit()
+
+                # Update in-memory result
+                self.job_results[job_id].status = JobStatus.COMPLETED
+                self.job_results[job_id].result = {"report_id": report_id, "content": result}
+                self.job_results[job_id].completed_at = datetime.utcnow()
+
+                logger.info(f"✅ Thesis chapter generator job {job_id} completed successfully")
+
+        except Exception as e:
+            logger.error(f"❌ Thesis chapter generator job {job_id} failed: {e}")
+            self.job_results[job_id].status = JobStatus.FAILED
+            self.job_results[job_id].error_message = str(e)
+
+            # Update database
+            try:
+                with next(get_db()) as db:
+                    job_record = db.query(BackgroundJob).filter(BackgroundJob.job_id == job_id).first()
+                    if job_record:
+                        job_record.status = JobStatus.FAILED.value
+                        job_record.error_message = str(e)
+                        job_record.completed_at = datetime.utcnow()
+                        db.commit()
+            except Exception as db_error:
+                logger.error(f"Failed to update job status in database: {db_error}")
+
+    async def _process_methodology_synthesis_job(self, job_id: str, user_id: str, project_id: str, input_data: dict):
+        """Process methodology synthesis job in background"""
+        try:
+            logger.info(f"🧪 Processing methodology synthesis job {job_id}")
+
+            # Update job status to processing
+            self.job_results[job_id].status = JobStatus.PROCESSING
+
+            # Import and call the actual endpoint function
+            from main import synthesize_methodologies_endpoint, MethodologySynthesisRequest
+            from database import get_db
+
+            # Create request object
+            request = MethodologySynthesisRequest(**input_data)
+
+            # Get database session
+            with next(get_db()) as db:
+                # Call the endpoint function
+                result = await synthesize_methodologies_endpoint(request, user_id, db)
+
+                # Save result as a report
+                report_id = str(uuid.uuid4())
+                report = Report(
+                    report_id=report_id,
+                    title=f"Methodology Synthesis: {input_data.get('objective', 'Methodology Analysis')}",
+                    objective=input_data.get('objective', 'Synthesize methodologies'),
+                    project_id=project_id,
+                    created_by=user_id,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                    content=result.dict() if hasattr(result, 'dict') else result,
+                    status="completed"
+                )
+                db.add(report)
+                db.commit()
+
+                # Update job with result
+                job_record = db.query(BackgroundJob).filter(BackgroundJob.job_id == job_id).first()
+                if job_record:
+                    job_record.status = JobStatus.COMPLETED.value
+                    job_record.result_id = report_id
+                    job_record.completed_at = datetime.utcnow()
+                    db.commit()
+
+                # Update in-memory result
+                self.job_results[job_id].status = JobStatus.COMPLETED
+                self.job_results[job_id].result = {"report_id": report_id, "content": result}
+                self.job_results[job_id].completed_at = datetime.utcnow()
+
+                logger.info(f"✅ Methodology synthesis job {job_id} completed successfully")
+
+        except Exception as e:
+            logger.error(f"❌ Methodology synthesis job {job_id} failed: {e}")
+            self.job_results[job_id].status = JobStatus.FAILED
+            self.job_results[job_id].error_message = str(e)
+
+            # Update database
+            try:
+                with next(get_db()) as db:
+                    job_record = db.query(BackgroundJob).filter(BackgroundJob.job_id == job_id).first()
+                    if job_record:
+                        job_record.status = JobStatus.FAILED.value
+                        job_record.error_message = str(e)
+                        job_record.completed_at = datetime.utcnow()
+                        db.commit()
+            except Exception as db_error:
+                logger.error(f"Failed to update job status in database: {db_error}")
+
 # Global background processor instance
 background_processor = BackgroundProcessor()

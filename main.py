@@ -238,6 +238,131 @@ async def start_background_deep_dive(
             "message": "Failed to start background job"
         }
 
+# PhD Background Job Endpoints
+@app.post("/background-jobs/generate-summary")
+async def start_background_generate_summary(
+    request: GenerateSummaryRequest,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """Start a background generate-summary job for PhD analysis"""
+    try:
+        job_id = await background_processor.start_phd_analysis_job(
+            job_type="generate_summary",
+            user_id=user_id,
+            project_id=request.project_id,
+            input_data=request.dict()
+        )
+
+        return {
+            "success": True,
+            "job_id": job_id,
+            "status": "pending",
+            "message": "Background PhD summary generation started successfully",
+            "estimated_completion": "5-10 minutes"
+        }
+    except Exception as e:
+        logger.error(f"Failed to start background generate-summary job: {e}")
+        return {
+            "success": False,
+            "job_id": None,
+            "status": "failed",
+            "message": f"Failed to start background job: {str(e)}"
+        }
+
+@app.post("/background-jobs/literature-gap-analysis")
+async def start_background_literature_gap_analysis(
+    request: LiteratureGapAnalysisRequest,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """Start a background literature gap analysis job"""
+    try:
+        job_id = await background_processor.start_phd_analysis_job(
+            job_type="literature_gap_analysis",
+            user_id=user_id,
+            project_id=request.project_id,
+            input_data=request.dict()
+        )
+
+        return {
+            "success": True,
+            "job_id": job_id,
+            "status": "pending",
+            "message": "Background literature gap analysis started successfully",
+            "estimated_completion": "8-15 minutes"
+        }
+    except Exception as e:
+        logger.error(f"Failed to start background literature gap analysis job: {e}")
+        return {
+            "success": False,
+            "job_id": None,
+            "status": "failed",
+            "message": f"Failed to start background job: {str(e)}"
+        }
+
+@app.post("/background-jobs/thesis-chapter-generator")
+async def start_background_thesis_chapter_generator(
+    request: ThesisChapterRequest,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """Start a background thesis chapter generation job"""
+    try:
+        job_id = await background_processor.start_phd_analysis_job(
+            job_type="thesis_chapter_generator",
+            user_id=user_id,
+            project_id=request.project_id,
+            input_data=request.dict()
+        )
+
+        return {
+            "success": True,
+            "job_id": job_id,
+            "status": "pending",
+            "message": "Background thesis chapter generation started successfully",
+            "estimated_completion": "15-25 minutes"
+        }
+    except Exception as e:
+        logger.error(f"Failed to start background thesis chapter generation job: {e}")
+        return {
+            "success": False,
+            "job_id": None,
+            "status": "failed",
+            "message": f"Failed to start background job: {str(e)}"
+        }
+
+@app.post("/background-jobs/methodology-synthesis")
+async def start_background_methodology_synthesis(
+    request: MethodologySynthesisRequest,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """Start a background methodology synthesis job"""
+    try:
+        job_id = await background_processor.start_phd_analysis_job(
+            job_type="methodology_synthesis",
+            user_id=user_id,
+            project_id=request.project_id,
+            input_data=request.dict()
+        )
+
+        return {
+            "success": True,
+            "job_id": job_id,
+            "status": "pending",
+            "message": "Background methodology synthesis started successfully",
+            "estimated_completion": "10-18 minutes"
+        }
+    except Exception as e:
+        logger.error(f"Failed to start background methodology synthesis job: {e}")
+        return {
+            "success": False,
+            "job_id": None,
+            "status": "failed",
+            "message": f"Failed to start background job: {str(e)}"
+        }
+
 @app.get("/background-jobs/{job_id}/status")
 async def get_job_status(
     job_id: str,
