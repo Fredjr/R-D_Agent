@@ -22,8 +22,8 @@ except ImportError as e:
     email_service = None
 
 # Step 2.2.1: Import LangChain components for prompt-driven chain (REQUIRED)
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
+from langchain_core.prompts import PromptTemplate
+from langchain.chains.llm import LLMChain
 LANGCHAIN_AVAILABLE = True
 print("✅ LangChain components loaded successfully")
 import json
