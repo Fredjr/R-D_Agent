@@ -6,7 +6,13 @@ from fastapi import UploadFile, File, Form
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field, validator, field_validator, model_validator
 import re
-from langchain_openai import ChatOpenAI
+try:
+    from langchain_openai import ChatOpenAI
+    LANGCHAIN_OPENAI_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ LangChain OpenAI import failed: {e}")
+    ChatOpenAI = None
+    LANGCHAIN_OPENAI_AVAILABLE = False
 import os
 from dotenv import load_dotenv
 import time
@@ -20,15 +26,29 @@ except ImportError as e:
     print(f"Email service import failed: {e}")
     email_service = None
 
-# Step 2.2.1: Import LangChain components for prompt-driven chain
+# Step 2.2.1: Import LangChain components for prompt-driven chain (OPTIONAL)
 try:
     from langchain.prompts import PromptTemplate
     from langchain.chains import LLMChain
     LANGCHAIN_AVAILABLE = True
+    print("✅ LangChain components loaded successfully")
 except ImportError as e:
-    print(f"LangChain import failed: {e}")
-    PromptTemplate = None
-    LLMChain = None
+    print(f"⚠️ LangChain import failed (continuing without it): {e}")
+    # Create dummy classes to prevent errors
+    class DummyPromptTemplate:
+        def __init__(self, *args, **kwargs):
+            pass
+        def format(self, *args, **kwargs):
+            return "LangChain not available"
+
+    class DummyLLMChain:
+        def __init__(self, *args, **kwargs):
+            pass
+        def run(self, *args, **kwargs):
+            return "LangChain not available"
+
+    PromptTemplate = DummyPromptTemplate
+    LLMChain = DummyLLMChain
     LANGCHAIN_AVAILABLE = False
 import json
 import re
@@ -90,7 +110,14 @@ from deep_dive_agents import (
     run_enhanced_model_pipeline_with_contract, run_methods_pipeline_with_contract, run_results_pipeline_with_contract
 )
 from project_summary_agents import ProjectSummaryOrchestrator, ContextEnhancedProjectSummaryOrchestrator, ContractEnhancedProjectSummaryOrchestrator
-from langchain.agents import AgentType, initialize_agent
+try:
+    from langchain.agents import AgentType, initialize_agent
+    LANGCHAIN_AGENTS_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ LangChain agents import failed: {e}")
+    AgentType = None
+    initialize_agent = None
+    LANGCHAIN_AGENTS_AVAILABLE = False
 from scoring import calculate_publication_score
 
 # Database imports
@@ -132,7 +159,13 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Embeddings and Pinecone
-from langchain_community.embeddings import HuggingFaceEmbeddings
+try:
+    from langchain_community.embeddings import HuggingFaceEmbeddings
+    LANGCHAIN_EMBEDDINGS_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ LangChain embeddings import failed: {e}")
+    HuggingFaceEmbeddings = None
+    LANGCHAIN_EMBEDDINGS_AVAILABLE = False
 from pinecone import Pinecone
 try:
     # Optional: legacy/alternate Index constructor in some pinecone versions
