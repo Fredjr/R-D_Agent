@@ -21,8 +21,15 @@ except ImportError as e:
     email_service = None
 
 # Step 2.2.1: Import LangChain components for prompt-driven chain
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
+try:
+    from langchain.prompts import PromptTemplate
+    from langchain.chains import LLMChain
+    LANGCHAIN_AVAILABLE = True
+except ImportError as e:
+    print(f"LangChain import failed: {e}")
+    PromptTemplate = None
+    LLMChain = None
+    LANGCHAIN_AVAILABLE = False
 import json
 import re
 from typing import List, Optional, Dict, Any
