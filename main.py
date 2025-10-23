@@ -22,28 +22,10 @@ except ImportError as e:
     email_service = None
 
 # Step 2.2.1: Import LangChain components for prompt-driven chain (REQUIRED)
-try:
-    from langchain_core.prompts import PromptTemplate
-    from langchain.chains.llm import LLMChain
-    LANGCHAIN_AVAILABLE = True
-    print("✅ LangChain components loaded successfully")
-except ImportError as e:
-    print(f"⚠️ LangChain core import failed, trying alternative: {e}")
-    try:
-        from langchain.prompts import PromptTemplate
-        from langchain.chains import LLMChain
-        LANGCHAIN_AVAILABLE = True
-        print("✅ LangChain components loaded successfully (alternative import)")
-    except ImportError as e2:
-        print(f"❌ All LangChain imports failed: {e2}")
-        # Create minimal dummy classes to prevent startup failure
-        class PromptTemplate:
-            def __init__(self, *args, **kwargs): pass
-            def format(self, *args, **kwargs): return "LangChain not available"
-        class LLMChain:
-            def __init__(self, *args, **kwargs): pass
-            def run(self, *args, **kwargs): return "LangChain not available"
-        LANGCHAIN_AVAILABLE = False
+from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
+LANGCHAIN_AVAILABLE = True
+print("✅ LangChain components loaded successfully")
 import json
 import re
 from typing import List, Optional, Dict, Any
@@ -68,7 +50,11 @@ try:
 except Exception:
     _HAS_PDF = False
 from jsonschema import validate as jsonschema_validate, ValidationError
-from langgraph.graph import StateGraph, END
+try:
+    from langgraph.graph import StateGraph, END
+except ImportError:
+    StateGraph = None
+    END = None
 
 from tools import PubMedSearchTool, WebSearchTool, PatentsSearchTool
 
@@ -92,15 +78,8 @@ print("✅ Deep dive agents imported successfully")
 from project_summary_agents import ProjectSummaryOrchestrator, ContextEnhancedProjectSummaryOrchestrator, ContractEnhancedProjectSummaryOrchestrator
 PROJECT_SUMMARY_AGENTS_AVAILABLE = True
 print("✅ Project summary agents imported successfully")
-try:
-    from langchain.agents import AgentType, initialize_agent
-    LANGCHAIN_AGENTS_AVAILABLE = True
-    print("✅ LangChain agents loaded successfully")
-except ImportError as e:
-    print(f"⚠️ LangChain agents import failed: {e}")
-    AgentType = None
-    initialize_agent = None
-    LANGCHAIN_AGENTS_AVAILABLE = False
+from langchain.agents import AgentType, initialize_agent
+LANGCHAIN_AGENTS_AVAILABLE = True
 from scoring import calculate_publication_score
 
 # Database imports
