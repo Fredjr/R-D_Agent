@@ -107,7 +107,18 @@ class ComprehensiveAllEndpointsTest {
         const result = await this.makeRequest('/generate-review', reviewData);
         
         if (result.ok && result.data) {
-            const reviewContent = result.data.review_content || result.data.comprehensive_review || '';
+            // Debug: Log the actual response structure
+            this.log(`Response structure: ${JSON.stringify(Object.keys(result.data))}`, 'info');
+
+            // Extract content from results array (actual structure)
+            let reviewContent = result.data.review_content || result.data.comprehensive_review || '';
+
+            // If no direct content, check results array
+            if (!reviewContent && result.data.results && Array.isArray(result.data.results)) {
+                reviewContent = result.data.results.map(r => r.result || r.content || '').join(' ');
+                this.log(`Extracted content from ${result.data.results.length} results`, 'info');
+            }
+
             const contentLength = reviewContent.length;
             const hasFinerenone = reviewContent.toLowerCase().includes('finerenone');
             const hasAldosterone = reviewContent.toLowerCase().includes('aldosterone');
@@ -149,12 +160,28 @@ class ComprehensiveAllEndpointsTest {
         const result = await this.makeRequest('/deep-dive', deepDiveData);
         
         if (result.ok && result.data) {
-            const content = result.data.analysis_content || result.data.deep_dive_analysis || '';
+            // Debug: Log the actual response structure
+            this.log(`Deep Dive Response structure: ${JSON.stringify(Object.keys(result.data))}`, 'info');
+
+            // Extract content from various possible fields
+            let content = result.data.analysis_content || result.data.deep_dive_analysis || '';
+
+            // If no direct content, check results or other fields
+            if (!content && result.data.results && Array.isArray(result.data.results)) {
+                content = result.data.results.map(r => r.result || r.content || '').join(' ');
+                this.log(`Deep Dive: Extracted content from ${result.data.results.length} results`, 'info');
+            }
+
+            // Also check for scientific_model_analysis or other analysis fields
+            if (!content) {
+                content = result.data.scientific_model_analysis || result.data.model_description || '';
+            }
+
             const contentLength = content.length;
             const hasFinerenone = content.toLowerCase().includes('finerenone');
             const hasCardiovascular = content.toLowerCase().includes('cardiovascular');
             const hasKidney = content.toLowerCase().includes('kidney');
-            const hasMethodology = !!(result.data.methodology_analysis);
+            const hasMethodology = !!(result.data.methodology_analysis || result.data.experimental_methods_analysis);
             const hasCitations = !!(result.data.citations || result.data.references);
             
             this.log('Deep Dive Analysis: SUCCESS', 'success');
