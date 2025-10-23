@@ -14950,8 +14950,7 @@ async def get_phd_progress_endpoint(
     db: Session = Depends(get_db)
 ):
     """Get PhD progress metrics for a project"""
-    if not PHD_ANALYSIS_AVAILABLE:
-        raise HTTPException(status_code=503, detail="PhD analysis service not available")
+    # PhD progress works without langchain - it uses database data and basic calculations
 
     try:
         logger.info(f"📊 Calculating PhD progress for project {project_id}")
