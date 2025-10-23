@@ -21,11 +21,22 @@ except ImportError as e:
     print(f"Email service import failed: {e}")
     email_service = None
 
-# Step 2.2.1: Import LangChain components for prompt-driven chain (REQUIRED)
-from langchain_core.prompts import PromptTemplate
-from langchain.chains.llm import LLMChain
-LANGCHAIN_AVAILABLE = True
-print("✅ LangChain components loaded successfully")
+# Step 2.2.1: Import LangChain components for prompt-driven chain (OPTIONAL - FALLBACK ENABLED)
+try:
+    from langchain_core.prompts import PromptTemplate
+    from langchain.chains.llm import LLMChain
+    LANGCHAIN_AVAILABLE = True
+    print("✅ LangChain components loaded successfully")
+except ImportError as e:
+    print(f"⚠️ LangChain not available, using fallback: {e}")
+    # Create dummy classes to prevent errors
+    class PromptTemplate:
+        def __init__(self, *args, **kwargs): pass
+        def format(self, *args, **kwargs): return "LangChain not available - using OpenAI directly"
+    class LLMChain:
+        def __init__(self, *args, **kwargs): pass
+        def run(self, *args, **kwargs): return "LangChain not available - using OpenAI directly"
+    LANGCHAIN_AVAILABLE = False
 import json
 import re
 from typing import List, Optional, Dict, Any
@@ -78,8 +89,15 @@ print("✅ Deep dive agents imported successfully")
 from project_summary_agents import ProjectSummaryOrchestrator, ContextEnhancedProjectSummaryOrchestrator, ContractEnhancedProjectSummaryOrchestrator
 PROJECT_SUMMARY_AGENTS_AVAILABLE = True
 print("✅ Project summary agents imported successfully")
-from langchain.agents import AgentType, initialize_agent
-LANGCHAIN_AGENTS_AVAILABLE = True
+try:
+    from langchain.agents import AgentType, initialize_agent
+    LANGCHAIN_AGENTS_AVAILABLE = True
+    print("✅ LangChain agents loaded successfully")
+except ImportError as e:
+    print(f"⚠️ LangChain agents not available: {e}")
+    AgentType = None
+    initialize_agent = None
+    LANGCHAIN_AGENTS_AVAILABLE = False
 from scoring import calculate_publication_score
 
 # Database imports
