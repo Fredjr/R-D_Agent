@@ -1,6 +1,7 @@
 /**
- * Enhanced PhD System Browser Test
+ * Enhanced PhD System Browser Test - REDEPLOYED FOR COMPREHENSIVE TESTING
  * Tests all PhD enhancement features with improved backend data
+ * Updated for comprehensive endpoint testing including Deep Dive and Generate Review
  */
 
 class EnhancedPhDSystemTest {
@@ -255,21 +256,21 @@ class EnhancedPhDSystemTest {
 
     async testDataIntegration() {
         this.log('info', '🔗 Testing Data Integration');
-        
+
         try {
-            // Test API endpoints
+            // Test API endpoints using proper proxy routes
             const projectId = window.location.pathname.split('/').pop();
-            
+
             if (projectId && projectId.length > 10) {
                 this.log('success', `Project ID detected: ${projectId}`);
-                
-                // Test PhD Progress endpoint
+
+                // Test PhD Progress endpoint via proxy
                 try {
                     const response = await fetch(`/api/proxy/projects/${projectId}/phd-progress`);
                     if (response.ok) {
                         const data = await response.json();
                         this.log('success', 'PhD Progress API endpoint working');
-                        
+
                         if (data.dissertation_progress && data.literature_coverage) {
                             this.log('success', 'PhD Progress data structure is correct');
                         } else {
@@ -280,6 +281,42 @@ class EnhancedPhDSystemTest {
                     }
                 } catch (apiError) {
                     this.log('warning', `PhD Progress API test failed: ${apiError.message}`);
+                }
+
+                // Test PhD endpoints via proxy (these should use frontend proxy routes)
+                const phdEndpoints = [
+                    { name: 'Generate Summary', endpoint: `/api/proxy/generate-summary` },
+                    { name: 'Literature Gap Analysis', endpoint: `/api/proxy/literature-gap-analysis` },
+                    { name: 'Thesis Chapter Generator', endpoint: `/api/proxy/thesis-chapter-generator` },
+                    { name: 'Methodology Synthesis', endpoint: `/api/proxy/methodology-synthesis` }
+                ];
+
+                for (const { name, endpoint } of phdEndpoints) {
+                    try {
+                        // Test with minimal payload
+                        const testResponse = await fetch(endpoint, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'User-ID': 'test-user'
+                            },
+                            body: JSON.stringify({
+                                project_id: projectId,
+                                user_id: 'test-user',
+                                test: true
+                            })
+                        });
+
+                        if (testResponse.ok) {
+                            this.log('success', `${name} endpoint accessible via proxy`);
+                        } else if (testResponse.status === 404) {
+                            this.log('warning', `${name} endpoint not found (may need implementation)`);
+                        } else {
+                            this.log('warning', `${name} endpoint returned ${testResponse.status}`);
+                        }
+                    } catch (endpointError) {
+                        this.log('warning', `${name} endpoint test failed: ${endpointError.message}`);
+                    }
                 }
             } else {
                 this.log('warning', 'Could not detect valid project ID from URL');
