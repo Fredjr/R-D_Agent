@@ -10,7 +10,15 @@ import { FolderIcon, UserIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 
-interface Article { title: string; pub_year: number; citation_count: number; pmid?: string }
+interface Article {
+  title: string;
+  pub_year: number;
+  citation_count: number;
+  pmid?: string;
+  journal?: string;
+  authors?: string[];
+  year?: number; // For backward compatibility
+}
 interface AgentResult { summary: string; confidence_score: number; methodologies: string[]; publication_score: number; overall_relevance_score: number }
 export interface ResultData { query?: string; result: AgentResult; articles: Article[] }
 
