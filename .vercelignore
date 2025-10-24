@@ -1,0 +1,36 @@
+# Ignore Python backend files
+*.py
+requirements.txt
+Dockerfile
+Procfile
+*.db
+*.db-journal
+
+# Ignore Python directories
+api/
+services/
+migrations/
+database_models/
+scripts/
+tests/
+models/
+models_cache/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore backend config
+.env
+*.pid
+*.log
+
+# Ignore large files
+node_modules/
+.git/
+.vscode/
+.idea/
+
+# Only build frontend
+!frontend/**
+
