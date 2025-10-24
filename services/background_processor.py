@@ -178,13 +178,16 @@ class BackgroundProcessor:
             # Initialize AI service
             ai_service = SpotifyInspiredRecommendationsService()
 
-            # Process the review (this is the long-running operation)
-            result = await ai_service.generate_comprehensive_review(
-                molecule=molecule,
-                objective=objective,
-                max_results=max_results,
-                user_id=user_id,
-                **kwargs
+            # Process the review (this is the long-running operation) with timeout
+            result = await asyncio.wait_for(
+                ai_service.generate_comprehensive_review(
+                    molecule=molecule,
+                    objective=objective,
+                    max_results=max_results,
+                    user_id=user_id,
+                    **kwargs
+                ),
+                timeout=300.0  # 5 minute timeout for generate review
             )
 
             # Check if result indicates error
@@ -235,6 +238,24 @@ class BackgroundProcessor:
             # Send notification (using extracted report_id, not database object)
             await self._send_completion_notification(job_id, user_id, "generate_review", report_id)
             
+        except asyncio.TimeoutError:
+            logger.error(f"⏰ Generate-review job {job_id} timed out after 5 minutes")
+            error_message = "Generate review timed out after 5 minutes. Please try with a more specific objective or fewer results."
+
+            # Update job status in database with timeout error
+            try:
+                with next(get_db()) as db:
+                    job_record = db.query(BackgroundJob).filter(BackgroundJob.job_id == job_id).first()
+                    if job_record:
+                        job_record.status = JobStatus.FAILED.value
+                        job_record.error_message = error_message
+                        job_record.completed_at = datetime.utcnow()
+                        db.commit()
+            except Exception as db_error:
+                logger.error(f"❌ Failed to update job record for {job_id}: {str(db_error)}")
+
+            await self._update_job_status(job_id, JobStatus.FAILED, error_message=error_message)
+
         except Exception as e:
             logger.error(f"❌ Generate-review job {job_id} failed: {str(e)}", exc_info=True)
 
@@ -281,12 +302,15 @@ class BackgroundProcessor:
             # Initialize deep dive service
             deep_dive_service = DeepDiveService()
 
-            # Process the deep dive (this is the long-running operation)
-            result = await deep_dive_service.analyze_paper(
-                pmid=pmid,
-                article_title=article_title,
-                user_id=user_id,
-                **kwargs
+            # Process the deep dive (this is the long-running operation) with timeout
+            result = await asyncio.wait_for(
+                deep_dive_service.analyze_paper(
+                    pmid=pmid,
+                    article_title=article_title,
+                    user_id=user_id,
+                    **kwargs
+                ),
+                timeout=180.0  # 3 minute timeout for deep dive
             )
 
             # Validate result structure
@@ -344,6 +368,24 @@ class BackgroundProcessor:
             # Send notification
             await self._send_completion_notification(job_id, user_id, "deep_dive", analysis_id)
             
+        except asyncio.TimeoutError:
+            logger.error(f"⏰ Deep-dive job {job_id} timed out after 3 minutes")
+            error_message = "Deep dive analysis timed out after 3 minutes. Please try with a different article or check the PMID."
+
+            # Update job status in database with timeout error
+            try:
+                with next(get_db()) as db:
+                    job_record = db.query(BackgroundJob).filter(BackgroundJob.job_id == job_id).first()
+                    if job_record:
+                        job_record.status = JobStatus.FAILED.value
+                        job_record.error_message = error_message
+                        job_record.completed_at = datetime.utcnow()
+                        db.commit()
+            except Exception as db_error:
+                logger.error(f"❌ Failed to update job record for {job_id}: {str(db_error)}")
+
+            await self._update_job_status(job_id, JobStatus.FAILED, error_message=error_message)
+
         except Exception as e:
             logger.error(f"❌ Deep-dive job {job_id} failed: {str(e)}", exc_info=True)
 
