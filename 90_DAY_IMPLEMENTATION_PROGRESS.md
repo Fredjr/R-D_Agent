@@ -15,11 +15,11 @@ Sprint 2A: ████████████████████ 100% COM
 Sprint 2B: ████████████████████ 100% COMPLETE ✅
 Sprint 3A: ████████████████████ 100% COMPLETE ✅
 Sprint 3B: ████████████████████ 100% COMPLETE ✅ DEPLOYED ✅
-Sprint 4:  ████░░░░░░░░░░░░░░░░  20% IN PROGRESS 🔄
+Sprint 4:  ████████████░░░░░░░░  60% IN PROGRESS 🔄
 Sprint 5:  ░░░░░░░░░░░░░░░░░░░░   0% NOT STARTED
 Sprint 6:  ░░░░░░░░░░░░░░░░░░░░   0% NOT STARTED
 
-Overall: ██████████████░░░░░░ 69% (6/9 sprints complete, 1 in progress)
+Overall: ███████████████░░░░░ 73% (6/9 sprints complete, 1 at 60%)
 ```
 
 ---
@@ -334,9 +334,9 @@ Overall: ██████████████░░░░░░ 69% (6/9 s
 ## 🔄 CURRENT SPRINT
 
 ### Sprint 4: Discovery Tree → Cluster-Aware (Week 4-5)
-**Status**: 🔄 IN PROGRESS (Phase 1 - Core Services)
+**Status**: 🔄 IN PROGRESS (Phase 2 Complete - API & Integration)
 **Start Date**: October 25, 2025
-**Progress**: 20% (2/10 days complete)
+**Progress**: 60% (6/10 days complete)
 
 **Objectives**:
 - Transform discovery tree from flat paper lists to cluster-aware navigation
@@ -344,20 +344,33 @@ Overall: ██████████████░░░░░░ 69% (6/9 s
 - Add cluster navigation and filtering
 - Integrate with Weekly Mix (Sprint 3B) for cluster diversity
 
-**Deliverables Completed**:
+**Phase 1 Completed** (Days 1-3):
 - ✅ Sprint 4 Implementation Plan (`SPRINT_4_PLAN.md`)
 - ✅ Discovery Tree Service (`services/discovery_tree_service.py`)
 - ✅ Cluster Recommendation Service (`services/cluster_recommendation_service.py`)
 
-**In Progress**:
-- 🔄 Database models (ClusterView, ClusterNavigation)
-- 🔄 Unit tests for services
-- 🔄 Cluster tree generation testing
+**Phase 2 Completed** (Days 4-6):
+- ✅ Database models (ClusterView, ClusterNavigation)
+- ✅ Discovery Tree API (7 endpoints)
+  - GET /api/v1/discovery-tree
+  - GET /api/v1/discovery-tree/cluster/{id}
+  - GET /api/v1/discovery-tree/cluster/{id}/papers
+  - GET /api/v1/discovery-tree/cluster/{id}/related
+  - POST /api/v1/discovery-tree/navigate
+  - GET /api/v1/discovery-tree/recommendations
+  - POST /api/v1/discovery-tree/search
+- ✅ API registered in main.py
+- ✅ Comprehensive tests (30+ tests across 3 files)
+  - test_sprint_4_discovery_tree.py (15 tests)
+  - test_sprint_4_cluster_recommendations.py (12 tests)
+  - test_sprint_4_integration.py (10+ tests)
 
-**Next Steps**:
-- Phase 2: Discovery Tree API (7 endpoints)
-- Integration testing with Sprint 2B and 3B
-- Performance optimization and deployment
+**Next Steps** (Phase 3 - Days 7-10):
+- Performance optimization and caching
+- Documentation updates
+- Deployment to Railway and Cloud Run
+- Production validation
+- Sprint 4 completion report
 
 [Full Plan](./SPRINT_4_PLAN.md)
 
