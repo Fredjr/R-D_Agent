@@ -2004,33 +2004,33 @@ PAPERS TO ANALYZE:
 
         parsed_result = parse_result.data
 
-            # Format for UI compatibility (maintain backward compatibility)
-            formatted_gaps = []
-            if "identified_gaps" in parsed_result.get("gap_analysis", {}):
-                for i, gap in enumerate(parsed_result["gap_analysis"]["identified_gaps"][:5]):  # Limit to 5 gaps
-                    formatted_gaps.append({
-                        "id": gap.get("gap_id", f"gap_{i+1}"),
-                        "title": gap.get("gap_title", "Research Gap"),
-                        "description": gap.get("gap_description", "Gap identified through analysis"),
-                        "gap_type": gap.get("gap_type", "theoretical"),
-                        "severity": gap.get("impact_potential", "Medium").lower(),
-                        "research_opportunity": gap.get("gap_description", "Research opportunity identified"),
-                        "potential_impact": gap.get("impact_potential", "Medium"),
-                        "suggested_approaches": ["Literature review", "Empirical study"],
-                        "timeline_estimate": gap.get("timeline_estimate", "6-12 months"),
-                        "related_papers": [paper.get("title", "Unknown") for paper in papers[:3]],
-                        "evidence_strength": gap.get("evidence_strength", "Moderate"),
-                        "severity_score": gap.get("severity_score", 0.5)
-                    })
+        # Format for UI compatibility (maintain backward compatibility)
+        formatted_gaps = []
+        if "identified_gaps" in parsed_result.get("gap_analysis", {}):
+            for i, gap in enumerate(parsed_result["gap_analysis"]["identified_gaps"][:5]):  # Limit to 5 gaps
+                formatted_gaps.append({
+                    "id": gap.get("gap_id", f"gap_{i+1}"),
+                    "title": gap.get("gap_title", "Research Gap"),
+                    "description": gap.get("gap_description", "Gap identified through analysis"),
+                    "gap_type": gap.get("gap_type", "theoretical"),
+                    "severity": gap.get("impact_potential", "Medium").lower(),
+                    "research_opportunity": gap.get("gap_description", "Research opportunity identified"),
+                    "potential_impact": gap.get("impact_potential", "Medium"),
+                    "suggested_approaches": ["Literature review", "Empirical study"],
+                    "timeline_estimate": gap.get("timeline_estimate", "6-12 months"),
+                    "related_papers": [paper.get("title", "Unknown") for paper in papers[:3]],
+                    "evidence_strength": gap.get("evidence_strength", "Moderate"),
+                    "severity_score": gap.get("severity_score", 0.5)
+                })
 
-            # Extract research opportunities
-            research_opportunities = []
-            if "research_opportunities" in parsed_result.get("opportunity_analysis", {}):
-                for opp in parsed_result["opportunity_analysis"]["research_opportunities"][:3]:
-                    research_opportunities.append(opp.get("opportunity_title", "Research opportunity"))
+        # Extract research opportunities
+        research_opportunities = []
+        if "research_opportunities" in parsed_result.get("opportunity_analysis", {}):
+            for opp in parsed_result["opportunity_analysis"]["research_opportunities"][:3]:
+                research_opportunities.append(opp.get("opportunity_title", "Research opportunity"))
 
-            # Combine enhanced and legacy format
-            return {
+        # Combine enhanced and legacy format
+        return {
                 # Enhanced format
                 "enhanced_analysis": parsed_result,
                 "identified_gaps": formatted_gaps,
@@ -2044,13 +2044,6 @@ PAPERS TO ANALYZE:
                 "temporal_gaps": self._convert_to_legacy_gaps(formatted_gaps, "temporal"),
                 "cross_domain_opportunities": parsed_result.get("opportunity_analysis", {}).get("cross_domain_opportunities", [])
             }
-
-        except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse enhanced gap result as JSON: {e}")
-            return self._create_fallback_gap_structure(papers, context_pack)
-        except Exception as e:
-            logger.warning(f"Error parsing enhanced gap result: {e}")
-            return self._create_fallback_gap_structure(papers, context_pack)
 
     async def _fallback_gap_analysis(self, project_data: Dict[str, Any], user_profile: Dict[str, Any] = None) -> Dict[str, Any]:
         """Fallback gap analysis for graceful degradation"""
@@ -2757,57 +2750,50 @@ ANALYSIS RESULTS TO INTEGRATE:
 
         parsed_result = parse_result.data
 
-            # Extract thesis chapters for backward compatibility
-            thesis_chapters = []
-            if "chapters" in parsed_result.get("thesis_structure", {}):
-                for chapter in parsed_result["thesis_structure"]["chapters"]:
-                    # Convert enhanced format to legacy format
-                    legacy_chapter = {
-                        "chapter_number": chapter.get("chapter_number", 1),
-                        "title": chapter.get("title", "Chapter Title"),
-                        "sections": [section.get("section_title", "Section") for section in chapter.get("sections", [])],
-                        "estimated_pages": chapter.get("estimated_pages", 20),
-                        "estimated_words": chapter.get("estimated_words", 5000),
-                        "completion_status": "not_started",
-                        "completion_timeline": chapter.get("completion_timeline", "4-6 weeks"),
-                        "dependencies": chapter.get("dependencies", []),
-                        "quality_criteria": chapter.get("quality_criteria", []),
-                        "chapter_rationale": chapter.get("chapter_rationale", "Essential chapter for dissertation"),
-                        "key_content": {
-                            "sections_detail": chapter.get("sections", []),
-                            "writing_guidelines": chapter.get("writing_guidelines", "Follow academic standards")
-                        }
+        # Extract thesis chapters for backward compatibility
+        thesis_chapters = []
+        if "chapters" in parsed_result.get("thesis_structure", {}):
+            for chapter in parsed_result["thesis_structure"]["chapters"]:
+                # Convert enhanced format to legacy format
+                legacy_chapter = {
+                    "chapter_number": chapter.get("chapter_number", 1),
+                    "title": chapter.get("title", "Chapter Title"),
+                    "sections": [section.get("section_title", "Section") for section in chapter.get("sections", [])],
+                    "estimated_pages": chapter.get("estimated_pages", 20),
+                    "estimated_words": chapter.get("estimated_words", 5000),
+                    "completion_status": "not_started",
+                    "completion_timeline": chapter.get("completion_timeline", "4-6 weeks"),
+                    "dependencies": chapter.get("dependencies", []),
+                    "quality_criteria": chapter.get("quality_criteria", []),
+                    "chapter_rationale": chapter.get("chapter_rationale", "Essential chapter for dissertation"),
+                    "key_content": {
+                        "sections_detail": chapter.get("sections", []),
+                        "writing_guidelines": chapter.get("writing_guidelines", "Follow academic standards")
                     }
-                    thesis_chapters.append(legacy_chapter)
+                }
+                thesis_chapters.append(legacy_chapter)
 
-            # Extract writing guidelines
-            writing_guidelines = parsed_result.get("writing_framework", {}).get("academic_style_guide", {})
+        # Extract writing guidelines
+        writing_guidelines = parsed_result.get("writing_framework", {}).get("academic_style_guide", {})
 
-            # Extract implementation guidance
-            implementation = parsed_result.get("implementation_guidance", {})
+        # Extract implementation guidance
+        implementation = parsed_result.get("implementation_guidance", {})
 
-            # Combine enhanced and legacy format
-            return {
-                # Enhanced format
-                "enhanced_structure": parsed_result,
-                "thesis_chapters": thesis_chapters,
-                "chapter_outlines": self._create_chapter_outlines_from_enhanced(thesis_chapters),
-                "writing_guidelines": writing_guidelines,
-                "estimated_word_counts": self._extract_word_counts_from_enhanced(parsed_result),
-                "completion_timeline": parsed_result.get("thesis_structure", {}).get("completion_timeline", "12-18 months"),
-                "implementation_guidance": implementation,
-                "quality_assurance_protocols": parsed_result.get("quality_assurance", []),
-                # Legacy compatibility
-                "total_estimated_words": parsed_result.get("thesis_structure", {}).get("total_estimated_words", 80000),
-                "total_estimated_pages": parsed_result.get("thesis_structure", {}).get("total_estimated_pages", 300)
-            }
-
-        except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse enhanced structure result as JSON: {e}")
-            return self._create_fallback_structure(papers, analysis_results, context_pack)
-        except Exception as e:
-            logger.warning(f"Error parsing enhanced structure result: {e}")
-            return self._create_fallback_structure(papers, analysis_results, context_pack)
+        # Combine enhanced and legacy format
+        return {
+            # Enhanced format
+            "enhanced_structure": parsed_result,
+            "thesis_chapters": thesis_chapters,
+            "chapter_outlines": self._create_chapter_outlines_from_enhanced(thesis_chapters),
+            "writing_guidelines": writing_guidelines,
+            "estimated_word_counts": self._extract_word_counts_from_enhanced(parsed_result),
+            "completion_timeline": parsed_result.get("thesis_structure", {}).get("completion_timeline", "12-18 months"),
+            "implementation_guidance": implementation,
+            "quality_assurance_protocols": parsed_result.get("quality_assurance", []),
+            # Legacy compatibility
+            "total_estimated_words": parsed_result.get("thesis_structure", {}).get("total_estimated_words", 80000),
+            "total_estimated_pages": parsed_result.get("thesis_structure", {}).get("total_estimated_pages", 300)
+        }
 
     async def _fallback_thesis_structure(self, project_data: Dict[str, Any], analysis_results: Dict[str, Any] = None, user_profile: Dict[str, Any] = None) -> Dict[str, Any]:
         """Fallback thesis structuring for graceful degradation"""
@@ -4166,36 +4152,36 @@ PAPERS TO ANALYZE:
 
         parsed_result = parse_result.data
 
-            # Extract data for backward compatibility
-            author_network = parsed_result.get("author_network", {})
-            influence_analysis = parsed_result.get("influence_analysis", {})
-            research_communities = parsed_result.get("research_communities", {})
-            strategic_recommendations = parsed_result.get("strategic_recommendations", [])
+        # Extract data for backward compatibility
+        author_network = parsed_result.get("author_network", {})
+        influence_analysis = parsed_result.get("influence_analysis", {})
+        research_communities = parsed_result.get("research_communities", {})
+        strategic_recommendations = parsed_result.get("strategic_recommendations", [])
 
-            # Convert to legacy format
-            legacy_influence_scores = []
-            if "top_influencers" in influence_analysis:
-                for influencer in influence_analysis["top_influencers"][:10]:
-                    legacy_influence_scores.append({
-                        "author": influencer.get("author", "Unknown"),
-                        "influence_score": influencer.get("influence_score", 0.5),
-                        "citation_impact": influencer.get("citation_impact", 0),
-                        "key_contributions": influencer.get("key_contributions", [])
-                    })
+        # Convert to legacy format
+        legacy_influence_scores = []
+        if "top_influencers" in influence_analysis:
+            for influencer in influence_analysis["top_influencers"][:10]:
+                legacy_influence_scores.append({
+                    "author": influencer.get("author", "Unknown"),
+                    "influence_score": influencer.get("influence_score", 0.5),
+                    "citation_impact": influencer.get("citation_impact", 0),
+                    "key_contributions": influencer.get("key_contributions", [])
+                })
 
-            legacy_collaboration_patterns = {}
-            if "collaboration_clusters" in author_network:
-                for cluster in author_network["collaboration_clusters"][:5]:
-                    cluster_id = cluster.get("cluster_id", "cluster_unknown")
-                    legacy_collaboration_patterns[cluster_id] = {
-                        "cluster_name": cluster.get("cluster_name", "Research Cluster"),
-                        "core_members": cluster.get("core_members", []),
-                        "collaboration_strength": cluster.get("collaboration_strength", 0.5),
-                        "research_focus": cluster.get("research_focus", "Research focus")
-                    }
+        legacy_collaboration_patterns = {}
+        if "collaboration_clusters" in author_network:
+            for cluster in author_network["collaboration_clusters"][:5]:
+                cluster_id = cluster.get("cluster_id", "cluster_unknown")
+                legacy_collaboration_patterns[cluster_id] = {
+                    "cluster_name": cluster.get("cluster_name", "Research Cluster"),
+                    "core_members": cluster.get("core_members", []),
+                    "collaboration_strength": cluster.get("collaboration_strength", 0.5),
+                    "research_focus": cluster.get("research_focus", "Research focus")
+                }
 
-            # Combine enhanced and legacy format
-            return {
+        # Combine enhanced and legacy format
+        return {
                 # Enhanced format
                 "enhanced_network": parsed_result,
                 "author_network": author_network,
@@ -4210,13 +4196,6 @@ PAPERS TO ANALYZE:
                 "total_communities": len(research_communities.get("identified_communities", [])),
                 "collaboration_score": self._calculate_overall_collaboration_score(parsed_result)
             }
-
-        except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse enhanced network result as JSON: {e}")
-            return self._create_fallback_network(papers, context_pack)
-        except Exception as e:
-            logger.warning(f"Error parsing enhanced network result: {e}")
-            return self._create_fallback_network(papers, context_pack)
 
     async def _fallback_citation_network(self, project_data: Dict[str, Any], user_profile: Dict[str, Any] = None) -> Dict[str, Any]:
         """Fallback citation network analysis for graceful degradation"""
