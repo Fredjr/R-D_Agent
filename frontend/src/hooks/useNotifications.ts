@@ -48,12 +48,12 @@ export function useNotifications(): UseNotificationsReturn {
   const connectionFailedRef = useRef(false);
 
   const connect = useCallback(() => {
-    if (!user?.email || connectionFailedRef.current) {
+    if (!user?.user_id || connectionFailedRef.current) {
       return;
     }
 
-    const userEmail = user.email;
-    const wsUrl = `${WEBSOCKET_URL}/${encodeURIComponent(userEmail)}`;
+    const userId = user.user_id;
+    const wsUrl = `${WEBSOCKET_URL}/${encodeURIComponent(userId)}`;
 
     try {
       console.log(`🔗 Attempting WebSocket connection to: ${wsUrl}`);
@@ -240,7 +240,7 @@ export function useNotifications(): UseNotificationsReturn {
 
   // Connect/disconnect WebSocket based on user authentication
   useEffect(() => {
-    if (user?.email) {
+    if (user?.user_id) {
       connect();
     } else {
       disconnect();

@@ -493,7 +493,11 @@ export class UserProfileSystem {
       ...profile.behavior.paper_views.filter(v => v.timestamp > cutoff),
       ...profile.behavior.searches.filter(s => s.timestamp > cutoff),
       ...profile.behavior.deep_dives.filter(d => d.timestamp > cutoff)
-    ].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    ].sort((a, b) => {
+      const aTime = a.timestamp instanceof Date ? a.timestamp : new Date(a.timestamp);
+      const bTime = b.timestamp instanceof Date ? b.timestamp : new Date(b.timestamp);
+      return bTime.getTime() - aTime.getTime();
+    });
   }
 
   private queueBehaviorUpdate(userId: string, action: string, data: any): void {

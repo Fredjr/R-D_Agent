@@ -278,11 +278,12 @@ class WeeklyMixAutomationSystem {
   private getRecentUserPapers(userId: string): Array<{pmid: string, title: string}> {
     try {
       const activityHistory = this.activityHistory.get(userId) || [];
-      const recentActivity = activityHistory.filter(a =>
-        a.type === 'bookmark' &&
-        a.pmid &&
-        new Date().getTime() - a.timestamp.getTime() < 7 * 24 * 60 * 60 * 1000 // Last 7 days
-      );
+      const recentActivity = activityHistory.filter(a => {
+        const timestamp = a.timestamp instanceof Date ? a.timestamp : new Date(a.timestamp);
+        return a.type === 'bookmark' &&
+          a.pmid &&
+          new Date().getTime() - timestamp.getTime() < 7 * 24 * 60 * 60 * 1000; // Last 7 days
+      });
 
       return recentActivity.map(a => ({
         pmid: a.pmid!,
@@ -330,9 +331,10 @@ class WeeklyMixAutomationSystem {
    * Analyze search patterns
    */
   private analyzeSearchPatterns(searchHistory: SearchHistoryEntry[]): any {
-    const recentSearches = searchHistory.filter(s => 
-      new Date().getTime() - s.timestamp.getTime() < 30 * 24 * 60 * 60 * 1000 // Last 30 days
-    );
+    const recentSearches = searchHistory.filter(s => {
+      const timestamp = s.timestamp instanceof Date ? s.timestamp : new Date(s.timestamp);
+      return new Date().getTime() - timestamp.getTime() < 30 * 24 * 60 * 60 * 1000; // Last 30 days
+    });
 
     const queryTerms = recentSearches.flatMap(s => s.query.toLowerCase().split(' '));
     const termFrequency = queryTerms.reduce((acc, term) => {
@@ -360,9 +362,10 @@ class WeeklyMixAutomationSystem {
    * Analyze activity patterns
    */
   private analyzeActivityPatterns(activityHistory: ActivityEntry[]): any {
-    const recentActivity = activityHistory.filter(a => 
-      new Date().getTime() - a.timestamp.getTime() < 30 * 24 * 60 * 60 * 1000 // Last 30 days
-    );
+    const recentActivity = activityHistory.filter(a => {
+      const timestamp = a.timestamp instanceof Date ? a.timestamp : new Date(a.timestamp);
+      return new Date().getTime() - timestamp.getTime() < 30 * 24 * 60 * 60 * 1000; // Last 30 days
+    });
 
     const typeDistribution = recentActivity.reduce((acc, a) => {
       acc[a.type] = (acc[a.type] || 0) + 1;
@@ -429,8 +432,14 @@ class WeeklyMixAutomationSystem {
       activitiesThisWeek: recentActivity.length,
       engagementScore: (recentSearches.length * 0.3 + recentActivity.length * 0.7) / 7, // Daily average
       lastActiveDate: Math.max(
-        ...searchHistory.map(s => s.timestamp.getTime()),
-        ...activityHistory.map(a => a.timestamp.getTime())
+        ...searchHistory.map(s => {
+          const timestamp = s.timestamp instanceof Date ? s.timestamp : new Date(s.timestamp);
+          return timestamp.getTime();
+        }),
+        ...activityHistory.map(a => {
+          const timestamp = a.timestamp instanceof Date ? a.timestamp : new Date(a.timestamp);
+          return timestamp.getTime();
+        })
       )
     };
   }

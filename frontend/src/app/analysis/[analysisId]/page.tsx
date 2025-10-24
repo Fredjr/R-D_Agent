@@ -221,7 +221,41 @@ export default function AnalysisDetailPage() {
   const experimentalMethods = analysis.experimental_methods_analysis;
   const resultsInterpretation = analysis.results_interpretation_analysis;
 
-  const hasContent = scientificModel || experimentalMethods || resultsInterpretation;
+  // Enhanced content checking - look for actual content, not just empty objects
+  const hasScientificModelContent = scientificModel && (
+    scientificModel.model_type ||
+    scientificModel.study_design ||
+    scientificModel.population_description ||
+    scientificModel.protocol_summary ||
+    scientificModel.strengths ||
+    scientificModel.limitations
+  );
+
+  const hasExperimentalMethodsContent = experimentalMethods && (
+    Array.isArray(experimentalMethods) ? experimentalMethods.length > 0 :
+    (typeof experimentalMethods === 'object' && Object.keys(experimentalMethods).length > 0)
+  );
+
+  const hasResultsInterpretationContent = resultsInterpretation && (
+    resultsInterpretation.hypothesis_alignment ||
+    (resultsInterpretation.key_results && resultsInterpretation.key_results.length > 0) ||
+    (resultsInterpretation.limitations_biases_in_results && resultsInterpretation.limitations_biases_in_results.length > 0) ||
+    (resultsInterpretation.fact_anchors && resultsInterpretation.fact_anchors.length > 0)
+  );
+
+  const hasContent = hasScientificModelContent || hasExperimentalMethodsContent || hasResultsInterpretationContent;
+
+  // Debug logging
+  console.log('🔍 Analysis Content Debug:', {
+    analysisId: analysis.analysis_id,
+    scientificModel,
+    experimentalMethods,
+    resultsInterpretation,
+    hasScientificModelContent,
+    hasExperimentalMethodsContent,
+    hasResultsInterpretationContent,
+    hasContent
+  });
 
 
 
@@ -348,35 +382,81 @@ export default function AnalysisDetailPage() {
 
               {/* Tab Content */}
               <div className="mt-6">
-                {activeTab === 'Model' && scientificModel && (
-                  <ScientificModelCard data={scientificModel} />
+                {activeTab === 'Model' && (
+                  <>
+                    {hasScientificModelContent ? (
+                      <ScientificModelCard data={scientificModel} />
+                    ) : scientificModel ? (
+                      <div className="text-center py-8">
+                        <div className="text-gray-500 mb-4">
+                          Scientific model analysis completed but contains empty fields
+                        </div>
+                        <div className="text-sm text-gray-400 bg-gray-50 p-4 rounded-lg">
+                          <p className="mb-2"><strong>Debug Info:</strong></p>
+                          <p>Analysis ID: {analysis.analysis_id}</p>
+                          <p>PMID: {analysis.article_pmid}</p>
+                          <p>Status: {analysis.processing_status}</p>
+                          <p>Model Type: "{scientificModel.model_type || 'empty'}"</p>
+                          <p>Study Design: "{scientificModel.study_design || 'empty'}"</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        Scientific model analysis not available
+                      </div>
+                    )}
+                  </>
                 )}
 
-                {activeTab === 'Methods' && experimentalMethods && (
-                  <ExperimentalMethodsTable data={experimentalMethods} />
+                {activeTab === 'Methods' && (
+                  <>
+                    {hasExperimentalMethodsContent ? (
+                      <ExperimentalMethodsTable data={experimentalMethods} />
+                    ) : experimentalMethods ? (
+                      <div className="text-center py-8">
+                        <div className="text-gray-500 mb-4">
+                          Experimental methods analysis completed but contains no methods
+                        </div>
+                        <div className="text-sm text-gray-400 bg-gray-50 p-4 rounded-lg">
+                          <p className="mb-2"><strong>Debug Info:</strong></p>
+                          <p>Analysis ID: {analysis.analysis_id}</p>
+                          <p>Methods Type: {Array.isArray(experimentalMethods) ? 'Array' : 'Object'}</p>
+                          <p>Methods Length: {Array.isArray(experimentalMethods) ? experimentalMethods.length : Object.keys(experimentalMethods).length}</p>
+                          <p>Methods Content: {JSON.stringify(experimentalMethods).substring(0, 200)}...</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        Experimental methods analysis not available
+                      </div>
+                    )}
+                  </>
                 )}
 
-                {activeTab === 'Results' && resultsInterpretation && (
-                  <ResultsInterpretationCard data={resultsInterpretation} />
-                )}
-
-                {/* Fallback for missing data */}
-                {activeTab === 'Model' && !scientificModel && (
-                  <div className="text-center py-8 text-gray-500">
-                    Scientific model analysis not available
-                  </div>
-                )}
-
-                {activeTab === 'Methods' && !experimentalMethods && (
-                  <div className="text-center py-8 text-gray-500">
-                    Experimental methods analysis not available
-                  </div>
-                )}
-
-                {activeTab === 'Results' && !resultsInterpretation && (
-                  <div className="text-center py-8 text-gray-500">
-                    Results interpretation analysis not available
-                  </div>
+                {activeTab === 'Results' && (
+                  <>
+                    {hasResultsInterpretationContent ? (
+                      <ResultsInterpretationCard data={resultsInterpretation} />
+                    ) : resultsInterpretation ? (
+                      <div className="text-center py-8">
+                        <div className="text-gray-500 mb-4">
+                          Results interpretation analysis completed but contains empty fields
+                        </div>
+                        <div className="text-sm text-gray-400 bg-gray-50 p-4 rounded-lg">
+                          <p className="mb-2"><strong>Debug Info:</strong></p>
+                          <p>Analysis ID: {analysis.analysis_id}</p>
+                          <p>Hypothesis Alignment: "{resultsInterpretation.hypothesis_alignment || 'empty'}"</p>
+                          <p>Key Results: {resultsInterpretation.key_results?.length || 0} items</p>
+                          <p>Limitations: {resultsInterpretation.limitations_biases_in_results?.length || 0} items</p>
+                          <p>Fact Anchors: {resultsInterpretation.fact_anchors?.length || 0} items</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        Results interpretation analysis not available
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 

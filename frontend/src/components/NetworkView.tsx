@@ -764,74 +764,76 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           }
         }
 
-        // ARTICLE-SPECIFIC FALLBACK: Create a network based on the selected article's metadata
-        console.log('Both article networks empty, creating article-specific network...');
+        // ARTICLE-SPECIFIC FALLBACK: Only create synthetic network if PubMed fallback also failed
+        if (!data.nodes || data.nodes.length <= 1) {
+          console.log('Both article networks empty, creating article-specific network...');
 
-        // Use passed articleMetadata if available, otherwise try to find in current network
-        let originalArticle;
+          // Use passed articleMetadata if available, otherwise try to find in current network
+          let originalArticle;
 
-        if (articleMetadata) {
-          console.log('🎯 Using passed article metadata:', articleMetadata.title);
-          originalArticle = {
-            id: sourceId,
-            metadata: articleMetadata
-          };
-        } else {
-          // Try to get the original article data from the current network nodes
-          const currentNodes = networkData?.nodes || [];
-          originalArticle = currentNodes.find(node => node.id === sourceId);
-
-          // If not found in current network, create a basic article node from the sourceId
-          if (!originalArticle) {
-            console.log('🔧 Article not found in current network, creating from sourceId:', sourceId);
+          if (articleMetadata) {
+            console.log('🎯 Using passed article metadata:', articleMetadata.title);
             originalArticle = {
               id: sourceId,
-              metadata: {
-                pmid: sourceId,
-                title: `Article ${sourceId}`,
-                authors: [],
-                journal: '',
-                year: new Date().getFullYear(),
-                citation_count: 0
-              }
+              metadata: articleMetadata
             };
+          } else {
+            // Try to get the original article data from the current network nodes
+            const currentNodes = networkData?.nodes || [];
+            originalArticle = currentNodes.find(node => node.id === sourceId);
+
+            // If not found in current network, create a basic article node from the sourceId
+            if (!originalArticle) {
+              console.log('🔧 Article not found in current network, creating from sourceId:', sourceId);
+              originalArticle = {
+                id: sourceId,
+                metadata: {
+                  pmid: sourceId,
+                  title: `Article ${sourceId}`,
+                  authors: [],
+                  journal: '',
+                  year: new Date().getFullYear(),
+                  citation_count: 0
+                }
+              };
+            }
           }
-        }
 
-        console.log('🎯 Creating article-specific network for:', originalArticle.metadata?.title);
+          console.log('🎯 Creating article-specific network for:', originalArticle.metadata?.title);
 
-        // Create a synthetic network based on the article's metadata
-        const syntheticNetwork = createArticleSpecificNetwork(originalArticle, sourceId);
-        console.log('🔧 Synthetic network created:', {
-          nodesCount: syntheticNetwork.nodes.length,
-          edgesCount: syntheticNetwork.edges.length
-        });
-
-        // Set the synthetic network data and let it fall through to React Flow conversion
-        data = syntheticNetwork;
-
-        // FINAL DEMO FALLBACK: If we can't create article-specific network, show demo
-        console.log('Creating final demo fallback network with real PubMed data...');
-        const demoResponse = await fetch('/api/proxy/pubmed/network?pmid=33462507&type=citations&limit=10', {
-          headers: {
-            'User-ID': user?.email || 'default_user',
-          },
-        });
-        if (demoResponse.ok) {
-          const demoData = await demoResponse.json();
-          console.log('🎯 Demo multi-column network:', {
-            nodesCount: demoData.nodes?.length || 0,
-            edgesCount: demoData.edges?.length || 0
+          // Create a synthetic network based on the article's metadata
+          const syntheticNetwork = createArticleSpecificNetwork(originalArticle, sourceId);
+          console.log('🔧 Synthetic network created:', {
+            nodesCount: syntheticNetwork.nodes.length,
+            edgesCount: syntheticNetwork.edges.length
           });
-          if (demoData.nodes && demoData.nodes.length > 1) {
-            // Add demo indicator to metadata
-            demoData.metadata = {
-              ...demoData.metadata,
-              demo_mode: true,
-              demo_message: `Demo: Real PubMed citation network (original article data not available)`
-            };
-            console.log('🔧 Using final PubMed demo fallback, will convert to React Flow format');
-            data = demoData;
+
+          // Set the synthetic network data and let it fall through to React Flow conversion
+          data = syntheticNetwork;
+
+          // FINAL DEMO FALLBACK: If we can't create article-specific network, show demo
+          console.log('Creating final demo fallback network with real PubMed data...');
+          const demoResponse = await fetch('/api/proxy/pubmed/network?pmid=33462507&type=citations&limit=10', {
+            headers: {
+              'User-ID': user?.email || 'default_user',
+            },
+          });
+          if (demoResponse.ok) {
+            const demoData = await demoResponse.json();
+            console.log('🎯 Demo multi-column network:', {
+              nodesCount: demoData.nodes?.length || 0,
+              edgesCount: demoData.edges?.length || 0
+            });
+            if (demoData.nodes && demoData.nodes.length > 1) {
+              // Add demo indicator to metadata
+              demoData.metadata = {
+                ...demoData.metadata,
+                demo_mode: true,
+                demo_message: `Demo: Real PubMed citation network (original article data not available)`
+              };
+              console.log('🔧 Using final PubMed demo fallback, will convert to React Flow format');
+              data = demoData;
+            }
           }
         }
       }
