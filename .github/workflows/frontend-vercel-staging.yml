@@ -45,5 +45,5 @@ jobs:
           cd frontend
           npx vercel --version | cat
           npx vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
-          npx vercel build --token "$VERCEL_TOKEN"
+          npx vercel build --prod --token "$VERCEL_TOKEN"
           npx vercel deploy --prebuilt --prod --token "$VERCEL_TOKEN"
