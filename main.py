@@ -6314,7 +6314,6 @@ async def list_projects(request: Request, db: Session = Depends(get_db)):
     """List all projects for the current user"""
     current_user = request.headers.get("User-ID", "default_user")
 
-    # TEMPORARY FIX: For testing, return all active projects if no user-specific projects found
     # Get projects owned by user
     owned_projects = db.query(Project).filter(
         Project.owner_user_id == current_user,
@@ -6328,9 +6327,8 @@ async def list_projects(request: Request, db: Session = Depends(get_db)):
         Project.is_active == True
     ).all()
 
-    # TEMPORARY: If no user-specific projects found, return all active projects for testing
-    if not owned_projects and not collaborated_projects:
-        owned_projects = db.query(Project).filter(Project.is_active == True).limit(20).all()
+    # SECURITY FIX: Never return all projects - only return user-specific projects
+    # If user has no projects, return empty list (this is correct behavior)
     
     # Combine and deduplicate
     all_projects = list({p.project_id: p for p in owned_projects + collaborated_projects}.values())
