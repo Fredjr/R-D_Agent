@@ -835,7 +835,12 @@ class LiteratureReviewAgent:
             return await self._fallback_clustering(papers_text)
         
         try:
-            papers = json.loads(papers_text)
+            # Use flexible parser for papers data
+            parse_result = parse_llm_json(papers_text, expected_structure=[], fallback_factory=lambda: [])
+            if parse_result.success and isinstance(parse_result.data, list):
+                papers = parse_result.data
+            else:
+                papers = []
             texts = [f"{p.get('title', '')} {p.get('abstract', '')}" for p in papers]
             
             # Generate embeddings
@@ -883,7 +888,9 @@ class LiteratureReviewAgent:
     
     async def _fallback_clustering(self, papers_text: str) -> Dict[str, Any]:
         """Fallback clustering when embeddings are not available"""
-        papers = json.loads(papers_text)
+        # Use flexible parser for papers data
+        parse_result = parse_llm_json(papers_text, expected_structure=[], fallback_factory=lambda: [])
+        papers = parse_result.data if parse_result.success and isinstance(parse_result.data, list) else []
         # Simple keyword-based clustering
         return {
             'clusters': {0: [{'paper': p, 'similarity_score': 0.5} for p in papers]},
@@ -961,12 +968,15 @@ class LiteratureReviewAgent:
         }
     
     def _parse_agent_result(self, result: Any) -> Dict[str, Any]:
-        """Parse result from LangChain agent"""
+        """Parse result from LangChain agent with flexible JSON parser"""
         if isinstance(result, dict) and 'output' in result:
-            try:
-                return json.loads(result['output'])
-            except json.JSONDecodeError:
-                return {'analysis': result['output']}
+            # Use flexible parser for agent output
+            parse_result = parse_llm_json(
+                result['output'],
+                expected_structure=None,
+                fallback_factory=lambda: {'analysis': result['output']}
+            )
+            return parse_result.data if parse_result.success else {'analysis': result['output']}
         return {'analysis': str(result)}
 
     def _parse_enhanced_result(self, result: Dict[str, Any]) -> Dict[str, Any]:
@@ -1276,35 +1286,22 @@ class MethodologySynthesisAgent:
             }
 
     def _parse_enhanced_methodology_result(self, result: Dict[str, Any]) -> Dict[str, Any]:
-        """Parse enhanced methodology synthesis result with error handling"""
-        try:
-            # Extract text from LLM result
-            text = result.get("text", result) if isinstance(result, dict) else str(result)
+        """Parse enhanced methodology synthesis result with flexible JSON parser"""
+        # Extract text from LLM result
+        text = result.get("text", result) if isinstance(result, dict) else str(result)
 
-            # Clean and parse JSON
-            if "```json" in text:
-                text = text.split("```json")[1].split("```")[0].strip()
-            elif "```" in text:
-                text = text.split("```")[1].split("```")[0].strip()
+        # Define expected structure
+        expected_structure = {
+            "methodology_synthesis": {"quantitative_methods": [], "qualitative_methods": [], "mixed_methods": []},
+            "methodological_innovations": [],
+            "quality_assessment": {"methodological_rigor_analysis": [], "risk_of_bias_assessment": []},
+            "comparative_analysis": [],
+            "implementation_guidance": {"methodology_selection_framework": [], "quality_assurance_protocols": []},
+            "research_recommendations": []
+        }
 
-            # Parse JSON
-            parsed_result = json.loads(text)
-
-            # Validate required structure
-            required_keys = [
-                "methodology_synthesis", "methodological_innovations", "quality_assessment",
-                "comparative_analysis", "implementation_guidance", "research_recommendations"
-            ]
-
-            for key in required_keys:
-                if key not in parsed_result:
-                    parsed_result[key] = {}
-
-            return parsed_result
-
-        except (json.JSONDecodeError, KeyError, IndexError) as e:
-            logger.warning(f"Failed to parse enhanced methodology result: {e}")
-            # Return structured fallback
+        # Fallback factory
+        def create_fallback():
             return {
                 "methodology_synthesis": {"quantitative_methods": [], "qualitative_methods": [], "mixed_methods": []},
                 "methodological_innovations": [],
@@ -1312,9 +1309,17 @@ class MethodologySynthesisAgent:
                 "comparative_analysis": [],
                 "implementation_guidance": {"methodology_selection_framework": [], "quality_assurance_protocols": []},
                 "research_recommendations": [],
-                "parsing_error": str(e),
-                "raw_output": str(result)[:500]  # First 500 chars for debugging
+                "parsing_note": "Used fallback structure due to parsing issues"
             }
+
+        # Use flexible parser
+        parse_result = parse_llm_json(text, expected_structure, create_fallback)
+
+        if parse_result.success:
+            return parse_result.data
+        else:
+            logger.warning(f"Failed to parse enhanced methodology result: {parse_result.error}")
+            return create_fallback()
 
     async def _fallback_methodology_synthesis(self, methodologies: List, statistical_methods: List,
                                             experimental_designs: List, papers: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -1974,26 +1979,30 @@ PAPERS TO ANALYZE:
             return await self._fallback_gap_analysis(project_data, user_profile)
 
     def _parse_enhanced_gap_result(self, result: Dict[str, Any], papers: List[Dict[str, Any]], context_pack: Dict[str, Any]) -> Dict[str, Any]:
-        """Parse enhanced gap analysis result with structured validation"""
-        try:
-            # Extract text from LLM result
-            text = result.get("text", result) if isinstance(result, dict) else str(result)
+        """Parse enhanced gap analysis result with flexible JSON parser"""
+        # Extract text from LLM result
+        text = result.get("text", result) if isinstance(result, dict) else str(result)
 
-            # Extract JSON from markdown code blocks if present
-            if "```json" in text:
-                text = text.split("```json")[1].split("```")[0].strip()
-            elif "```" in text:
-                text = text.split("```")[1].split("```")[0].strip()
+        # Define expected structure
+        expected_structure = {
+            "gap_analysis": {"identified_gaps": []},
+            "opportunity_analysis": {"research_opportunities": [], "cross_domain_opportunities": []},
+            "evidence_assessment": {"evidence_quality": [], "methodological_assessment": []},
+            "actionable_recommendations": []
+        }
 
-            # Parse JSON result
-            parsed_result = json.loads(text)
+        # Fallback factory
+        def create_fallback():
+            return self._create_fallback_gap_structure(papers, context_pack)
 
-            # Validate required structure
-            required_keys = ["gap_analysis", "opportunity_analysis", "evidence_assessment", "actionable_recommendations"]
-            for key in required_keys:
-                if key not in parsed_result:
-                    logger.warning(f"Missing required key: {key}")
-                    parsed_result[key] = {}
+        # Use flexible parser
+        parse_result = parse_llm_json(text, expected_structure, create_fallback)
+
+        if not parse_result.success:
+            logger.warning(f"Failed to parse enhanced gap result: {parse_result.error}")
+            return create_fallback()
+
+        parsed_result = parse_result.data
 
             # Format for UI compatibility (maintain backward compatibility)
             formatted_gaps = []
@@ -2723,26 +2732,30 @@ ANALYSIS RESULTS TO INTEGRATE:
 
     def _parse_enhanced_structure_result(self, result: Dict[str, Any], papers: List[Dict[str, Any]],
                                        analysis_results: Dict[str, Any], context_pack: Dict[str, Any]) -> Dict[str, Any]:
-        """Parse enhanced thesis structure result with structured validation"""
-        try:
-            # Extract text from LLM result
-            text = result.get("text", result) if isinstance(result, dict) else str(result)
+        """Parse enhanced thesis structure result with flexible JSON parser"""
+        # Extract text from LLM result
+        text = result.get("text", result) if isinstance(result, dict) else str(result)
 
-            # Extract JSON from markdown code blocks if present
-            if "```json" in text:
-                text = text.split("```json")[1].split("```")[0].strip()
-            elif "```" in text:
-                text = text.split("```")[1].split("```")[0].strip()
+        # Define expected structure
+        expected_structure = {
+            "thesis_structure": {"chapters": [], "total_estimated_words": 80000, "total_estimated_pages": 300},
+            "writing_framework": {"academic_style_guide": {}},
+            "implementation_guidance": {"practical_recommendations": [], "resource_requirements": []},
+            "quality_assurance": []
+        }
 
-            # Parse JSON result
-            parsed_result = json.loads(text)
+        # Fallback factory
+        def create_fallback():
+            return self._create_fallback_structure(papers, analysis_results, context_pack)
 
-            # Validate required structure
-            required_keys = ["thesis_structure", "writing_framework", "implementation_guidance", "quality_assurance"]
-            for key in required_keys:
-                if key not in parsed_result:
-                    logger.warning(f"Missing required key: {key}")
-                    parsed_result[key] = {}
+        # Use flexible parser
+        parse_result = parse_llm_json(text, expected_structure, create_fallback)
+
+        if not parse_result.success:
+            logger.warning(f"Failed to parse enhanced structure result: {parse_result.error}")
+            return create_fallback()
+
+        parsed_result = parse_result.data
 
             # Extract thesis chapters for backward compatibility
             thesis_chapters = []
@@ -4128,26 +4141,30 @@ PAPERS TO ANALYZE:
             return await self._fallback_citation_network(project_data, user_profile)
 
     def _parse_enhanced_network_result(self, result: Dict[str, Any], papers: List[Dict[str, Any]], context_pack: Dict[str, Any]) -> Dict[str, Any]:
-        """Parse enhanced citation network result with structured validation"""
-        try:
-            # Extract text from LLM result
-            text = result.get("text", result) if isinstance(result, dict) else str(result)
+        """Parse enhanced citation network result with flexible JSON parser"""
+        # Extract text from LLM result
+        text = result.get("text", result) if isinstance(result, dict) else str(result)
 
-            # Extract JSON from markdown code blocks if present
-            if "```json" in text:
-                text = text.split("```json")[1].split("```")[0].strip()
-            elif "```" in text:
-                text = text.split("```")[1].split("```")[0].strip()
+        # Define expected structure
+        expected_structure = {
+            "author_network": {"key_authors": []},
+            "influence_analysis": {"top_influencers": []},
+            "research_communities": {"identified_communities": []},
+            "strategic_recommendations": []
+        }
 
-            # Parse JSON result
-            parsed_result = json.loads(text)
+        # Fallback factory
+        def create_fallback():
+            return self._create_fallback_network(papers, context_pack)
 
-            # Validate required structure
-            required_keys = ["author_network", "influence_analysis", "research_communities", "strategic_recommendations"]
-            for key in required_keys:
-                if key not in parsed_result:
-                    logger.warning(f"Missing required key: {key}")
-                    parsed_result[key] = {}
+        # Use flexible parser
+        parse_result = parse_llm_json(text, expected_structure, create_fallback)
+
+        if not parse_result.success:
+            logger.warning(f"Failed to parse enhanced network result: {parse_result.error}")
+            return create_fallback()
+
+        parsed_result = parse_result.data
 
             # Extract data for backward compatibility
             author_network = parsed_result.get("author_network", {})

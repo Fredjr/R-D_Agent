@@ -9,11 +9,39 @@ from __future__ import annotations
 import json
 from typing import Dict, List, Any, Optional
 from datetime import datetime
+from services.flexible_json_parser import parse_llm_json
 
-from langchain.chains import LLMChain
-from langchain.prompts import PromptTemplate
-from langchain.agents import AgentType, initialize_agent
-from langchain.tools import Tool
+try:
+    from langchain.chains import LLMChain
+    from langchain.prompts import PromptTemplate
+    from langchain.agents import AgentType, initialize_agent
+    from langchain.tools import Tool
+    LANGCHAIN_AVAILABLE = True
+except ImportError:
+    print("⚠️ LangChain not available in project_summary_agents, using dummy classes")
+    class LLMChain:
+        def __init__(self, *args, **kwargs):
+            pass
+        def run(self, *args, **kwargs):
+            return "LangChain not available"
+
+    class PromptTemplate:
+        def __init__(self, *args, **kwargs):
+            pass
+        def format(self, *args, **kwargs):
+            return "LangChain not available"
+
+    class AgentType:
+        pass
+
+    def initialize_agent(*args, **kwargs):
+        return None
+
+    class Tool:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    LANGCHAIN_AVAILABLE = False
 
 
 # =============================================================================
@@ -269,19 +297,24 @@ class ProjectSummaryOrchestrator:
         return results
     
     async def _execute_agent(self, chain: LLMChain, inputs: Dict[str, str]) -> Dict[str, Any]:
-        """Execute an agent chain and parse JSON response"""
+        """Execute an agent chain and parse JSON response with flexible parser"""
         try:
             raw_result = await chain.ainvoke(inputs)
             text = raw_result.get('text', raw_result) if isinstance(raw_result, dict) else str(raw_result)
-            
-            # Clean and parse JSON
-            cleaned_text = text.strip()
-            if cleaned_text.startswith('```json'):
-                cleaned_text = cleaned_text[7:]
-            if cleaned_text.endswith('```'):
-                cleaned_text = cleaned_text[:-3]
-            
-            return json.loads(cleaned_text.strip())
+
+            # Use flexible JSON parser
+            parse_result = parse_llm_json(
+                text,
+                expected_structure=None,
+                fallback_factory=lambda: {"error": "Parsing failed", "raw_output": text}
+            )
+
+            if parse_result.success:
+                return parse_result.data
+            else:
+                print(f"Agent execution parsing failed: {parse_result.error}")
+                return {"error": parse_result.error, "raw_output": text}
+
         except Exception as e:
             print(f"Agent execution error: {e}")
             return {"error": str(e), "raw_output": text if 'text' in locals() else ""}
@@ -566,10 +599,14 @@ class ContextEnhancedProjectSummaryOrchestrator:
             result = chain.invoke(context_vars)
 
             text_result = result.get("text", result) if isinstance(result, dict) else str(result)
-            if "```" in text_result:
-                text_result = text_result.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
 
-            return json.loads(text_result)
+            # Use flexible JSON parser
+            parse_result = parse_llm_json(text_result, expected_structure=None, fallback_factory=None)
+            if parse_result.success:
+                return parse_result.data
+            else:
+                # If flexible parser fails, try fallback
+                raise Exception(f"JSON parsing failed: {parse_result.error}")
         except Exception:
             # Fallback to basic analysis
             basic_agent = ReportsAnalysisAgent()
@@ -848,10 +885,14 @@ class ContractEnhancedProjectSummaryOrchestrator:
             result = chain.invoke(context_vars)
 
             text_result = result.get("text", result) if isinstance(result, dict) else str(result)
-            if "```" in text_result:
-                text_result = text_result.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
 
-            return json.loads(text_result)
+            # Use flexible JSON parser
+            parse_result = parse_llm_json(text_result, expected_structure=None, fallback_factory=None)
+            if parse_result.success:
+                return parse_result.data
+            else:
+                # If flexible parser fails, try fallback
+                raise Exception(f"JSON parsing failed: {parse_result.error}")
         except Exception:
             # Fallback to context-enhanced analysis
             context_orchestrator = ContextEnhancedProjectSummaryOrchestrator(self.llm, self.context_pack)
@@ -933,10 +974,14 @@ class ContractEnhancedProjectSummaryOrchestrator:
             result = chain.invoke(context_vars)
 
             text_result = result.get("text", result) if isinstance(result, dict) else str(result)
-            if "```" in text_result:
-                text_result = text_result.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
 
-            return json.loads(text_result)
+            # Use flexible JSON parser
+            parse_result = parse_llm_json(text_result, expected_structure=None, fallback_factory=None)
+            if parse_result.success:
+                return parse_result.data
+            else:
+                # If flexible parser fails, try fallback
+                raise Exception(f"JSON parsing failed: {parse_result.error}")
         except Exception:
             # Fallback to context-enhanced analysis
             context_orchestrator = ContextEnhancedProjectSummaryOrchestrator(self.llm, self.context_pack)
