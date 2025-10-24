@@ -583,48 +583,63 @@ class SpotifyInspiredRecommendationsService:
                     "user_id": user_id
                 }
 
-                # Enhance with PhD-level content if available
+                # Enhance with PhD-level content if available (with timeout protection)
                 if self.phd_integration_service:
                     try:
-                        logger.info("🔬 Enhancing comprehensive review with PhD-level analysis")
-                        enhanced_result = await self.phd_integration_service.enhance_generate_review_response(
-                            {
-                                "results": [
+                        # Add environment variable check for PhD enhancements
+                        import os
+                        phd_enhancements_enabled = os.getenv("PHD_ENHANCEMENTS_ENABLED", "false").lower() == "true"
+
+                        if phd_enhancements_enabled:
+                            logger.info("🔬 Enhancing comprehensive review with PhD-level analysis")
+
+                            # Add timeout wrapper to prevent infinite hanging
+                            enhanced_result = await asyncio.wait_for(
+                                self.phd_integration_service.enhance_generate_review_response(
                                     {
-                                        "section_title": "Primary Research",
-                                        "articles": review_result["sections"]["primary_research"]
+                                        "results": [
+                                            {
+                                                "section_title": "Primary Research",
+                                                "articles": review_result["sections"]["primary_research"]
+                                            },
+                                            {
+                                                "section_title": "Trending Topics",
+                                                "articles": review_result["sections"]["trending_topics"]
+                                            },
+                                            {
+                                                "section_title": "Cross-Domain Insights",
+                                                "articles": review_result["sections"]["cross_domain_insights"]
+                                            },
+                                            {
+                                                "section_title": "Citation Opportunities",
+                                                "articles": review_result["sections"]["citation_opportunities"]
+                                            }
+                                        ]
                                     },
-                                    {
-                                        "section_title": "Trending Topics",
-                                        "articles": review_result["sections"]["trending_topics"]
-                                    },
-                                    {
-                                        "section_title": "Cross-Domain Insights",
-                                        "articles": review_result["sections"]["cross_domain_insights"]
-                                    },
-                                    {
-                                        "section_title": "Citation Opportunities",
-                                        "articles": review_result["sections"]["citation_opportunities"]
-                                    }
-                                ]
-                            },
-                            objective,
-                            molecule
-                        )
+                                    objective,
+                                    molecule
+                                ),
+                                timeout=30.0  # 30 second timeout to prevent hanging
+                            )
 
-                        # Update review_result with enhanced data
-                        if "results" in enhanced_result:
-                            enhanced_sections = {}
-                            for section in enhanced_result["results"]:
-                                section_key = section["section_title"].lower().replace(" ", "_").replace("-", "_")
-                                enhanced_sections[section_key] = section.get("articles", [])
+                            # Update review_result with enhanced data
+                            if "results" in enhanced_result:
+                                enhanced_sections = {}
+                                for section in enhanced_result["results"]:
+                                    section_key = section["section_title"].lower().replace(" ", "_").replace("-", "_")
+                                    enhanced_sections[section_key] = section.get("articles", [])
 
-                            review_result["sections"] = enhanced_sections
-                            review_result["enhancement_metadata"] = enhanced_result.get("enhancement_metadata", {})
-                            review_result["phd_level_analysis"] = True
+                                review_result["sections"] = enhanced_sections
+                                review_result["enhancement_metadata"] = enhanced_result.get("enhancement_metadata", {})
+                                review_result["phd_level_analysis"] = True
 
-                        logger.info("✅ PhD-level enhancement completed successfully")
+                            logger.info("✅ PhD-level enhancement completed successfully")
+                        else:
+                            logger.info("🔧 PhD enhancements disabled via environment variable")
 
+                    except asyncio.TimeoutError:
+                        logger.warning("⚠️ PhD enhancement timed out after 30 seconds, using standard result")
+                        # Continue with original result
                     except Exception as e:
                         logger.error(f"❌ Error enhancing with PhD-level content: {e}")
                         # Continue with original result if enhancement fails
