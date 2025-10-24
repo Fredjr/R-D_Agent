@@ -1,0 +1,26 @@
+[
+  {
+    "feedback_id": "965f2058-6872-4791-99c0-073d247c85a9",
+    "analysis_id": "convenience_test",
+    "user_id": "convenience_user",
+    "timestamp": "2025-10-04T09:48:35.471703",
+    "overall_quality": 9,
+    "specificity": 8,
+    "evidence_quality": 5,
+    "analytical_depth": 5,
+    "academic_rigor": 5,
+    "coherence": 5,
+    "strengths": [
+      "Excellent analysis"
+    ],
+    "weaknesses": [],
+    "specific_improvements": [],
+    "general_comments": "",
+    "query": "test query",
+    "analysis_type": "test",
+    "analysis_content": "",
+    "user_expertise": "unknown",
+    "research_domain": "unknown",
+    "feedback_source": "api"
+  }
+]

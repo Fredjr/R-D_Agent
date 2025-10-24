@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Direct Backend Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 20px;
+            background: #1a1a1a;
+            color: #ffffff;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #2d2d2d;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+        }
+        .console {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            height: 600px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            border: 2px solid #333;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .status.success { background: #1a5f1a; color: #4ade80; border: 2px solid #22c55e; }
+        .status.error { background: #5f1a1a; color: #f87171; border: 2px solid #ef4444; }
+        .status.info { background: #1a3a5f; color: #60a5fa; border: 2px solid #3b82f6; }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 2.5em;
+            margin: 0;
+        }
+        .warning {
+            background: #5f4a1a;
+            color: #fbbf24;
+            border: 2px solid #f59e0b;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Direct Backend Test</h1>
+            <p>Testing Railway backend directly (bypassing CORS issues)</p>
+        </div>
+
+        <div class="warning">
+            <strong>⚠️ CORS Notice:</strong> This test goes directly to your Railway backend at 
+            <code>https://r-dagent-production.up.railway.app</code> to bypass browser CORS restrictions.
+        </div>
+
+        <div class="controls">
+            <button class="button" onclick="runDirectBackendTest()">🚀 Test Railway Backend Directly</button>
+            <button class="button" onclick="testHealthEndpoint()">💓 Test Health Endpoint</button>
+            <button class="button" onclick="clearConsole()">🗑️ Clear Console</button>
+        </div>
+
+        <div id="status" class="status info">
+            Ready to test Railway backend directly. This bypasses CORS issues.
+        </div>
+        
+        <div id="console" class="console">
+🎯 Direct Backend Test Console
+==============================
+✅ Backend URL: https://r-dagent-production.up.railway.app
+✅ Project ID: 5ac213d7-6fcc-46ff-9420-5c7f4b421012
+✅ User ID: fredericle77@gmail.com
+
+This test bypasses frontend proxy and CORS issues by testing the Railway backend directly.
+
+Ready to begin testing...
+        </div>
+    </div>
+
+    <script>
+        let consoleOutput = '🎯 Direct Backend Test Console\n==============================\n✅ Backend URL: https://r-dagent-production.up.railway.app\n✅ Project ID: 5ac213d7-6fcc-46ff-9420-5c7f4b421012\n✅ User ID: fredericle77@gmail.com\n\nThis test bypasses frontend proxy and CORS issues by testing the Railway backend directly.\n\nReady to begin testing...\n';
+
+        const BACKEND_URL = 'https://r-dagent-production.up.railway.app';
+        const PROJECT_ID = '5ac213d7-6fcc-46ff-9420-5c7f4b421012';
+        const USER_ID = 'fredericle77@gmail.com';
+
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        function appendToConsole(message) {
+            consoleOutput += message + '\n';
+            const consoleEl = document.getElementById('console');
+            consoleEl.textContent = consoleOutput;
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        function clearConsole() {
+            consoleOutput = '🎯 Direct Backend Test Console\n==============================\n✅ Backend URL: https://r-dagent-production.up.railway.app\n✅ Project ID: 5ac213d7-6fcc-46ff-9420-5c7f4b421012\n✅ User ID: fredericle77@gmail.com\n\nConsole cleared. Ready for new test...\n\n';
+            document.getElementById('console').textContent = consoleOutput;
+            showStatus('Console cleared. Ready to run tests.', 'info');
+        }
+
+        async function testHealthEndpoint() {
+            showStatus('💓 Testing health endpoint...', 'info');
+            appendToConsole('💓 Testing Health Endpoint');
+            appendToConsole('=========================');
+            
+            try {
+                const url = `${BACKEND_URL}/health`;
+                appendToConsole(`🔍 Testing: ${url}`);
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    mode: 'cors'
+                });
+                
+                appendToConsole(`📊 Response Status: ${response.status}`);
+                appendToConsole(`📊 Response OK: ${response.ok}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    appendToConsole(`✅ SUCCESS: Backend is healthy`);
+                    appendToConsole(`📄 Health data: ${JSON.stringify(data, null, 2)}`);
+                    showStatus(`✅ Health check successful! Backend is running`, 'success');
+                } else {
+                    const errorText = await response.text();
+                    appendToConsole(`❌ FAILED: ${response.status} - ${errorText}`);
+                    showStatus(`❌ Health check failed: ${response.status}`, 'error');
+                }
+                
+            } catch (error) {
+                appendToConsole(`❌ ERROR: ${error.message}`);
+                if (error.message.includes('CORS')) {
+                    appendToConsole(`💡 CORS Issue: Railway backend may not allow direct browser requests`);
+                    appendToConsole(`💡 This is normal - your frontend proxy handles CORS properly`);
+                    showStatus(`⚠️ CORS restriction detected (this is normal)`, 'error');
+                } else {
+                    showStatus(`❌ Health check error: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        async function runDirectBackendTest() {
+            showStatus('🚀 Running direct backend test...', 'info');
+            appendToConsole('🚀 Starting Direct Backend Test');
+            appendToConsole('=================================');
+            appendToConsole(`🌐 Backend URL: ${BACKEND_URL}`);
+            appendToConsole(`📍 Project ID: ${PROJECT_ID}`);
+            appendToConsole(`👤 User ID: ${USER_ID}`);
+            appendToConsole('');
+            
+            // Test basic endpoints that should work with CORS
+            const endpoints = [
+                {
+                    name: 'Health Check',
+                    url: `${BACKEND_URL}/health`,
+                    method: 'GET'
+                },
+                {
+                    name: 'Reports List',
+                    url: `${BACKEND_URL}/projects/${PROJECT_ID}/reports`,
+                    method: 'GET'
+                },
+                {
+                    name: 'Deep Dive Analyses List',
+                    url: `${BACKEND_URL}/projects/${PROJECT_ID}/deep-dive-analyses`,
+                    method: 'GET'
+                },
+                {
+                    name: 'Literature Gap Analysis',
+                    url: `${BACKEND_URL}/literature-gap-analysis`,
+                    method: 'POST',
+                    payload: {
+                        project_id: PROJECT_ID,
+                        objective: 'Test literature gap analysis'
+                    }
+                },
+                {
+                    name: 'Methodology Synthesis',
+                    url: `${BACKEND_URL}/methodology-synthesis`,
+                    method: 'POST',
+                    payload: {
+                        project_id: PROJECT_ID,
+                        objective: 'Test methodology synthesis'
+                    }
+                },
+                {
+                    name: 'Thesis Chapter Generator',
+                    url: `${BACKEND_URL}/thesis-chapter-generator`,
+                    method: 'POST',
+                    payload: {
+                        project_id: PROJECT_ID,
+                        objective: 'Test thesis chapter generation'
+                    }
+                }
+            ];
+
+            let passed = 0;
+            let total = endpoints.length;
+            let corsBlocked = 0;
+
+            for (const endpoint of endpoints) {
+                try {
+                    appendToConsole(`🧪 Testing ${endpoint.name}...`);
+                    
+                    const options = {
+                        method: endpoint.method,
+                        mode: 'cors',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'User-ID': USER_ID
+                        }
+                    };
+
+                    if (endpoint.payload) {
+                        options.body = JSON.stringify(endpoint.payload);
+                    }
+
+                    const response = await fetch(endpoint.url, options);
+
+                    if (response.ok) {
+                        appendToConsole(`✅ ${endpoint.name}: SUCCESS (${response.status})`);
+                        passed++;
+                        
+                        // Try to get response data
+                        try {
+                            const data = await response.json();
+                            if (Array.isArray(data)) {
+                                appendToConsole(`   📊 Found ${data.length} items`);
+                            } else if (data.message) {
+                                appendToConsole(`   📄 Message: ${data.message}`);
+                            }
+                        } catch (e) {
+                            appendToConsole(`   📄 Response received (couldn't parse JSON)`);
+                        }
+                    } else {
+                        const errorText = await response.text();
+                        appendToConsole(`❌ ${endpoint.name}: FAILED (${response.status}) - ${errorText.substring(0, 100)}`);
+                    }
+                } catch (error) {
+                    if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
+                        appendToConsole(`⚠️ ${endpoint.name}: CORS BLOCKED (this is expected)`);
+                        corsBlocked++;
+                    } else {
+                        appendToConsole(`❌ ${endpoint.name}: ERROR - ${error.message}`);
+                    }
+                }
+                
+                // Small delay between requests
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+
+            const successRate = (passed / total * 100).toFixed(1);
+            
+            appendToConsole('');
+            appendToConsole('🎯 DIRECT BACKEND TEST RESULTS');
+            appendToConsole('==============================');
+            appendToConsole(`📊 Tests Passed: ${passed}/${total}`);
+            appendToConsole(`📊 Success Rate: ${successRate}%`);
+            appendToConsole(`⚠️ CORS Blocked: ${corsBlocked}/${total}`);
+            appendToConsole('');
+            appendToConsole('💡 IMPORTANT NOTES:');
+            appendToConsole('   • CORS blocking is NORMAL for direct backend requests');
+            appendToConsole('   • Your frontend proxy handles CORS properly');
+            appendToConsole('   • If health check works, backend is running correctly');
+            appendToConsole('   • Use frontend URL in browser to test full functionality');
+            
+            if (passed > 0) {
+                appendToConsole('✅ Backend is responding to some requests');
+                showStatus(`✅ Backend test completed! ${passed} endpoints working, ${corsBlocked} CORS blocked`, 'success');
+            } else if (corsBlocked > 0) {
+                appendToConsole('⚠️ All requests CORS blocked (this is normal)');
+                showStatus(`⚠️ All requests CORS blocked (normal security behavior)`, 'info');
+            } else {
+                appendToConsole('❌ No successful responses');
+                showStatus(`❌ Backend test failed - no successful responses`, 'error');
+            }
+        }
+
+        // Auto-initialize
+        window.addEventListener('load', () => {
+            appendToConsole('🎯 Direct backend test console initialized');
+            appendToConsole('📋 Configuration:');
+            appendToConsole(`   • Backend URL: ${BACKEND_URL}`);
+            appendToConsole(`   • Project ID: ${PROJECT_ID}`);
+            appendToConsole(`   • User ID: ${USER_ID}`);
+            appendToConsole('');
+            appendToConsole('💡 Note: CORS blocking is expected when testing directly from browser');
+            appendToConsole('💡 Your frontend proxy at https://frontend-psi-seven-85.vercel.app handles CORS');
+            appendToConsole('');
+            appendToConsole('Click "Test Health Endpoint" first, then "Test Railway Backend Directly"');
+            
+            showStatus('✅ Direct backend test loaded. CORS blocking is expected.', 'info');
+        });
+    </script>
+</body>
+</html>

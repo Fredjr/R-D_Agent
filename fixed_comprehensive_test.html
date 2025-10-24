@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fixed Comprehensive Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 20px;
+            background: #1a1a1a;
+            color: #ffffff;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #2d2d2d;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+        }
+        .console {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            height: 600px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            border: 2px solid #333;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .status.success { background: #1a5f1a; color: #4ade80; border: 2px solid #22c55e; }
+        .status.error { background: #5f1a1a; color: #f87171; border: 2px solid #ef4444; }
+        .status.info { background: #1a3a5f; color: #60a5fa; border: 2px solid #3b82f6; }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 2.5em;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 Fixed Comprehensive Test</h1>
+            <p>Testing with correct frontend URL (https://frontend-psi-seven-85.vercel.app)</p>
+        </div>
+
+        <div class="controls">
+            <button class="button" onclick="runFixedTest()">🚀 Run Fixed Comprehensive Test</button>
+            <button class="button" onclick="testSingleEndpoint()">⚡ Test Single Endpoint</button>
+            <button class="button" onclick="clearConsole()">🗑️ Clear Console</button>
+        </div>
+
+        <div id="status" class="status info">
+            Ready to run fixed comprehensive test with correct frontend URL.
+        </div>
+        
+        <div id="console" class="console">
+🧪 Fixed Comprehensive Test Console
+===================================
+✅ Frontend URL: https://frontend-psi-seven-85.vercel.app
+✅ Project ID: 5ac213d7-6fcc-46ff-9420-5c7f4b421012
+✅ User ID: fredericle77@gmail.com
+
+Ready to test with correct configuration...
+        </div>
+    </div>
+
+    <script>
+        let consoleOutput = '🧪 Fixed Comprehensive Test Console\n===================================\n✅ Frontend URL: https://frontend-psi-seven-85.vercel.app\n✅ Project ID: 5ac213d7-6fcc-46ff-9420-5c7f4b421012\n✅ User ID: fredericle77@gmail.com\n\nReady to test with correct configuration...\n';
+
+        const FRONTEND_URL = 'https://frontend-psi-seven-85.vercel.app';
+        const PROJECT_ID = '5ac213d7-6fcc-46ff-9420-5c7f4b421012';
+        const USER_ID = 'fredericle77@gmail.com';
+
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        function appendToConsole(message) {
+            consoleOutput += message + '\n';
+            const consoleEl = document.getElementById('console');
+            consoleEl.textContent = consoleOutput;
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        function clearConsole() {
+            consoleOutput = '🧪 Fixed Comprehensive Test Console\n===================================\n✅ Frontend URL: https://frontend-psi-seven-85.vercel.app\n✅ Project ID: 5ac213d7-6fcc-46ff-9420-5c7f4b421012\n✅ User ID: fredericle77@gmail.com\n\nConsole cleared. Ready for new test...\n\n';
+            document.getElementById('console').textContent = consoleOutput;
+            showStatus('Console cleared. Ready to run tests.', 'info');
+        }
+
+        async function testSingleEndpoint() {
+            showStatus('⚡ Testing single endpoint...', 'info');
+            appendToConsole('⚡ Testing Single Endpoint');
+            appendToConsole('========================');
+            
+            try {
+                const url = `${FRONTEND_URL}/api/proxy/projects/${PROJECT_ID}/reports`;
+                appendToConsole(`🔍 Testing: ${url}`);
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'User-ID': USER_ID
+                    }
+                });
+                
+                appendToConsole(`📊 Response Status: ${response.status}`);
+                appendToConsole(`📊 Response OK: ${response.ok}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const count = Array.isArray(data) ? data.length : (data.reports?.length || 0);
+                    appendToConsole(`✅ SUCCESS: Found ${count} reports`);
+                    appendToConsole(`📄 Sample data: ${JSON.stringify(data).substring(0, 200)}...`);
+                    showStatus(`✅ Single endpoint test successful! Found ${count} reports`, 'success');
+                } else {
+                    const errorText = await response.text();
+                    appendToConsole(`❌ FAILED: ${response.status} - ${errorText}`);
+                    showStatus(`❌ Single endpoint test failed: ${response.status}`, 'error');
+                }
+                
+            } catch (error) {
+                appendToConsole(`❌ ERROR: ${error.message}`);
+                showStatus(`❌ Single endpoint test error: ${error.message}`, 'error');
+            }
+        }
+
+        async function runFixedTest() {
+            showStatus('🚀 Running fixed comprehensive test...', 'info');
+            appendToConsole('🚀 Starting Fixed Comprehensive Test');
+            appendToConsole('====================================');
+            appendToConsole(`🌐 Frontend URL: ${FRONTEND_URL}`);
+            appendToConsole(`📍 Project ID: ${PROJECT_ID}`);
+            appendToConsole(`👤 User ID: ${USER_ID}`);
+            appendToConsole('');
+            
+            const endpoints = [
+                {
+                    name: 'New Report',
+                    url: `${FRONTEND_URL}/api/proxy/projects/${PROJECT_ID}/generate-summary-report`,
+                    method: 'POST',
+                    payload: {
+                        project_id: PROJECT_ID,
+                        summary_type: 'comprehensive',
+                        academic_level: 'phd'
+                    }
+                },
+                {
+                    name: 'Generate Summary',
+                    url: `${FRONTEND_URL}/api/proxy/projects/${PROJECT_ID}/generate-comprehensive-summary`,
+                    method: 'POST',
+                    payload: {
+                        analysis_type: 'comprehensive',
+                        include_methodology_synthesis: true,
+                        include_gap_analysis: true,
+                        academic_level: 'phd'
+                    }
+                },
+                {
+                    name: 'Deep Dive Analysis',
+                    url: `${FRONTEND_URL}/api/proxy/deep-dive-analyses`,
+                    method: 'POST',
+                    payload: {
+                        objective: 'Test deep dive analysis generation for machine learning in medical diagnostics',
+                        project_id: PROJECT_ID,
+                        pmid: '38278529',
+                        title: 'Machine Learning in Medical Diagnostics: A Comprehensive Review',
+                        url: 'https://pubmed.ncbi.nlm.nih.gov/38278529/'
+                    }
+                },
+                {
+                    name: 'Literature Gap Analysis',
+                    url: `${FRONTEND_URL}/api/proxy/literature-gap-analysis`,
+                    method: 'POST',
+                    payload: {
+                        project_id: PROJECT_ID,
+                        objective: 'Identify research gaps in machine learning applications for medical diagnostics',
+                        gap_types: ['theoretical', 'methodological', 'empirical'],
+                        domain_focus: 'medical_diagnostics',
+                        severity_threshold: 'moderate',
+                        academic_level: 'phd',
+                        analysis_depth: 'comprehensive',
+                        include_methodology_gaps: true
+                    }
+                },
+                {
+                    name: 'Methodology Synthesis',
+                    url: `${FRONTEND_URL}/api/proxy/methodology-synthesis`,
+                    method: 'POST',
+                    payload: {
+                        project_id: PROJECT_ID,
+                        objective: 'Synthesize research methodologies for machine learning in medical diagnostics',
+                        methodology_types: ['experimental', 'observational', 'computational'],
+                        include_statistical_methods: true,
+                        include_validation: true,
+                        comparison_depth: 'detailed',
+                        academic_level: 'phd',
+                        synthesis_type: 'comprehensive_comparative'
+                    }
+                },
+                {
+                    name: 'Thesis Chapter Generator',
+                    url: `${FRONTEND_URL}/api/proxy/thesis-chapter-generator`,
+                    method: 'POST',
+                    payload: {
+                        project_id: PROJECT_ID,
+                        objective: 'Generate thesis chapter structure for machine learning in medical diagnostics research',
+                        chapter_focus: 'comprehensive',
+                        academic_level: 'phd',
+                        citation_style: 'apa',
+                        target_length: 80000,
+                        include_timeline: true
+                    }
+                }
+            ];
+
+            let passed = 0;
+            let total = endpoints.length;
+
+            for (const endpoint of endpoints) {
+                try {
+                    appendToConsole(`🧪 Testing ${endpoint.name}...`);
+                    
+                    const response = await fetch(endpoint.url, {
+                        method: endpoint.method,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'User-ID': USER_ID
+                        },
+                        body: JSON.stringify(endpoint.payload)
+                    });
+
+                    if (response.ok) {
+                        appendToConsole(`✅ ${endpoint.name}: SUCCESS (${response.status})`);
+                        passed++;
+                    } else {
+                        const errorText = await response.text();
+                        appendToConsole(`❌ ${endpoint.name}: FAILED (${response.status}) - ${errorText.substring(0, 100)}`);
+                    }
+                } catch (error) {
+                    appendToConsole(`❌ ${endpoint.name}: ERROR - ${error.message}`);
+                }
+                
+                // Small delay between requests
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+
+            // Test data endpoints
+            appendToConsole('');
+            appendToConsole('📊 Testing Data Endpoints');
+            appendToConsole('=========================');
+
+            const dataEndpoints = [
+                { name: 'Reports List', url: `${FRONTEND_URL}/api/proxy/projects/${PROJECT_ID}/reports` },
+                { name: 'Deep Dive Analyses List', url: `${FRONTEND_URL}/api/proxy/projects/${PROJECT_ID}/deep-dive-analyses` },
+                { name: 'Collections List', url: `${FRONTEND_URL}/api/proxy/projects/${PROJECT_ID}/collections` }
+            ];
+
+            for (const endpoint of dataEndpoints) {
+                try {
+                    appendToConsole(`📊 Testing ${endpoint.name}...`);
+                    
+                    const response = await fetch(endpoint.url, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'User-ID': USER_ID
+                        }
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        const count = Array.isArray(data) ? data.length : (data.reports?.length || data.analyses?.length || 0);
+                        appendToConsole(`✅ ${endpoint.name}: SUCCESS - ${count} items found`);
+                        passed++;
+                    } else {
+                        appendToConsole(`❌ ${endpoint.name}: FAILED (${response.status})`);
+                    }
+                } catch (error) {
+                    appendToConsole(`❌ ${endpoint.name}: ERROR - ${error.message}`);
+                }
+                total++;
+            }
+
+            const successRate = (passed / total * 100).toFixed(1);
+            
+            appendToConsole('');
+            appendToConsole('🎯 FIXED TEST RESULTS');
+            appendToConsole('====================');
+            appendToConsole(`📊 Tests Passed: ${passed}/${total}`);
+            appendToConsole(`📊 Success Rate: ${successRate}%`);
+            
+            if (successRate >= 80) {
+                appendToConsole('✅ Status: EXCELLENT');
+                showStatus(`✅ Fixed test completed! Success rate: ${successRate}% - EXCELLENT`, 'success');
+            } else if (successRate >= 60) {
+                appendToConsole('⚠️ Status: NEEDS ATTENTION');
+                showStatus(`⚠️ Fixed test completed! Success rate: ${successRate}% - NEEDS ATTENTION`, 'error');
+            } else {
+                appendToConsole('❌ Status: CRITICAL ISSUES');
+                showStatus(`❌ Fixed test completed! Success rate: ${successRate}% - CRITICAL ISSUES`, 'error');
+            }
+        }
+
+        // Auto-initialize
+        window.addEventListener('load', () => {
+            appendToConsole('🎯 Fixed test console initialized');
+            appendToConsole('📋 Configuration verified:');
+            appendToConsole(`   • Frontend URL: ${FRONTEND_URL}`);
+            appendToConsole(`   • Project ID: ${PROJECT_ID}`);
+            appendToConsole(`   • User ID: ${USER_ID}`);
+            appendToConsole('');
+            appendToConsole('Click "Run Fixed Comprehensive Test" to begin...');
+            
+            showStatus('✅ Fixed test framework loaded. Ready to run with correct URLs!', 'success');
+        });
+    </script>
+</body>
+</html>

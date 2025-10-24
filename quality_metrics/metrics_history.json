@@ -1,0 +1,2102 @@
+[
+  {
+    "metric_name": "context_coverage",
+    "value": 0.25,
+    "timestamp": "2025-10-04T09:24:56.876333",
+    "analysis_type": "generate_review",
+    "analysis_id": "integration_test_001",
+    "metadata": {
+      "content_length": 97,
+      "query_length": 26,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "specificity_score",
+    "value": 1.0,
+    "timestamp": "2025-10-04T09:24:56.876333",
+    "analysis_type": "generate_review",
+    "analysis_id": "integration_test_001",
+    "metadata": {
+      "content_length": 97,
+      "query_length": 26,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "evidence_density",
+    "value": 0.5882352941176471,
+    "timestamp": "2025-10-04T09:24:56.876333",
+    "analysis_type": "generate_review",
+    "analysis_id": "integration_test_001",
+    "metadata": {
+      "content_length": 97,
+      "query_length": 26,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "novelty_score",
+    "value": 0.5,
+    "timestamp": "2025-10-04T09:24:56.876333",
+    "analysis_type": "generate_review",
+    "analysis_id": "integration_test_001",
+    "metadata": {
+      "content_length": 97,
+      "query_length": 26,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "academic_credibility",
+    "value": 0.0,
+    "timestamp": "2025-10-04T09:24:56.876333",
+    "analysis_type": "generate_review",
+    "analysis_id": "integration_test_001",
+    "metadata": {
+      "content_length": 97,
+      "query_length": 26,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "response_coherence",
+    "value": 0.5,
+    "timestamp": "2025-10-04T09:24:56.876333",
+    "analysis_type": "generate_review",
+    "analysis_id": "integration_test_001",
+    "metadata": {
+      "content_length": 97,
+      "query_length": 26,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "context_coverage",
+    "value": 0.6833333333333333,
+    "timestamp": "2025-10-04T10:26:03.069942",
+    "analysis_type": "generate_review",
+    "analysis_id": "test_trulens_integration_1759569963",
+    "metadata": {
+      "content_length": 1213,
+      "query_length": 73,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "specificity_score",
+    "value": 0.5797101449275364,
+    "timestamp": "2025-10-04T10:26:03.069942",
+    "analysis_type": "generate_review",
+    "analysis_id": "test_trulens_integration_1759569963",
+    "metadata": {
+      "content_length": 1213,
+      "query_length": 73,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "evidence_density",
+    "value": 0.1811594202898551,
+    "timestamp": "2025-10-04T10:26:03.069942",
+    "analysis_type": "generate_review",
+    "analysis_id": "test_trulens_integration_1759569963",
+    "metadata": {
+      "content_length": 1213,
+      "query_length": 73,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "novelty_score",
+    "value": 0.5166666666666667,
+    "timestamp": "2025-10-04T10:26:03.069942",
+    "analysis_type": "generate_review",
+    "analysis_id": "test_trulens_integration_1759569963",
+    "metadata": {
+      "content_length": 1213,
+      "query_length": 73,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "academic_credibility",
+    "value": 0.3260869565217392,
+    "timestamp": "2025-10-04T10:26:03.069942",
+    "analysis_type": "generate_review",
+    "analysis_id": "test_trulens_integration_1759569963",
+    "metadata": {
+      "content_length": 1213,
+      "query_length": 73,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "response_coherence",
+    "value": 0.51,
+    "timestamp": "2025-10-04T10:26:03.069942",
+    "analysis_type": "generate_review",
+    "analysis_id": "test_trulens_integration_1759569963",
+    "metadata": {
+      "content_length": 1213,
+      "query_length": 73,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_groundedness",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.069942",
+    "analysis_type": "generate_review",
+    "analysis_id": "test_trulens_integration_1759569963",
+    "metadata": {
+      "content_length": 1213,
+      "query_length": 73,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_answer_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.069942",
+    "analysis_type": "generate_review",
+    "analysis_id": "test_trulens_integration_1759569963",
+    "metadata": {
+      "content_length": 1213,
+      "query_length": 73,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_context_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.069942",
+    "analysis_type": "generate_review",
+    "analysis_id": "test_trulens_integration_1759569963",
+    "metadata": {
+      "content_length": 1213,
+      "query_length": 73,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_citation_accuracy",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.069942",
+    "analysis_type": "generate_review",
+    "analysis_id": "test_trulens_integration_1759569963",
+    "metadata": {
+      "content_length": 1213,
+      "query_length": 73,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_specificity",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.069942",
+    "analysis_type": "generate_review",
+    "analysis_id": "test_trulens_integration_1759569963",
+    "metadata": {
+      "content_length": 1213,
+      "query_length": 73,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_overall_quality",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.069942",
+    "analysis_type": "generate_review",
+    "analysis_id": "test_trulens_integration_1759569963",
+    "metadata": {
+      "content_length": 1213,
+      "query_length": 73,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_hallucination_detected",
+    "value": 0.0,
+    "timestamp": "2025-10-04T10:26:03.069942",
+    "analysis_type": "generate_review",
+    "analysis_id": "test_trulens_integration_1759569963",
+    "metadata": {
+      "content_length": 1213,
+      "query_length": 73,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "context_coverage",
+    "value": 0.5555555555555556,
+    "timestamp": "2025-10-04T10:26:03.071342",
+    "analysis_type": "generate_review",
+    "analysis_id": "hallucination_test_1759569963",
+    "metadata": {
+      "content_length": 437,
+      "query_length": 55,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "specificity_score",
+    "value": 0.36363636363636365,
+    "timestamp": "2025-10-04T10:26:03.071342",
+    "analysis_type": "generate_review",
+    "analysis_id": "hallucination_test_1759569963",
+    "metadata": {
+      "content_length": 437,
+      "query_length": 55,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "evidence_density",
+    "value": 0.09090909090909091,
+    "timestamp": "2025-10-04T10:26:03.071342",
+    "analysis_type": "generate_review",
+    "analysis_id": "hallucination_test_1759569963",
+    "metadata": {
+      "content_length": 437,
+      "query_length": 55,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "novelty_score",
+    "value": 0.5333333333333333,
+    "timestamp": "2025-10-04T10:26:03.071342",
+    "analysis_type": "generate_review",
+    "analysis_id": "hallucination_test_1759569963",
+    "metadata": {
+      "content_length": 437,
+      "query_length": 55,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "academic_credibility",
+    "value": 0.18181818181818182,
+    "timestamp": "2025-10-04T10:26:03.071342",
+    "analysis_type": "generate_review",
+    "analysis_id": "hallucination_test_1759569963",
+    "metadata": {
+      "content_length": 437,
+      "query_length": 55,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "response_coherence",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.071342",
+    "analysis_type": "generate_review",
+    "analysis_id": "hallucination_test_1759569963",
+    "metadata": {
+      "content_length": 437,
+      "query_length": 55,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_groundedness",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.071342",
+    "analysis_type": "generate_review",
+    "analysis_id": "hallucination_test_1759569963",
+    "metadata": {
+      "content_length": 437,
+      "query_length": 55,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_answer_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.071342",
+    "analysis_type": "generate_review",
+    "analysis_id": "hallucination_test_1759569963",
+    "metadata": {
+      "content_length": 437,
+      "query_length": 55,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_context_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.071342",
+    "analysis_type": "generate_review",
+    "analysis_id": "hallucination_test_1759569963",
+    "metadata": {
+      "content_length": 437,
+      "query_length": 55,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_citation_accuracy",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.071342",
+    "analysis_type": "generate_review",
+    "analysis_id": "hallucination_test_1759569963",
+    "metadata": {
+      "content_length": 437,
+      "query_length": 55,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_specificity",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.071342",
+    "analysis_type": "generate_review",
+    "analysis_id": "hallucination_test_1759569963",
+    "metadata": {
+      "content_length": 437,
+      "query_length": 55,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_overall_quality",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.071342",
+    "analysis_type": "generate_review",
+    "analysis_id": "hallucination_test_1759569963",
+    "metadata": {
+      "content_length": 437,
+      "query_length": 55,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_hallucination_detected",
+    "value": 0.0,
+    "timestamp": "2025-10-04T10:26:03.071342",
+    "analysis_type": "generate_review",
+    "analysis_id": "hallucination_test_1759569963",
+    "metadata": {
+      "content_length": 437,
+      "query_length": 55,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "context_coverage",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.072394",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_0_1759569963",
+    "metadata": {
+      "content_length": 34,
+      "query_length": 11,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "specificity_score",
+    "value": 0.0,
+    "timestamp": "2025-10-04T10:26:03.072394",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_0_1759569963",
+    "metadata": {
+      "content_length": 34,
+      "query_length": 11,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "evidence_density",
+    "value": 0.0,
+    "timestamp": "2025-10-04T10:26:03.072394",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_0_1759569963",
+    "metadata": {
+      "content_length": 34,
+      "query_length": 11,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "novelty_score",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.072394",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_0_1759569963",
+    "metadata": {
+      "content_length": 34,
+      "query_length": 11,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "academic_credibility",
+    "value": 0.0,
+    "timestamp": "2025-10-04T10:26:03.072394",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_0_1759569963",
+    "metadata": {
+      "content_length": 34,
+      "query_length": 11,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "response_coherence",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.072394",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_0_1759569963",
+    "metadata": {
+      "content_length": 34,
+      "query_length": 11,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_groundedness",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.072394",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_0_1759569963",
+    "metadata": {
+      "content_length": 34,
+      "query_length": 11,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_answer_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.072394",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_0_1759569963",
+    "metadata": {
+      "content_length": 34,
+      "query_length": 11,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_context_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.072394",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_0_1759569963",
+    "metadata": {
+      "content_length": 34,
+      "query_length": 11,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_citation_accuracy",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.072394",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_0_1759569963",
+    "metadata": {
+      "content_length": 34,
+      "query_length": 11,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_specificity",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.072394",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_0_1759569963",
+    "metadata": {
+      "content_length": 34,
+      "query_length": 11,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_overall_quality",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.072394",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_0_1759569963",
+    "metadata": {
+      "content_length": 34,
+      "query_length": 11,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_hallucination_detected",
+    "value": 0.0,
+    "timestamp": "2025-10-04T10:26:03.072394",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_0_1759569963",
+    "metadata": {
+      "content_length": 34,
+      "query_length": 11,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "context_coverage",
+    "value": 0.2,
+    "timestamp": "2025-10-04T10:26:03.073464",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_1_1759569963",
+    "metadata": {
+      "content_length": 66,
+      "query_length": 38,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "specificity_score",
+    "value": 0.0,
+    "timestamp": "2025-10-04T10:26:03.073464",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_1_1759569963",
+    "metadata": {
+      "content_length": 66,
+      "query_length": 38,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "evidence_density",
+    "value": 0.0,
+    "timestamp": "2025-10-04T10:26:03.073464",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_1_1759569963",
+    "metadata": {
+      "content_length": 66,
+      "query_length": 38,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "novelty_score",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.073464",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_1_1759569963",
+    "metadata": {
+      "content_length": 66,
+      "query_length": 38,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "academic_credibility",
+    "value": 0.0,
+    "timestamp": "2025-10-04T10:26:03.073464",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_1_1759569963",
+    "metadata": {
+      "content_length": 66,
+      "query_length": 38,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "response_coherence",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.073464",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_1_1759569963",
+    "metadata": {
+      "content_length": 66,
+      "query_length": 38,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_groundedness",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.073464",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_1_1759569963",
+    "metadata": {
+      "content_length": 66,
+      "query_length": 38,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_answer_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.073464",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_1_1759569963",
+    "metadata": {
+      "content_length": 66,
+      "query_length": 38,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_context_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.073464",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_1_1759569963",
+    "metadata": {
+      "content_length": 66,
+      "query_length": 38,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_citation_accuracy",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.073464",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_1_1759569963",
+    "metadata": {
+      "content_length": 66,
+      "query_length": 38,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_specificity",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.073464",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_1_1759569963",
+    "metadata": {
+      "content_length": 66,
+      "query_length": 38,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_overall_quality",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.073464",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_1_1759569963",
+    "metadata": {
+      "content_length": 66,
+      "query_length": 38,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_hallucination_detected",
+    "value": 0.0,
+    "timestamp": "2025-10-04T10:26:03.073464",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_1_1759569963",
+    "metadata": {
+      "content_length": 66,
+      "query_length": 38,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "context_coverage",
+    "value": 0.16666666666666666,
+    "timestamp": "2025-10-04T10:26:03.074855",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_2_1759569963",
+    "metadata": {
+      "content_length": 137,
+      "query_length": 44,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "specificity_score",
+    "value": 0.0,
+    "timestamp": "2025-10-04T10:26:03.074855",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_2_1759569963",
+    "metadata": {
+      "content_length": 137,
+      "query_length": 44,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "evidence_density",
+    "value": 0.5882352941176471,
+    "timestamp": "2025-10-04T10:26:03.074855",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_2_1759569963",
+    "metadata": {
+      "content_length": 137,
+      "query_length": 44,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "novelty_score",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.074855",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_2_1759569963",
+    "metadata": {
+      "content_length": 137,
+      "query_length": 44,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "academic_credibility",
+    "value": 0.0,
+    "timestamp": "2025-10-04T10:26:03.074855",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_2_1759569963",
+    "metadata": {
+      "content_length": 137,
+      "query_length": 44,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "response_coherence",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.074855",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_2_1759569963",
+    "metadata": {
+      "content_length": 137,
+      "query_length": 44,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_groundedness",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.074855",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_2_1759569963",
+    "metadata": {
+      "content_length": 137,
+      "query_length": 44,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_answer_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.074855",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_2_1759569963",
+    "metadata": {
+      "content_length": 137,
+      "query_length": 44,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_context_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.074855",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_2_1759569963",
+    "metadata": {
+      "content_length": 137,
+      "query_length": 44,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_citation_accuracy",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.074855",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_2_1759569963",
+    "metadata": {
+      "content_length": 137,
+      "query_length": 44,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_specificity",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.074855",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_2_1759569963",
+    "metadata": {
+      "content_length": 137,
+      "query_length": 44,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_overall_quality",
+    "value": 0.5,
+    "timestamp": "2025-10-04T10:26:03.074855",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_2_1759569963",
+    "metadata": {
+      "content_length": 137,
+      "query_length": 44,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_hallucination_detected",
+    "value": 0.0,
+    "timestamp": "2025-10-04T10:26:03.074855",
+    "analysis_type": "performance_test",
+    "analysis_id": "performance_test_2_1759569963",
+    "metadata": {
+      "content_length": 137,
+      "query_length": 44,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "context_coverage",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:40:34.663756",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617634",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "specificity_score",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:40:34.663756",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617634",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "evidence_density",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:40:34.663756",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617634",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "novelty_score",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:40:34.663756",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617634",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "academic_credibility",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:40:34.663756",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617634",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "response_coherence",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:40:34.663756",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617634",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_groundedness",
+    "value": 0.5,
+    "timestamp": "2025-10-05T00:40:34.663756",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617634",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_answer_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-05T00:40:34.663756",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617634",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_context_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-05T00:40:34.663756",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617634",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_citation_accuracy",
+    "value": 0.5,
+    "timestamp": "2025-10-05T00:40:34.663756",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617634",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_specificity",
+    "value": 0.5,
+    "timestamp": "2025-10-05T00:40:34.663756",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617634",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_overall_quality",
+    "value": 0.5,
+    "timestamp": "2025-10-05T00:40:34.663756",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617634",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_hallucination_detected",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:40:34.663756",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617634",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "context_coverage",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:44:12.405495",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617852",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "specificity_score",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:44:12.405495",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617852",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "evidence_density",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:44:12.405495",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617852",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "novelty_score",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:44:12.405495",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617852",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "academic_credibility",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:44:12.405495",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617852",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "response_coherence",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:44:12.405495",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617852",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_groundedness",
+    "value": 0.5,
+    "timestamp": "2025-10-05T00:44:12.405495",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617852",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_answer_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-05T00:44:12.405495",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617852",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_context_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-05T00:44:12.405495",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617852",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_citation_accuracy",
+    "value": 0.5,
+    "timestamp": "2025-10-05T00:44:12.405495",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617852",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_specificity",
+    "value": 0.5,
+    "timestamp": "2025-10-05T00:44:12.405495",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617852",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_overall_quality",
+    "value": 0.5,
+    "timestamp": "2025-10-05T00:44:12.405495",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617852",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_hallucination_detected",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:44:12.405495",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759617852",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "context_coverage",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:48:14.858521",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618094",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "specificity_score",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:48:14.858521",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618094",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "evidence_density",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:48:14.858521",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618094",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "novelty_score",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:48:14.858521",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618094",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "academic_credibility",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:48:14.858521",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618094",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "response_coherence",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:48:14.858521",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618094",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_groundedness",
+    "value": 0.5,
+    "timestamp": "2025-10-05T00:48:14.858521",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618094",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_answer_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-05T00:48:14.858521",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618094",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_context_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-05T00:48:14.858521",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618094",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_citation_accuracy",
+    "value": 0.5,
+    "timestamp": "2025-10-05T00:48:14.858521",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618094",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_specificity",
+    "value": 0.5,
+    "timestamp": "2025-10-05T00:48:14.858521",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618094",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_overall_quality",
+    "value": 0.5,
+    "timestamp": "2025-10-05T00:48:14.858521",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618094",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_hallucination_detected",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:48:14.858521",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618094",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 22,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "context_coverage",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:53:43.505380",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618423",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "specificity_score",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:53:43.505380",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618423",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "evidence_density",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:53:43.505380",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618423",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "novelty_score",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:53:43.505380",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618423",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "academic_credibility",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:53:43.505380",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618423",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "response_coherence",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:53:43.505380",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618423",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_groundedness",
+    "value": 0.5,
+    "timestamp": "2025-10-05T00:53:43.505380",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618423",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_answer_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-05T00:53:43.505380",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618423",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_context_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-05T00:53:43.505380",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618423",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_citation_accuracy",
+    "value": 0.5,
+    "timestamp": "2025-10-05T00:53:43.505380",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618423",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_specificity",
+    "value": 0.5,
+    "timestamp": "2025-10-05T00:53:43.505380",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618423",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_overall_quality",
+    "value": 0.5,
+    "timestamp": "2025-10-05T00:53:43.505380",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618423",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_hallucination_detected",
+    "value": 0.0,
+    "timestamp": "2025-10-05T00:53:43.505380",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618423",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "context_coverage",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:01:11.836718",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618871",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "specificity_score",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:01:11.836718",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618871",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "evidence_density",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:01:11.836718",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618871",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "novelty_score",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:01:11.836718",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618871",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "academic_credibility",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:01:11.836718",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618871",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "response_coherence",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:01:11.836718",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618871",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_groundedness",
+    "value": 0.5,
+    "timestamp": "2025-10-05T01:01:11.836718",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618871",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_answer_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-05T01:01:11.836718",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618871",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_context_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-05T01:01:11.836718",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618871",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_citation_accuracy",
+    "value": 0.5,
+    "timestamp": "2025-10-05T01:01:11.836718",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618871",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_specificity",
+    "value": 0.5,
+    "timestamp": "2025-10-05T01:01:11.836718",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618871",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_overall_quality",
+    "value": 0.5,
+    "timestamp": "2025-10-05T01:01:11.836718",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618871",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_hallucination_detected",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:01:11.836718",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759618871",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "context_coverage",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:18:07.210735",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759619887",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 79,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "specificity_score",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:18:07.210735",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759619887",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 79,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "evidence_density",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:18:07.210735",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759619887",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 79,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "novelty_score",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:18:07.210735",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759619887",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 79,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "academic_credibility",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:18:07.210735",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759619887",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 79,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "response_coherence",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:18:07.210735",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759619887",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 79,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_groundedness",
+    "value": 0.5,
+    "timestamp": "2025-10-05T01:18:07.210735",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759619887",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 79,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_answer_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-05T01:18:07.210735",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759619887",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 79,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_context_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-05T01:18:07.210735",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759619887",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 79,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_citation_accuracy",
+    "value": 0.5,
+    "timestamp": "2025-10-05T01:18:07.210735",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759619887",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 79,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_specificity",
+    "value": 0.5,
+    "timestamp": "2025-10-05T01:18:07.210735",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759619887",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 79,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_overall_quality",
+    "value": 0.5,
+    "timestamp": "2025-10-05T01:18:07.210735",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759619887",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 79,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_hallucination_detected",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:18:07.210735",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759619887",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 79,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "context_coverage",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:36:16.358885",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759620976",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "specificity_score",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:36:16.358885",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759620976",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "evidence_density",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:36:16.358885",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759620976",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "novelty_score",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:36:16.358885",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759620976",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "academic_credibility",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:36:16.358885",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759620976",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "response_coherence",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:36:16.358885",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759620976",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_groundedness",
+    "value": 0.5,
+    "timestamp": "2025-10-05T01:36:16.358885",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759620976",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_answer_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-05T01:36:16.358885",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759620976",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_context_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-05T01:36:16.358885",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759620976",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_citation_accuracy",
+    "value": 0.5,
+    "timestamp": "2025-10-05T01:36:16.358885",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759620976",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_specificity",
+    "value": 0.5,
+    "timestamp": "2025-10-05T01:36:16.358885",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759620976",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_overall_quality",
+    "value": 0.5,
+    "timestamp": "2025-10-05T01:36:16.358885",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759620976",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_hallucination_detected",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:36:16.358885",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759620976",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "context_coverage",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:57:45.963653",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759622265",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "specificity_score",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:57:45.963653",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759622265",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "evidence_density",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:57:45.963653",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759622265",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "novelty_score",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:57:45.963653",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759622265",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "academic_credibility",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:57:45.963653",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759622265",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "response_coherence",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:57:45.963653",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759622265",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_groundedness",
+    "value": 0.5,
+    "timestamp": "2025-10-05T01:57:45.963653",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759622265",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_answer_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-05T01:57:45.963653",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759622265",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_context_relevance",
+    "value": 0.5,
+    "timestamp": "2025-10-05T01:57:45.963653",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759622265",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_citation_accuracy",
+    "value": 0.5,
+    "timestamp": "2025-10-05T01:57:45.963653",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759622265",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_specificity",
+    "value": 0.5,
+    "timestamp": "2025-10-05T01:57:45.963653",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759622265",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_overall_quality",
+    "value": 0.5,
+    "timestamp": "2025-10-05T01:57:45.963653",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759622265",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  },
+  {
+    "metric_name": "trulens_hallucination_detected",
+    "value": 0.0,
+    "timestamp": "2025-10-05T01:57:45.963653",
+    "analysis_type": "generate_review",
+    "analysis_id": "generate_review_1759622265",
+    "metadata": {
+      "content_length": 0,
+      "query_length": 166,
+      "context_available": true
+    }
+  }
+]

@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhD Content Enhancement - Deployment & Testing Suite</title>
+    <style>
+        body {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: #00ff00;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.3);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff00;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 2px solid #00ff00;
+            border-radius: 8px;
+            background: rgba(0, 255, 0, 0.05);
+        }
+        
+        .test-section h2 {
+            color: #00ffff;
+            margin-top: 0;
+            text-shadow: 0 0 5px #00ffff;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        
+        button {
+            background: linear-gradient(45deg, #00ff00, #00cc00);
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 255, 0, 0.3);
+        }
+        
+        button:hover {
+            background: linear-gradient(45deg, #00cc00, #009900);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 255, 0, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button.warning {
+            background: linear-gradient(45deg, #ff9900, #ff6600);
+        }
+        
+        button.danger {
+            background: linear-gradient(45deg, #ff3300, #cc0000);
+        }
+        
+        .console {
+            background: #000;
+            color: #00ff00;
+            padding: 20px;
+            border-radius: 5px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid #00ff00;
+            margin: 20px 0;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-success { background: #00ff00; }
+        .status-warning { background: #ffaa00; }
+        .status-error { background: #ff0000; }
+        .status-info { background: #0088ff; }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #333;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff00, #00cc00);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+        }
+        
+        .highlight {
+            background: rgba(255, 255, 0, 0.2);
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        
+        .timestamp {
+            color: #888;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎓 PhD Content Enhancement<br>Deployment & Testing Suite</h1>
+        
+        <div class="test-section">
+            <h2>🚀 Phase 1: Deployment Monitoring</h2>
+            <p>Monitor Railway deployment and validate PhD service availability</p>
+            
+            <div class="button-group">
+                <button onclick="startDeploymentMonitoring()">
+                    📡 Start Deployment Monitoring
+                </button>
+                <button onclick="checkBackendHealth()">
+                    🏥 Check Backend Health
+                </button>
+                <button onclick="testPhdServicesQuick()">
+                    🔬 Quick PhD Services Test
+                </button>
+            </div>
+            
+            <div class="progress-bar">
+                <div class="progress-fill" id="deploymentProgress"></div>
+            </div>
+            
+            <div id="deploymentStatus">
+                <span class="status-indicator status-info"></span>
+                <span>Deployment monitoring ready...</span>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>🧪 Phase 2: Comprehensive PhD Validation</h2>
+            <p>Extensively test all PhD-level content generation features</p>
+            
+            <div class="button-group">
+                <button onclick="runComprehensiveValidation()">
+                    🎯 Run Comprehensive Validation
+                </button>
+                <button onclick="testGenerateReviewOnly()">
+                    📊 Test Generate Review Only
+                </button>
+                <button onclick="testDeepDiveOnly()">
+                    🔬 Test Deep Dive Only
+                </button>
+                <button onclick="testPhdFeaturesOnly()">
+                    🎓 Test PhD Features Only
+                </button>
+            </div>
+            
+            <div class="progress-bar">
+                <div class="progress-fill" id="validationProgress"></div>
+            </div>
+            
+            <div id="validationStatus">
+                <span class="status-indicator status-info"></span>
+                <span>Comprehensive validation ready...</span>
+            </div>
+        </div>
+        
+        <div class="grid">
+            <div class="test-section">
+                <h2>📊 Test Results Summary</h2>
+                <div id="testSummary">
+                    <p>No tests run yet. Click a test button to begin.</p>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>⚡ Quick Actions</h2>
+                <div class="button-group">
+                    <button onclick="runFullTestSuite()" class="warning">
+                        🚀 Run Full Test Suite
+                    </button>
+                    <button onclick="clearConsole()">
+                        🧹 Clear Console
+                    </button>
+                    <button onclick="exportResults()">
+                        💾 Export Results
+                    </button>
+                    <button onclick="openFrontendUrls()" class="warning">
+                        🌐 Open Frontend URLs
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>📋 Console Output</h2>
+            <div class="console" id="console">
+                PhD Content Enhancement Deployment & Testing Suite loaded.
+                Click a test button to begin monitoring and validation...
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>📖 Instructions</h2>
+            <ol>
+                <li><strong>Start with Deployment Monitoring:</strong> Click "Start Deployment Monitoring" to check if the PhD enhancements are deployed</li>
+                <li><strong>Run Comprehensive Validation:</strong> Once deployment is confirmed, run the comprehensive validation suite</li>
+                <li><strong>Review Results:</strong> Check the console output and test summary for detailed results</li>
+                <li><strong>Test Individual Components:</strong> Use individual test buttons to focus on specific areas</li>
+                <li><strong>Export Results:</strong> Save test results for documentation and analysis</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- Load test scripts -->
+    <script src="phd_deployment_monitor.js"></script>
+    <script src="comprehensive_phd_validation_test.js"></script>
+    
+    <script>
+        // Global state
+        let deploymentResults = null;
+        let validationResults = null;
+        let testStartTime = null;
+        
+        // Console management
+        function logToConsole(message, type = 'info') {
+            const console = document.getElementById('console');
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : '📋';
+            const logMessage = `${prefix} [${timestamp}] ${message}\n`;
+            console.textContent += logMessage;
+            console.scrollTop = console.scrollHeight;
+            
+            // Also log to browser console
+            console.log(logMessage.trim());
+        }
+        
+        function clearConsole() {
+            document.getElementById('console').textContent = 'Console cleared. Ready for new tests...\n';
+        }
+        
+        function updateProgress(elementId, percentage) {
+            document.getElementById(elementId).style.width = percentage + '%';
+        }
+        
+        function updateStatus(elementId, message, type = 'info') {
+            const statusElement = document.getElementById(elementId);
+            const indicator = statusElement.querySelector('.status-indicator');
+            const textElement = statusElement.querySelector('span:last-child');
+            
+            indicator.className = `status-indicator status-${type}`;
+            textElement.textContent = message;
+        }
+        
+        // Deployment monitoring functions
+        async function startDeploymentMonitoring() {
+            logToConsole('🚀 Starting PhD deployment monitoring...', 'info');
+            updateStatus('deploymentStatus', 'Monitoring deployment...', 'warning');
+            updateProgress('deploymentProgress', 10);
+            
+            try {
+                if (window.phdDeploymentMonitor) {
+                    deploymentResults = await window.phdDeploymentMonitor.monitorDeployment();
+                    
+                    if (deploymentResults.success) {
+                        logToConsole('✅ Deployment monitoring completed successfully!', 'success');
+                        updateStatus('deploymentStatus', 'PhD enhancements deployed successfully', 'success');
+                        updateProgress('deploymentProgress', 100);
+                    } else {
+                        logToConsole('⚠️ Deployment monitoring completed with issues', 'warning');
+                        updateStatus('deploymentStatus', 'Deployment issues detected', 'warning');
+                        updateProgress('deploymentProgress', 60);
+                    }
+                } else {
+                    throw new Error('Deployment monitor not available');
+                }
+            } catch (error) {
+                logToConsole(`❌ Deployment monitoring error: ${error.message}`, 'error');
+                updateStatus('deploymentStatus', 'Deployment monitoring failed', 'error');
+                updateProgress('deploymentProgress', 0);
+            }
+            
+            updateTestSummary();
+        }
+        
+        async function checkBackendHealth() {
+            logToConsole('🏥 Checking backend health...', 'info');
+            
+            try {
+                const response = await fetch('https://rd-agent-backend-production.up.railway.app/health');
+                if (response.ok) {
+                    const data = await response.json();
+                    logToConsole('✅ Backend health check passed', 'success');
+                    logToConsole(`📊 Health data: ${JSON.stringify(data, null, 2)}`, 'info');
+                } else {
+                    logToConsole(`⚠️ Backend health check failed: HTTP ${response.status}`, 'warning');
+                }
+            } catch (error) {
+                logToConsole(`❌ Backend health check error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testPhdServicesQuick() {
+            logToConsole('🔬 Running quick PhD services test...', 'info');
+            
+            try {
+                const response = await fetch('https://rd-agent-backend-production.up.railway.app/generate-review', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'User-ID': 'quick-phd-test'
+                    },
+                    body: JSON.stringify({
+                        objective: 'Quick PhD services test',
+                        molecule: 'test compound',
+                        project_id: 'quick-test'
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const hasEnhancements = data.enhancement_metadata || 
+                                          data.results?.some(s => s.articles?.some(a => a.score_breakdown));
+                    
+                    if (hasEnhancements) {
+                        logToConsole('✅ PhD services are working!', 'success');
+                    } else {
+                        logToConsole('⚠️ PhD services responding but enhancements not detected', 'warning');
+                    }
+                } else {
+                    logToConsole(`⚠️ PhD services test failed: HTTP ${response.status}`, 'warning');
+                }
+            } catch (error) {
+                logToConsole(`❌ PhD services test error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Comprehensive validation functions
+        async function runComprehensiveValidation() {
+            logToConsole('🎯 Starting comprehensive PhD validation...', 'info');
+            updateStatus('validationStatus', 'Running comprehensive validation...', 'warning');
+            updateProgress('validationProgress', 0);
+            
+            try {
+                if (window.runComprehensivePhDValidation) {
+                    // Simulate progress updates
+                    const progressInterval = setInterval(() => {
+                        const currentProgress = parseInt(document.getElementById('validationProgress').style.width) || 0;
+                        if (currentProgress < 90) {
+                            updateProgress('validationProgress', currentProgress + 10);
+                        }
+                    }, 5000);
+                    
+                    validationResults = await window.runComprehensivePhDValidation();
+                    clearInterval(progressInterval);
+                    
+                    updateProgress('validationProgress', 100);
+                    updateStatus('validationStatus', 'Comprehensive validation completed', 'success');
+                    logToConsole('✅ Comprehensive validation completed!', 'success');
+                } else {
+                    throw new Error('Comprehensive validation function not available');
+                }
+            } catch (error) {
+                logToConsole(`❌ Comprehensive validation error: ${error.message}`, 'error');
+                updateStatus('validationStatus', 'Validation failed', 'error');
+                updateProgress('validationProgress', 0);
+            }
+            
+            updateTestSummary();
+        }
+        
+        async function testGenerateReviewOnly() {
+            logToConsole('📊 Testing Generate Review only...', 'info');
+            // Implementation would focus on Generate Review tests only
+            logToConsole('⚠️ Individual test functions not yet implemented', 'warning');
+        }
+        
+        async function testDeepDiveOnly() {
+            logToConsole('🔬 Testing Deep Dive only...', 'info');
+            // Implementation would focus on Deep Dive tests only
+            logToConsole('⚠️ Individual test functions not yet implemented', 'warning');
+        }
+        
+        async function testPhdFeaturesOnly() {
+            logToConsole('🎓 Testing PhD features only...', 'info');
+            // Implementation would focus on PhD-specific features only
+            logToConsole('⚠️ Individual test functions not yet implemented', 'warning');
+        }
+        
+        async function runFullTestSuite() {
+            logToConsole('🚀 Running full test suite...', 'info');
+            testStartTime = Date.now();
+            
+            // Run deployment monitoring first
+            await startDeploymentMonitoring();
+            
+            // Then run comprehensive validation
+            await runComprehensiveValidation();
+            
+            const totalTime = ((Date.now() - testStartTime) / 60000).toFixed(1);
+            logToConsole(`🎯 Full test suite completed in ${totalTime} minutes`, 'success');
+        }
+        
+        function updateTestSummary() {
+            const summaryElement = document.getElementById('testSummary');
+            let summary = '<h3>Test Results:</h3>';
+            
+            if (deploymentResults) {
+                summary += `<p><strong>Deployment:</strong> ${deploymentResults.success ? '✅ Success' : '❌ Failed'}</p>`;
+                summary += `<p>Backend Health: ${deploymentResults.backendHealthy ? '✅' : '❌'}</p>`;
+                summary += `<p>PhD Enhancements: ${deploymentResults.phdEnhancementsReady ? '✅' : '❌'}</p>`;
+            }
+            
+            if (validationResults) {
+                summary += `<p><strong>Validation:</strong> ${validationResults.success ? '✅ Success' : '❌ Failed'}</p>`;
+                summary += `<p>Success Rate: ${validationResults.overallSuccessRate?.toFixed(1)}%</p>`;
+                summary += `<p>Duration: ${validationResults.duration} minutes</p>`;
+            }
+            
+            if (!deploymentResults && !validationResults) {
+                summary += '<p>No tests run yet. Click a test button to begin.</p>';
+            }
+            
+            summaryElement.innerHTML = summary;
+        }
+        
+        function exportResults() {
+            const results = {
+                timestamp: new Date().toISOString(),
+                deployment: deploymentResults,
+                validation: validationResults,
+                consoleLog: document.getElementById('console').textContent
+            };
+            
+            const blob = new Blob([JSON.stringify(results, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `phd-test-results-${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            logToConsole('💾 Test results exported', 'success');
+        }
+        
+        function openFrontendUrls() {
+            const urls = [
+                'https://frontend-psi-seven-85.vercel.app/report/7b6d5665-4fb7-4817-9122-6c138bdfa4da',
+                'https://frontend-psi-seven-85.vercel.app/report/40b56784-1ce8-4d80-95b2-fb643d7134dd',
+                'https://frontend-psi-seven-85.vercel.app/analysis/b0f9545d-7e5c-49c9-94ae-f129fec4dd96'
+            ];
+            
+            urls.forEach(url => window.open(url, '_blank'));
+            logToConsole('🌐 Frontend URLs opened for manual verification', 'info');
+        }
+        
+        // Initialize
+        logToConsole('🎓 PhD Content Enhancement Test Suite initialized', 'success');
+        logToConsole('📋 Ready to begin deployment monitoring and comprehensive validation', 'info');
+    </script>
+</body>
+</html>

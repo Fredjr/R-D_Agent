@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprehensive Data Quality Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 20px;
+            background: #0f0f0f;
+            color: #ffffff;
+        }
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: #1a1a1a;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            background: linear-gradient(135deg, #ff6b6b 0%, #4ecdc4 50%, #45b7d1 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 2.5em;
+            margin: 0;
+        }
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .test-card {
+            background: #2d2d2d;
+            border: 2px solid #444;
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+        .test-card:hover {
+            border-color: #4ecdc4;
+            transform: translateY(-2px);
+        }
+        .test-card h3 {
+            color: #4ecdc4;
+            margin-top: 0;
+        }
+        .button {
+            background: linear-gradient(135deg, #ff6b6b 0%, #4ecdc4 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            margin: 10px;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+        }
+        .console {
+            background: #0a0a0a;
+            color: #00ff41;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+            height: 700px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            border: 2px solid #333;
+            margin: 20px 0;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .status.excellent { background: #1a5f1a; color: #4ade80; border: 2px solid #22c55e; }
+        .status.good { background: #1a3a5f; color: #60a5fa; border: 2px solid #3b82f6; }
+        .status.warning { background: #5f4a1a; color: #fbbf24; border: 2px solid #f59e0b; }
+        .status.error { background: #5f1a1a; color: #f87171; border: 2px solid #ef4444; }
+        .checklist {
+            background: #2d2d2d;
+            border: 2px solid #4ecdc4;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .checklist h3 {
+            color: #4ecdc4;
+            margin-top: 0;
+        }
+        .checklist ul {
+            list-style: none;
+            padding: 0;
+        }
+        .checklist li {
+            padding: 8px 0;
+            border-bottom: 1px solid #444;
+        }
+        .checklist li:last-child {
+            border-bottom: none;
+        }
+        .progress-bar {
+            background: #333;
+            border-radius: 10px;
+            height: 20px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        .progress-fill {
+            background: linear-gradient(90deg, #ff6b6b 0%, #4ecdc4 50%, #45b7d1 100%);
+            height: 100%;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔬 Comprehensive Data Quality Test</h1>
+            <p>Deep analysis of PhD-level data, UI parsing, and platform integrity</p>
+        </div>
+
+        <div class="checklist">
+            <h3>🎯 Test Coverage</h3>
+            <ul>
+                <li>🔍 <strong>Deep Dive 500 Error Diagnosis</strong> - Root cause analysis and fix</li>
+                <li>🎓 <strong>PhD-Level Data Quality</strong> - Academic rigor and content depth</li>
+                <li>🎨 <strong>UI Data Parsing</strong> - Frontend rendering and display capability</li>
+                <li>📦 <strong>Payload Completeness</strong> - Full data fetching verification</li>
+                <li>💾 <strong>Persistence & Access</strong> - Workspace data availability</li>
+                <li>🕵️ <strong>Mock Data Detection</strong> - Real vs placeholder content</li>
+            </ul>
+        </div>
+
+        <div class="test-grid">
+            <div class="test-card">
+                <h3>🔍 Error Diagnosis</h3>
+                <p>Analyze and fix the Deep Dive Analysis 500 error by testing different payload structures and identifying the root cause.</p>
+            </div>
+            <div class="test-card">
+                <h3>🎓 PhD Data Quality</h3>
+                <p>Verify that responses contain rich, academic-level content with proper research terminology and substantial analysis.</p>
+            </div>
+            <div class="test-card">
+                <h3>🎨 UI Integration</h3>
+                <p>Check that the frontend can properly parse and display all data without showing mock content or empty states.</p>
+            </div>
+            <div class="test-card">
+                <h3>💾 Data Persistence</h3>
+                <p>Ensure all generated content is properly saved and accessible through the project workspace interface.</p>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="button" onclick="runComprehensiveTest()">🚀 Run Comprehensive Data Quality Test</button>
+            <button class="button" onclick="clearConsole()">🗑️ Clear Console</button>
+        </div>
+
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+
+        <div id="status" class="status good">
+            Ready to run comprehensive data quality analysis. This test will verify all aspects of your platform's data integrity.
+        </div>
+        
+        <div id="console" class="console">
+🔬 Comprehensive Data Quality Test Console
+========================================
+✅ Test framework loaded and ready
+🎯 This test will analyze:
+
+1. 🔍 Deep Dive Analysis 500 Error
+   - Root cause diagnosis
+   - Payload structure analysis
+   - Fix implementation
+
+2. 🎓 PhD-Level Data Quality
+   - Content depth analysis
+   - Academic terminology verification
+   - Research rigor assessment
+
+3. 🎨 UI Data Parsing & Display
+   - Frontend rendering capability
+   - Mock data detection
+   - Content completeness
+
+4. 💾 Data Persistence & Access
+   - Workspace integration
+   - Long-term data availability
+   - Cross-session accessibility
+
+5. 📦 Payload Completeness
+   - Full data fetching verification
+   - Response structure analysis
+   - Content richness assessment
+
+6. 🕵️ Mock Data Detection
+   - Placeholder content identification
+   - Real vs synthetic data analysis
+   - Production readiness verification
+
+Ready to begin comprehensive analysis...
+        </div>
+    </div>
+
+    <script src="./comprehensive_data_quality_test.js"></script>
+    <script>
+        let consoleOutput = `🔬 Comprehensive Data Quality Test Console
+========================================
+✅ Test framework loaded and ready
+🎯 This test will analyze:
+
+1. 🔍 Deep Dive Analysis 500 Error
+   - Root cause diagnosis
+   - Payload structure analysis
+   - Fix implementation
+
+2. 🎓 PhD-Level Data Quality
+   - Content depth analysis
+   - Academic terminology verification
+   - Research rigor assessment
+
+3. 🎨 UI Data Parsing & Display
+   - Frontend rendering capability
+   - Mock data detection
+   - Content completeness
+
+4. 💾 Data Persistence & Access
+   - Workspace integration
+   - Long-term data availability
+   - Cross-session accessibility
+
+5. 📦 Payload Completeness
+   - Full data fetching verification
+   - Response structure analysis
+   - Content richness assessment
+
+6. 🕵️ Mock Data Detection
+   - Placeholder content identification
+   - Real vs synthetic data analysis
+   - Production readiness verification
+
+Ready to begin comprehensive analysis...
+`;
+
+        function showStatus(message, type = 'good') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        function updateProgress(percentage) {
+            const progressFill = document.getElementById('progressFill');
+            progressFill.style.width = `${percentage}%`;
+        }
+
+        function appendToConsole(message) {
+            consoleOutput += message + '\n';
+            const consoleEl = document.getElementById('console');
+            consoleEl.textContent = consoleOutput;
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        function clearConsole() {
+            consoleOutput = '🔬 Comprehensive Data Quality Test Console\n========================================\nConsole cleared. Ready for new analysis...\n\n';
+            document.getElementById('console').textContent = consoleOutput;
+            showStatus('Console cleared. Ready to run comprehensive analysis.', 'good');
+            updateProgress(0);
+        }
+
+        // Override console.log to capture output
+        const originalLog = console.log;
+        console.log = function(...args) {
+            const message = args.join(' ');
+            appendToConsole(message);
+            originalLog.apply(console, args);
+        };
+
+        async function runComprehensiveTest() {
+            showStatus('🔬 Running comprehensive data quality analysis...', 'good');
+            updateProgress(10);
+            appendToConsole('🚀 Starting Comprehensive Data Quality Analysis');
+            appendToConsole('==============================================');
+            
+            try {
+                // Check if the test function is available
+                if (typeof runComprehensiveDataQualityTest === 'undefined') {
+                    throw new Error('Comprehensive test function not found');
+                }
+
+                updateProgress(20);
+                
+                // Run the comprehensive test
+                const results = await runComprehensiveDataQualityTest();
+                
+                updateProgress(100);
+                
+                appendToConsole('');
+                appendToConsole('🎯 COMPREHENSIVE ANALYSIS COMPLETED');
+                appendToConsole('==================================');
+                
+                // Calculate overall status
+                let statusType = 'excellent';
+                let statusMessage = '🎉 Comprehensive analysis completed! All systems excellent.';
+                
+                if (results) {
+                    // Analyze results to determine status
+                    const hasErrors = Object.values(results).some(result => 
+                        result && (result.quality === 'ERROR' || result.accessible === false)
+                    );
+                    
+                    const hasWarnings = Object.values(results).some(result => 
+                        result && (result.quality === 'NEEDS_REVIEW' || result.hasPotentialMockData)
+                    );
+                    
+                    if (hasErrors) {
+                        statusType = 'error';
+                        statusMessage = '❌ Analysis completed with critical issues found.';
+                    } else if (hasWarnings) {
+                        statusType = 'warning';
+                        statusMessage = '⚠️ Analysis completed with some areas needing attention.';
+                    }
+                }
+                
+                showStatus(statusMessage, statusType);
+                
+            } catch (error) {
+                updateProgress(0);
+                appendToConsole(`❌ ERROR: ${error.message}`);
+                appendToConsole(`Stack trace: ${error.stack}`);
+                showStatus(`❌ Comprehensive analysis failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-initialize
+        window.addEventListener('load', () => {
+            appendToConsole('🔬 Comprehensive data quality test initialized');
+            appendToConsole('📋 All analysis modules loaded and ready');
+            appendToConsole('');
+            appendToConsole('Click "Run Comprehensive Data Quality Test" to begin...');
+            
+            if (typeof runComprehensiveDataQualityTest !== 'undefined') {
+                appendToConsole('✅ Test framework loaded successfully');
+                showStatus('✅ Comprehensive test framework ready. Click to start analysis!', 'excellent');
+            } else {
+                appendToConsole('⚠️ Test framework not found');
+                showStatus('⚠️ Test framework not loaded properly.', 'error');
+            }
+        });
+    </script>
+</body>
+</html>

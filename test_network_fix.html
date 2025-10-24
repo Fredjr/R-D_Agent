@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network View Fix Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e1e8ed;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .results {
+            margin-top: 20px;
+            padding: 20px;
+            background: #2c3e50;
+            color: #ecf0f1;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .status {
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+        .status.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .status.info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .pmid-input {
+            width: 200px;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 0 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 Network View Fix Test</h1>
+            <p>Testing the PubMed network fallback fix for real articles</p>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 Test Real PubMed Article Network</h3>
+            <p>Test PMID: <input type="text" id="pmidInput" class="pmid-input" value="38278529" placeholder="Enter PMID"></p>
+            <button class="button" onclick="testPubMedNetwork()">Test PubMed Network API</button>
+            <button class="button" onclick="testNetworkViewLogic()">Test Network View Logic</button>
+            <button class="button" onclick="clearResults()">Clear Results</button>
+        </div>
+
+        <div class="test-section">
+            <h3>🧪 Quick API Tests</h3>
+            <button class="button" onclick="testCitationsAPI()">Test Citations API</button>
+            <button class="button" onclick="testSimilarAPI()">Test Similar Articles API</button>
+            <button class="button" onclick="testBothAPIs()">Test Both APIs</button>
+        </div>
+
+        <div id="status" class="status" style="display: none;"></div>
+        <div id="results" class="results" style="display: none;"></div>
+    </div>
+
+    <script>
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            statusEl.style.display = 'block';
+        }
+
+        function showResults(content) {
+            const resultsEl = document.getElementById('results');
+            resultsEl.textContent = content;
+            resultsEl.style.display = 'block';
+        }
+
+        function clearResults() {
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('status').style.display = 'none';
+        }
+
+        async function testPubMedNetwork() {
+            const pmid = document.getElementById('pmidInput').value;
+            if (!pmid) {
+                showStatus('Please enter a PMID', 'error');
+                return;
+            }
+
+            showStatus(`Testing PubMed network for PMID: ${pmid}`, 'info');
+
+            try {
+                // Test the exact endpoint that NetworkView uses
+                const response = await fetch(`/api/proxy/pubmed/network?pmid=${pmid}&type=citations&limit=12`, {
+                    headers: {
+                        'User-ID': 'fredericle77@gmail.com',
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                
+                const results = {
+                    status: response.status,
+                    ok: response.ok,
+                    pmid: pmid,
+                    nodes_count: data.nodes?.length || 0,
+                    edges_count: data.edges?.length || 0,
+                    has_nodes: !!(data.nodes && data.nodes.length > 0),
+                    has_multiple_nodes: !!(data.nodes && data.nodes.length > 1),
+                    metadata: data.metadata,
+                    sample_nodes: data.nodes?.slice(0, 3).map(node => ({
+                        id: node.id,
+                        title: node.metadata?.title?.substring(0, 50) + '...',
+                        authors: node.metadata?.authors?.slice(0, 2)
+                    })),
+                    raw_response: data
+                };
+
+                showResults(JSON.stringify(results, null, 2));
+                
+                if (results.has_multiple_nodes) {
+                    showStatus(`✅ SUCCESS: Found ${results.nodes_count} nodes, ${results.edges_count} edges`, 'success');
+                } else if (results.has_nodes) {
+                    showStatus(`⚠️ WARNING: Only ${results.nodes_count} node found`, 'error');
+                } else {
+                    showStatus(`❌ ERROR: No nodes found`, 'error');
+                }
+
+            } catch (error) {
+                showStatus(`❌ ERROR: ${error.message}`, 'error');
+                showResults(`Error: ${error.message}\n${error.stack}`);
+            }
+        }
+
+        async function testNetworkViewLogic() {
+            const pmid = document.getElementById('pmidInput').value;
+            if (!pmid) {
+                showStatus('Please enter a PMID', 'error');
+                return;
+            }
+
+            showStatus(`Testing NetworkView logic for PMID: ${pmid}`, 'info');
+
+            try {
+                // Simulate the NetworkView logic
+                let data = { nodes: [], edges: [] }; // Start with empty data (simulating failed similar articles)
+
+                // Test the fallback logic
+                console.log('🧪 Simulating NetworkView fallback logic...');
+                
+                // ARTICLE NETWORK FALLBACK: If article network is empty or has only 1 node, try PubMed citations
+                if (!data.nodes || data.nodes.length <= 1) {
+                    console.log('Article similar-network empty/single node, trying PubMed citations...');
+                    const fallbackResponse = await fetch(`/api/proxy/pubmed/network?pmid=${pmid}&type=citations&limit=12`, {
+                        headers: {
+                            'User-ID': 'fredericle77@gmail.com',
+                        },
+                    });
+                    
+                    if (fallbackResponse.ok) {
+                        const fallbackData = await fallbackResponse.json();
+                        console.log('🔄 Article PubMed citations fallback:', {
+                            nodesCount: fallbackData.nodes?.length || 0,
+                            edgesCount: fallbackData.edges?.length || 0
+                        });
+                        
+                        if (fallbackData.nodes && fallbackData.nodes.length > 1) {
+                            // Add fallback indicator to metadata
+                            fallbackData.metadata = {
+                                ...fallbackData.metadata,
+                                fallback_mode: true,
+                                fallback_message: `Showing real citation network from PubMed (similar articles not found)`
+                            };
+                            console.log('🔧 Using PubMed fallback data, will convert to React Flow format');
+                            data = fallbackData;
+                        }
+                    }
+
+                    // ARTICLE-SPECIFIC FALLBACK: Only create synthetic network if PubMed fallback also failed
+                    if (!data.nodes || data.nodes.length <= 1) {
+                        console.log('Both article networks empty, creating article-specific network...');
+                        // This is where the synthetic network would be created
+                        data = {
+                            nodes: [
+                                { id: pmid, metadata: { title: `Article ${pmid}`, pmid: pmid } },
+                                { id: 'synthetic1', metadata: { title: 'Related Article 1' } },
+                                { id: 'synthetic2', metadata: { title: 'Related Article 2' } }
+                            ],
+                            edges: [
+                                { source: pmid, target: 'synthetic1' },
+                                { source: pmid, target: 'synthetic2' }
+                            ],
+                            metadata: { synthetic: true }
+                        };
+                        console.log('🔧 Created synthetic network as final fallback');
+                    }
+                }
+
+                const results = {
+                    final_network: {
+                        nodes_count: data.nodes?.length || 0,
+                        edges_count: data.edges?.length || 0,
+                        is_synthetic: !!data.metadata?.synthetic,
+                        is_fallback: !!data.metadata?.fallback_mode,
+                        is_demo: !!data.metadata?.demo_mode
+                    },
+                    logic_flow: {
+                        started_with_empty: true,
+                        tried_pubmed_fallback: true,
+                        pubmed_fallback_worked: !!(data.metadata?.fallback_mode),
+                        used_synthetic: !!(data.metadata?.synthetic),
+                        final_result: data.metadata?.fallback_mode ? 'REAL_PUBMED_DATA' : 
+                                     data.metadata?.synthetic ? 'SYNTHETIC_DATA' : 'UNKNOWN'
+                    },
+                    sample_data: data
+                };
+
+                showResults(JSON.stringify(results, null, 2));
+                
+                if (results.logic_flow.final_result === 'REAL_PUBMED_DATA') {
+                    showStatus(`✅ SUCCESS: NetworkView logic should now use real PubMed data!`, 'success');
+                } else if (results.logic_flow.final_result === 'SYNTHETIC_DATA') {
+                    showStatus(`⚠️ FALLBACK: Would use synthetic data (PubMed API failed)`, 'error');
+                } else {
+                    showStatus(`❌ ERROR: Logic flow unclear`, 'error');
+                }
+
+            } catch (error) {
+                showStatus(`❌ ERROR: ${error.message}`, 'error');
+                showResults(`Error: ${error.message}\n${error.stack}`);
+            }
+        }
+
+        async function testCitationsAPI() {
+            const pmid = document.getElementById('pmidInput').value;
+            showStatus(`Testing Citations API for PMID: ${pmid}`, 'info');
+            
+            try {
+                const response = await fetch(`/api/proxy/pubmed/network?pmid=${pmid}&type=citations&limit=12`);
+                const data = await response.json();
+                showResults(`Citations API Result:\n${JSON.stringify(data, null, 2)}`);
+                showStatus(`Citations: ${data.nodes?.length || 0} nodes`, data.nodes?.length > 1 ? 'success' : 'error');
+            } catch (error) {
+                showStatus(`Citations API Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testSimilarAPI() {
+            const pmid = document.getElementById('pmidInput').value;
+            showStatus(`Testing Similar Articles API for PMID: ${pmid}`, 'info');
+            
+            try {
+                const response = await fetch(`/api/proxy/pubmed/network?pmid=${pmid}&type=similar&limit=12`);
+                const data = await response.json();
+                showResults(`Similar Articles API Result:\n${JSON.stringify(data, null, 2)}`);
+                showStatus(`Similar: ${data.nodes?.length || 0} nodes`, data.nodes?.length > 1 ? 'success' : 'error');
+            } catch (error) {
+                showStatus(`Similar API Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testBothAPIs() {
+            const pmid = document.getElementById('pmidInput').value;
+            showStatus(`Testing both APIs for PMID: ${pmid}`, 'info');
+            
+            try {
+                const [citationsResponse, similarResponse] = await Promise.all([
+                    fetch(`/api/proxy/pubmed/network?pmid=${pmid}&type=citations&limit=12`),
+                    fetch(`/api/proxy/pubmed/network?pmid=${pmid}&type=similar&limit=12`)
+                ]);
+                
+                const citationsData = await citationsResponse.json();
+                const similarData = await similarResponse.json();
+                
+                const results = {
+                    citations: {
+                        nodes: citationsData.nodes?.length || 0,
+                        edges: citationsData.edges?.length || 0,
+                        working: citationsData.nodes?.length > 1
+                    },
+                    similar: {
+                        nodes: similarData.nodes?.length || 0,
+                        edges: similarData.edges?.length || 0,
+                        working: similarData.nodes?.length > 1
+                    },
+                    recommendation: citationsData.nodes?.length > 1 ? 'Use Citations API' : 
+                                   similarData.nodes?.length > 1 ? 'Use Similar API' : 'Both APIs failed'
+                };
+                
+                showResults(JSON.stringify(results, null, 2));
+                
+                if (results.citations.working || results.similar.working) {
+                    showStatus(`✅ At least one API working: ${results.recommendation}`, 'success');
+                } else {
+                    showStatus(`❌ Both APIs failed for this PMID`, 'error');
+                }
+                
+            } catch (error) {
+                showStatus(`Both APIs Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-run a quick test when page loads
+        window.addEventListener('load', () => {
+            showStatus('Network View Fix Test loaded. Click buttons to test the fix!', 'info');
+        });
+    </script>
+</body>
+</html>

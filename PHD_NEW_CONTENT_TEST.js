@@ -28,6 +28,7 @@ class PhDNewContentTester {
         this.graphTests = [];
         this.vectorStoreTests = [];
         this.clusterTests = [];
+        this.explanationTests = [];
     }
 
     log(message, type = 'info') {
@@ -724,6 +725,116 @@ class PhDNewContentTester {
         }
     }
 
+    async testExplanationAPI() {
+        this.log('💡 Testing Explanation API (Sprint 3A)...');
+
+        try {
+            // Get some PMIDs from the page
+            const pmids = ['33301246', '32817357', '31570887'];
+
+            // Test 1: Generate explanation
+            const startTime = Date.now();
+            const generateResponse = await fetch(`${this.backendUrl}/api/v1/explanations/generate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'User-ID': 'phd-explanation-test'
+                },
+                body: JSON.stringify({
+                    paper_pmid: pmids[0],
+                    context: {
+                        viewed_papers: [pmids[1], pmids[2]],
+                        collection_papers: [pmids[1]]
+                    },
+                    save_to_db: false
+                })
+            });
+
+            const generateTime = Date.now() - startTime;
+
+            if (generateResponse.ok) {
+                const explanationData = await generateResponse.json();
+                this.log(`✅ Explanation generated: ${explanationData.explanation_type} (confidence: ${explanationData.confidence_score?.toFixed(2)}) (${generateTime}ms)`, 'success');
+
+                this.explanationTests.push({
+                    test: 'Generate explanation',
+                    success: true,
+                    time: generateTime,
+                    type: explanationData.explanation_type,
+                    confidence: explanationData.confidence_score
+                });
+
+                // Test 2: Batch explanations
+                const batchResponse = await fetch(`${this.backendUrl}/api/v1/explanations/batch`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'User-ID': 'phd-explanation-test'
+                    },
+                    body: JSON.stringify({
+                        paper_pmids: pmids,
+                        context: {
+                            viewed_papers: [pmids[0]]
+                        },
+                        save_to_db: false
+                    })
+                });
+
+                if (batchResponse.ok) {
+                    const batchData = await batchResponse.json();
+                    this.log(`✅ Batch explanations: ${batchData.total_papers} papers`, 'success');
+
+                    this.explanationTests.push({
+                        test: 'Batch explanations',
+                        success: true,
+                        papers: batchData.total_papers
+                    });
+                }
+
+                // Test 3: Get explanation stats
+                const statsResponse = await fetch(`${this.backendUrl}/api/v1/explanations/stats/summary`, {
+                    headers: {
+                        'User-ID': 'phd-explanation-test'
+                    }
+                });
+
+                if (statsResponse.ok) {
+                    const statsData = await statsResponse.json();
+                    this.log(`✅ Explanation stats: ${statsData.total_explanations} total, avg confidence: ${statsData.avg_confidence?.toFixed(2)}`, 'success');
+
+                    this.explanationTests.push({
+                        test: 'Get explanation stats',
+                        success: true,
+                        total: statsData.total_explanations,
+                        avg_confidence: statsData.avg_confidence
+                    });
+                }
+
+                // Performance check
+                if (generateTime < 200) {
+                    this.log(`✅ Performance target met: ${generateTime}ms < 200ms`, 'success');
+                } else {
+                    this.log(`⚠️ Performance target missed: ${generateTime}ms >= 200ms`, 'warning');
+                }
+
+            } else {
+                this.log(`❌ Explanation generation failed: ${generateResponse.status}`, 'error');
+                this.explanationTests.push({
+                    test: 'Generate explanation',
+                    success: false,
+                    error: `HTTP ${generateResponse.status}`
+                });
+            }
+        } catch (error) {
+            this.log(`❌ Explanation API error: ${error.message}`, 'error');
+            this.explanationTests.push({
+                test: 'Explanation API',
+                success: false,
+                error: error.message
+            });
+        }
+    }
+
     async runNewContentTest() {
         this.log('🚀 Starting Comprehensive PhD & Discovery Engine Test...');
 
@@ -734,6 +845,7 @@ class PhDNewContentTester {
         await this.testGraphAPI();
         await this.testVectorStoreAPI();
         await this.testClusterAPI();
+        await this.testExplanationAPI();
 
         // Step 1: Check backend availability
         const backendAvailable = await this.testBackendAvailability();
@@ -811,6 +923,21 @@ class PhDNewContentTester {
                 const papers = test.papers ? `, ${test.papers} papers` : '';
                 const title = test.title ? ` - "${test.title}"` : '';
                 this.log(`   ${status} ${test.test}${time}${clusters}${papers}${title}`);
+            });
+        }
+
+        // Explanation API Results (Sprint 3A)
+        if (this.explanationTests.length > 0) {
+            this.log('\n💡 EXPLANATION API (Sprint 3A):');
+            const explanationSuccess = this.explanationTests.filter(t => t.success).length;
+            this.log(`   Tests: ${explanationSuccess}/${this.explanationTests.length} passed`);
+            this.explanationTests.forEach(test => {
+                const status = test.success ? '✅' : '❌';
+                const time = test.time ? ` (${test.time}ms)` : '';
+                const type = test.type ? ` - ${test.type}` : '';
+                const confidence = test.confidence ? ` (confidence: ${test.confidence.toFixed(2)})` : '';
+                const papers = test.papers ? ` - ${test.papers} papers` : '';
+                this.log(`   ${status} ${test.test}${time}${type}${confidence}${papers}`);
             });
         }
 

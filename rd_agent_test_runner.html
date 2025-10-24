@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>R&D Agent Platform Test Runner</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+        
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.8;
+            font-size: 1.1em;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e1e8ed;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        
+        .test-section h3 {
+            margin: 0 0 15px 0;
+            color: #2c3e50;
+            font-size: 1.3em;
+        }
+        
+        .button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+        
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .results {
+            margin-top: 20px;
+            padding: 20px;
+            background: #2c3e50;
+            color: #ecf0f1;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            max-height: 500px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        
+        .status {
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .progress {
+            width: 100%;
+            height: 6px;
+            background: #e1e8ed;
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .config {
+            background: #f1f3f4;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        
+        .config input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        .config label {
+            display: block;
+            margin: 10px 0 5px 0;
+            font-weight: 500;
+            color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 R&D Agent Platform Test Runner</h1>
+            <p>Comprehensive testing suite for all endpoints and UI components</p>
+        </div>
+        
+        <div class="content">
+            <div class="config">
+                <h3>🔧 Test Configuration</h3>
+                <label for="projectId">Project ID:</label>
+                <input type="text" id="projectId" value="5ac213d7-6fcc-46ff-9420-5c7f4b421012" placeholder="Enter project ID">
+                
+                <label for="userId">User ID:</label>
+                <input type="text" id="userId" value="fredericle77@gmail.com" placeholder="Enter user email">
+                
+                <label for="frontendUrl">Frontend URL:</label>
+                <input type="text" id="frontendUrl" value="https://frontend-psi-seven-85.vercel.app" placeholder="Enter frontend URL">
+            </div>
+            
+            <div class="test-section">
+                <h3>🚀 Quick Test Actions</h3>
+                <button class="button" onclick="runQuickTest()">Run Quick Test</button>
+                <button class="button" onclick="runFullTest()">Run Full Comprehensive Test</button>
+                <button class="button" onclick="testSpecificEndpoint()">Test Specific Endpoint</button>
+                <button class="button" onclick="clearResults()">Clear Results</button>
+            </div>
+            
+            <div class="test-section">
+                <h3>🎯 Individual Test Components</h3>
+                <button class="button" onclick="testQuickActions()">Test Quick Actions</button>
+                <button class="button" onclick="testWorkspaceData()">Test Workspace Data</button>
+                <button class="button" onclick="testReportAccess()">Test Report Access</button>
+                <button class="button" onclick="testUIComponents()">Test UI Components</button>
+                <button class="button" onclick="testNetworkView()">Test Network View</button>
+            </div>
+            
+            <div id="status" class="status" style="display: none;"></div>
+            <div class="progress" style="display: none;">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            
+            <div id="results" class="results" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        let testRunner = null;
+        let isTestRunning = false;
+
+        // Initialize test runner when page loads
+        window.addEventListener('load', async () => {
+            try {
+                // Load the test script
+                const response = await fetch('./comprehensive_rd_agent_test.js');
+                const scriptContent = await response.text();
+                eval(scriptContent);
+                
+                // Initialize with current config
+                updateTestConfig();
+                showStatus('Test runner loaded successfully!', 'success');
+            } catch (error) {
+                showStatus('Failed to load test script: ' + error.message, 'error');
+                console.error('Failed to load test script:', error);
+            }
+        });
+
+        function updateTestConfig() {
+            if (window.testRDAgent) {
+                window.testRDAgent.projectId = document.getElementById('projectId').value;
+                window.testRDAgent.testUserId = document.getElementById('userId').value;
+                window.testRDAgent.frontendUrl = document.getElementById('frontendUrl').value;
+            }
+        }
+
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            statusEl.style.display = 'block';
+        }
+
+        function showProgress(percent) {
+            const progressEl = document.querySelector('.progress');
+            const progressBar = document.getElementById('progressBar');
+            progressEl.style.display = 'block';
+            progressBar.style.width = percent + '%';
+        }
+
+        function hideProgress() {
+            document.querySelector('.progress').style.display = 'none';
+        }
+
+        function showResults(content) {
+            const resultsEl = document.getElementById('results');
+            resultsEl.textContent = content;
+            resultsEl.style.display = 'block';
+        }
+
+        function clearResults() {
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('status').style.display = 'none';
+            hideProgress();
+        }
+
+        async function runQuickTest() {
+            if (isTestRunning) return;
+            
+            isTestRunning = true;
+            updateTestConfig();
+            showStatus('Running quick test...', 'info');
+            showProgress(0);
+            
+            try {
+                if (!window.testRDAgent) {
+                    throw new Error('Test runner not loaded');
+                }
+                
+                showProgress(25);
+                const workspaceData = await window.testRDAgent.testProjectWorkspaceData();
+                
+                showProgress(50);
+                const individualAccess = await window.testRDAgent.testIndividualReportAccess();
+                
+                showProgress(75);
+                const uiParsing = await window.testRDAgent.testUIDataParsing();
+                
+                showProgress(100);
+                
+                const results = {
+                    workspaceData,
+                    individualAccess,
+                    uiParsing,
+                    timestamp: new Date().toISOString()
+                };
+                
+                showResults(JSON.stringify(results, null, 2));
+                showStatus('Quick test completed successfully!', 'success');
+                
+            } catch (error) {
+                showStatus('Quick test failed: ' + error.message, 'error');
+                showResults('Error: ' + error.message + '\n' + error.stack);
+            } finally {
+                isTestRunning = false;
+                hideProgress();
+            }
+        }
+
+        async function runFullTest() {
+            if (isTestRunning) return;
+            
+            isTestRunning = true;
+            updateTestConfig();
+            showStatus('Running comprehensive test...', 'info');
+            showProgress(0);
+            
+            try {
+                if (!window.runRDAgentTest) {
+                    throw new Error('Test runner not loaded');
+                }
+                
+                const results = await window.runRDAgentTest();
+                showProgress(100);
+                showResults(JSON.stringify(results, null, 2));
+                showStatus('Comprehensive test completed!', 'success');
+                
+            } catch (error) {
+                showStatus('Comprehensive test failed: ' + error.message, 'error');
+                showResults('Error: ' + error.message + '\n' + error.stack);
+            } finally {
+                isTestRunning = false;
+                hideProgress();
+            }
+        }
+
+        async function testQuickActions() {
+            if (isTestRunning) return;
+            
+            isTestRunning = true;
+            updateTestConfig();
+            showStatus('Testing Quick Actions endpoints...', 'info');
+            
+            try {
+                const results = await window.testRDAgent.testQuickActionsEndpoints();
+                showResults(JSON.stringify(results, null, 2));
+                showStatus('Quick Actions test completed!', 'success');
+            } catch (error) {
+                showStatus('Quick Actions test failed: ' + error.message, 'error');
+                showResults('Error: ' + error.message);
+            } finally {
+                isTestRunning = false;
+            }
+        }
+
+        async function testWorkspaceData() {
+            if (isTestRunning) return;
+            
+            isTestRunning = true;
+            updateTestConfig();
+            showStatus('Testing Workspace Data...', 'info');
+            
+            try {
+                const results = await window.testRDAgent.testProjectWorkspaceData();
+                showResults(JSON.stringify(results, null, 2));
+                showStatus('Workspace Data test completed!', 'success');
+            } catch (error) {
+                showStatus('Workspace Data test failed: ' + error.message, 'error');
+                showResults('Error: ' + error.message);
+            } finally {
+                isTestRunning = false;
+            }
+        }
+
+        async function testReportAccess() {
+            if (isTestRunning) return;
+            
+            isTestRunning = true;
+            updateTestConfig();
+            showStatus('Testing Report Access...', 'info');
+            
+            try {
+                const results = await window.testRDAgent.testIndividualReportAccess();
+                showResults(JSON.stringify(results, null, 2));
+                showStatus('Report Access test completed!', 'success');
+            } catch (error) {
+                showStatus('Report Access test failed: ' + error.message, 'error');
+                showResults('Error: ' + error.message);
+            } finally {
+                isTestRunning = false;
+            }
+        }
+
+        async function testUIComponents() {
+            if (isTestRunning) return;
+            
+            isTestRunning = true;
+            updateTestConfig();
+            showStatus('Testing UI Components...', 'info');
+            
+            try {
+                const results = await window.testRDAgent.testUIDataParsing();
+                showResults(JSON.stringify(results, null, 2));
+                showStatus('UI Components test completed!', 'success');
+            } catch (error) {
+                showStatus('UI Components test failed: ' + error.message, 'error');
+                showResults('Error: ' + error.message);
+            } finally {
+                isTestRunning = false;
+            }
+        }
+
+        async function testNetworkView() {
+            if (isTestRunning) return;
+            
+            isTestRunning = true;
+            updateTestConfig();
+            showStatus('Testing Network View...', 'info');
+            
+            try {
+                const results = await window.testRDAgent.testNetworkViewIntegration();
+                showResults(JSON.stringify(results, null, 2));
+                showStatus('Network View test completed!', 'success');
+            } catch (error) {
+                showStatus('Network View test failed: ' + error.message, 'error');
+                showResults('Error: ' + error.message);
+            } finally {
+                isTestRunning = false;
+            }
+        }
+
+        function testSpecificEndpoint() {
+            const endpoint = prompt('Enter endpoint to test (e.g., /api/proxy/reports/123):');
+            if (!endpoint) return;
+            
+            showStatus(`Testing endpoint: ${endpoint}`, 'info');
+            
+            fetch(endpoint, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'User-ID': document.getElementById('userId').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                showResults(JSON.stringify(data, null, 2));
+                showStatus(`Endpoint test completed: ${endpoint}`, 'success');
+            })
+            .catch(error => {
+                showStatus(`Endpoint test failed: ${error.message}`, 'error');
+                showResults('Error: ' + error.message);
+            });
+        }
+    </script>
+</body>
+</html>

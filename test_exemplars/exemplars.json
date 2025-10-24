@@ -1,0 +1,17 @@
+{
+  "exemplars": [
+    {
+      "id": "generate_review_oncology_20251003_200310",
+      "analysis_type": "generate_review",
+      "content": "High-quality analysis with quantitative metrics and evidence-based conclusions...",
+      "quality_score": 8.0,
+      "research_domain": "oncology",
+      "analysis_context": {
+        "type": "resistance_analysis"
+      },
+      "embedding": null,
+      "created_at": "2025-10-03T20:03:10.085709",
+      "metadata": {}
+    }
+  ]
+}

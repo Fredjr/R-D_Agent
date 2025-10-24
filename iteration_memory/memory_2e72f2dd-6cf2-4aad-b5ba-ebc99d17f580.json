@@ -1,0 +1,69 @@
+{
+  "iteration_id": "2e72f2dd-6cf2-4aad-b5ba-ebc99d17f580",
+  "project_id": "integration_test",
+  "session_id": "session_123",
+  "user_id": "user_456",
+  "timestamp": "2025-10-04T10:36:08.397654",
+  "query": "AI in healthcare",
+  "analysis_type": "literature_review",
+  "decisions": [
+    {
+      "decision_id": "e997bf3a-c22f-444e-876c-30b278400bd6",
+      "timestamp": "2025-10-04T10:36:08.397663",
+      "decision_type": "source_selection",
+      "decision_content": "Selected peer-reviewed papers only",
+      "rationale": "Higher quality sources",
+      "context_snapshot": {
+        "filter": "peer_reviewed"
+      },
+      "impact_score": 0.0,
+      "user_confidence": 0.9,
+      "metadata": {}
+    }
+  ],
+  "context_evolution": [
+    {
+      "evolution_id": "e5e27bb2-7709-4e17-b4f6-6c8cfdd08c16",
+      "project_id": "integration_test",
+      "session_id": "session_123",
+      "timestamp": "2025-10-04T10:36:08.397672",
+      "context_before": {
+        "scope": "broad"
+      },
+      "context_after": {
+        "scope": "focused"
+      },
+      "trigger_event": "user_feedback",
+      "evolution_type": "refinement",
+      "significance_score": 0.0,
+      "metadata": {}
+    }
+  ],
+  "analysis_results": {
+    "findings": [
+      "AI shows promise in diagnostics"
+    ]
+  },
+  "quality_metrics": {
+    "accuracy": 0.88,
+    "relevance": 0.82
+  },
+  "user_satisfaction": 0.85,
+  "learned_patterns": [],
+  "next_recommendations": [
+    "Consider refining query focus for better results"
+  ],
+  "success_indicators": {
+    "decision_quality": 0.9,
+    "context_evolution": 0.0,
+    "analysis_quality": 0.85
+  },
+  "duration_seconds": 2.4e-05,
+  "resource_usage": {},
+  "metadata": {
+    "initial_context": {
+      "domain": "healthcare",
+      "ai_focus": "machine_learning"
+    }
+  }
+}

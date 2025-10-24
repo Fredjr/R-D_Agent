@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Updated Comprehensive Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 20px;
+            background: #1a1a1a;
+            color: #ffffff;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #2d2d2d;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+        }
+        .console {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            height: 600px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            border: 2px solid #333;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .status.success { background: #1a5f1a; color: #4ade80; border: 2px solid #22c55e; }
+        .status.error { background: #5f1a1a; color: #f87171; border: 2px solid #ef4444; }
+        .status.info { background: #1a3a5f; color: #60a5fa; border: 2px solid #3b82f6; }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 2.5em;
+            margin: 0;
+        }
+        .fixes {
+            background: #1a5f1a;
+            color: #4ade80;
+            border: 2px solid #22c55e;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Updated Comprehensive Test</h1>
+            <p>All fixes applied - expecting 100% success rate!</p>
+        </div>
+
+        <div class="fixes">
+            <strong>🔧 ALL FIXES APPLIED:</strong>
+            <ul>
+                <li>✅ Added required "molecule" field to New Report</li>
+                <li>✅ Fixed Deep Dive Analysis field names (pmid → article_pmid)</li>
+                <li>✅ Enhanced all PhD endpoint payloads</li>
+                <li>✅ Corrected endpoint URLs</li>
+                <li>✅ Fixed frontend URL detection</li>
+            </ul>
+        </div>
+
+        <div class="controls">
+            <button class="button" onclick="runUpdatedTest()">🚀 Run Updated Comprehensive Test</button>
+            <button class="button" onclick="clearConsole()">🗑️ Clear Console</button>
+        </div>
+
+        <div id="status" class="status info">
+            Ready to run updated comprehensive test with all fixes applied.
+        </div>
+        
+        <div id="console" class="console">
+🎯 Updated Comprehensive Test Console
+====================================
+✅ All fixes applied and ready to test
+✅ Expected success rate: 100%
+
+Fixes included:
+• New Report: Added required "molecule" field
+• Deep Dive Analysis: Fixed field names (pmid → article_pmid)
+• PhD Endpoints: Enhanced payloads with all required fields
+• Endpoint URLs: Corrected all URLs
+• Frontend URL: Fixed detection for file:// protocol
+
+Ready to run the updated test...
+        </div>
+    </div>
+
+    <script src="./updated_comprehensive_test.js"></script>
+    <script>
+        let consoleOutput = '🎯 Updated Comprehensive Test Console\n====================================\n✅ All fixes applied and ready to test\n✅ Expected success rate: 100%\n\nFixes included:\n• New Report: Added required "molecule" field\n• Deep Dive Analysis: Fixed field names (pmid → article_pmid)\n• PhD Endpoints: Enhanced payloads with all required fields\n• Endpoint URLs: Corrected all URLs\n• Frontend URL: Fixed detection for file:// protocol\n\nReady to run the updated test...\n';
+
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        function appendToConsole(message) {
+            consoleOutput += message + '\n';
+            const consoleEl = document.getElementById('console');
+            consoleEl.textContent = consoleOutput;
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        function clearConsole() {
+            consoleOutput = '🎯 Updated Comprehensive Test Console\n====================================\nConsole cleared. Ready for new test...\n\n';
+            document.getElementById('console').textContent = consoleOutput;
+            showStatus('Console cleared. Ready to run tests.', 'info');
+        }
+
+        // Override console.log to capture output
+        const originalLog = console.log;
+        console.log = function(...args) {
+            const message = args.join(' ');
+            appendToConsole(message);
+            originalLog.apply(console, args);
+        };
+
+        async function runUpdatedTest() {
+            showStatus('🚀 Running updated comprehensive test...', 'info');
+            appendToConsole('🚀 Starting Updated Comprehensive Test');
+            appendToConsole('==========================================');
+            
+            try {
+                // Check if the updated test function is available
+                if (typeof runUpdatedRDAgentTest === 'undefined') {
+                    throw new Error('Updated test function not found');
+                }
+
+                // Run the updated test
+                const results = await runUpdatedRDAgentTest();
+                
+                appendToConsole('');
+                appendToConsole('🎯 UPDATED TEST COMPLETED');
+                appendToConsole('=========================');
+                
+                if (results && results.successRate) {
+                    const successRate = results.successRate;
+                    appendToConsole(`📊 Final Success Rate: ${successRate}%`);
+                    appendToConsole(`✅ Working Endpoints: ${results.passed}/${results.total}`);
+                    
+                    if (successRate >= 90) {
+                        showStatus(`🎉 Updated test completed! Success rate: ${successRate}% - EXCELLENT!`, 'success');
+                    } else if (successRate >= 75) {
+                        showStatus(`✅ Updated test completed! Success rate: ${successRate}% - GOOD`, 'success');
+                    } else {
+                        showStatus(`⚠️ Updated test completed! Success rate: ${successRate}% - NEEDS ATTENTION`, 'error');
+                    }
+                } else {
+                    showStatus('✅ Updated test completed! Check console for detailed results.', 'success');
+                }
+                
+            } catch (error) {
+                appendToConsole(`❌ ERROR: ${error.message}`);
+                appendToConsole(`Stack trace: ${error.stack}`);
+                showStatus(`❌ Updated test failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-initialize
+        window.addEventListener('load', () => {
+            appendToConsole('🎯 Updated test console initialized');
+            appendToConsole('📋 All fixes have been applied to this test version');
+            appendToConsole('');
+            appendToConsole('Click "Run Updated Comprehensive Test" to begin...');
+            
+            if (typeof runUpdatedRDAgentTest !== 'undefined') {
+                appendToConsole('✅ Updated test function loaded successfully');
+                showStatus('✅ Updated test framework loaded. Ready to run with all fixes!', 'success');
+            } else {
+                appendToConsole('⚠️ Updated test function not found');
+                showStatus('⚠️ Updated test framework not loaded properly.', 'error');
+            }
+        });
+    </script>
+</body>
+</html>

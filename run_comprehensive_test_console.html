@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprehensive Test Console</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 20px;
+            background: #1a1a1a;
+            color: #ffffff;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #2d2d2d;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+        }
+        .console {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            height: 500px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            border: 2px solid #333;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .status.success { background: #1a5f1a; color: #4ade80; border: 2px solid #22c55e; }
+        .status.error { background: #5f1a1a; color: #f87171; border: 2px solid #ef4444; }
+        .status.info { background: #1a3a5f; color: #60a5fa; border: 2px solid #3b82f6; }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 2.5em;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 Comprehensive R&D Agent Test Console</h1>
+            <p>Execute the comprehensive test suite with real-time console output</p>
+        </div>
+
+        <div class="controls">
+            <button class="button" onclick="loadAndRunTest()">🚀 Load & Run Comprehensive Test</button>
+            <button class="button" onclick="runQuickTest()">⚡ Run Quick Endpoint Test</button>
+            <button class="button" onclick="clearConsole()">🗑️ Clear Console</button>
+        </div>
+
+        <div id="status" class="status info">
+            Ready to run comprehensive test. Click "Load & Run Comprehensive Test" to begin.
+        </div>
+        
+        <div id="console" class="console">
+🧪 Comprehensive R&D Agent Test Console
+========================================
+Waiting for test execution...
+
+Instructions:
+1. Click "Load & Run Comprehensive Test" to execute the full test suite
+2. Watch real-time output in this console
+3. Results will show success rates and detailed diagnostics
+
+Ready to begin testing...
+        </div>
+    </div>
+
+    <script src="./comprehensive_rd_agent_test.js"></script>
+    <script>
+        let consoleOutput = '';
+
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        function appendToConsole(message) {
+            consoleOutput += message + '\n';
+            const consoleEl = document.getElementById('console');
+            consoleEl.textContent = consoleOutput;
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        function clearConsole() {
+            consoleOutput = '🧪 Comprehensive R&D Agent Test Console\n========================================\nConsole cleared. Ready for new test...\n\n';
+            document.getElementById('console').textContent = consoleOutput;
+            showStatus('Console cleared. Ready to run tests.', 'info');
+        }
+
+        // Override console.log to capture output
+        const originalLog = console.log;
+        console.log = function(...args) {
+            const message = args.join(' ');
+            appendToConsole(message);
+            originalLog.apply(console, args);
+        };
+
+        async function loadAndRunTest() {
+            showStatus('🚀 Loading and running comprehensive test...', 'info');
+            appendToConsole('🚀 Starting comprehensive R&D Agent test...');
+            appendToConsole('📊 Loading test configuration...');
+            
+            try {
+                // Check if test class is available
+                if (typeof ComprehensiveRDAgentTest === 'undefined') {
+                    throw new Error('ComprehensiveRDAgentTest class not found');
+                }
+
+                appendToConsole('✅ Test class loaded successfully');
+                appendToConsole('🎯 Initializing test runner...');
+                
+                const tester = new ComprehensiveRDAgentTest();
+                appendToConsole(`📍 Testing project: ${tester.projectId}`);
+                appendToConsole(`🌐 Frontend URL: ${tester.frontendUrl}`);
+                appendToConsole('');
+                
+                // Run the comprehensive test
+                const results = await tester.runComprehensiveTest();
+                
+                appendToConsole('');
+                appendToConsole('🎯 TEST COMPLETED');
+                appendToConsole('================');
+                
+                if (results && results.summary) {
+                    const successRate = results.summary.successRate || 0;
+                    appendToConsole(`📊 Success Rate: ${successRate}%`);
+                    appendToConsole(`✅ Working Endpoints: ${results.summary.workingEndpoints || 0}`);
+                    appendToConsole(`❌ Failed Endpoints: ${results.summary.failedEndpoints || 0}`);
+                    
+                    if (successRate >= 80) {
+                        showStatus(`✅ Test completed! Success rate: ${successRate}% - EXCELLENT`, 'success');
+                    } else if (successRate >= 60) {
+                        showStatus(`⚠️ Test completed! Success rate: ${successRate}% - NEEDS ATTENTION`, 'error');
+                    } else {
+                        showStatus(`❌ Test completed! Success rate: ${successRate}% - CRITICAL ISSUES`, 'error');
+                    }
+                } else {
+                    showStatus('✅ Test completed! Check console for detailed results.', 'success');
+                }
+                
+            } catch (error) {
+                appendToConsole(`❌ ERROR: ${error.message}`);
+                appendToConsole(`Stack trace: ${error.stack}`);
+                showStatus(`❌ Test failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function runQuickTest() {
+            showStatus('⚡ Running quick endpoint test...', 'info');
+            appendToConsole('⚡ Quick Endpoint Test');
+            appendToConsole('====================');
+            
+            const endpoints = [
+                { name: 'Health Check', url: '/api/health' },
+                { name: 'Reports List', url: `/api/proxy/projects/5ac213d7-6fcc-46ff-9420-5c7f4b421012/reports` },
+                { name: 'Deep Dive Analyses', url: `/api/proxy/projects/5ac213d7-6fcc-46ff-9420-5c7f4b421012/deep-dive-analyses` },
+                { name: 'Collections', url: `/api/proxy/projects/5ac213d7-6fcc-46ff-9420-5c7f4b421012/collections` }
+            ];
+            
+            let passed = 0;
+            let total = endpoints.length;
+            
+            for (const endpoint of endpoints) {
+                try {
+                    appendToConsole(`🔍 Testing ${endpoint.name}...`);
+                    const response = await fetch(endpoint.url, {
+                        headers: { 'User-ID': 'fredericle77@gmail.com' }
+                    });
+                    
+                    if (response.ok) {
+                        appendToConsole(`✅ ${endpoint.name}: SUCCESS (${response.status})`);
+                        passed++;
+                    } else {
+                        appendToConsole(`❌ ${endpoint.name}: FAILED (${response.status})`);
+                    }
+                } catch (error) {
+                    appendToConsole(`❌ ${endpoint.name}: ERROR - ${error.message}`);
+                }
+            }
+            
+            const successRate = (passed / total * 100).toFixed(1);
+            appendToConsole('');
+            appendToConsole(`📊 Quick Test Results: ${passed}/${total} (${successRate}%)`);
+            
+            if (successRate >= 75) {
+                showStatus(`✅ Quick test completed! ${successRate}% success rate`, 'success');
+            } else {
+                showStatus(`⚠️ Quick test completed! ${successRate}% success rate`, 'error');
+            }
+        }
+
+        // Auto-initialize
+        window.addEventListener('load', () => {
+            appendToConsole('🎯 Test console initialized');
+            appendToConsole('📋 Available tests:');
+            appendToConsole('   • Comprehensive Test: Full platform testing');
+            appendToConsole('   • Quick Test: Basic endpoint connectivity');
+            appendToConsole('');
+            appendToConsole('Click a button above to begin testing...');
+            
+            if (typeof ComprehensiveRDAgentTest !== 'undefined') {
+                appendToConsole('✅ ComprehensiveRDAgentTest class loaded');
+                showStatus('✅ Test framework loaded. Ready to run comprehensive test!', 'success');
+            } else {
+                appendToConsole('⚠️ ComprehensiveRDAgentTest class not found');
+                showStatus('⚠️ Test framework not loaded. Will attempt to load during test execution.', 'error');
+            }
+        });
+    </script>
+</body>
+</html>

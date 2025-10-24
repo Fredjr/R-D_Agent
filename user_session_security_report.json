@@ -1,0 +1,31 @@
+{
+  "critical_vulnerabilities": [
+    {
+      "type": "PROJECT_DATA_LEAKAGE",
+      "severity": "CRITICAL",
+      "description": "Users can see each other's projects",
+      "shared_project_ids": [
+        "645b145a-ce90-489f-b8db-f0341207b129",
+        "91adc0ab-2581-4faf-aea2-363762f9faa6",
+        "a10a5dc3-631d-49a5-8830-5b77bb96b200",
+        "5f2f9e2f-52ac-4714-b4df-16c8e5aa9122",
+        "c574a108-aead-487c-9abb-0ee8c852e290",
+        "6a8fffe2-db6a-433f-8808-739a3d5ed452"
+      ],
+      "user_a_total": 13,
+      "user_b_total": 20
+    }
+  ],
+  "data_leakage_found": true,
+  "test_results": {
+    "projects": {
+      "user_a_count": 13,
+      "user_b_count": 20,
+      "shared_count": 6
+    },
+    "recommendations": {
+      "user_a_papers": 20,
+      "user_b_papers": 16
+    }
+  }
+}
