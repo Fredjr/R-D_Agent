@@ -68,6 +68,16 @@ except ImportError as e:
     EVENTS_API_AVAILABLE = False
     events_router = None
 
+# Import Candidate API - Sprint 1B
+try:
+    from api.candidates import router as candidates_router
+    CANDIDATES_API_AVAILABLE = True
+    print("✅ Candidate API loaded successfully")
+except ImportError as e:
+    print(f"⚠️ Candidate API not available: {e}")
+    CANDIDATES_API_AVAILABLE = False
+    candidates_router = None
+
 # Import PhD analysis wrapper - OPTIONAL with fallback
 try:
     from phd_analysis_wrapper import (
@@ -230,6 +240,11 @@ app = FastAPI(title="R&D Agent API", version="1.0.0")
 if EVENTS_API_AVAILABLE and events_router:
     app.include_router(events_router)
     print("✅ Event Tracking API routes registered")
+
+# Register Candidate API router - Sprint 1B
+if CANDIDATES_API_AVAILABLE and candidates_router:
+    app.include_router(candidates_router)
+    print("✅ Candidate API routes registered")
 
 # Register notification callback with background processor
 background_processor.add_notification_callback(background_job_notification_callback)
