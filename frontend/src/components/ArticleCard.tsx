@@ -284,21 +284,31 @@ export default function ArticleCard({ item, projectId, onAddToCollection }: Prop
       {item.articles?.length ? (
         <div className="mt-2 grid gap-2 text-sm text-gray-600">
           {item.articles.slice(0, 3).map((a, i) => (
-            <div key={i} className="flex flex-col gap-1">
-              <div className="flex items-center justify-between">
-                {a.pmid ? (
-                  <a
-                    href={`https://pubmed.ncbi.nlm.nih.gov/${a.pmid}/`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="truncate hover:underline"
-                  >
-                    • {a.title}
-                  </a>
-                ) : (
-                  <span className="truncate">• {a.title}</span>
-                )}
-                <span className="ml-3 shrink-0 text-gray-500">{a.pub_year} · {a.citation_count} cites</span>
+            <div key={i} className="flex flex-col gap-1 p-2 border border-gray-200 rounded-lg bg-gray-50">
+              <div className="flex flex-col gap-1">
+                <div className="flex-1">
+                  {a.pmid ? (
+                    <a
+                      href={`https://pubmed.ncbi.nlm.nih.gov/${a.pmid}/`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:underline text-blue-600 hover:text-blue-800 font-medium"
+                      title={a.title}
+                    >
+                      • {a.title}
+                    </a>
+                  ) : (
+                    <span className="text-gray-900 font-medium" title={a.title}>• {a.title}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-4 text-xs text-gray-500">
+                  <span>{a.pub_year}</span>
+                  <span>{a.citation_count} citations</span>
+                  {a.journal && <span>{a.journal}</span>}
+                  {a.authors && a.authors.length > 0 && (
+                    <span>{a.authors.slice(0, 2).join(', ')}{a.authors.length > 2 ? ' et al.' : ''}</span>
+                  )}
+                </div>
               </div>
               {Boolean((a as any).score_breakdown) && (
                 <div className="flex flex-wrap gap-2 text-xs">
