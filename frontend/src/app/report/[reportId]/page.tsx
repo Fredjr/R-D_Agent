@@ -229,6 +229,20 @@ export default function ReportDetailPage() {
           const sections = content.sections || {};
           const allPapers = content.papers || [];
 
+          // Helper function to transform paper objects to match ArticleCard expectations
+          const transformPapers = (papers: any[]) => {
+            return papers.map((paper: any) => ({
+              title: paper.title,
+              pub_year: paper.year || paper.publication_year, // Map year to pub_year
+              citation_count: paper.citation_count || 0,
+              pmid: paper.pmid,
+              authors: paper.authors,
+              journal: paper.journal,
+              // Keep original fields for compatibility
+              ...paper
+            }));
+          };
+
           // Create results for each section
           const results: SearchResult[] = [];
 
@@ -243,7 +257,7 @@ export default function ReportDetailPage() {
                 publication_score: 85,
                 overall_relevance_score: 88
               },
-              articles: sections.primary_research,
+              articles: transformPapers(sections.primary_research),
               source: 'primary'
             });
           }
@@ -259,7 +273,7 @@ export default function ReportDetailPage() {
                 publication_score: 80,
                 overall_relevance_score: 83
               },
-              articles: sections.trending_topics,
+              articles: transformPapers(sections.trending_topics),
               source: 'primary'
             });
           }
@@ -275,7 +289,7 @@ export default function ReportDetailPage() {
                 publication_score: 78,
                 overall_relevance_score: 80
               },
-              articles: sections.cross_domain_insights,
+              articles: transformPapers(sections.cross_domain_insights),
               source: 'primary'
             });
           }
@@ -291,7 +305,7 @@ export default function ReportDetailPage() {
                 publication_score: 90,
                 overall_relevance_score: 89
               },
-              articles: sections.citation_opportunities,
+              articles: transformPapers(sections.citation_opportunities),
               source: 'primary'
             });
           }
@@ -307,7 +321,7 @@ export default function ReportDetailPage() {
                 publication_score: 80,
                 overall_relevance_score: 82
               },
-              articles: allPapers,
+              articles: transformPapers(allPapers),
               source: 'primary'
             });
           }
