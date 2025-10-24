@@ -27,6 +27,7 @@ class PhDNewContentTester {
         this.eventTrackingTests = [];
         this.graphTests = [];
         this.vectorStoreTests = [];
+        this.clusterTests = [];
     }
 
     log(message, type = 'info') {
@@ -602,6 +603,127 @@ class PhDNewContentTester {
         }
     }
 
+    async testClusterAPI() {
+        this.log('🔍 Testing Cluster API (Sprint 2B)...');
+
+        try {
+            // Get some PMIDs from the page
+            const pmids = ['33301246', '32817357', '31570887', '33199918', '32817357', '31570887'];
+
+            // Test 1: Generate clusters
+            const startTime = Date.now();
+            const generateResponse = await fetch(`${this.backendUrl}/api/v1/clusters/generate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'User-ID': 'phd-cluster-test'
+                },
+                body: JSON.stringify({
+                    pmids: pmids,
+                    source_type: 'test',
+                    source_id: 'phd-test',
+                    update_database: false
+                })
+            });
+
+            const generateTime = Date.now() - startTime;
+
+            if (generateResponse.ok) {
+                const clusterData = await generateResponse.json();
+                this.log(`✅ Clusters generated: ${clusterData.total_clusters || 0} clusters, ${clusterData.total_papers || 0} papers (${generateTime}ms)`, 'success');
+
+                this.clusterTests.push({
+                    test: 'Generate clusters',
+                    success: true,
+                    time: generateTime,
+                    clusters: clusterData.total_clusters,
+                    papers: clusterData.total_papers
+                });
+
+                // Test 2: List clusters
+                const listResponse = await fetch(`${this.backendUrl}/api/v1/clusters`, {
+                    headers: {
+                        'User-ID': 'phd-cluster-test'
+                    }
+                });
+
+                if (listResponse.ok) {
+                    const listData = await listResponse.json();
+                    this.log(`✅ Clusters listed: ${listData.total_clusters || 0} clusters`, 'success');
+
+                    this.clusterTests.push({
+                        test: 'List clusters',
+                        success: true,
+                        clusters: listData.total_clusters
+                    });
+
+                    // Test 3: Get cluster details (if clusters exist)
+                    if (listData.clusters && listData.clusters.length > 0) {
+                        const firstCluster = listData.clusters[0];
+                        const detailResponse = await fetch(`${this.backendUrl}/api/v1/clusters/${firstCluster.cluster_id}`, {
+                            headers: {
+                                'User-ID': 'phd-cluster-test'
+                            }
+                        });
+
+                        if (detailResponse.ok) {
+                            const detailData = await detailResponse.json();
+                            this.log(`✅ Cluster details: "${detailData.title}" with ${detailData.paper_count} papers`, 'success');
+
+                            this.clusterTests.push({
+                                test: 'Get cluster details',
+                                success: true,
+                                title: detailData.title,
+                                papers: detailData.paper_count
+                            });
+                        }
+
+                        // Test 4: Get cluster quality metrics
+                        const qualityResponse = await fetch(`${this.backendUrl}/api/v1/clusters/quality/metrics`, {
+                            headers: {
+                                'User-ID': 'phd-cluster-test'
+                            }
+                        });
+
+                        if (qualityResponse.ok) {
+                            const qualityData = await qualityResponse.json();
+                            this.log(`✅ Quality metrics: modularity=${qualityData.modularity?.toFixed(3)}, avg_size=${qualityData.avg_cluster_size?.toFixed(1)}`, 'success');
+
+                            this.clusterTests.push({
+                                test: 'Get quality metrics',
+                                success: true,
+                                modularity: qualityData.modularity,
+                                avg_size: qualityData.avg_cluster_size
+                            });
+                        }
+                    }
+                }
+
+                // Performance check
+                if (generateTime < 1000) {
+                    this.log(`✅ Performance target met: ${generateTime}ms < 1000ms`, 'success');
+                } else {
+                    this.log(`⚠️ Performance target missed: ${generateTime}ms >= 1000ms`, 'warning');
+                }
+
+            } else {
+                this.log(`❌ Cluster generation failed: ${generateResponse.status}`, 'error');
+                this.clusterTests.push({
+                    test: 'Generate clusters',
+                    success: false,
+                    error: `HTTP ${generateResponse.status}`
+                });
+            }
+        } catch (error) {
+            this.log(`❌ Cluster API error: ${error.message}`, 'error');
+            this.clusterTests.push({
+                test: 'Cluster API',
+                success: false,
+                error: error.message
+            });
+        }
+    }
+
     async runNewContentTest() {
         this.log('🚀 Starting Comprehensive PhD & Discovery Engine Test...');
 
@@ -611,6 +733,7 @@ class PhDNewContentTester {
         // Step 0.5: Test Discovery Engine APIs
         await this.testGraphAPI();
         await this.testVectorStoreAPI();
+        await this.testClusterAPI();
 
         // Step 1: Check backend availability
         const backendAvailable = await this.testBackendAvailability();
@@ -673,6 +796,21 @@ class PhDNewContentTester {
                 const edges = test.edges ? `, ${test.edges} edges` : '';
                 const communities = test.communities ? ` - ${test.communities} communities` : '';
                 this.log(`   ${status} ${test.test}${time}${nodes}${edges}${communities}`);
+            });
+        }
+
+        // Cluster API Results (Sprint 2B)
+        if (this.clusterTests.length > 0) {
+            this.log('\n🔍 CLUSTER API (Sprint 2B):');
+            const clusterSuccess = this.clusterTests.filter(t => t.success).length;
+            this.log(`   Tests: ${clusterSuccess}/${this.clusterTests.length} passed`);
+            this.clusterTests.forEach(test => {
+                const status = test.success ? '✅' : '❌';
+                const time = test.time ? ` (${test.time}ms)` : '';
+                const clusters = test.clusters ? ` - ${test.clusters} clusters` : '';
+                const papers = test.papers ? `, ${test.papers} papers` : '';
+                const title = test.title ? ` - "${test.title}"` : '';
+                this.log(`   ${status} ${test.test}${time}${clusters}${papers}${title}`);
             });
         }
 
