@@ -14,12 +14,12 @@ Sprint 1B: ████████████████████ 100% COM
 Sprint 2A: ████████████████████ 100% COMPLETE ✅
 Sprint 2B: ████████████████████ 100% COMPLETE ✅
 Sprint 3A: ████████████████████ 100% COMPLETE ✅
-Sprint 3B: ████████████████████ 100% COMPLETE ✅
-Sprint 4:  ░░░░░░░░░░░░░░░░░░░░   0% NOT STARTED
+Sprint 3B: ████████████████████ 100% COMPLETE ✅ DEPLOYED ✅
+Sprint 4:  ████░░░░░░░░░░░░░░░░  20% IN PROGRESS 🔄
 Sprint 5:  ░░░░░░░░░░░░░░░░░░░░   0% NOT STARTED
 Sprint 6:  ░░░░░░░░░░░░░░░░░░░░   0% NOT STARTED
 
-Overall: █████████████░░░░░░░ 67% (6/9 sprints)
+Overall: ██████████████░░░░░░ 69% (6/9 sprints complete, 1 in progress)
 ```
 
 ---
@@ -34,7 +34,7 @@ Overall: █████████████░░░░░░░ 67% (6/9 s
 | **2B** | 2 | 4-7 | Clustering V1 | ✅ COMPLETE |
 | **3A** | 3 | 1-3 | Explainability API V1 | ✅ COMPLETE |
 | **3B** | 3 | 4-7 | Weekly Mix Enhancement | ✅ COMPLETE |
-| **4** | 4-5 | - | Discovery Tree → Cluster-Aware | 🔄 NEXT |
+| **4** | 4-5 | - | Discovery Tree → Cluster-Aware | 🔄 IN PROGRESS |
 | **5** | 6-7 | - | Cohort Signals & Personalization | 📅 PLANNED |
 | **6** | 8-9 | - | Hardening, Cost & Launch | 📅 PLANNED |
 
@@ -334,8 +334,32 @@ Overall: █████████████░░░░░░░ 67% (6/9 s
 ## 🔄 CURRENT SPRINT
 
 ### Sprint 4: Discovery Tree → Cluster-Aware (Week 4-5)
-**Status**: 🔄 NEXT
-**Target Start**: October 25, 2025
+**Status**: 🔄 IN PROGRESS (Phase 1 - Core Services)
+**Start Date**: October 25, 2025
+**Progress**: 20% (2/10 days complete)
+
+**Objectives**:
+- Transform discovery tree from flat paper lists to cluster-aware navigation
+- Implement cluster-based recommendations with user interest modeling
+- Add cluster navigation and filtering
+- Integrate with Weekly Mix (Sprint 3B) for cluster diversity
+
+**Deliverables Completed**:
+- ✅ Sprint 4 Implementation Plan (`SPRINT_4_PLAN.md`)
+- ✅ Discovery Tree Service (`services/discovery_tree_service.py`)
+- ✅ Cluster Recommendation Service (`services/cluster_recommendation_service.py`)
+
+**In Progress**:
+- 🔄 Database models (ClusterView, ClusterNavigation)
+- 🔄 Unit tests for services
+- 🔄 Cluster tree generation testing
+
+**Next Steps**:
+- Phase 2: Discovery Tree API (7 endpoints)
+- Integration testing with Sprint 2B and 3B
+- Performance optimization and deployment
+
+[Full Plan](./SPRINT_4_PLAN.md)
 
 ---
 
