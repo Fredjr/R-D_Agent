@@ -11844,25 +11844,37 @@ async def generate_review_internal(request: ReviewRequest, db: Session, current_
                 "memories": memories,
             }
 
-            # 🔬 ENHANCEMENT: PhD-level content integration
+            # 🔬 ENHANCEMENT: PhD-level content integration (with circuit breaker)
             try:
-                from services.phd_content_integration_service import PhDContentIntegrationService
+                # Temporary circuit breaker to prevent stuck jobs
+                import os
+                phd_enhancements_enabled = os.getenv("PHD_ENHANCEMENTS_ENABLED", "false").lower() == "true"
 
-                # Initialize PhD integration service
-                phd_service = PhDContentIntegrationService()
+                if phd_enhancements_enabled:
+                    from services.phd_content_integration_service import PhDContentIntegrationService
 
-                # Enhance response with PhD-level analysis
-                enhanced_resp = await phd_service.enhance_generate_review_response(
-                    resp,
-                    request.objective or "Research analysis",
-                    request.molecule
-                )
+                    # Initialize PhD integration service with timeout
+                    phd_service = PhDContentIntegrationService()
 
-                # Use enhanced response if successful
-                if enhanced_resp and enhanced_resp.get("enhancement_metadata"):
-                    resp = enhanced_resp
-                    logger.info("✅ Generate Review response enhanced with PhD-level content")
+                    # Add timeout wrapper to prevent hanging
+                    enhanced_resp = await asyncio.wait_for(
+                        phd_service.enhance_generate_review_response(
+                            resp,
+                            request.objective or "Research analysis",
+                            request.molecule
+                        ),
+                        timeout=30.0  # 30 second timeout for PhD enhancements
+                    )
 
+                    # Use enhanced response if successful
+                    if enhanced_resp and enhanced_resp.get("enhancement_metadata"):
+                        resp = enhanced_resp
+                        logger.info("✅ Generate Review response enhanced with PhD-level content")
+                else:
+                    logger.info("🔧 PhD enhancements temporarily disabled via circuit breaker")
+
+            except asyncio.TimeoutError:
+                logger.warning("⚠️ PhD enhancement timed out after 30 seconds, using standard response")
             except Exception as e:
                 logger.warning(f"⚠️ PhD enhancement failed, using standard response: {e}")
 
@@ -12041,25 +12053,37 @@ async def generate_review_internal(request: ReviewRequest, db: Session, current_
                 "memories": memories,
             }
 
-            # 🔬 ENHANCEMENT: PhD-level content integration for DAG results
+            # 🔬 ENHANCEMENT: PhD-level content integration for DAG results (with circuit breaker)
             try:
-                from services.phd_content_integration_service import PhDContentIntegrationService
+                # Temporary circuit breaker to prevent stuck jobs
+                import os
+                phd_enhancements_enabled = os.getenv("PHD_ENHANCEMENTS_ENABLED", "false").lower() == "true"
 
-                # Initialize PhD integration service
-                phd_service = PhDContentIntegrationService()
+                if phd_enhancements_enabled:
+                    from services.phd_content_integration_service import PhDContentIntegrationService
 
-                # Enhance response with PhD-level analysis
-                enhanced_resp = await phd_service.enhance_generate_review_response(
-                    resp,
-                    request.objective or "Research analysis",
-                    request.molecule
-                )
+                    # Initialize PhD integration service with timeout
+                    phd_service = PhDContentIntegrationService()
 
-                # Use enhanced response if successful
-                if enhanced_resp and enhanced_resp.get("enhancement_metadata"):
-                    resp = enhanced_resp
-                    logger.info("✅ DAG Generate Review response enhanced with PhD-level content")
+                    # Add timeout wrapper to prevent hanging
+                    enhanced_resp = await asyncio.wait_for(
+                        phd_service.enhance_generate_review_response(
+                            resp,
+                            request.objective or "Research analysis",
+                            request.molecule
+                        ),
+                        timeout=30.0  # 30 second timeout for PhD enhancements
+                    )
 
+                    # Use enhanced response if successful
+                    if enhanced_resp and enhanced_resp.get("enhancement_metadata"):
+                        resp = enhanced_resp
+                        logger.info("✅ DAG Generate Review response enhanced with PhD-level content")
+                else:
+                    logger.info("🔧 PhD enhancements temporarily disabled via circuit breaker for DAG")
+
+            except asyncio.TimeoutError:
+                logger.warning("⚠️ PhD enhancement timed out after 30 seconds for DAG response, using standard response")
             except Exception as e:
                 logger.warning(f"⚠️ PhD enhancement failed for DAG response, using standard response: {e}")
             # Final safety net: if results are under desired minimum, top-up from V2 here as well
