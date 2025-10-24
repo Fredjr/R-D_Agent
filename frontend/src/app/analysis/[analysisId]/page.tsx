@@ -223,12 +223,12 @@ export default function AnalysisDetailPage() {
 
   // Enhanced content checking - look for actual content, not just empty objects
   const hasScientificModelContent = scientificModel && (
-    scientificModel.model_type ||
-    scientificModel.study_design ||
-    scientificModel.population_description ||
-    scientificModel.protocol_summary ||
-    scientificModel.strengths ||
-    scientificModel.limitations
+    (scientificModel.model_type && scientificModel.model_type.trim() !== '') ||
+    (scientificModel.study_design && scientificModel.study_design.trim() !== '') ||
+    (scientificModel.population_description && scientificModel.population_description.trim() !== '') ||
+    (scientificModel.protocol_summary && scientificModel.protocol_summary.trim() !== '') ||
+    (scientificModel.strengths && scientificModel.strengths.trim() !== '') ||
+    (scientificModel.limitations && scientificModel.limitations.trim() !== '')
   );
 
   const hasExperimentalMethodsContent = experimentalMethods && (
@@ -237,7 +237,7 @@ export default function AnalysisDetailPage() {
   );
 
   const hasResultsInterpretationContent = resultsInterpretation && (
-    resultsInterpretation.hypothesis_alignment ||
+    (resultsInterpretation.hypothesis_alignment && resultsInterpretation.hypothesis_alignment.trim() !== '') ||
     (resultsInterpretation.key_results && resultsInterpretation.key_results.length > 0) ||
     (resultsInterpretation.limitations_biases_in_results && resultsInterpretation.limitations_biases_in_results.length > 0) ||
     (resultsInterpretation.fact_anchors && resultsInterpretation.fact_anchors.length > 0)
