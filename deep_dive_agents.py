@@ -266,10 +266,10 @@ def run_methods_pipeline(full_text: str, objective: str, llm) -> List[Dict[str, 
     safe_text = _extract_methods_section(full_text or "", max_chars=25000)
     base = LLMChain(llm=llm, prompt=METHODS_BASE_PROMPT).invoke({"objective": objective[:400], "full_text": safe_text})
     try:
-        import json
-        rows = json.loads(base.get("text", base) if isinstance(base, dict) else str(base))
-        if not isinstance(rows, list):
-            rows = []
+        from services.flexible_json_parser import parse_llm_json
+        text = base.get("text", base) if isinstance(base, dict) else str(base)
+        parse_result = parse_llm_json(text, expected_structure=[], fallback_factory=lambda: [])
+        rows = parse_result.data if parse_result.success and isinstance(parse_result.data, list) else []
     except Exception:
         rows = []
     # Enrich with heuristics
@@ -449,18 +449,11 @@ def run_enhanced_model_pipeline(full_text: str, objective: str, llm) -> Dict[str
             "full_text": safe_text
         })
 
-        import json
+        from services.flexible_json_parser import parse_llm_json
         raw_text = base.get("text", base) if isinstance(base, dict) else str(base)
 
-        # Clean JSON response
-        if "```json" in raw_text:
-            raw_text = raw_text.split("```json")[1].split("```")[0]
-        elif "```" in raw_text:
-            raw_text = raw_text.split("```")[1].split("```")[0]
-
-        result = json.loads(raw_text)
-        if not isinstance(result, dict):
-            result = {}
+        parse_result = parse_llm_json(raw_text, expected_structure={}, fallback_factory=lambda: {})
+        result = parse_result.data if parse_result.success and isinstance(parse_result.data, dict) else {}
 
     except Exception as e:
         print(f"Model analysis error: {e}")
@@ -761,17 +754,14 @@ def run_methods_pipeline_with_context(full_text: str, objective: str, llm, conte
         result = chain.invoke(context_vars)
 
         # Parse and return result
-        import json
+        from services.flexible_json_parser import parse_llm_json
         text_result = result.get("text", result) if isinstance(result, dict) else str(result)
 
-        # Clean JSON formatting
-        if "```" in text_result:
-            text_result = text_result.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
-
-        try:
-            parsed_result = json.loads(text_result)
-            return parsed_result if isinstance(parsed_result, list) else [parsed_result]
-        except json.JSONDecodeError:
+        parse_result = parse_llm_json(text_result, expected_structure=[], fallback_factory=lambda: [])
+        if parse_result.success:
+            parsed_data = parse_result.data
+            return parsed_data if isinstance(parsed_data, list) else [parsed_data]
+        else:
             # Fallback to original pipeline if JSON parsing fails
             return run_methods_pipeline(full_text, objective, llm)
 
@@ -809,17 +799,13 @@ def run_results_pipeline_with_context(full_text: str, objective: str, llm, pmid:
         result = chain.invoke(context_vars)
 
         # Parse and return result
-        import json
+        from services.flexible_json_parser import parse_llm_json
         text_result = result.get("text", result) if isinstance(result, dict) else str(result)
 
-        # Clean JSON formatting
-        if "```" in text_result:
-            text_result = text_result.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
-
-        try:
-            parsed_result = json.loads(text_result)
-            return parsed_result if isinstance(parsed_result, dict) else {}
-        except json.JSONDecodeError:
+        parse_result = parse_llm_json(text_result, expected_structure={}, fallback_factory=lambda: {})
+        if parse_result.success:
+            return parse_result.data if isinstance(parse_result.data, dict) else {}
+        else:
             # Fallback to original pipeline if JSON parsing fails
             return run_results_pipeline(full_text, objective, llm, pmid)
 
@@ -857,17 +843,13 @@ def run_enhanced_model_pipeline_with_context(full_text: str, objective: str, llm
         result = chain.invoke(context_vars)
 
         # Parse and return result
-        import json
+        from services.flexible_json_parser import parse_llm_json
         text_result = result.get("text", result) if isinstance(result, dict) else str(result)
 
-        # Clean JSON formatting
-        if "```" in text_result:
-            text_result = text_result.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
-
-        try:
-            parsed_result = json.loads(text_result)
-            return parsed_result if isinstance(parsed_result, dict) else {}
-        except json.JSONDecodeError:
+        parse_result = parse_llm_json(text_result, expected_structure={}, fallback_factory=lambda: {})
+        if parse_result.success:
+            return parse_result.data if isinstance(parse_result.data, dict) else {}
+        else:
             # Fallback to original pipeline if JSON parsing fails
             return run_enhanced_model_pipeline(full_text, objective, llm)
 
@@ -959,18 +941,12 @@ def run_methods_pipeline_with_contract(full_text: str, objective: str, llm, cont
         if "```" in text_result:
             text_result = text_result.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
 
-        try:
-            parsed_result = json.loads(text_result)
-            return parsed_result if isinstance(parsed_result, list) else [parsed_result]
-        except json.JSONDecodeError:
-            # Try to extract JSON from text
-            import re
-            json_match = re.search(r'\[.*\]', text_result, re.DOTALL)
-            if json_match:
-                try:
-                    return json.loads(json_match.group())
-                except:
-                    pass
+        from services.flexible_json_parser import parse_llm_json
+        parse_result = parse_llm_json(text_result, expected_structure=[], fallback_factory=lambda: [{"error": "Failed to parse contract-enhanced methods analysis", "raw_output": text_result[:500]}])
+        if parse_result.success:
+            parsed_data = parse_result.data
+            return parsed_data if isinstance(parsed_data, list) else [parsed_data]
+        else:
             return [{"error": "Failed to parse contract-enhanced methods analysis", "raw_output": text_result[:500]}]
 
     except Exception:
@@ -1057,18 +1033,12 @@ def run_results_pipeline_with_contract(full_text: str, objective: str, llm, pmid
         if "```" in text_result:
             text_result = text_result.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
 
-        try:
-            parsed_result = json.loads(text_result)
-            return parsed_result if isinstance(parsed_result, list) else [parsed_result]
-        except json.JSONDecodeError:
-            # Try to extract JSON from text
-            import re
-            json_match = re.search(r'\[.*\]', text_result, re.DOTALL)
-            if json_match:
-                try:
-                    return json.loads(json_match.group())
-                except:
-                    pass
+        from services.flexible_json_parser import parse_llm_json
+        parse_result = parse_llm_json(text_result, expected_structure=[], fallback_factory=lambda: [{"error": "Failed to parse contract-enhanced results analysis", "raw_output": text_result[:500]}])
+        if parse_result.success:
+            parsed_data = parse_result.data
+            return parsed_data if isinstance(parsed_data, list) else [parsed_data]
+        else:
             return [{"error": "Failed to parse contract-enhanced results analysis", "raw_output": text_result[:500]}]
 
     except Exception:
@@ -1155,18 +1125,12 @@ def run_enhanced_model_pipeline_with_contract(full_text: str, objective: str, ll
         if "```" in text_result:
             text_result = text_result.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
 
-        try:
-            parsed_result = json.loads(text_result)
-            return parsed_result if isinstance(parsed_result, list) else [parsed_result]
-        except json.JSONDecodeError:
-            # Try to extract JSON from text
-            import re
-            json_match = re.search(r'\[.*\]', text_result, re.DOTALL)
-            if json_match:
-                try:
-                    return json.loads(json_match.group())
-                except:
-                    pass
+        from services.flexible_json_parser import parse_llm_json
+        parse_result = parse_llm_json(text_result, expected_structure=[], fallback_factory=lambda: [{"error": "Failed to parse contract-enhanced model analysis", "raw_output": text_result[:500]}])
+        if parse_result.success:
+            parsed_data = parse_result.data
+            return parsed_data if isinstance(parsed_data, list) else [parsed_data]
+        else:
             return [{"error": "Failed to parse contract-enhanced model analysis", "raw_output": text_result[:500]}]
 
     except Exception:
