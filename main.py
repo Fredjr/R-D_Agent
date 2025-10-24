@@ -10802,16 +10802,16 @@ async def deep_dive(request: DeepDiveRequest, db: Session = Depends(get_db), htt
     except asyncio.TimeoutError:
         return {
             "error": "Deep dive analysis timed out after 2 minutes",
-            "pmid": request.pmid,
-            "objective": request.objective,
+            "pmid": getattr(request, 'pmid', 'unknown'),
+            "objective": getattr(request, 'objective', 'unknown'),
             "status": "timeout",
             "suggestion": "Try using the background job endpoint for complex analyses"
         }
     except Exception as e:
         return {
             "error": f"Deep dive analysis failed: {str(e)}",
-            "pmid": request.pmid,
-            "objective": request.objective,
+            "pmid": getattr(request, 'pmid', 'unknown'),
+            "objective": getattr(request, 'objective', 'unknown'),
             "status": "error"
         }
 
@@ -11395,18 +11395,20 @@ async def generate_review(request: ReviewRequest, http_request: Request, db: Ses
         )
         return result
     except asyncio.TimeoutError:
-        return {
+        timeout_response = {
             "error": "Request timed out after 2 minutes",
-            "molecule": request.molecule,
-            "objective": request.objective,
+            "molecule": getattr(request, 'molecule', 'unknown'),
+            "objective": getattr(request, 'objective', 'unknown'),
             "status": "timeout",
             "suggestion": "Try using the background job endpoint for complex analyses"
         }
+        print(f"🔧 Timeout response: {timeout_response}")
+        return timeout_response
     except Exception as e:
         return {
             "error": f"Generate review failed: {str(e)}",
-            "molecule": request.molecule,
-            "objective": request.objective,
+            "molecule": getattr(request, 'molecule', 'unknown'),
+            "objective": getattr(request, 'objective', 'unknown'),
             "status": "error"
         }
 
