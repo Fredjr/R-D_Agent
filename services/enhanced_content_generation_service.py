@@ -15,6 +15,7 @@ from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
 import re
 import numpy as np
+from services.flexible_json_parser import parse_llm_json
 
 logger = logging.getLogger(__name__)
 
@@ -623,16 +624,38 @@ class EnhancedContentGenerationService:
                 )
             )
 
-            # Parse JSON result with sanitization
-            try:
-                sanitized_result = self._sanitize_json_string(result)
-                fact_anchors = json.loads(sanitized_result)
+            # Parse JSON result with flexible parser
+            expected_structure = [
+                {
+                    "claim": "",
+                    "evidence": {
+                        "title": "",
+                        "year": 2024,
+                        "pmid": "",
+                        "quote": ""
+                    }
+                }
+            ]
+
+            parse_result = parse_llm_json(
+                result,
+                expected_structure=None,  # Don't enforce structure for arrays
+                fallback_factory=lambda: self._generate_fallback_fact_anchors(paper)
+            )
+
+            if parse_result.success:
+                fact_anchors = parse_result.data
                 if isinstance(fact_anchors, list):
                     return fact_anchors[:5]  # Limit to 5 anchors
-            except json.JSONDecodeError as e:
-                self.logger.warning(f"Failed to parse JSON for fact anchors: {e}")
-                self.logger.debug(f"Raw result: {result[:500]}...")
-                pass
+                elif isinstance(fact_anchors, dict):
+                    # Try to extract anchors from various keys
+                    for key in ['fact_anchors', 'anchors', 'evidence', 'facts']:
+                        if key in fact_anchors and isinstance(fact_anchors[key], list):
+                            return fact_anchors[key][:5]
+                    # If no array found, create single anchor from dict
+                    return [fact_anchors]
+                else:
+                    return self._generate_fallback_fact_anchors(paper)
 
         except Exception as e:
             self.logger.warning(f"Error generating fact anchors: {e}")

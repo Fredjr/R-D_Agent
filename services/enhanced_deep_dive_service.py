@@ -13,6 +13,7 @@ import time
 from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 import re
+from services.flexible_json_parser import parse_llm_json
 
 logger = logging.getLogger(__name__)
 
@@ -207,15 +208,28 @@ class EnhancedDeepDiveService:
                 )
             )
             
-            # Parse JSON result with sanitization
-            try:
-                # Sanitize the JSON string to fix common LLM JSON issues
-                sanitized_result = self._sanitize_json_string(result)
-                analysis = json.loads(sanitized_result)
-                return self._validate_and_enhance_scientific_model(analysis, title, pmid)
-            except json.JSONDecodeError as e:
-                self.logger.warning(f"Failed to parse JSON for scientific model analysis: {pmid}, error: {e}")
-                self.logger.debug(f"Raw result: {result[:500]}...")
+            # Parse JSON result with flexible parser
+            expected_structure = {
+                "model_type": "",
+                "study_design": "",
+                "population_description": "",
+                "protocol_summary": "",
+                "strengths": [],
+                "limitations": [],
+                "bias_assessment": "",
+                "fact_anchors": []
+            }
+
+            parse_result = parse_llm_json(
+                result,
+                expected_structure=expected_structure,
+                fallback_factory=lambda: self._generate_fallback_scientific_model(title, abstract)
+            )
+
+            if parse_result.success:
+                return self._validate_and_enhance_scientific_model(parse_result.data, title, pmid)
+            else:
+                self.logger.warning(f"All parsing strategies failed for scientific model analysis: {pmid}")
                 return self._generate_fallback_scientific_model(title, abstract)
             
         except Exception as e:
@@ -383,17 +397,30 @@ class EnhancedDeepDiveService:
                 )
             )
 
-            try:
-                # Sanitize the JSON string to fix common LLM JSON issues
-                sanitized_result = self._sanitize_json_string(result)
-                methods = json.loads(sanitized_result)
+            # Parse JSON result with flexible parser (expecting array)
+            expected_structure = []  # Expecting array of methods
+
+            parse_result = parse_llm_json(
+                result,
+                expected_structure=None,  # Don't enforce structure for arrays
+                fallback_factory=lambda: self._generate_fallback_experimental_methods(title, abstract)
+            )
+
+            if parse_result.success:
+                methods = parse_result.data
+                # Handle different response formats
                 if isinstance(methods, list):
                     return [self._validate_experimental_method(method) for method in methods[:10]]
+                elif isinstance(methods, dict):
+                    # If it's a dict, try to extract methods from various keys
+                    for key in ['methods', 'experimental_methods', 'techniques', 'procedures']:
+                        if key in methods and isinstance(methods[key], list):
+                            return [self._validate_experimental_method(method) for method in methods[key][:10]]
+                    # If no array found, treat the dict as a single method
+                    return [self._validate_experimental_method(methods)]
                 else:
                     return self._generate_fallback_experimental_methods(title, abstract)
-            except json.JSONDecodeError as e:
-                self.logger.warning(f"Failed to parse JSON for experimental methods: {pmid}, error: {e}")
-                self.logger.debug(f"Raw result: {result[:500]}...")
+            else:
                 return self._generate_fallback_experimental_methods(title, abstract)
 
         except Exception as e:
@@ -603,14 +630,23 @@ class EnhancedDeepDiveService:
                 )
             )
 
-            try:
-                # Sanitize the JSON string to fix common LLM JSON issues
-                sanitized_result = self._sanitize_json_string(result)
-                analysis = json.loads(sanitized_result)
-                return self._validate_and_enhance_results_interpretation(analysis, title, pmid)
-            except json.JSONDecodeError as e:
-                self.logger.warning(f"Failed to parse JSON for results interpretation: {pmid}, error: {e}")
-                self.logger.debug(f"Raw result: {result[:500]}...")
+            # Parse JSON result with flexible parser
+            expected_structure = {
+                "hypothesis_alignment": "",
+                "key_results": [],
+                "limitations_biases_in_results": "",
+                "fact_anchors": []
+            }
+
+            parse_result = parse_llm_json(
+                result,
+                expected_structure=expected_structure,
+                fallback_factory=lambda: self._generate_fallback_results_interpretation(title, abstract)
+            )
+
+            if parse_result.success:
+                return self._validate_and_enhance_results_interpretation(parse_result.data, title, pmid)
+            else:
                 return self._generate_fallback_results_interpretation(title, abstract)
 
         except Exception as e:

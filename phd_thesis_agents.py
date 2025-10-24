@@ -18,6 +18,7 @@ import logging
 import time
 from typing import Dict, List, Any, Optional
 from datetime import datetime
+from services.flexible_json_parser import parse_llm_json
 
 # LangChain imports
 from langchain.agents import AgentExecutor, create_openai_functions_agent
@@ -969,35 +970,23 @@ class LiteratureReviewAgent:
         return {'analysis': str(result)}
 
     def _parse_enhanced_result(self, result: Dict[str, Any]) -> Dict[str, Any]:
-        """Parse enhanced LLM result with error handling"""
-        try:
-            # Extract text from LLM result
-            text = result.get("text", result) if isinstance(result, dict) else str(result)
+        """Parse enhanced LLM result with flexible JSON parser"""
+        # Extract text from LLM result
+        text = result.get("text", result) if isinstance(result, dict) else str(result)
 
-            # Clean and parse JSON
-            if "```json" in text:
-                text = text.split("```json")[1].split("```")[0].strip()
-            elif "```" in text:
-                text = text.split("```")[1].split("```")[0].strip()
+        # Define expected structure
+        expected_structure = {
+            "theoretical_landscape": {"dominant_frameworks": [], "emerging_theories": []},
+            "methodological_analysis": {"quantitative_approaches": [], "qualitative_approaches": []},
+            "research_evolution": {"chronological_timeline": []},
+            "evidence_synthesis": [],
+            "gap_analysis": {"theoretical_gaps": [], "methodological_gaps": []},
+            "dissertation_implications": {"positioning_in_field": "", "contribution_potential": ""},
+            "actionable_recommendations": []
+        }
 
-            # Parse JSON
-            parsed_result = json.loads(text)
-
-            # Validate required structure
-            required_keys = [
-                "theoretical_landscape", "methodological_analysis", "research_evolution",
-                "evidence_synthesis", "gap_analysis", "dissertation_implications", "actionable_recommendations"
-            ]
-
-            for key in required_keys:
-                if key not in parsed_result:
-                    parsed_result[key] = {}
-
-            return parsed_result
-
-        except (json.JSONDecodeError, KeyError, IndexError) as e:
-            logger.warning(f"Failed to parse enhanced result: {e}")
-            # Return structured fallback
+        # Fallback factory
+        def create_fallback():
             return {
                 "theoretical_landscape": {"dominant_frameworks": [], "emerging_theories": []},
                 "methodological_analysis": {"quantitative_approaches": [], "qualitative_approaches": []},
@@ -1006,9 +995,17 @@ class LiteratureReviewAgent:
                 "gap_analysis": {"theoretical_gaps": [], "methodological_gaps": []},
                 "dissertation_implications": {"positioning_in_field": "", "contribution_potential": ""},
                 "actionable_recommendations": [],
-                "parsing_error": str(e),
-                "raw_output": str(result)[:500]  # First 500 chars for debugging
+                "parsing_note": "Used fallback structure due to parsing issues"
             }
+
+        # Use flexible parser
+        parse_result = parse_llm_json(text, expected_structure, create_fallback)
+
+        if parse_result.success:
+            return parse_result.data
+        else:
+            logger.warning(f"Failed to parse enhanced result: {parse_result.error}")
+            return create_fallback()
 
 
 class MethodologySynthesisAgent:
