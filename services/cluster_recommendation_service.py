@@ -16,7 +16,8 @@ from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
 from collections import Counter, defaultdict
 
-from database import Article, UserInteraction
+from database import Article
+from database_models.user_interaction import UserInteraction
 from services.clustering_service import get_clustering_service
 
 logger = logging.getLogger(__name__)

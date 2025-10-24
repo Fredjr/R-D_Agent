@@ -609,6 +609,59 @@ class WeeklyMix(Base):
     )
 
 
+class ClusterView(Base):
+    """Track user cluster views for recommendations - Sprint 4"""
+    __tablename__ = "cluster_views"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String, nullable=False)
+    cluster_id = Column(String, nullable=False)
+
+    # View metrics
+    view_count = Column(Integer, default=1)
+    last_viewed_at = Column(DateTime, default=datetime.now)
+    avg_time_spent = Column(Float, default=0.0)  # seconds
+    papers_viewed = Column(Integer, default=0)
+    papers_saved = Column(Integer, default=0)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_user_cluster', 'user_id', 'cluster_id'),
+        Index('idx_user_last_viewed', 'user_id', 'last_viewed_at'),
+        Index('idx_cluster_views', 'cluster_id', 'view_count'),
+    )
+
+
+class ClusterNavigation(Base):
+    """Track cluster navigation patterns - Sprint 4"""
+    __tablename__ = "cluster_navigations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String, nullable=False)
+
+    # Navigation path
+    from_cluster_id = Column(String, nullable=True)  # Null for entry point
+    to_cluster_id = Column(String, nullable=False)
+
+    # Navigation metadata
+    navigation_type = Column(String, nullable=False)  # 'direct', 'related', 'search', 'recommendation'
+    session_id = Column(String, nullable=True)  # For session tracking
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.now)
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_user_navigation', 'user_id', 'created_at'),
+        Index('idx_cluster_from_to', 'from_cluster_id', 'to_cluster_id'),
+        Index('idx_navigation_type', 'navigation_type'),
+    )
+
+
 # Database session dependency
 def get_db():
     """Dependency to get database session"""

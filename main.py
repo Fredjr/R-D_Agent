@@ -118,6 +118,16 @@ except ImportError as e:
     WEEKLY_MIX_API_AVAILABLE = False
     weekly_mix_router = None
 
+# Import Discovery Tree API - Sprint 4
+try:
+    from api.discovery_tree import router as discovery_tree_router
+    DISCOVERY_TREE_API_AVAILABLE = True
+    print("✅ Discovery Tree API loaded successfully")
+except ImportError as e:
+    print(f"⚠️ Discovery Tree API not available: {e}")
+    DISCOVERY_TREE_API_AVAILABLE = False
+    discovery_tree_router = None
+
 # Import PhD analysis wrapper - OPTIONAL with fallback
 try:
     from phd_analysis_wrapper import (
@@ -305,6 +315,11 @@ if EXPLANATIONS_API_AVAILABLE and explanations_router:
 if WEEKLY_MIX_API_AVAILABLE and weekly_mix_router:
     app.include_router(weekly_mix_router)
     print("✅ Weekly Mix API routes registered")
+
+# Register Discovery Tree API router - Sprint 4
+if DISCOVERY_TREE_API_AVAILABLE and discovery_tree_router:
+    app.include_router(discovery_tree_router)
+    print("✅ Discovery Tree API routes registered")
 
 # Register notification callback with background processor
 background_processor.add_notification_callback(background_job_notification_callback)
