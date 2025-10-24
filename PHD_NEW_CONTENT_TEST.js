@@ -8,6 +8,8 @@
  *
  * ENHANCED FEATURES:
  * - Event tracking validation (Sprint 1A)
+ * - Vector store & candidate API (Sprint 1B)
+ * - Graph builder & network analysis (Sprint 2A)
  * - PhD enhancement detection
  * - Performance monitoring
  * - Regression testing
@@ -23,6 +25,8 @@ class PhDNewContentTester {
         this.backendUrl = 'https://r-dagent-production.up.railway.app';
         this.performanceMetrics = [];
         this.eventTrackingTests = [];
+        this.graphTests = [];
+        this.vectorStoreTests = [];
     }
 
     log(message, type = 'info') {
@@ -438,11 +442,175 @@ class PhDNewContentTester {
         }
     }
 
+    async testGraphAPI() {
+        this.log('🕸️ Testing Graph API (Sprint 2A)...');
+
+        try {
+            // Get some PMIDs from the page
+            const pmids = ['33301246', '32817357', '31570887'];
+
+            // Test 1: Build citation graph
+            const startTime = Date.now();
+            const buildResponse = await fetch(`${this.backendUrl}/api/v1/graphs/build`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'User-ID': 'phd-graph-test'
+                },
+                body: JSON.stringify({
+                    pmids: pmids,
+                    graph_type: 'citation',
+                    source_type: 'test',
+                    source_id: 'phd-test'
+                })
+            });
+
+            const buildTime = Date.now() - startTime;
+
+            if (buildResponse.ok) {
+                const graphData = await buildResponse.json();
+                this.log(`✅ Graph built: ${graphData.nodes?.length || 0} nodes, ${graphData.edges?.length || 0} edges (${buildTime}ms)`, 'success');
+
+                this.graphTests.push({
+                    test: 'Build citation graph',
+                    success: true,
+                    responseTime: buildTime,
+                    nodes: graphData.nodes?.length || 0,
+                    edges: graphData.edges?.length || 0
+                });
+
+                // Test 2: Analyze graph
+                if (graphData.graph_id) {
+                    const analyzeStart = Date.now();
+                    const analyzeResponse = await fetch(`${this.backendUrl}/api/v1/graphs/${graphData.graph_id}/analyze`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'User-ID': 'phd-graph-test'
+                        },
+                        body: JSON.stringify({
+                            compute_centrality: true,
+                            detect_communities: true,
+                            identify_influential: true,
+                            top_n: 5
+                        })
+                    });
+
+                    const analyzeTime = Date.now() - analyzeStart;
+
+                    if (analyzeResponse.ok) {
+                        const analysisData = await analyzeResponse.json();
+                        this.log(`✅ Graph analyzed: ${analysisData.communities?.num_communities || 0} communities (${analyzeTime}ms)`, 'success');
+
+                        this.graphTests.push({
+                            test: 'Analyze graph',
+                            success: true,
+                            responseTime: analyzeTime,
+                            communities: analysisData.communities?.num_communities || 0,
+                            influential: analysisData.influential_papers?.length || 0
+                        });
+                    } else {
+                        this.log(`⚠️ Graph analysis failed: HTTP ${analyzeResponse.status}`, 'warning');
+                        this.graphTests.push({
+                            test: 'Analyze graph',
+                            success: false,
+                            error: `HTTP ${analyzeResponse.status}`
+                        });
+                    }
+                }
+            } else {
+                this.log(`⚠️ Graph build failed: HTTP ${buildResponse.status}`, 'warning');
+                this.graphTests.push({
+                    test: 'Build citation graph',
+                    success: false,
+                    error: `HTTP ${buildResponse.status}`
+                });
+            }
+        } catch (error) {
+            this.log(`❌ Graph API error: ${error.message}`, 'error');
+            this.graphTests.push({
+                test: 'Graph API',
+                success: false,
+                error: error.message
+            });
+        }
+    }
+
+    async testVectorStoreAPI() {
+        this.log('� Testing Vector Store API (Sprint 1B)...');
+
+        try {
+            // Test semantic search
+            const startTime = Date.now();
+            const searchResponse = await fetch(`${this.backendUrl}/api/v1/candidates/semantic-search`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'User-ID': 'phd-vector-test'
+                },
+                body: JSON.stringify({
+                    query: 'cancer immunotherapy',
+                    top_k: 5
+                })
+            });
+
+            const searchTime = Date.now() - startTime;
+
+            if (searchResponse.ok) {
+                const searchData = await searchResponse.json();
+                this.log(`✅ Semantic search: ${searchData.candidates?.length || 0} results (${searchTime}ms)`, 'success');
+
+                this.vectorStoreTests.push({
+                    test: 'Semantic search',
+                    success: true,
+                    responseTime: searchTime,
+                    results: searchData.candidates?.length || 0
+                });
+            } else {
+                this.log(`⚠️ Semantic search failed: HTTP ${searchResponse.status}`, 'warning');
+                this.vectorStoreTests.push({
+                    test: 'Semantic search',
+                    success: false,
+                    error: `HTTP ${searchResponse.status}`
+                });
+            }
+
+            // Test cache stats
+            const statsResponse = await fetch(`${this.backendUrl}/api/v1/candidates/cache-stats`, {
+                method: 'GET',
+                headers: {
+                    'User-ID': 'phd-vector-test'
+                }
+            });
+
+            if (statsResponse.ok) {
+                const statsData = await statsResponse.json();
+                this.log(`✅ Cache stats retrieved`, 'success');
+
+                this.vectorStoreTests.push({
+                    test: 'Cache stats',
+                    success: true
+                });
+            }
+        } catch (error) {
+            this.log(`❌ Vector Store API error: ${error.message}`, 'error');
+            this.vectorStoreTests.push({
+                test: 'Vector Store API',
+                success: false,
+                error: error.message
+            });
+        }
+    }
+
     async runNewContentTest() {
-        this.log('🚀 Starting Comprehensive PhD Content Test...');
+        this.log('🚀 Starting Comprehensive PhD & Discovery Engine Test...');
 
         // Step 0: Test Event Tracking (Sprint 1A)
         await this.testEventTrackingAPI();
+
+        // Step 0.5: Test Discovery Engine APIs
+        await this.testGraphAPI();
+        await this.testVectorStoreAPI();
 
         // Step 1: Check backend availability
         const backendAvailable = await this.testBackendAvailability();
@@ -477,6 +645,34 @@ class PhDNewContentTester {
                 const status = test.success ? '✅' : '❌';
                 const time = test.responseTime ? ` (${test.responseTime}ms)` : '';
                 this.log(`   ${status} ${test.test}${time}`);
+            });
+        }
+
+        // Vector Store Results (Sprint 1B)
+        if (this.vectorStoreTests.length > 0) {
+            this.log('\n🔍 VECTOR STORE API (Sprint 1B):');
+            const vectorSuccess = this.vectorStoreTests.filter(t => t.success).length;
+            this.log(`   Tests: ${vectorSuccess}/${this.vectorStoreTests.length} passed`);
+            this.vectorStoreTests.forEach(test => {
+                const status = test.success ? '✅' : '❌';
+                const time = test.responseTime ? ` (${test.responseTime}ms)` : '';
+                const results = test.results ? ` - ${test.results} results` : '';
+                this.log(`   ${status} ${test.test}${time}${results}`);
+            });
+        }
+
+        // Graph API Results (Sprint 2A)
+        if (this.graphTests.length > 0) {
+            this.log('\n🕸️ GRAPH API (Sprint 2A):');
+            const graphSuccess = this.graphTests.filter(t => t.success).length;
+            this.log(`   Tests: ${graphSuccess}/${this.graphTests.length} passed`);
+            this.graphTests.forEach(test => {
+                const status = test.success ? '✅' : '❌';
+                const time = test.responseTime ? ` (${test.responseTime}ms)` : '';
+                const nodes = test.nodes ? ` - ${test.nodes} nodes` : '';
+                const edges = test.edges ? `, ${test.edges} edges` : '';
+                const communities = test.communities ? ` - ${test.communities} communities` : '';
+                this.log(`   ${status} ${test.test}${time}${nodes}${edges}${communities}`);
             });
         }
 
@@ -547,6 +743,8 @@ console.log('5. Check performance metrics for response times');
 console.log('6. Create manual content through the UI to verify');
 console.log('\n📊 WHAT THIS TEST VALIDATES:');
 console.log('✅ Sprint 1A: Event Tracking API functionality');
+console.log('✅ Sprint 1B: Vector Store & Semantic Search');
+console.log('✅ Sprint 2A: Graph Builder & Network Analysis');
 console.log('✅ PhD Enhancement: Advanced content generation');
 console.log('✅ Performance: Response time monitoring');
 console.log('✅ Regression: Existing features still working');

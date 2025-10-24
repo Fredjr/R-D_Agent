@@ -78,6 +78,16 @@ except ImportError as e:
     CANDIDATES_API_AVAILABLE = False
     candidates_router = None
 
+# Import Graph API - Sprint 2A
+try:
+    from api.graphs import router as graphs_router
+    GRAPHS_API_AVAILABLE = True
+    print("✅ Graph API loaded successfully")
+except ImportError as e:
+    print(f"⚠️ Graph API not available: {e}")
+    GRAPHS_API_AVAILABLE = False
+    graphs_router = None
+
 # Import PhD analysis wrapper - OPTIONAL with fallback
 try:
     from phd_analysis_wrapper import (
@@ -245,6 +255,11 @@ if EVENTS_API_AVAILABLE and events_router:
 if CANDIDATES_API_AVAILABLE and candidates_router:
     app.include_router(candidates_router)
     print("✅ Candidate API routes registered")
+
+# Register Graph API router - Sprint 2A
+if GRAPHS_API_AVAILABLE and graphs_router:
+    app.include_router(graphs_router)
+    print("✅ Graph API routes registered")
 
 # Register notification callback with background processor
 background_processor.add_notification_callback(background_job_notification_callback)
