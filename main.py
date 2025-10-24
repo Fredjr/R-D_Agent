@@ -58,6 +58,16 @@ except ImportError:
 
 from tools import PubMedSearchTool, WebSearchTool, PatentsSearchTool
 
+# Import Event Tracking API - Sprint 1A
+try:
+    from api.events import router as events_router
+    EVENTS_API_AVAILABLE = True
+    print("✅ Event Tracking API loaded successfully")
+except ImportError as e:
+    print(f"⚠️ Event Tracking API not available: {e}")
+    EVENTS_API_AVAILABLE = False
+    events_router = None
+
 # Import PhD analysis wrapper - OPTIONAL with fallback
 try:
     from phd_analysis_wrapper import (
@@ -215,6 +225,11 @@ def verify_password(password: str, hashed: str) -> bool:
 
 # Initialize FastAPI app
 app = FastAPI(title="R&D Agent API", version="1.0.0")
+
+# Register Event Tracking API router - Sprint 1A
+if EVENTS_API_AVAILABLE and events_router:
+    app.include_router(events_router)
+    print("✅ Event Tracking API routes registered")
 
 # Register notification callback with background processor
 background_processor.add_notification_callback(background_job_notification_callback)
