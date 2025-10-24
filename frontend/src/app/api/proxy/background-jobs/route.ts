@@ -6,8 +6,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const userId = request.headers.get('User-ID') || 'default_user';
-    
-    console.log('🔄 [Background Jobs] Starting job:', body.job_type);
+
+    console.log('🔄 [Background Jobs] Starting job:', body.job_type, 'for user:', userId);
     
     const response = await fetch(`${BACKEND_URL}/background-jobs`, {
       method: 'POST',
