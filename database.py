@@ -543,6 +543,35 @@ class ActivityLog(Base):
     analysis = relationship("DeepDiveAnalysis")
     collection = relationship("Collection")
 
+
+# Sprint 3A: Explainability API
+class PaperExplanation(Base):
+    """Paper recommendation explanations for transparency"""
+    __tablename__ = "paper_explanations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    paper_pmid = Column(String, ForeignKey("articles.pmid"), nullable=False)
+    user_id = Column(String, nullable=False)
+
+    # Explanation details
+    explanation_type = Column(String, nullable=False)  # semantic, citation, cluster, author, temporal
+    explanation_text = Column(Text, nullable=False)
+    confidence_score = Column(Float, nullable=False)  # 0.0-1.0
+    evidence = Column(JSON, nullable=True)  # Supporting data
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_paper_user_explanation', 'paper_pmid', 'user_id'),
+        Index('idx_user_created_explanation', 'user_id', 'created_at'),
+        Index('idx_confidence_explanation', 'confidence_score'),
+        Index('idx_type_explanation', 'explanation_type'),
+    )
+
+
 # Database session dependency
 def get_db():
     """Dependency to get database session"""

@@ -98,6 +98,16 @@ except ImportError as e:
     CLUSTERS_API_AVAILABLE = False
     clusters_router = None
 
+# Import Explanation API - Sprint 3A
+try:
+    from api.explanations import router as explanations_router
+    EXPLANATIONS_API_AVAILABLE = True
+    print("✅ Explanation API loaded successfully")
+except ImportError as e:
+    print(f"⚠️ Explanation API not available: {e}")
+    EXPLANATIONS_API_AVAILABLE = False
+    explanations_router = None
+
 # Import PhD analysis wrapper - OPTIONAL with fallback
 try:
     from phd_analysis_wrapper import (
@@ -275,6 +285,11 @@ if GRAPHS_API_AVAILABLE and graphs_router:
 if CLUSTERS_API_AVAILABLE and clusters_router:
     app.include_router(clusters_router)
     print("✅ Cluster API routes registered")
+
+# Register Explanation API router - Sprint 3A
+if EXPLANATIONS_API_AVAILABLE and explanations_router:
+    app.include_router(explanations_router)
+    print("✅ Explanation API routes registered")
 
 # Register notification callback with background processor
 background_processor.add_notification_callback(background_job_notification_callback)
