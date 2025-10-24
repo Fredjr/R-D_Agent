@@ -16,6 +16,11 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 logger = logging.getLogger(__name__)
 
 try:
+    # Fix import paths - these modules are in the root directory, not services/
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
     from scientific_model_analyst import analyze_scientific_model
     from experimental_methods_analyst import analyze_experimental_methods
     from results_interpretation_analyst import analyze_results_interpretation
@@ -80,15 +85,56 @@ class DeepDiveService:
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
     
+    async def _fetch_paper_content(self, pmid: str, title: str) -> str:
+        """Fetch paper content from PubMed (abstract + title)"""
+        try:
+            import requests
+            import re
+
+            logger.info(f"📄 Fetching paper content for PMID: {pmid}")
+
+            # Use PubMed eutils API to get abstract
+            fetch_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id={pmid}&retmode=xml&rettype=abstract"
+
+            response = requests.get(fetch_url, headers={
+                'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
+            })
+
+            if response.ok:
+                xml_content = response.text
+
+                # Extract title and abstract from XML
+                title_match = re.search(r'<ArticleTitle>(.*?)</ArticleTitle>', xml_content, re.DOTALL)
+                abstract_match = re.search(r'<AbstractText[^>]*>(.*?)</AbstractText>', xml_content, re.DOTALL)
+
+                extracted_title = title_match.group(1).strip() if title_match else title
+                abstract = abstract_match.group(1).strip() if abstract_match else ""
+
+                # Clean HTML tags
+                extracted_title = re.sub(r'<[^>]+>', '', extracted_title)
+                abstract = re.sub(r'<[^>]+>', '', abstract)
+
+                # Combine title and abstract for analysis
+                full_content = f"Title: {extracted_title}\n\nAbstract: {abstract}\n\nPMID: {pmid}"
+
+                logger.info(f"✅ Fetched paper content: {len(full_content)} characters")
+                return full_content
+            else:
+                logger.warning(f"⚠️ Failed to fetch paper content, using title only")
+                return f"Title: {title}\nPMID: {pmid}\n\nNote: Abstract not available"
+
+        except Exception as e:
+            logger.error(f"❌ Error fetching paper content: {e}")
+            return f"Title: {title}\nPMID: {pmid}\n\nNote: Content fetch failed"
+
     async def _analyze_scientific_model(self, pmid: str, title: str) -> Dict[str, Any]:
         """Analyze the scientific model and theoretical framework"""
         try:
             if REAL_ANALYSIS_AVAILABLE and self.llm:
                 logger.info(f"🔬 Performing real PhD-level scientific model analysis for PMID: {pmid}")
 
-                # For now, use title as full text until we implement paper fetching
-                # TODO: Implement proper paper content fetching
-                full_text = f"Title: {title}\nPMID: {pmid}\n\nThis is a research paper analysis request."
+                # Fetch actual paper content (title + abstract)
+                full_text = await self._fetch_paper_content(pmid, title)
 
                 # Perform real analysis using the PhD-level analyst
                 user_objective = f"Analyze the scientific model and theoretical framework of: {title}"
@@ -117,9 +163,8 @@ class DeepDiveService:
             if REAL_ANALYSIS_AVAILABLE and self.llm:
                 logger.info(f"🔬 Performing real PhD-level experimental methods analysis for PMID: {pmid}")
 
-                # For now, use title as full text until we implement paper fetching
-                # TODO: Implement proper paper content fetching
-                full_text = f"Title: {title}\nPMID: {pmid}\n\nThis is a research paper analysis request."
+                # Fetch actual paper content (title + abstract)
+                full_text = await self._fetch_paper_content(pmid, title)
 
                 # Perform real analysis using the PhD-level analyst
                 user_objective = f"Analyze the experimental methods and methodology of: {title}"
@@ -149,9 +194,8 @@ class DeepDiveService:
             if REAL_ANALYSIS_AVAILABLE and self.llm:
                 logger.info(f"🔬 Performing real PhD-level results interpretation analysis for PMID: {pmid}")
 
-                # For now, use title as full text until we implement paper fetching
-                # TODO: Implement proper paper content fetching
-                full_text = f"Title: {title}\nPMID: {pmid}\n\nThis is a research paper analysis request."
+                # Fetch actual paper content (title + abstract)
+                full_text = await self._fetch_paper_content(pmid, title)
 
                 # Perform real analysis using the PhD-level analyst
                 user_objective = f"Analyze the results interpretation and conclusions of: {title}"
