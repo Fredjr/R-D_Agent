@@ -21,3 +21,28 @@ coverage.xml
 .mypy_cache
 .pytest_cache
 .hypothesis
+
+# Model cache files (large files)
+models_cache/
+models/
+
+# Database files
+*.db
+*.db-journal
+
+# Frontend build files
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
