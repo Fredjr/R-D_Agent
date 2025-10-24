@@ -88,6 +88,16 @@ except ImportError as e:
     GRAPHS_API_AVAILABLE = False
     graphs_router = None
 
+# Import Cluster API - Sprint 2B
+try:
+    from api.clusters import router as clusters_router
+    CLUSTERS_API_AVAILABLE = True
+    print("✅ Cluster API loaded successfully")
+except ImportError as e:
+    print(f"⚠️ Cluster API not available: {e}")
+    CLUSTERS_API_AVAILABLE = False
+    clusters_router = None
+
 # Import PhD analysis wrapper - OPTIONAL with fallback
 try:
     from phd_analysis_wrapper import (
@@ -260,6 +270,11 @@ if CANDIDATES_API_AVAILABLE and candidates_router:
 if GRAPHS_API_AVAILABLE and graphs_router:
     app.include_router(graphs_router)
     print("✅ Graph API routes registered")
+
+# Register Cluster API router - Sprint 2B
+if CLUSTERS_API_AVAILABLE and clusters_router:
+    app.include_router(clusters_router)
+    print("✅ Cluster API routes registered")
 
 # Register notification callback with background processor
 background_processor.add_notification_callback(background_job_notification_callback)
