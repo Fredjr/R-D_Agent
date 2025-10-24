@@ -28,6 +28,16 @@ try:
     from langchain_openai import ChatOpenAI
     REAL_ANALYSIS_AVAILABLE = True
     logger.info("✅ Real PhD-level analysis modules imported successfully")
+
+    # Import PhD content integration service
+    try:
+        from services.phd_content_integration_service import PhDContentIntegrationService
+        PHD_INTEGRATION_AVAILABLE = True
+        logger.info("✅ PhD content integration service imported successfully")
+    except ImportError as e:
+        logger.warning(f"⚠️ PhD content integration service not available: {e}")
+        PHD_INTEGRATION_AVAILABLE = False
+        PhDContentIntegrationService = None
 except ImportError as e:
     logger.warning(f"⚠️ Could not import real analysis modules: {e}")
     REAL_ANALYSIS_AVAILABLE = False
@@ -38,6 +48,24 @@ class DeepDiveService:
     def __init__(self):
         self.analysis_cache = {}
         # self.paper_fetcher = PaperFetcherService() if REAL_ANALYSIS_AVAILABLE else None  # Commented out - module doesn't exist
+
+        # Initialize PhD content integration service
+        self.phd_integration_service = None
+        if PHD_INTEGRATION_AVAILABLE:
+            try:
+                # Initialize with LLM if available
+                llm = None
+                if REAL_ANALYSIS_AVAILABLE:
+                    try:
+                        llm = ChatOpenAI(temperature=0.1, model="gpt-4")
+                    except Exception as e:
+                        logger.warning(f"Could not initialize LLM: {e}")
+
+                self.phd_integration_service = PhDContentIntegrationService(llm)
+                logger.info("✅ PhD content integration service initialized in deep dive service")
+            except Exception as e:
+                logger.error(f"❌ Failed to initialize PhD content integration service: {e}")
+                self.phd_integration_service = None
         self.paper_fetcher = None  # Will implement paper fetching later
         self.llm = ChatOpenAI(model="gpt-4", temperature=0.1) if REAL_ANALYSIS_AVAILABLE else None
         logger.info("✅ DeepDiveService initialized with real analysis capabilities" if REAL_ANALYSIS_AVAILABLE else "⚠️ DeepDiveService initialized with placeholder data only")
@@ -58,7 +86,43 @@ class DeepDiveService:
         try:
             logger.info(f"🔬 Starting deep dive analysis for PMID: {pmid}")
             
-            # Simulate comprehensive analysis (replace with actual analysis logic)
+            # Use PhD integration service if available, otherwise use existing analysis
+            if self.phd_integration_service:
+                try:
+                    logger.info(f"🔬 Using PhD-level enhanced analysis for PMID: {pmid}")
+
+                    # Fetch paper content for enhanced analysis
+                    paper_content = await self._fetch_paper_content(pmid, article_title)
+
+                    # Extract objective from kwargs if available
+                    objective = kwargs.get('objective', f"Deep dive analysis of {article_title}")
+
+                    # Generate enhanced analysis
+                    enhanced_analysis = await self.phd_integration_service.enhance_deep_dive_analysis(
+                        pmid=pmid,
+                        title=article_title,
+                        objective=objective,
+                        abstract=paper_content,
+                        full_text=""  # Could be enhanced to fetch full text
+                    )
+
+                    # Add user metadata
+                    enhanced_analysis["metadata"] = {
+                        "pmid": pmid,
+                        "title": article_title,
+                        "analyzed_by": user_id,
+                        "analysis_timestamp": datetime.now(timezone.utc).isoformat(),
+                        "analysis_version": "2.0_phd_enhanced"
+                    }
+
+                    logger.info(f"✅ PhD-enhanced deep dive analysis completed for PMID: {pmid}")
+                    return enhanced_analysis
+
+                except Exception as e:
+                    logger.error(f"❌ Error in PhD-enhanced analysis, falling back to standard analysis: {e}")
+                    # Fall through to standard analysis
+
+            # Standard analysis (fallback or when PhD integration not available)
             analysis_result = {
                 "scientific_model_analysis": await self._analyze_scientific_model(pmid, article_title),
                 "experimental_methods_analysis": await self._analyze_experimental_methods(pmid, article_title),
@@ -71,7 +135,7 @@ class DeepDiveService:
                     "analysis_version": "1.0"
                 }
             }
-            
+
             logger.info(f"✅ Deep dive analysis completed for PMID: {pmid}")
             return analysis_result
             

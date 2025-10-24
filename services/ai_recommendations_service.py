@@ -29,6 +29,16 @@ from database import get_db, Article, Collection, Project, User, ArticleCollecti
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, and_, or_, text
 
+# Import PhD content integration service
+try:
+    from services.phd_content_integration_service import PhDContentIntegrationService
+    PHD_INTEGRATION_AVAILABLE = True
+    logging.info("✅ PhD content integration service imported successfully")
+except ImportError as e:
+    logging.warning(f"⚠️ PhD content integration service not available: {e}")
+    PHD_INTEGRATION_AVAILABLE = False
+    PhDContentIntegrationService = None
+
 # Import AI agents for enhanced recommendations
 try:
     from recommendation_agents import RecommendationOrchestrator
@@ -55,6 +65,24 @@ class SpotifyInspiredRecommendationsService:
     def __init__(self):
         self.recommendation_cache = {}
         self.semantic_cache = {}  # Cache for semantic analysis results
+
+        # Initialize PhD content integration service
+        self.phd_integration_service = None
+        if PHD_INTEGRATION_AVAILABLE:
+            try:
+                # Initialize with LLM if available
+                llm = None
+                try:
+                    from langchain_openai import ChatOpenAI
+                    llm = ChatOpenAI(temperature=0.1, model="gpt-4")
+                except ImportError:
+                    pass
+
+                self.phd_integration_service = PhDContentIntegrationService(llm)
+                logger.info("✅ PhD content integration service initialized in recommendations service")
+            except Exception as e:
+                logger.error(f"❌ Failed to initialize PhD content integration service: {e}")
+                self.phd_integration_service = None
 
         # Initialize semantic analysis service
         self.semantic_service = None
@@ -554,6 +582,52 @@ class SpotifyInspiredRecommendationsService:
                     "generated_at": datetime.now(timezone.utc).isoformat(),
                     "user_id": user_id
                 }
+
+                # Enhance with PhD-level content if available
+                if self.phd_integration_service:
+                    try:
+                        logger.info("🔬 Enhancing comprehensive review with PhD-level analysis")
+                        enhanced_result = await self.phd_integration_service.enhance_generate_review_response(
+                            {
+                                "results": [
+                                    {
+                                        "section_title": "Primary Research",
+                                        "articles": review_result["sections"]["primary_research"]
+                                    },
+                                    {
+                                        "section_title": "Trending Topics",
+                                        "articles": review_result["sections"]["trending_topics"]
+                                    },
+                                    {
+                                        "section_title": "Cross-Domain Insights",
+                                        "articles": review_result["sections"]["cross_domain_insights"]
+                                    },
+                                    {
+                                        "section_title": "Citation Opportunities",
+                                        "articles": review_result["sections"]["citation_opportunities"]
+                                    }
+                                ]
+                            },
+                            objective,
+                            molecule
+                        )
+
+                        # Update review_result with enhanced data
+                        if "results" in enhanced_result:
+                            enhanced_sections = {}
+                            for section in enhanced_result["results"]:
+                                section_key = section["section_title"].lower().replace(" ", "_").replace("-", "_")
+                                enhanced_sections[section_key] = section.get("articles", [])
+
+                            review_result["sections"] = enhanced_sections
+                            review_result["enhancement_metadata"] = enhanced_result.get("enhancement_metadata", {})
+                            review_result["phd_level_analysis"] = True
+
+                        logger.info("✅ PhD-level enhancement completed successfully")
+
+                    except Exception as e:
+                        logger.error(f"❌ Error enhancing with PhD-level content: {e}")
+                        # Continue with original result if enhancement fails
 
                 logger.info(f"✅ Generated comprehensive review with {len(all_papers)} papers")
                 return review_result

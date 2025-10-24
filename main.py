@@ -11843,6 +11843,29 @@ async def generate_review_internal(request: ReviewRequest, db: Session, current_
                 "executive_summary": v2.get("executive_summary", ""),
                 "memories": memories,
             }
+
+            # 🔬 ENHANCEMENT: PhD-level content integration
+            try:
+                from services.phd_content_integration_service import PhDContentIntegrationService
+
+                # Initialize PhD integration service
+                phd_service = PhDContentIntegrationService()
+
+                # Enhance response with PhD-level analysis
+                enhanced_resp = await phd_service.enhance_generate_review_response(
+                    resp,
+                    request.objective or "Research analysis",
+                    request.molecule
+                )
+
+                # Use enhanced response if successful
+                if enhanced_resp and enhanced_resp.get("enhancement_metadata"):
+                    resp = enhanced_resp
+                    logger.info("✅ Generate Review response enhanced with PhD-level content")
+
+            except Exception as e:
+                logger.warning(f"⚠️ PhD enhancement failed, using standard response: {e}")
+
             took = _now_ms() - req_start
             _metrics_inc("latency_ms_sum", took)
             log_event({"event": "generate_review_v2", "sections": len(resp["results"]), "latency_ms": took})
@@ -12017,6 +12040,28 @@ async def generate_review_internal(request: ReviewRequest, db: Session, current_
                 "executive_summary": out.get("executive_summary", ""),
                 "memories": memories,
             }
+
+            # 🔬 ENHANCEMENT: PhD-level content integration for DAG results
+            try:
+                from services.phd_content_integration_service import PhDContentIntegrationService
+
+                # Initialize PhD integration service
+                phd_service = PhDContentIntegrationService()
+
+                # Enhance response with PhD-level analysis
+                enhanced_resp = await phd_service.enhance_generate_review_response(
+                    resp,
+                    request.objective or "Research analysis",
+                    request.molecule
+                )
+
+                # Use enhanced response if successful
+                if enhanced_resp and enhanced_resp.get("enhancement_metadata"):
+                    resp = enhanced_resp
+                    logger.info("✅ DAG Generate Review response enhanced with PhD-level content")
+
+            except Exception as e:
+                logger.warning(f"⚠️ PhD enhancement failed for DAG response, using standard response: {e}")
             # Final safety net: if results are under desired minimum, top-up from V2 here as well
             try:
                 pref_str_final = str(getattr(request, "preference", "precision") or "precision").lower()
