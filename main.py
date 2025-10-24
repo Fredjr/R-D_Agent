@@ -10465,8 +10465,7 @@ async def deep_dive_async(request: DeepDiveRequest, http_request: Request, db: S
         "poll_url": f"/jobs/{analysis_id}/status"
     }
 
-@app.post("/deep-dive")
-async def deep_dive(request: DeepDiveRequest, db: Session = Depends(get_db), http_request: Request = None):
+async def deep_dive_internal(request: DeepDiveRequest, db: Session = Depends(get_db), http_request: Request = None):
     t0 = _now_ms()
     try:
         # 🚀 ENHANCEMENT: Extract user context for deep-dive analysis
@@ -10790,6 +10789,31 @@ async def deep_dive(request: DeepDiveRequest, db: Session = Depends(get_db), htt
             "diagnostics": {"error_type": type(e).__name__, "traceback": traceback.format_exc()[:500]}
         }
 
+@app.post("/deep-dive")
+async def deep_dive(request: DeepDiveRequest, db: Session = Depends(get_db), http_request: Request = None):
+    """Deep dive analysis with timeout protection"""
+    try:
+        # Add timeout wrapper to prevent hanging
+        result = await asyncio.wait_for(
+            deep_dive_internal(request, db, http_request),
+            timeout=120.0  # 2 minute timeout
+        )
+        return result
+    except asyncio.TimeoutError:
+        return {
+            "error": "Deep dive analysis timed out after 2 minutes",
+            "pmid": request.pmid,
+            "objective": request.objective,
+            "status": "timeout",
+            "suggestion": "Try using the background job endpoint for complex analyses"
+        }
+    except Exception as e:
+        return {
+            "error": f"Deep dive analysis failed: {str(e)}",
+            "pmid": request.pmid,
+            "objective": request.objective,
+            "status": "error"
+        }
 
 @app.post("/deep-dive-upload")
 async def deep_dive_upload(objective: str = Form(...), file: UploadFile = File(...)):
@@ -11362,7 +11386,29 @@ async def generate_comprehensive_project_summary(
 async def generate_review(request: ReviewRequest, http_request: Request, db: Session = Depends(get_db)):
     """Generate a summary report (legacy endpoint)"""
     current_user = http_request.headers.get("User-ID", "default_user")
-    return await generate_review_internal(request, db, current_user)
+
+    try:
+        # Add timeout wrapper to prevent hanging
+        result = await asyncio.wait_for(
+            generate_review_internal(request, db, current_user),
+            timeout=120.0  # 2 minute timeout
+        )
+        return result
+    except asyncio.TimeoutError:
+        return {
+            "error": "Request timed out after 2 minutes",
+            "molecule": request.molecule,
+            "objective": request.objective,
+            "status": "timeout",
+            "suggestion": "Try using the background job endpoint for complex analyses"
+        }
+    except Exception as e:
+        return {
+            "error": f"Generate review failed: {str(e)}",
+            "molecule": request.molecule,
+            "objective": request.objective,
+            "status": "error"
+        }
 
 @app.post("/generate-review-async")
 async def generate_review_async(request: ReviewRequest, http_request: Request, db: Session = Depends(get_db)):
