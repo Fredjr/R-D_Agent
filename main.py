@@ -5536,6 +5536,35 @@ async def debug_llm_status():
             "llm_analyzer_available": False
         }
 
+@app.post("/debug/test-generate-review")
+async def debug_test_generate_review():
+    """Debug endpoint to test generate-review with minimal data"""
+    try:
+        # Test basic LLM functionality
+        llm = get_llm()
+        if not llm:
+            return {"error": "LLM not available", "status": "failed"}
+
+        # Test simple prompt
+        from langchain.prompts import PromptTemplate
+        from langchain.chains import LLMChain
+
+        prompt = PromptTemplate(
+            input_variables=["molecule"],
+            template="Write a brief summary about {molecule}:"
+        )
+
+        chain = LLMChain(llm=llm, prompt=prompt)
+        result = await run_in_threadpool(lambda: chain.run(molecule="Finerenone"))
+
+        return {
+            "status": "success",
+            "result": result[:500],  # First 500 chars
+            "length": len(result)
+        }
+    except Exception as e:
+        return {"error": str(e), "status": "failed"}
+
 # Global variable to track background task results
 _background_test_results = {}
 
