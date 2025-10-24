@@ -207,12 +207,15 @@ class EnhancedDeepDiveService:
                 )
             )
             
-            # Parse JSON result
+            # Parse JSON result with sanitization
             try:
-                analysis = json.loads(result)
+                # Sanitize the JSON string to fix common LLM JSON issues
+                sanitized_result = self._sanitize_json_string(result)
+                analysis = json.loads(sanitized_result)
                 return self._validate_and_enhance_scientific_model(analysis, title, pmid)
-            except json.JSONDecodeError:
-                self.logger.warning(f"Failed to parse JSON for scientific model analysis: {pmid}")
+            except json.JSONDecodeError as e:
+                self.logger.warning(f"Failed to parse JSON for scientific model analysis: {pmid}, error: {e}")
+                self.logger.debug(f"Raw result: {result[:500]}...")
                 return self._generate_fallback_scientific_model(title, abstract)
             
         except Exception as e:
@@ -381,12 +384,16 @@ class EnhancedDeepDiveService:
             )
 
             try:
-                methods = json.loads(result)
+                # Sanitize the JSON string to fix common LLM JSON issues
+                sanitized_result = self._sanitize_json_string(result)
+                methods = json.loads(sanitized_result)
                 if isinstance(methods, list):
                     return [self._validate_experimental_method(method) for method in methods[:10]]
                 else:
                     return self._generate_fallback_experimental_methods(title, abstract)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                self.logger.warning(f"Failed to parse JSON for experimental methods: {pmid}, error: {e}")
+                self.logger.debug(f"Raw result: {result[:500]}...")
                 return self._generate_fallback_experimental_methods(title, abstract)
 
         except Exception as e:
@@ -437,6 +444,33 @@ class EnhancedDeepDiveService:
         except Exception as e:
             self.logger.error(f"Error enhancing existing scientific model analysis: {e}")
             return existing_analysis
+
+    def _sanitize_json_string(self, json_str: str) -> str:
+        """Sanitize JSON string to fix common LLM-generated JSON issues"""
+        try:
+            # Remove any leading/trailing whitespace
+            json_str = json_str.strip()
+
+            # Remove markdown code blocks if present
+            if json_str.startswith('```json'):
+                json_str = json_str[7:]
+            if json_str.startswith('```'):
+                json_str = json_str[3:]
+            if json_str.endswith('```'):
+                json_str = json_str[:-3]
+
+            # Remove any trailing commas before closing braces/brackets
+            import re
+            json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)
+
+            # Fix common quote issues - escape unescaped quotes in values
+            # This is a simple fix for basic cases
+            json_str = json_str.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+
+            return json_str.strip()
+        except Exception as e:
+            self.logger.warning(f"Error sanitizing JSON: {e}")
+            return json_str
 
     def _is_review_paper(self, title: str, abstract: str) -> bool:
         """Check if this is a review paper (no experimental methods expected)"""
@@ -570,9 +604,13 @@ class EnhancedDeepDiveService:
             )
 
             try:
-                analysis = json.loads(result)
+                # Sanitize the JSON string to fix common LLM JSON issues
+                sanitized_result = self._sanitize_json_string(result)
+                analysis = json.loads(sanitized_result)
                 return self._validate_and_enhance_results_interpretation(analysis, title, pmid)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                self.logger.warning(f"Failed to parse JSON for results interpretation: {pmid}, error: {e}")
+                self.logger.debug(f"Raw result: {result[:500]}...")
                 return self._generate_fallback_results_interpretation(title, abstract)
 
         except Exception as e:

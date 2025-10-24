@@ -623,12 +623,15 @@ class EnhancedContentGenerationService:
                 )
             )
 
-            # Parse JSON result
+            # Parse JSON result with sanitization
             try:
-                fact_anchors = json.loads(result)
+                sanitized_result = self._sanitize_json_string(result)
+                fact_anchors = json.loads(sanitized_result)
                 if isinstance(fact_anchors, list):
                     return fact_anchors[:5]  # Limit to 5 anchors
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                self.logger.warning(f"Failed to parse JSON for fact anchors: {e}")
+                self.logger.debug(f"Raw result: {result[:500]}...")
                 pass
 
         except Exception as e:
@@ -866,3 +869,30 @@ class EnhancedContentGenerationService:
             cross_domain_potential=0.4,
             clinical_relevance=0.5
         )
+
+    def _sanitize_json_string(self, json_str: str) -> str:
+        """Sanitize JSON string to fix common LLM-generated JSON issues"""
+        try:
+            # Remove any leading/trailing whitespace
+            json_str = json_str.strip()
+
+            # Remove markdown code blocks if present
+            if json_str.startswith('```json'):
+                json_str = json_str[7:]
+            if json_str.startswith('```'):
+                json_str = json_str[3:]
+            if json_str.endswith('```'):
+                json_str = json_str[:-3]
+
+            # Remove any trailing commas before closing braces/brackets
+            import re
+            json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)
+
+            # Fix common quote issues - escape unescaped quotes in values
+            # This is a simple fix for basic cases
+            json_str = json_str.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+
+            return json_str.strip()
+        except Exception as e:
+            self.logger.warning(f"Error sanitizing JSON: {e}")
+            return json_str
