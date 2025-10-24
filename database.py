@@ -3,7 +3,7 @@ Google Cloud SQL Database Configuration for R&D Agent
 Complete data persistence for users, projects, dossiers, and deep dive analyses
 """
 import os
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Boolean, ForeignKey, JSON, Index, Float, text
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Date, Text, Boolean, ForeignKey, JSON, Index, Float, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.sql import func
@@ -569,6 +569,43 @@ class PaperExplanation(Base):
         Index('idx_user_created_explanation', 'user_id', 'created_at'),
         Index('idx_confidence_explanation', 'confidence_score'),
         Index('idx_type_explanation', 'explanation_type'),
+    )
+
+
+class WeeklyMix(Base):
+    """Weekly personalized paper recommendations"""
+    __tablename__ = "weekly_mix"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String, nullable=False)
+    paper_pmid = Column(String, ForeignKey("articles.pmid"), nullable=False)
+
+    # Mix metadata
+    mix_date = Column(Date, nullable=False)  # Week start date
+    position = Column(Integer, nullable=False)  # Position in mix (1-10)
+
+    # Scoring
+    score = Column(Float, nullable=False)  # Combined score
+    diversity_score = Column(Float, nullable=True)
+    recency_score = Column(Float, nullable=True)
+
+    # Explanation
+    explanation_id = Column(Integer, ForeignKey("paper_explanations.id"), nullable=True)
+
+    # User interaction
+    viewed = Column(Boolean, default=False)
+    feedback = Column(String, nullable=True)  # 'helpful', 'not_helpful', 'irrelevant'
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_user_mix_date', 'user_id', 'mix_date'),
+        Index('idx_mix_date', 'mix_date'),
+        Index('idx_user_viewed', 'user_id', 'viewed'),
+        Index('idx_score', 'score'),
     )
 
 

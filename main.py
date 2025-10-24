@@ -108,6 +108,16 @@ except ImportError as e:
     EXPLANATIONS_API_AVAILABLE = False
     explanations_router = None
 
+# Import Weekly Mix API - Sprint 3B
+try:
+    from api.weekly_mix import router as weekly_mix_router
+    WEEKLY_MIX_API_AVAILABLE = True
+    print("✅ Weekly Mix API loaded successfully")
+except ImportError as e:
+    print(f"⚠️ Weekly Mix API not available: {e}")
+    WEEKLY_MIX_API_AVAILABLE = False
+    weekly_mix_router = None
+
 # Import PhD analysis wrapper - OPTIONAL with fallback
 try:
     from phd_analysis_wrapper import (
@@ -290,6 +300,11 @@ if CLUSTERS_API_AVAILABLE and clusters_router:
 if EXPLANATIONS_API_AVAILABLE and explanations_router:
     app.include_router(explanations_router)
     print("✅ Explanation API routes registered")
+
+# Register Weekly Mix API router - Sprint 3B
+if WEEKLY_MIX_API_AVAILABLE and weekly_mix_router:
+    app.include_router(weekly_mix_router)
+    print("✅ Weekly Mix API routes registered")
 
 # Register notification callback with background processor
 background_processor.add_notification_callback(background_job_notification_callback)
