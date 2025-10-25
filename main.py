@@ -313,6 +313,14 @@ def verify_password(password: str, hashed: str) -> bool:
 # Initialize FastAPI app
 app = FastAPI(title="R&D Agent API", version="1.0.0")
 
+# Register Admin API router (for migrations and admin tasks)
+try:
+    from api.admin import router as admin_router
+    app.include_router(admin_router)
+    print("✅ Admin API routes registered")
+except Exception as e:
+    print(f"⚠️ Admin API not available: {e}")
+
 # Register Event Tracking API router - Sprint 1A
 if EVENTS_API_AVAILABLE and events_router:
     app.include_router(events_router)
