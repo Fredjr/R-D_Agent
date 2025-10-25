@@ -54,9 +54,9 @@ class PersonalizationFixValidator {
         this.log('Expected: Unique scores > 80% (was 10%)', 'info');
 
         try {
-            // Get Weekly Mix
+            // Get Weekly Mix with force_refresh to test new logic
             const response = await fetch(
-                `${this.backendUrl}/api/v1/weekly-mix/current`,
+                `${this.backendUrl}/api/v1/weekly-mix/current?force_refresh=true`,
                 { headers: { 'User-ID': this.userId } }
             );
             
@@ -140,12 +140,12 @@ class PersonalizationFixValidator {
         this.log('Expected: All explanations unique (was 1 identical)', 'info');
 
         try {
-            // Get Weekly Mix
+            // Get Weekly Mix with force_refresh to test new logic
             const response = await fetch(
-                `${this.backendUrl}/api/v1/weekly-mix/current`,
+                `${this.backendUrl}/api/v1/weekly-mix/current?force_refresh=true`,
                 { headers: { 'User-ID': this.userId } }
             );
-            
+
             const data = await response.json();
             
             if (!data.papers || data.papers.length === 0) {
@@ -201,12 +201,12 @@ class PersonalizationFixValidator {
         this.log('Expected: Explanations include specific paper titles or percentages', 'info');
 
         try {
-            // Get Weekly Mix
+            // Get Weekly Mix with force_refresh to test new logic
             const response = await fetch(
-                `${this.backendUrl}/api/v1/weekly-mix/current`,
+                `${this.backendUrl}/api/v1/weekly-mix/current?force_refresh=true`,
                 { headers: { 'User-ID': this.userId } }
             );
-            
+
             const data = await response.json();
             
             if (!data.papers || data.papers.length === 0) {
