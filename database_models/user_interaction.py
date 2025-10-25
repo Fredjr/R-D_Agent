@@ -26,7 +26,7 @@ class UserInteraction(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     
     # Core event data
-    user_id = Column(String, ForeignKey("users.user_id"), nullable=False, index=True)
+    user_id = Column(String, nullable=False, index=True)  # Removed FK constraint for flexibility
     pmid = Column(String, nullable=False, index=True)  # PubMed ID of the paper
     event_type = Column(String, nullable=False, index=True)  # open, save, like, skip, summary_view, add_to_collection
     
