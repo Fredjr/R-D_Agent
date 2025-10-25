@@ -223,10 +223,11 @@ async def get_user_history(
     Get user interaction history for debugging
 
     Returns:
-        User's viewing history and interaction stats
+        User's viewing history and interaction stats from all sources
     """
     try:
         from database_models.user_interaction import UserInteraction
+        from database import ArticleCollection
 
         # Get all interactions for user
         interactions = db.query(UserInteraction).filter(
@@ -237,6 +238,13 @@ async def get_user_history(
         paper_views = [i for i in interactions if i.event_type == 'paper_view']
         viewed_pmids = [i.pmid for i in paper_views if i.pmid]
 
+        # Get papers from collections
+        collection_papers = db.query(ArticleCollection).filter(
+            ArticleCollection.added_by == user_id
+        ).limit(50).all()
+
+        collection_pmids = [p.article_pmid for p in collection_papers if p.article_pmid]
+
         return {
             "status": "success",
             "user_id": user_id,
@@ -244,6 +252,9 @@ async def get_user_history(
             "paper_views": len(paper_views),
             "unique_papers_viewed": len(set(viewed_pmids)),
             "viewed_pmids": viewed_pmids[:10],  # First 10
+            "collection_papers_count": len(collection_papers),
+            "collection_pmids": collection_pmids[:10],  # First 10
+            "total_unique_papers": len(set(viewed_pmids + collection_pmids)),
             "recent_interactions": [
                 {
                     "event_type": i.event_type,
@@ -251,10 +262,20 @@ async def get_user_history(
                     "timestamp": i.timestamp.isoformat() if i.timestamp else None
                 }
                 for i in interactions[:10]
+            ],
+            "recent_collection_papers": [
+                {
+                    "pmid": p.article_pmid,
+                    "title": p.article_title[:60] + "..." if p.article_title and len(p.article_title) > 60 else p.article_title,
+                    "added_at": p.added_at.isoformat() if p.added_at else None
+                }
+                for p in collection_papers[:10]
             ]
         }
 
     except Exception as e:
         logger.error(f"❌ Failed to get user history: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to get history: {str(e)}")
 
