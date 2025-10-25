@@ -68,12 +68,12 @@ class ComprehensiveBrowserTest {
             
             // Test 2: Get user events
             const historyResponse = await fetch(
-                `${this.backendUrl}/api/v1/events/history?limit=10`,
+                `${this.backendUrl}/api/v1/events/user/${this.userId}?limit=10`,
                 {
                     headers: { 'User-ID': this.userId }
                 }
             );
-            
+
             const historyData = await historyResponse.json();
             this.results.sprint1a.push({
                 test: 'Get Event History',
@@ -81,7 +81,7 @@ class ComprehensiveBrowserTest {
                 status: historyResponse.status,
                 count: historyData.events?.length || 0
             });
-            
+
             if (historyResponse.ok) {
                 this.log(`✅ Retrieved ${historyData.events?.length || 0} events`, 'success');
             }
@@ -102,12 +102,12 @@ class ComprehensiveBrowserTest {
         try {
             // Test: Get semantic candidates
             const candidatesResponse = await fetch(
-                `${this.backendUrl}/api/v1/candidates/semantic?pmid=12345678&limit=5`,
+                `${this.backendUrl}/api/v1/candidates/semantic-search?pmid=12345678&limit=5`,
                 {
                     headers: { 'User-ID': this.userId }
                 }
             );
-            
+
             const candidatesData = await candidatesResponse.json();
             this.results.sprint1b.push({
                 test: 'Semantic Candidates',
@@ -115,7 +115,7 @@ class ComprehensiveBrowserTest {
                 status: candidatesResponse.status,
                 count: candidatesData.candidates?.length || 0
             });
-            
+
             if (candidatesResponse.ok) {
                 this.log(`✅ Retrieved ${candidatesData.candidates?.length || 0} candidates`, 'success');
             } else {
@@ -136,25 +136,25 @@ class ComprehensiveBrowserTest {
         this.log('Testing Sprint 2A: Graph Builder...', 'info');
         
         try {
-            // Test: Get graph stats
+            // Test: Get graph health (stats endpoint doesn't exist, use health)
             const statsResponse = await fetch(
-                `${this.backendUrl}/api/v1/graphs/stats`,
+                `${this.backendUrl}/api/v1/graphs/health`,
                 {
                     headers: { 'User-ID': this.userId }
                 }
             );
-            
+
             const statsData = await statsResponse.json();
             this.results.sprint2a.push({
-                test: 'Graph Stats',
+                test: 'Graph Health',
                 passed: statsResponse.ok && statsData.success,
                 status: statsResponse.status
             });
-            
+
             if (statsResponse.ok) {
-                this.log(`✅ Graph stats retrieved`, 'success');
+                this.log(`✅ Graph health retrieved`, 'success');
             } else {
-                this.log(`❌ Graph stats failed: ${statsResponse.status}`, 'error');
+                this.log(`❌ Graph health failed: ${statsResponse.status}`, 'error');
             }
             
         } catch (error) {
@@ -218,7 +218,8 @@ class ComprehensiveBrowserTest {
                     },
                     body: JSON.stringify({
                         paper_pmid: '12345678',
-                        context: 'recommendation'
+                        context: {},
+                        save_to_db: false
                     })
                 }
             );
@@ -284,16 +285,16 @@ class ComprehensiveBrowserTest {
 
     async testSprint4() {
         this.log('Testing Sprint 4: Discovery Tree...', 'info');
-        
+
         try {
             // Test 1: Get discovery tree
             const treeResponse = await fetch(
                 `${this.backendUrl}/api/v1/discovery-tree`,
                 {
-                    headers: { 'User-ID': this.userId }
+                    headers: { 'X-User-ID': this.userId }
                 }
             );
-            
+
             const treeData = await treeResponse.json();
             this.results.sprint4.push({
                 test: 'Get Discovery Tree',
@@ -302,18 +303,18 @@ class ComprehensiveBrowserTest {
                 clusters: treeData.total_clusters || 0,
                 papers: treeData.total_papers || 0
             });
-            
+
             if (treeResponse.ok) {
                 this.log(`✅ Discovery tree: ${treeData.total_clusters} clusters, ${treeData.total_papers} papers`, 'success');
             } else {
                 this.log(`❌ Discovery tree failed: ${treeResponse.status}`, 'error');
             }
-            
+
             // Test 2: Get cluster recommendations
             const recsResponse = await fetch(
                 `${this.backendUrl}/api/v1/discovery-tree/recommendations?limit=5`,
                 {
-                    headers: { 'User-ID': this.userId }
+                    headers: { 'X-User-ID': this.userId }
                 }
             );
             
