@@ -5185,6 +5185,49 @@ async def test_database_schema():
             "error_type": type(e).__name__
         }
 
+@app.get("/debug/apis")
+async def debug_apis():
+    """Debug endpoint to check which APIs are loaded and registered"""
+    return {
+        "sprint_1a_events": {
+            "available": EVENTS_API_AVAILABLE,
+            "router_exists": events_router is not None,
+            "routes": len(events_router.routes) if events_router else 0
+        },
+        "sprint_1b_candidates": {
+            "available": CANDIDATES_API_AVAILABLE,
+            "router_exists": candidates_router is not None,
+            "routes": len(candidates_router.routes) if candidates_router else 0
+        },
+        "sprint_2a_graphs": {
+            "available": GRAPHS_API_AVAILABLE,
+            "router_exists": graphs_router is not None,
+            "routes": len(graphs_router.routes) if graphs_router else 0
+        },
+        "sprint_2b_clusters": {
+            "available": CLUSTERS_API_AVAILABLE,
+            "router_exists": clusters_router is not None,
+            "routes": len(clusters_router.routes) if clusters_router else 0
+        },
+        "sprint_3a_explanations": {
+            "available": EXPLANATIONS_API_AVAILABLE,
+            "router_exists": explanations_router is not None,
+            "routes": len(explanations_router.routes) if explanations_router else 0
+        },
+        "sprint_3b_weekly_mix": {
+            "available": WEEKLY_MIX_API_AVAILABLE,
+            "router_exists": weekly_mix_router is not None,
+            "routes": len(weekly_mix_router.routes) if weekly_mix_router else 0
+        },
+        "sprint_4_discovery_tree": {
+            "available": DISCOVERY_TREE_API_AVAILABLE,
+            "router_exists": discovery_tree_router is not None,
+            "routes": len(discovery_tree_router.routes) if discovery_tree_router else 0
+        },
+        "total_app_routes": len(app.routes),
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
 @app.get("/debug/env")
 async def debug_environment():
     """Debug endpoint to check environment configuration"""
