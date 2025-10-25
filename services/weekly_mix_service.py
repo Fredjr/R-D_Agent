@@ -125,8 +125,14 @@ class WeeklyMixService:
             raise
     
     def _get_user_history(self, db: Session, user_id: str) -> Dict[str, Any]:
-        """Get user interaction history"""
-        # Get viewed papers
+        """
+        Get user interaction history from multiple sources:
+        1. UserInteraction events (open, save, like)
+        2. Papers in user's collections (ArticleCollection)
+        """
+        from database import ArticleCollection
+
+        # Get viewed papers from UserInteraction events
         viewed_papers = db.query(UserInteraction.pmid).filter(
             and_(
                 UserInteraction.user_id == user_id,
@@ -134,9 +140,9 @@ class WeeklyMixService:
             )
         ).distinct().all()
 
-        viewed_pmids = [p[0] for p in viewed_papers]
+        viewed_pmids = [p[0] for p in viewed_papers if p[0]]
 
-        # Get saved papers
+        # Get saved papers from UserInteraction events
         saved_papers = db.query(UserInteraction.pmid).filter(
             and_(
                 UserInteraction.user_id == user_id,
@@ -144,12 +150,31 @@ class WeeklyMixService:
             )
         ).distinct().all()
 
-        saved_pmids = [p[0] for p in saved_papers]
+        saved_pmids = [p[0] for p in saved_papers if p[0]]
+
+        # NEW: Get papers from user's collections (this is the existing data!)
+        collection_papers = db.query(ArticleCollection.article_pmid).filter(
+            and_(
+                ArticleCollection.added_by == user_id,
+                ArticleCollection.article_pmid != None
+            )
+        ).distinct().all()
+
+        collection_pmids = [p[0] for p in collection_papers if p[0]]
+
+        # Combine all sources (collections are treated as "viewed" papers)
+        all_viewed_pmids = list(set(viewed_pmids + collection_pmids))
+        all_saved_pmids = list(set(saved_pmids + collection_pmids))
+
+        logger.info(f"User history for {user_id}: "
+                   f"{len(viewed_pmids)} interaction views, "
+                   f"{len(collection_pmids)} collection papers, "
+                   f"{len(all_viewed_pmids)} total viewed")
 
         return {
-            'viewed_papers': viewed_pmids,
-            'saved_papers': saved_pmids,
-            'collection_papers': saved_pmids
+            'viewed_papers': all_viewed_pmids,
+            'saved_papers': all_saved_pmids,
+            'collection_papers': collection_pmids
         }
     
     def _get_candidate_papers(self, db: Session, user_id: str,
