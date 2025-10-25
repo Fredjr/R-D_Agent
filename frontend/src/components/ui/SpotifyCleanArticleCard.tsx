@@ -21,6 +21,10 @@ interface SpotifyCleanArticleCardProps {
     journal?: string;
     year?: number;
     abstract?: string;
+    reason?: string;
+    explanation?: string;
+    personalization_score?: number;
+    relevance_score?: number;
     semantic_analysis?: {
       methodology?: 'experimental' | 'theoretical' | 'computational' | 'review' | 'meta_analysis' | 'case_study' | 'survey';
       complexity_score?: number;
@@ -144,16 +148,32 @@ export function SpotifyCleanArticleCard({
         <h3 className="text-[var(--spotify-white)] font-medium text-sm line-clamp-2 group-hover:text-[var(--spotify-green)] transition-colors">
           {paper.title}
         </h3>
-        
+
         {/* Authors */}
         <p className="text-[var(--spotify-light-text)] text-xs">
           {primaryAuthor}{additionalAuthors}
         </p>
-        
+
         {/* Journal */}
         {paper.journal && (
           <p className="text-[var(--spotify-muted-text)] text-xs">
             {paper.journal}
+          </p>
+        )}
+
+        {/* Personalization Score */}
+        {(paper.personalization_score !== undefined || paper.relevance_score !== undefined) && (
+          <div className="flex items-center gap-1 mt-1">
+            <span className="text-[var(--spotify-green)] text-xs font-medium">
+              {((paper.personalization_score || paper.relevance_score || 0) * 100).toFixed(0)}% match
+            </span>
+          </div>
+        )}
+
+        {/* Explanation */}
+        {(paper.explanation || paper.reason) && (
+          <p className="text-[var(--spotify-light-text)] text-xs line-clamp-2 mt-1 italic">
+            {paper.explanation || paper.reason}
           </p>
         )}
       </div>
