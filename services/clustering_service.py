@@ -29,6 +29,7 @@ class ClusterMetadata:
     def __init__(self, cluster_id: str, papers: List[str]):
         self.cluster_id = cluster_id
         self.papers = papers
+        self.paper_pmids = papers  # Alias for compatibility
         self.title = ""
         self.keywords = []
         self.paper_count = len(papers)

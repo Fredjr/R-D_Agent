@@ -195,15 +195,15 @@ class ClusterRecommendationService:
         cutoff_date = datetime.now() - timedelta(days=90)
         interactions = db.query(UserInteraction).filter(
             UserInteraction.user_id == user_id,
-            UserInteraction.created_at >= cutoff_date
+            UserInteraction.timestamp >= cutoff_date
         ).all()
-        
+
         if not interactions:
             logger.info("  No interactions found")
             return {}
-        
+
         # Get PMIDs from interactions
-        pmids = [i.paper_pmid for i in interactions if i.paper_pmid]
+        pmids = [i.pmid for i in interactions if i.pmid]
         
         # Get articles and their clusters
         articles = db.query(Article).filter(Article.pmid.in_(pmids)).all()
@@ -228,12 +228,12 @@ class ClusterRecommendationService:
             # Apply temporal decay (recent interactions weighted higher)
             recent_interactions = [
                 i for i in interactions
-                if i.paper_pmid in cluster_papers[cluster_id]
+                if i.pmid in cluster_papers[cluster_id]
             ]
-            
+
             if recent_interactions:
                 avg_age_days = sum(
-                    (datetime.now() - i.created_at).days
+                    (datetime.now() - i.timestamp).days
                     for i in recent_interactions
                 ) / len(recent_interactions)
                 
