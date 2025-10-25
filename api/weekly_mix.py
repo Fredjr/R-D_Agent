@@ -124,34 +124,47 @@ async def generate_weekly_mix(
 
 @router.get("/current", response_model=MixResponse)
 async def get_current_mix(
+    force_refresh: bool = False,
     db: Session = Depends(get_db),
     user_id: str = Header(None, alias="User-ID")
 ):
     """
     Get current weekly mix (cached if available)
-    
+
     Args:
+        force_refresh: If True, regenerate mix even if cached version exists
         user_id: User ID from header
-        
+
     Returns:
         MixResponse with papers
     """
     try:
         if not user_id:
             raise HTTPException(status_code=400, detail="User-ID header required")
-        
+
         # Get current week start
         today = date.today()
         week_start = today - timedelta(days=today.weekday())
-        
-        # Get from database
-        mix_entries = db.query(WeeklyMix).filter(
-            and_(
-                WeeklyMix.user_id == user_id,
-                WeeklyMix.mix_date == week_start
-            )
-        ).order_by(WeeklyMix.position).all()
-        
+
+        # If force_refresh, delete existing mix
+        if force_refresh:
+            db.query(WeeklyMix).filter(
+                and_(
+                    WeeklyMix.user_id == user_id,
+                    WeeklyMix.mix_date == week_start
+                )
+            ).delete()
+            db.commit()
+            mix_entries = []
+        else:
+            # Get from database
+            mix_entries = db.query(WeeklyMix).filter(
+                and_(
+                    WeeklyMix.user_id == user_id,
+                    WeeklyMix.mix_date == week_start
+                )
+            ).order_by(WeeklyMix.position).all()
+
         if not mix_entries:
             # Generate new mix
             mix_papers = weekly_mix_service.generate_weekly_mix(db, user_id, 10, False)
@@ -182,8 +195,8 @@ async def get_current_mix(
                         score=entry.score,
                         diversity_score=entry.diversity_score or 0.0,
                         recency_score=entry.recency_score or 0.0,
-                        explanation_text="Recommended for you",
-                        explanation_confidence=0.7,
+                        explanation_text=entry.explanation_text or "Recommended for you",
+                        explanation_confidence=entry.explanation_confidence or 0.7,
                         position=entry.position,
                         viewed=entry.viewed
                     ))
