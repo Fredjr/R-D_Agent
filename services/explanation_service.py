@@ -341,40 +341,52 @@ class ExplanationService:
     
     def get_explanation_stats(self, db: Session, user_id: Optional[str] = None) -> Dict[str, Any]:
         """Get explanation statistics"""
-        query = db.query(PaperExplanation)
-        
-        if user_id:
-            query = query.filter(PaperExplanation.user_id == user_id)
-        
-        explanations = query.all()
-        
-        if not explanations:
+        try:
+            query = db.query(PaperExplanation)
+
+            if user_id:
+                query = query.filter(PaperExplanation.user_id == user_id)
+
+            explanations = query.all()
+
+            if not explanations:
+                return {
+                    'total_explanations': 0,
+                    'avg_confidence': 0.0,
+                    'type_distribution': {},
+                    'high_confidence_rate': 0.0,
+                    'cache_size': len(self.explanation_cache) if hasattr(self, 'explanation_cache') else 0
+                }
+
+            # Calculate statistics
+            total = len(explanations)
+            avg_confidence = sum(e.confidence_score for e in explanations) / total
+
+            # Type distribution
+            type_counts = Counter(e.explanation_type for e in explanations)
+            type_distribution = dict(type_counts)
+
+            # High confidence rate (>0.7)
+            high_confidence = sum(1 for e in explanations if e.confidence_score > 0.7)
+            high_confidence_rate = high_confidence / total
+
+            return {
+                'total_explanations': total,
+                'avg_confidence': avg_confidence,
+                'type_distribution': type_distribution,
+                'high_confidence_rate': high_confidence_rate,
+                'cache_size': len(self.explanation_cache) if hasattr(self, 'explanation_cache') else 0
+            }
+        except Exception as e:
+            logger.error(f"Error getting explanation stats: {e}")
+            # Return default stats on error
             return {
                 'total_explanations': 0,
                 'avg_confidence': 0.0,
                 'type_distribution': {},
-                'high_confidence_rate': 0.0
+                'high_confidence_rate': 0.0,
+                'cache_size': 0
             }
-        
-        # Calculate statistics
-        total = len(explanations)
-        avg_confidence = sum(e.confidence_score for e in explanations) / total
-        
-        # Type distribution
-        type_counts = Counter(e.explanation_type for e in explanations)
-        type_distribution = dict(type_counts)
-        
-        # High confidence rate (>0.7)
-        high_confidence = sum(1 for e in explanations if e.confidence_score > 0.7)
-        high_confidence_rate = high_confidence / total
-        
-        return {
-            'total_explanations': total,
-            'avg_confidence': avg_confidence,
-            'type_distribution': type_distribution,
-            'high_confidence_rate': high_confidence_rate,
-            'cache_size': len(self.explanation_cache)
-        }
 
 
 # Singleton instance
