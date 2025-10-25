@@ -200,12 +200,23 @@ async def get_embedding_stats(
         # Calculate coverage
         coverage_percent = (articles_with_embeddings / total_articles * 100) if total_articles > 0 else 0
 
+        # Get sample papers
+        sample_papers = db.query(Article).filter(Article.title != None).limit(5).all()
+
         return {
             "status": "success",
             "total_articles": total_articles,
             "articles_with_embeddings": articles_with_embeddings,
             "articles_without_embeddings": total_articles - articles_with_embeddings,
-            "coverage_percent": round(coverage_percent, 2)
+            "coverage_percent": round(coverage_percent, 2),
+            "sample_papers": [
+                {
+                    "pmid": p.pmid,
+                    "title": p.title[:80] + "..." if p.title and len(p.title) > 80 else p.title,
+                    "year": p.publication_year
+                }
+                for p in sample_papers
+            ]
         }
 
     except Exception as e:
@@ -229,48 +240,69 @@ async def get_user_history(
         from database_models.user_interaction import UserInteraction
         from database import ArticleCollection
 
-        # Get all interactions for user
-        interactions = db.query(UserInteraction).filter(
+        logger.info(f"Getting user history for: {user_id}")
+
+        # Get interaction count (fast)
+        interaction_count = db.query(UserInteraction).filter(
             UserInteraction.user_id == user_id
-        ).order_by(UserInteraction.timestamp.desc()).limit(50).all()
+        ).count()
 
-        # Get paper views
-        paper_views = [i for i in interactions if i.event_type == 'paper_view']
-        viewed_pmids = [i.pmid for i in paper_views if i.pmid]
+        logger.info(f"Found {interaction_count} interactions")
 
-        # Get papers from collections
-        collection_papers = db.query(ArticleCollection).filter(
+        # Get collection papers count (fast)
+        collection_count = db.query(ArticleCollection).filter(
             ArticleCollection.added_by == user_id
-        ).limit(50).all()
+        ).count()
 
-        collection_pmids = [p.article_pmid for p in collection_papers if p.article_pmid]
+        logger.info(f"Found {collection_count} collection papers")
 
-        return {
-            "status": "success",
-            "user_id": user_id,
-            "total_interactions": len(interactions),
-            "paper_views": len(paper_views),
-            "unique_papers_viewed": len(set(viewed_pmids)),
-            "viewed_pmids": viewed_pmids[:10],  # First 10
-            "collection_papers_count": len(collection_papers),
-            "collection_pmids": collection_pmids[:10],  # First 10
-            "total_unique_papers": len(set(viewed_pmids + collection_pmids)),
-            "recent_interactions": [
+        # Only fetch details if there's data
+        viewed_pmids = []
+        collection_pmids = []
+        recent_interactions = []
+        recent_collection_papers = []
+
+        if interaction_count > 0:
+            interactions = db.query(UserInteraction).filter(
+                UserInteraction.user_id == user_id
+            ).order_by(UserInteraction.timestamp.desc()).limit(10).all()
+
+            viewed_pmids = [i.pmid for i in interactions if i.pmid]
+            recent_interactions = [
                 {
                     "event_type": i.event_type,
                     "pmid": i.pmid,
                     "timestamp": i.timestamp.isoformat() if i.timestamp else None
                 }
-                for i in interactions[:10]
-            ],
-            "recent_collection_papers": [
+                for i in interactions
+            ]
+
+        if collection_count > 0:
+            collection_papers = db.query(ArticleCollection).filter(
+                ArticleCollection.added_by == user_id
+            ).limit(10).all()
+
+            collection_pmids = [p.article_pmid for p in collection_papers if p.article_pmid]
+            recent_collection_papers = [
                 {
                     "pmid": p.article_pmid,
                     "title": p.article_title[:60] + "..." if p.article_title and len(p.article_title) > 60 else p.article_title,
                     "added_at": p.added_at.isoformat() if p.added_at else None
                 }
-                for p in collection_papers[:10]
+                for p in collection_papers
             ]
+
+        return {
+            "status": "success",
+            "user_id": user_id,
+            "total_interactions": interaction_count,
+            "unique_papers_viewed": len(set(viewed_pmids)),
+            "viewed_pmids": viewed_pmids,
+            "collection_papers_count": collection_count,
+            "collection_pmids": collection_pmids,
+            "total_unique_papers": len(set(viewed_pmids + collection_pmids)),
+            "recent_interactions": recent_interactions,
+            "recent_collection_papers": recent_collection_papers
         }
 
     except Exception as e:
