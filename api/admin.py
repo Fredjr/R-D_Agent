@@ -250,18 +250,27 @@ async def sync_collection_papers(
         skipped = 0
         errors = []
 
+        # Group by PMID to avoid duplicates in the same batch
+        pmid_to_paper = {}
         for cp in collection_papers:
+            if cp.article_pmid not in pmid_to_paper:
+                pmid_to_paper[cp.article_pmid] = cp
+
+        logger.info(f"Processing {len(pmid_to_paper)} unique PMIDs")
+
+        for pmid, cp in pmid_to_paper.items():
             try:
                 # Check if Article already exists
-                existing = db.query(Article).filter(Article.pmid == cp.article_pmid).first()
+                existing = db.query(Article).filter(Article.pmid == pmid).first()
 
                 if existing:
                     skipped += 1
+                    logger.debug(f"Skipping {pmid} (already exists)")
                     continue
 
                 # Create Article record
                 article = Article(
-                    pmid=cp.article_pmid,
+                    pmid=pmid,
                     title=cp.article_title,
                     authors=cp.article_authors if isinstance(cp.article_authors, list) else [],
                     journal=cp.article_journal,
@@ -269,11 +278,14 @@ async def sync_collection_papers(
                 )
 
                 db.add(article)
+                db.flush()  # Flush immediately to catch duplicates
                 synced += 1
+                logger.info(f"✅ Synced {pmid}: {cp.article_title[:60]}...")
 
             except Exception as e:
-                errors.append(f"PMID {cp.article_pmid}: {str(e)}")
-                logger.error(f"Error syncing {cp.article_pmid}: {e}")
+                db.rollback()  # Rollback this one, continue with others
+                errors.append(f"PMID {pmid}: {str(e)[:100]}")
+                logger.error(f"Error syncing {pmid}: {e}")
 
         db.commit()
 
@@ -284,15 +296,82 @@ async def sync_collection_papers(
             "message": f"Synced {synced} papers from collections to Article table",
             "synced": synced,
             "skipped": skipped,
-            "errors": errors[:10],
+            "total_unique_pmids": len(pmid_to_paper),
+            "errors": errors[:10] if errors else [],
             "next_step": "Run POST /api/admin/embeddings/populate to generate embeddings"
         }
 
     except Exception as e:
+        db.rollback()
         logger.error(f"❌ Failed to sync collection papers: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to sync: {str(e)}")
+
+
+@router.get("/collection-papers-analysis")
+async def analyze_collection_papers(
+    admin_user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Analyze which collection papers have embeddings vs which don't
+    """
+    try:
+        from database import ArticleCollection
+
+        # Get all unique PMIDs from collections
+        collection_papers = db.query(ArticleCollection).filter(
+            ArticleCollection.article_pmid != None
+        ).all()
+
+        # Group by PMID
+        pmid_to_papers = {}
+        for cp in collection_papers:
+            if cp.article_pmid not in pmid_to_papers:
+                pmid_to_papers[cp.article_pmid] = {
+                    'pmid': cp.article_pmid,
+                    'title': cp.article_title,
+                    'year': cp.article_year,
+                    'added_by': cp.added_by,
+                    'in_article_table': False,
+                    'has_embedding': False
+                }
+
+        # Check which are in Article table
+        for pmid in pmid_to_papers.keys():
+            article = db.query(Article).filter(Article.pmid == pmid).first()
+            if article:
+                pmid_to_papers[pmid]['in_article_table'] = True
+
+                # Check if has embedding
+                embedding = db.query(PaperEmbedding).filter(PaperEmbedding.pmid == pmid).first()
+                if embedding:
+                    pmid_to_papers[pmid]['has_embedding'] = True
+
+        # Calculate stats
+        total_collection_papers = len(pmid_to_papers)
+        in_article_table = sum(1 for p in pmid_to_papers.values() if p['in_article_table'])
+        has_embedding = sum(1 for p in pmid_to_papers.values() if p['has_embedding'])
+        missing_from_article = [p for p in pmid_to_papers.values() if not p['in_article_table']]
+        missing_embeddings = [p for p in pmid_to_papers.values() if p['in_article_table'] and not p['has_embedding']]
+
+        return {
+            "status": "success",
+            "total_collection_papers": total_collection_papers,
+            "in_article_table": in_article_table,
+            "has_embedding": has_embedding,
+            "missing_from_article_table": len(missing_from_article),
+            "missing_embeddings": len(missing_embeddings),
+            "sample_missing_from_article": missing_from_article[:5],
+            "sample_missing_embeddings": missing_embeddings[:5]
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Failed to analyze collection papers: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to analyze: {str(e)}")
 
 
 @router.get("/user-history/{user_id}")
