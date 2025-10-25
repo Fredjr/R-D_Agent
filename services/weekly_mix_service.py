@@ -241,29 +241,9 @@ class WeeklyMixService:
         ).first()
 
         if not article_embedding or not article_embedding.embedding_vector:
-            # Try to generate embedding on-the-fly
-            logger.info(f"Generating embedding for article {article.pmid}")
-            try:
-                import asyncio
-                success = asyncio.run(self.vector_store.embed_paper(
-                    db, article.pmid, article.title, article.abstract,
-                    publication_year=article.publication_year,
-                    journal=article.journal
-                ))
-                if success:
-                    # Retry fetching the embedding
-                    article_embedding = db.query(PaperEmbedding).filter(
-                        PaperEmbedding.pmid == article.pmid
-                    ).first()
-                    if not article_embedding or not article_embedding.embedding_vector:
-                        logger.warning(f"Failed to generate embedding for {article.pmid}")
-                        return 0.5
-                else:
-                    logger.warning(f"Failed to generate embedding for {article.pmid}")
-                    return 0.5
-            except Exception as e:
-                logger.error(f"Error generating embedding for {article.pmid}: {e}")
-                return 0.5
+            logger.warning(f"⚠️ No embedding found for article {article.pmid} - using default score. "
+                          f"Run: POST /api/v1/admin/embeddings/populate to generate embeddings.")
+            return 0.5  # No embedding available
 
         # Get embeddings for viewed papers (last 10 for performance)
         viewed_embeddings = []
@@ -274,29 +254,10 @@ class WeeklyMixService:
 
             if viewed_emb and viewed_emb.embedding_vector:
                 viewed_embeddings.append(viewed_emb.embedding_vector)
-            else:
-                # Try to generate embedding for viewed paper
-                viewed_article = db.query(Article).filter(Article.pmid == pmid).first()
-                if viewed_article and viewed_article.title:
-                    logger.info(f"Generating embedding for viewed paper {pmid}")
-                    try:
-                        import asyncio
-                        success = asyncio.run(self.vector_store.embed_paper(
-                            db, viewed_article.pmid, viewed_article.title, viewed_article.abstract,
-                            publication_year=viewed_article.publication_year,
-                            journal=viewed_article.journal
-                        ))
-                        if success:
-                            viewed_emb = db.query(PaperEmbedding).filter(
-                                PaperEmbedding.pmid == pmid
-                            ).first()
-                            if viewed_emb and viewed_emb.embedding_vector:
-                                viewed_embeddings.append(viewed_emb.embedding_vector)
-                    except Exception as e:
-                        logger.error(f"Error generating embedding for viewed paper {pmid}: {e}")
 
         if not viewed_embeddings:
-            logger.debug(f"No embeddings found for viewed papers")
+            logger.warning(f"⚠️ No embeddings found for viewed papers - using default score. "
+                          f"Run: POST /api/v1/admin/embeddings/populate to generate embeddings.")
             return 0.5  # No embeddings for comparison
 
         # Calculate average similarity to viewed papers
