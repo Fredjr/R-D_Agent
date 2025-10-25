@@ -7,8 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 import logging
 
-from database import get_engine, get_session_local
-from database_models.article import Article
+from database import get_engine, get_session_local, Article
 from database_models.paper_embedding import PaperEmbedding
 
 logger = logging.getLogger(__name__)
