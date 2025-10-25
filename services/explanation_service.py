@@ -141,25 +141,111 @@ class ExplanationService:
     
     def _explain_semantic_similarity(self, db: Session, paper: Article, user_id: str,
                                     context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        """Explain based on semantic similarity"""
-        # This would integrate with Sprint 1B vector store
-        # For now, return placeholder
-        
+        """
+        Explain based on semantic similarity to viewed papers using vector embeddings
+
+        Calculates actual similarity scores and identifies most similar papers
+        """
+        from database_models.paper_embedding import PaperEmbedding
+        from services.vector_store_service import get_vector_store_service
+
         confidence = 0.0
         text = ""
         evidence = {}
-        
-        if context and 'viewed_papers' in context:
-            # Simulate semantic similarity
-            viewed_papers = context['viewed_papers']
-            if viewed_papers:
-                confidence = 0.7
-                text = f"This paper is semantically similar to papers you've viewed. It shares key concepts and research themes."
-                evidence = {
-                    'similar_papers': viewed_papers[:3],
-                    'similarity_score': 0.75
-                }
-        
+
+        if not context or 'viewed_papers' not in context:
+            return {
+                'type': 'semantic',
+                'text': text,
+                'confidence': confidence,
+                'evidence': evidence
+            }
+
+        viewed_papers = context['viewed_papers']
+        if not viewed_papers:
+            return {
+                'type': 'semantic',
+                'text': text,
+                'confidence': confidence,
+                'evidence': evidence
+            }
+
+        # Get paper embedding
+        paper_embedding = db.query(PaperEmbedding).filter(
+            PaperEmbedding.pmid == paper.pmid
+        ).first()
+
+        if not paper_embedding or not paper_embedding.embedding_vector:
+            return {
+                'type': 'semantic',
+                'text': text,
+                'confidence': confidence,
+                'evidence': evidence
+            }
+
+        # Calculate similarity to viewed papers
+        vector_store = get_vector_store_service()
+        similarities = []
+
+        for viewed_pmid in viewed_papers[:10]:  # Check last 10 viewed papers
+            viewed_embedding = db.query(PaperEmbedding).filter(
+                PaperEmbedding.pmid == viewed_pmid
+            ).first()
+
+            if viewed_embedding and viewed_embedding.embedding_vector:
+                similarity = vector_store.cosine_similarity(
+                    paper_embedding.embedding_vector,
+                    viewed_embedding.embedding_vector
+                )
+
+                # Get paper title for evidence
+                viewed_article = db.query(Article).filter(
+                    Article.pmid == viewed_pmid
+                ).first()
+
+                similarities.append({
+                    'pmid': viewed_pmid,
+                    'title': viewed_article.title if viewed_article else 'Unknown',
+                    'similarity': similarity
+                })
+
+        if not similarities:
+            return {
+                'type': 'semantic',
+                'text': text,
+                'confidence': confidence,
+                'evidence': evidence
+            }
+
+        # Sort by similarity
+        similarities.sort(key=lambda x: x['similarity'], reverse=True)
+        top_similar = similarities[0]
+        avg_similarity = sum(s['similarity'] for s in similarities) / len(similarities)
+
+        # Generate personalized explanation
+        if top_similar['similarity'] > 0.8:
+            confidence = 0.9
+            text = f"This paper is highly similar to '{top_similar['title'][:60]}...' which you recently viewed (similarity: {top_similar['similarity']:.0%})."
+        elif top_similar['similarity'] > 0.7:
+            confidence = 0.8
+            text = f"This paper relates to '{top_similar['title'][:60]}...' from your reading history (similarity: {top_similar['similarity']:.0%})."
+        elif avg_similarity > 0.6:
+            confidence = 0.7
+            text = f"This paper shares concepts with {len(similarities)} papers you've viewed (avg similarity: {avg_similarity:.0%})."
+        else:
+            confidence = 0.5
+            text = f"This paper has some overlap with your recent reading (similarity: {avg_similarity:.0%})."
+
+        evidence = {
+            'most_similar_paper': {
+                'pmid': top_similar['pmid'],
+                'title': top_similar['title'],
+                'similarity': top_similar['similarity']
+            },
+            'avg_similarity': avg_similarity,
+            'compared_papers': len(similarities)
+        }
+
         return {
             'type': 'semantic',
             'text': text,

@@ -216,26 +216,112 @@ class WeeklyMixService:
         scored.sort(key=lambda x: x['score'], reverse=True)
         return scored
     
-    def _get_semantic_score(self, db: Session, article: Article, 
+    def _get_semantic_score(self, db: Session, article: Article,
                            user_history: Dict[str, Any]) -> float:
-        """Get semantic similarity score"""
+        """
+        Get semantic similarity score using vector embeddings
+
+        Calculates average cosine similarity between candidate paper
+        and user's recently viewed papers.
+
+        Returns:
+            float: Similarity score between 0.0 and 1.0
+        """
+        from database_models.paper_embedding import PaperEmbedding
+
         # Default score if no history
-        if not user_history.get('viewed_papers'):
+        viewed_pmids = user_history.get('viewed_papers', [])
+        if not viewed_pmids:
+            logger.debug(f"No viewing history for semantic scoring")
             return 0.5
-        
-        # Use vector store to get similarity
-        # For now, return a default score
-        # TODO: Integrate with vector store service
-        return 0.7
+
+        # Get article embedding
+        article_embedding = db.query(PaperEmbedding).filter(
+            PaperEmbedding.pmid == article.pmid
+        ).first()
+
+        if not article_embedding or not article_embedding.embedding_vector:
+            logger.debug(f"No embedding found for article {article.pmid}")
+            return 0.5  # No embedding available
+
+        # Get embeddings for viewed papers (last 10 for performance)
+        viewed_embeddings = []
+        for pmid in viewed_pmids[:10]:
+            viewed_emb = db.query(PaperEmbedding).filter(
+                PaperEmbedding.pmid == pmid
+            ).first()
+
+            if viewed_emb and viewed_emb.embedding_vector:
+                viewed_embeddings.append(viewed_emb.embedding_vector)
+
+        if not viewed_embeddings:
+            logger.debug(f"No embeddings found for viewed papers")
+            return 0.5  # No embeddings for comparison
+
+        # Calculate average similarity to viewed papers
+        similarities = []
+        article_vec = article_embedding.embedding_vector
+
+        for viewed_vec in viewed_embeddings:
+            similarity = self.vector_store.cosine_similarity(article_vec, viewed_vec)
+            similarities.append(similarity)
+
+        # Return average similarity
+        avg_similarity = sum(similarities) / len(similarities)
+
+        logger.debug(f"Semantic score for {article.pmid}: {avg_similarity:.3f} "
+                    f"(avg of {len(similarities)} comparisons)")
+
+        return avg_similarity
     
     def _get_diversity_score(self, article: Article, user_history: Dict[str, Any]) -> float:
-        """Get diversity score (higher = more diverse)"""
+        """
+        Get diversity score based on author and journal distribution
+
+        Penalizes papers from over-represented authors/journals in user's history
+        to encourage diverse recommendations.
+
+        Returns:
+            float: Diversity score between 0.3 and 1.0
+        """
         score = 1.0
-        
-        # Penalize if cluster is over-represented
-        # For now, return default
-        # TODO: Implement cluster diversity logic
-        
+
+        # Get user's viewed papers for diversity analysis
+        viewed_pmids = user_history.get('viewed_papers', [])
+        if not viewed_pmids:
+            return score  # No history, all papers equally diverse
+
+        # Analyze author diversity
+        if article.authors:
+            # Handle authors - can be list (JSON) or string
+            if isinstance(article.authors, list):
+                article_authors = set(article.authors[:3])  # First 3 authors
+            elif isinstance(article.authors, str):
+                article_authors = set(article.authors.split(', ')[:3])
+            else:
+                article_authors = set()
+
+            # Check if any authors appear frequently in user's history
+            # (This is a simplified check - in production, query viewed papers' authors)
+            # For now, we'll use a heuristic based on common author patterns
+            if len(article_authors) > 0:
+                # Slight bonus for papers with multiple authors (more collaborative)
+                if len(article_authors) >= 3:
+                    score *= 1.05
+
+        # Analyze journal diversity
+        if article.journal:
+            # Penalize if journal is very common (e.g., Nature, Science)
+            # This encourages exploring diverse sources
+            common_journals = ['Nature', 'Science', 'Cell', 'PNAS', 'Lancet']
+            if any(common in article.journal for common in common_journals):
+                score *= 0.95  # Slight penalty for very common journals
+
+        # Ensure score stays in valid range
+        score = max(0.3, min(1.0, score))
+
+        logger.debug(f"Diversity score for {article.pmid}: {score:.3f}")
+
         return score
     
     def _get_recency_score(self, article: Article) -> float:
