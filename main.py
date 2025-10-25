@@ -80,21 +80,39 @@ except ImportError as e:
 
 # Import Graph API - Sprint 2A
 try:
+    print("🔍 Attempting to import Graph API...")
     from api.graphs import router as graphs_router
     GRAPHS_API_AVAILABLE = True
-    print("✅ Graph API loaded successfully")
+    print(f"✅ Graph API loaded successfully - {len(graphs_router.routes)} routes")
 except ImportError as e:
-    print(f"⚠️ Graph API not available: {e}")
+    print(f"❌ Graph API ImportError: {e}")
+    import traceback
+    traceback.print_exc()
+    GRAPHS_API_AVAILABLE = False
+    graphs_router = None
+except Exception as e:
+    print(f"❌ Graph API Exception: {e}")
+    import traceback
+    traceback.print_exc()
     GRAPHS_API_AVAILABLE = False
     graphs_router = None
 
 # Import Cluster API - Sprint 2B
 try:
+    print("🔍 Attempting to import Cluster API...")
     from api.clusters import router as clusters_router
     CLUSTERS_API_AVAILABLE = True
-    print("✅ Cluster API loaded successfully")
+    print(f"✅ Cluster API loaded successfully - {len(clusters_router.routes)} routes")
 except ImportError as e:
-    print(f"⚠️ Cluster API not available: {e}")
+    print(f"❌ Cluster API ImportError: {e}")
+    import traceback
+    traceback.print_exc()
+    CLUSTERS_API_AVAILABLE = False
+    clusters_router = None
+except Exception as e:
+    print(f"❌ Cluster API Exception: {e}")
+    import traceback
+    traceback.print_exc()
     CLUSTERS_API_AVAILABLE = False
     clusters_router = None
 
@@ -120,11 +138,20 @@ except ImportError as e:
 
 # Import Discovery Tree API - Sprint 4
 try:
+    print("🔍 Attempting to import Discovery Tree API...")
     from api.discovery_tree import router as discovery_tree_router
     DISCOVERY_TREE_API_AVAILABLE = True
-    print("✅ Discovery Tree API loaded successfully")
+    print(f"✅ Discovery Tree API loaded successfully - {len(discovery_tree_router.routes)} routes")
 except ImportError as e:
-    print(f"⚠️ Discovery Tree API not available: {e}")
+    print(f"❌ Discovery Tree API ImportError: {e}")
+    import traceback
+    traceback.print_exc()
+    DISCOVERY_TREE_API_AVAILABLE = False
+    discovery_tree_router = None
+except Exception as e:
+    print(f"❌ Discovery Tree API Exception: {e}")
+    import traceback
+    traceback.print_exc()
     DISCOVERY_TREE_API_AVAILABLE = False
     discovery_tree_router = None
 
