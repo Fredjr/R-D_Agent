@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api/v1/events", tags=["events"])
 # Pydantic models for request/response
 class EventCreate(BaseModel):
     """Single event creation request"""
-    user_id: str = Field(..., description="User identifier")
+    user_id: Optional[str] = Field(None, description="User identifier (can also be provided via User-ID header)")
     pmid: str = Field(..., description="PubMed ID of the paper")
     event_type: str = Field(..., description="Type of event")
     meta: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Optional metadata")
@@ -94,7 +94,10 @@ async def track_event(
     try:
         # Use header user_id if provided, otherwise use event.user_id
         effective_user_id = user_id or event.user_id
-        
+
+        if not effective_user_id:
+            raise HTTPException(status_code=400, detail="user_id required (provide via User-ID header or request body)")
+
         created_event = EventTrackingService.track_event(
             db=db,
             user_id=effective_user_id,
