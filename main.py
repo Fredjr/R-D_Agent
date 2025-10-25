@@ -5419,7 +5419,7 @@ async def health_check():
         "status": "healthy",
         "service": "R&D Agent Backend - GPT-5/O3 Enhanced",
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "2.3-admin-embeddings-api",
+        "version": "2.4-auto-embeddings",
         "deployment_date": "2025-10-25",
         "admin_embeddings_api": True,
         "features": [
@@ -9399,6 +9399,35 @@ async def add_article_to_collection(
                 )
                 db.add(new_article)
                 db.flush()  # Ensure article is created before adding to collection
+
+                # Generate embedding for personalization (async, non-blocking)
+                try:
+                    from services.vector_store_service import get_vector_store_service
+                    from database_models.paper_embedding import PaperEmbedding
+
+                    # Check if embedding already exists
+                    existing_embedding = db.query(PaperEmbedding).filter(
+                        PaperEmbedding.pmid == article_data.article_pmid
+                    ).first()
+
+                    if not existing_embedding:
+                        vector_service = get_vector_store_service()
+                        paper = {
+                            'pmid': article_data.article_pmid,
+                            'title': article_data.article_title,
+                            'abstract': None,  # Will be enriched later
+                            'metadata': {
+                                'publication_year': article_data.article_year,
+                                'journal': article_data.article_journal,
+                                'authors': article_data.article_authors
+                            }
+                        }
+                        # Generate embedding (this is async but we don't wait for it)
+                        await vector_service.embed_papers_batch(db, [paper], batch_size=1)
+                        logger.info(f"✅ Generated embedding for paper {article_data.article_pmid}")
+                except Exception as e:
+                    # Don't fail the request if embedding generation fails
+                    logger.warning(f"⚠️ Failed to generate embedding for {article_data.article_pmid}: {e}")
 
         # Add article to collection
         article_collection = ArticleCollection(
