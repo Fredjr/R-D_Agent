@@ -1260,12 +1260,21 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 # Enable CORS for frontend dev (broad for local dev)
+# Updated to explicitly allow Vercel frontend and handle preflight requests
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=os.getenv('ALLOW_ORIGIN_REGEX', '.*'),
-    allow_credentials=False,
-    allow_methods=['*'],
-    allow_headers=['*'],
+    allow_origins=[
+        "https://frontend-psi-seven-85.vercel.app",
+        "https://frontend-psi-seven-86.vercel.app",
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "*"  # Allow all origins for development
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,
 )
 
 
