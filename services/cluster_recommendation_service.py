@@ -376,7 +376,7 @@ class ClusterRecommendationService:
         cluster_pmids = all_clusters[cluster_id].paper_pmids
         interactions = db.query(UserInteraction).filter(
             UserInteraction.user_id == user_id,
-            UserInteraction.paper_pmid.in_(cluster_pmids)
+            UserInteraction.pmid.in_(cluster_pmids)
         ).count()
         
         # Consider exhausted if user has seen >80% of papers

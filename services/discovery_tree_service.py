@@ -359,16 +359,24 @@ class DiscoveryTreeService:
         
         papers = []
         for article in articles:
+            # Handle authors - can be list (JSON) or string
+            if isinstance(article.authors, list):
+                authors = article.authors
+            elif isinstance(article.authors, str):
+                authors = article.authors.split(", ") if article.authors else []
+            else:
+                authors = []
+
             papers.append(PaperInCluster(
                 pmid=article.pmid,
                 title=article.title or "Untitled",
-                authors=article.authors.split(", ") if article.authors else [],
+                authors=authors,
                 journal=article.journal or "Unknown",
                 year=article.publication_year or 0,
                 relevance_score=0.8,  # Placeholder
                 cluster_position="central"  # Placeholder
             ))
-        
+
         return papers
     
     def _calculate_cluster_relevance(
