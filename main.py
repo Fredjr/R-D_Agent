@@ -326,8 +326,11 @@ try:
     from api.admin_embeddings import router as admin_embeddings_router
     app.include_router(admin_embeddings_router)
     print("✅ Admin Embeddings API routes registered")
+    print(f"   📍 Endpoints: /api/v1/admin/embeddings/populate, /stats, /clear")
 except Exception as e:
     print(f"⚠️ Admin Embeddings API not available: {e}")
+    import traceback
+    traceback.print_exc()
 
 # Register Event Tracking API router - Sprint 1A
 if EVENTS_API_AVAILABLE and events_router:
@@ -5062,8 +5065,8 @@ class ActivityLogResponse(BaseModel):
 async def startup_event():
     """Initialize database tables on startup - non-blocking"""
     print("🚀 Starting R&D Agent Backend with Semantic Analysis...")
-    print("🔄 Version: 2.2-personalization-fix-deployed")
-    print("🔄 RESTART TRIGGERED: Clearing singleton service cache")
+    print("🔄 Version: 2.3-admin-embeddings-api")
+    print("🔄 Admin Embeddings API enabled for personalization fix")
 
     # Run database initialization in background to not block startup
     async def init_database_background():
@@ -5425,9 +5428,9 @@ async def health_check():
         "status": "healthy",
         "service": "R&D Agent Backend - GPT-5/O3 Enhanced",
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "2.2-personalization-fix-restart",
+        "version": "2.3-admin-embeddings-api",
         "deployment_date": "2025-10-25",
-        "restart_applied": True,
+        "admin_embeddings_api": True,
         "features": [
             "gpt5_o3_model_integration",
             "phd_committee_simulation",
