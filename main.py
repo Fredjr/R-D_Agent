@@ -321,16 +321,7 @@ try:
 except Exception as e:
     print(f"⚠️ Admin API not available: {e}")
 
-# Register Admin Embeddings API router (for embedding management)
-try:
-    from api.admin_embeddings import router as admin_embeddings_router
-    app.include_router(admin_embeddings_router)
-    print("✅ Admin Embeddings API routes registered")
-    print(f"   📍 Endpoints: /api/v1/admin/embeddings/populate, /stats, /clear")
-except Exception as e:
-    print(f"⚠️ Admin Embeddings API not available: {e}")
-    import traceback
-    traceback.print_exc()
+# Admin Embeddings API is now part of api/admin.py (no separate router needed)
 
 # Register Event Tracking API router - Sprint 1A
 if EVENTS_API_AVAILABLE and events_router:
