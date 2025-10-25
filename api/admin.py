@@ -231,7 +231,7 @@ async def get_user_history(
         # Get all interactions for user
         interactions = db.query(UserInteraction).filter(
             UserInteraction.user_id == user_id
-        ).order_by(UserInteraction.created_at.desc()).limit(50).all()
+        ).order_by(UserInteraction.timestamp.desc()).limit(50).all()
 
         # Get paper views
         paper_views = [i for i in interactions if i.event_type == 'paper_view']
@@ -247,8 +247,8 @@ async def get_user_history(
             "recent_interactions": [
                 {
                     "event_type": i.event_type,
-                    "paper_pmid": i.paper_pmid,
-                    "created_at": i.created_at.isoformat() if i.created_at else None
+                    "pmid": i.pmid,
+                    "timestamp": i.timestamp.isoformat() if i.timestamp else None
                 }
                 for i in interactions[:10]
             ]
