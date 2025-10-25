@@ -278,7 +278,14 @@ class WeeklyMixService:
 
             # Check author diversity (max 2 per author)
             if article.authors:
-                authors = article.authors.split(', ')
+                # Handle authors - can be list (JSON) or string
+                if isinstance(article.authors, list):
+                    authors = article.authors
+                elif isinstance(article.authors, str):
+                    authors = article.authors.split(', ')
+                else:
+                    authors = []
+
                 skip = False
                 for author in authors[:3]:  # Check first 3 authors
                     if author_counts[author] >= 2:
