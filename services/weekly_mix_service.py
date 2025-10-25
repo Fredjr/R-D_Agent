@@ -68,6 +68,16 @@ class WeeklyMixService:
             today = date.today()
             week_start = today - timedelta(days=today.weekday())
             
+            # Clear caches if force_refresh
+            if force_refresh:
+                # Clear weekly mix cache
+                cache_key = f"{user_id}:{week_start}"
+                if cache_key in self.mix_cache:
+                    del self.mix_cache[cache_key]
+                # Clear explanation cache for this user
+                self.explanation_service.clear_cache(user_id)
+                logger.info(f"Cleared caches for {user_id} due to force_refresh")
+
             # Check cache
             cache_key = f"{user_id}:{week_start}"
             if not force_refresh and cache_key in self.mix_cache:

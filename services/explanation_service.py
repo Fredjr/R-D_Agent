@@ -47,10 +47,28 @@ class ExplanationResult:
 
 class ExplanationService:
     """Service for generating paper recommendation explanations"""
-    
+
     def __init__(self):
         self.explanation_cache = {}  # In-memory cache
         self.cache_ttl = timedelta(hours=24)
+
+    def clear_cache(self, user_id: Optional[str] = None):
+        """
+        Clear explanation cache
+
+        Args:
+            user_id: If provided, only clear cache for this user. Otherwise clear all.
+        """
+        if user_id:
+            # Clear only this user's cache
+            keys_to_delete = [k for k in self.explanation_cache.keys() if k.startswith(f"{user_id}:")]
+            for key in keys_to_delete:
+                del self.explanation_cache[key]
+            logger.info(f"Cleared explanation cache for user {user_id}")
+        else:
+            # Clear all cache
+            self.explanation_cache = {}
+            logger.info("Cleared all explanation cache")
     
     def generate_explanation(self, db: Session, paper_pmid: str, user_id: str,
                            context: Optional[Dict[str, Any]] = None) -> ExplanationResult:

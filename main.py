@@ -5419,7 +5419,7 @@ async def health_check():
         "status": "healthy",
         "service": "R&D Agent Backend - GPT-5/O3 Enhanced",
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "2.4-auto-embeddings",
+        "version": "2.5-discovery-explanations",
         "deployment_date": "2025-10-25",
         "admin_embeddings_api": True,
         "features": [
