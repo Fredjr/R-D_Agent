@@ -235,7 +235,7 @@ async def get_user_history(
 
         # Get paper views
         paper_views = [i for i in interactions if i.event_type == 'paper_view']
-        viewed_pmids = [i.paper_pmid for i in paper_views if i.paper_pmid]
+        viewed_pmids = [i.pmid for i in paper_views if i.pmid]
 
         return {
             "status": "success",

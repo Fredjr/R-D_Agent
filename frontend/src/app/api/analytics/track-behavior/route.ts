@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://r-dagent-production.up.railway.app';
+
 export async function POST(request: NextRequest) {
   try {
     const behaviorData = await request.json();
-    
+
     // Validate required fields
     if (!behaviorData.user_id || !behaviorData.action) {
       return NextResponse.json({
@@ -21,12 +23,7 @@ export async function POST(request: NextRequest) {
       origin: request.headers.get('origin') || '',
     };
 
-    // In production, you would:
-    // 1. Send to analytics service (Google Analytics, Mixpanel, etc.)
-    // 2. Store in database for analysis
-    // 3. Process for real-time insights
-
-    // For now, log the behavior data
+    // Log the behavior data
     console.log('📊 [Analytics] User behavior tracked:', {
       user_id: enrichedData.user_id,
       action: enrichedData.action,
@@ -34,7 +31,10 @@ export async function POST(request: NextRequest) {
       session_id: enrichedData.session_id
     });
 
-    // Simulate analytics processing
+    // NEW: Forward to backend event tracking API for personalization
+    await forwardToBackendEventTracking(enrichedData);
+
+    // Process analytics
     await processAnalytics(enrichedData);
 
     return NextResponse.json({
@@ -45,13 +45,73 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('📊 [Analytics] Error tracking behavior:', error);
-    
+
     // Don't fail the request - analytics should be non-blocking
     return NextResponse.json({
       success: false,
       message: 'Analytics tracking failed',
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 200 }); // Return 200 to not disrupt user experience
+  }
+}
+
+/**
+ * Forward events to backend event tracking API for personalization
+ */
+async function forwardToBackendEventTracking(data: any): Promise<void> {
+  try {
+    // Map frontend actions to backend event types
+    const eventTypeMap: Record<string, string> = {
+      'paper_view': 'open',
+      'activity': 'open',  // Generic activity
+      'collection_action': 'save',
+      'bookmark': 'like',
+      'save': 'save',
+      'like': 'like',
+      'skip': 'skip'
+    };
+
+    const eventType = eventTypeMap[data.action] || 'open';
+
+    // Extract PMID from data
+    const pmid = data.data?.pmid || data.pmid;
+
+    // Only track events with PMIDs (paper-related events)
+    if (!pmid) {
+      console.log('📊 [Analytics] Skipping backend tracking (no PMID):', data.action);
+      return;
+    }
+
+    // Send to backend event tracking API
+    const response = await fetch(`${BACKEND_URL}/api/v1/events/track`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': data.user_id
+      },
+      body: JSON.stringify({
+        pmid: pmid,
+        event_type: eventType,
+        meta: {
+          source: data.data?.source || 'frontend',
+          action: data.action,
+          session_id: data.session_id,
+          page: data.data?.page,
+          context: data.data?.context
+        },
+        session_id: data.session_id
+      })
+    });
+
+    if (response.ok) {
+      console.log(`✅ [Analytics] Forwarded to backend: ${eventType} for ${pmid}`);
+    } else {
+      console.warn(`⚠️ [Analytics] Backend tracking failed: ${response.status}`);
+    }
+
+  } catch (error) {
+    // Fail silently - don't disrupt user experience
+    console.warn('⚠️ [Analytics] Failed to forward to backend:', error);
   }
 }
 
