@@ -5410,23 +5410,16 @@ async def websocket_endpoint(websocket: WebSocket, project_id: str):
 @app.get("/health")
 async def health_check():
     """Health check endpoint for Railway deployment"""
-    # Simplified health check - don't test DB during Railway health checks
-    # as it can cause deployment failures
-
-    # Check if new code is deployed by inspecting service method
-    import inspect
-    from services.weekly_mix_service import get_weekly_mix_service
-    service = get_weekly_mix_service()
-    semantic_score_source = inspect.getsource(service._get_semantic_score)
-    has_real_scoring = "PaperEmbedding" in semantic_score_source and "cosine_similarity" in semantic_score_source
+    # Simplified health check - don't test DB or services during Railway health checks
+    # as it can cause deployment failures and timeouts
 
     return {
         "status": "healthy",
         "service": "R&D Agent Backend - GPT-5/O3 Enhanced",
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "2.2-personalization-fix-deployed",
+        "version": "2.2-personalization-fix-restart",
         "deployment_date": "2025-10-25",
-        "code_deployed": "NEW" if has_real_scoring else "OLD",
+        "restart_applied": True,
         "features": [
             "gpt5_o3_model_integration",
             "phd_committee_simulation",
