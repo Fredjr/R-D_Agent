@@ -75,15 +75,16 @@ class ComprehensiveBrowserTest {
             );
 
             const historyData = await historyResponse.json();
+            // Response is an array directly, not {events: [...]}
             this.results.sprint1a.push({
                 test: 'Get Event History',
-                passed: historyResponse.ok && Array.isArray(historyData.events),
+                passed: historyResponse.ok && Array.isArray(historyData),
                 status: historyResponse.status,
-                count: historyData.events?.length || 0
+                count: historyData?.length || 0
             });
 
             if (historyResponse.ok) {
-                this.log(`✅ Retrieved ${historyData.events?.length || 0} events`, 'success');
+                this.log(`✅ Retrieved ${historyData?.length || 0} events`, 'success');
             }
             
         } catch (error) {
@@ -271,13 +272,14 @@ class ComprehensiveBrowserTest {
             );
             
             const mixData = await mixResponse.json();
+            // Response has papers array, not success field
             this.results.sprint3b.push({
                 test: 'Get Weekly Mix',
-                passed: mixResponse.ok && mixData.success,
+                passed: mixResponse.ok && Array.isArray(mixData.papers),
                 status: mixResponse.status,
                 count: mixData.papers?.length || 0
             });
-            
+
             if (mixResponse.ok) {
                 this.log(`✅ Weekly mix retrieved: ${mixData.papers?.length || 0} papers`, 'success');
             } else {
