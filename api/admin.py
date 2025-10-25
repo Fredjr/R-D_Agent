@@ -212,3 +212,49 @@ async def get_embedding_stats(
         logger.error(f"❌ Failed to get embedding stats: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
 
+
+@router.get("/user-history/{user_id}")
+async def get_user_history(
+    user_id: str,
+    admin_user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get user interaction history for debugging
+
+    Returns:
+        User's viewing history and interaction stats
+    """
+    try:
+        from database_models.user_interaction import UserInteraction
+
+        # Get all interactions for user
+        interactions = db.query(UserInteraction).filter(
+            UserInteraction.user_id == user_id
+        ).order_by(UserInteraction.created_at.desc()).limit(50).all()
+
+        # Get paper views
+        paper_views = [i for i in interactions if i.event_type == 'paper_view']
+        viewed_pmids = [i.paper_pmid for i in paper_views if i.paper_pmid]
+
+        return {
+            "status": "success",
+            "user_id": user_id,
+            "total_interactions": len(interactions),
+            "paper_views": len(paper_views),
+            "unique_papers_viewed": len(set(viewed_pmids)),
+            "viewed_pmids": viewed_pmids[:10],  # First 10
+            "recent_interactions": [
+                {
+                    "event_type": i.event_type,
+                    "paper_pmid": i.paper_pmid,
+                    "created_at": i.created_at.isoformat() if i.created_at else None
+                }
+                for i in interactions[:10]
+            ]
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Failed to get user history: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get history: {str(e)}")
+
