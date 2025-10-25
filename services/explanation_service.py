@@ -232,8 +232,17 @@ class ExplanationService:
         elif avg_similarity > 0.6:
             confidence = 0.7
             text = f"This paper shares concepts with {len(similarities)} papers you've viewed (avg similarity: {avg_similarity:.0%})."
+        elif avg_similarity > 0.4:
+            # Discovery recommendation: moderate similarity
+            confidence = 0.75  # Higher than temporal (0.7) to prioritize
+            text = f"Recommended based on your interest in '{top_similar['title'][:60]}...' - explores related concepts you might find interesting."
+        elif avg_similarity > 0.2:
+            # Discovery recommendation: low similarity but still related
+            confidence = 0.72  # Slightly higher than temporal
+            text = f"Discovered for you: This paper explores themes adjacent to your collection, including work similar to '{top_similar['title'][:60]}...'."
         else:
-            confidence = 0.5
+            # Very low similarity - still mention connection
+            confidence = 0.68  # Just below temporal
             text = f"This paper has some overlap with your recent reading (similarity: {avg_similarity:.0%})."
 
         evidence = {
