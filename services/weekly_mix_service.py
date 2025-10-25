@@ -502,11 +502,13 @@ class WeeklyMixService:
 
 # Singleton instance
 _weekly_mix_service = None
+_service_version = "2.2-personalization-fix"  # Version marker for deployment verification
 
 def get_weekly_mix_service() -> WeeklyMixService:
     """Get singleton instance of WeeklyMixService"""
     global _weekly_mix_service
     if _weekly_mix_service is None:
+        logger.info(f"Creating WeeklyMixService instance (version: {_service_version})")
         _weekly_mix_service = WeeklyMixService()
     return _weekly_mix_service
 

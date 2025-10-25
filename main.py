@@ -5053,7 +5053,9 @@ class ActivityLogResponse(BaseModel):
 @app.on_event("startup")
 async def startup_event():
     """Initialize database tables on startup - non-blocking"""
-    print(" Starting R&D Agent Backend with Semantic Analysis...")
+    print("🚀 Starting R&D Agent Backend with Semantic Analysis...")
+    print("🔄 Version: 2.2-personalization-fix-deployed")
+    print("🔄 RESTART TRIGGERED: Clearing singleton service cache")
 
     # Run database initialization in background to not block startup
     async def init_database_background():
