@@ -19,9 +19,9 @@ console.log('🧪 PERSONALIZATION FIX VALIDATION TEST');
 console.log('='.repeat(80));
 
 class PersonalizationFixValidator {
-    constructor() {
+    constructor(userId = 'fredericle77@gmail.com') {
         this.backendUrl = 'https://r-dagent-production.up.railway.app';
-        this.userId = 'test-user-comprehensive'; // User with history
+        this.userId = userId; // Real user with collections
         this.results = {
             scoreVariance: null,
             uniqueScores: null,

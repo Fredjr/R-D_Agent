@@ -224,6 +224,77 @@ async def get_embedding_stats(
         raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
 
 
+@router.post("/sync-collection-papers")
+async def sync_collection_papers(
+    admin_user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Sync papers from ArticleCollection to Article table and generate embeddings
+
+    This fixes the issue where collection papers don't have embeddings
+    """
+    try:
+        from database import ArticleCollection
+
+        logger.info("🔄 Starting collection papers sync...")
+
+        # Get all unique PMIDs from ArticleCollection
+        collection_papers = db.query(ArticleCollection).filter(
+            ArticleCollection.article_pmid != None
+        ).all()
+
+        logger.info(f"Found {len(collection_papers)} papers in collections")
+
+        synced = 0
+        skipped = 0
+        errors = []
+
+        for cp in collection_papers:
+            try:
+                # Check if Article already exists
+                existing = db.query(Article).filter(Article.pmid == cp.article_pmid).first()
+
+                if existing:
+                    skipped += 1
+                    continue
+
+                # Create Article record
+                article = Article(
+                    pmid=cp.article_pmid,
+                    title=cp.article_title,
+                    authors=cp.article_authors if isinstance(cp.article_authors, list) else [],
+                    journal=cp.article_journal,
+                    publication_year=cp.article_year
+                )
+
+                db.add(article)
+                synced += 1
+
+            except Exception as e:
+                errors.append(f"PMID {cp.article_pmid}: {str(e)}")
+                logger.error(f"Error syncing {cp.article_pmid}: {e}")
+
+        db.commit()
+
+        logger.info(f"✅ Synced {synced} papers, skipped {skipped}")
+
+        return {
+            "status": "success",
+            "message": f"Synced {synced} papers from collections to Article table",
+            "synced": synced,
+            "skipped": skipped,
+            "errors": errors[:10],
+            "next_step": "Run POST /api/admin/embeddings/populate to generate embeddings"
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Failed to sync collection papers: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to sync: {str(e)}")
+
+
 @router.get("/user-history/{user_id}")
 async def get_user_history(
     user_id: str,
