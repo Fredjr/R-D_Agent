@@ -703,7 +703,9 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         nodesCount: data.nodes?.length || 0,
         edgesCount: data.edges?.length || 0,
         metadata: data.metadata,
-        firstFewNodes: data.nodes?.slice(0, 3)
+        firstFewNodes: data.nodes?.slice(0, 3),
+        allNodes: data.nodes?.map(n => ({ id: n.id, label: n.label?.substring(0, 50) })),
+        allEdges: data.edges
       });
 
       // DEMO FALLBACK: Only if project/collection network is completely empty (0 nodes)
