@@ -29,6 +29,9 @@ interface NetworkSidebarProps {
   onGenerateReview?: (pmid: string, title: string, fullTextOnly?: boolean) => void;
   onDeepDive?: (pmid: string, title: string, fullTextOnly?: boolean) => void;
   onExploreCluster?: (pmid: string, title: string) => void;
+  // OA/Full-Text toggle control
+  fullTextOnly?: boolean;
+  onFullTextOnlyChange?: (value: boolean) => void;
 }
 
 export default function NetworkSidebar({
@@ -49,7 +52,9 @@ export default function NetworkSidebar({
   showCreateColumnButton = false,
   onGenerateReview,
   onDeepDive,
-  onExploreCluster
+  onExploreCluster,
+  fullTextOnly: propFullTextOnly,
+  onFullTextOnlyChange
 }: NetworkSidebarProps) {
   console.log('🔍 NetworkSidebar rendered with props:', {
     hasSelectedNode: !!selectedNode,
@@ -95,7 +100,17 @@ export default function NetworkSidebar({
   const [savingToCollection, setSavingToCollection] = useState(false);
 
   // OA/Full-Text toggle for smart actions
-  const [fullTextOnly, setFullTextOnly] = useState(true); // Default to OA/Full-Text for better quality
+  // Use controlled state if provided, otherwise use internal state
+  const [internalFullTextOnly, setInternalFullTextOnly] = useState(true);
+  const fullTextOnly = propFullTextOnly !== undefined ? propFullTextOnly : internalFullTextOnly;
+
+  const handleFullTextOnlyChange = (value: boolean) => {
+    if (onFullTextOnlyChange) {
+      onFullTextOnlyChange(value);
+    } else {
+      setInternalFullTextOnly(value);
+    }
+  };
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -632,7 +647,7 @@ export default function NetworkSidebar({
               <input
                 type="checkbox"
                 checked={fullTextOnly}
-                onChange={(e) => setFullTextOnly(e.target.checked)}
+                onChange={(e) => handleFullTextOnlyChange(e.target.checked)}
                 className="sr-only"
               />
               <div className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors ${

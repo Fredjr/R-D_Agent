@@ -49,7 +49,10 @@ export default function NetworkViewWithSidebar({
   const [navigationMode, setNavigationMode] = useState<'default' | 'similar' | 'earlier' | 'later' | 'authors' | 'timeline'>('default');
   const networkViewRef = useRef<any>(null);
 
-  console.log('🔍 NetworkViewWithSidebar rendered with:', { sourceType, sourceId, projectId });
+  // OA/Full-Text toggle state - lifted up to share between NetworkView and NetworkSidebar
+  const [fullTextOnly, setFullTextOnly] = useState(true); // Default to OA/Full-Text for better quality
+
+  console.log('🔍 NetworkViewWithSidebar rendered with:', { sourceType, sourceId, projectId, fullTextOnly });
 
   const handleNodeSelect = useCallback((node: any | null) => {
     if (node) {
@@ -205,6 +208,7 @@ export default function NetworkViewWithSidebar({
             onGenerateReview={handleGenerateReview}
             onDeepDive={handleDeepDive}
             onExploreCluster={onExploreCluster}
+            fullTextOnly={fullTextOnly}
           />
         </ErrorBoundary>
       </div>
@@ -273,6 +277,8 @@ export default function NetworkViewWithSidebar({
                 console.log('🔍 Explore people:', authors);
                 onNavigationChange('authors', authors.join(','));
               }}
+              fullTextOnly={fullTextOnly}
+              onFullTextOnlyChange={setFullTextOnly}
             />
           </ErrorBoundary>
         </div>

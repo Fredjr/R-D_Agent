@@ -114,6 +114,8 @@ interface NetworkViewProps {
   onGenerateReview?: (pmid: string, title: string) => void;
   onDeepDive?: (pmid: string, title: string) => void;
   onExploreCluster?: (pmid: string, title: string) => void;
+  // OA/Full-Text filter
+  fullTextOnly?: boolean;
 }
 
 // Function to create article-specific network when backend data is unavailable
@@ -324,7 +326,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   projectId,
   onGenerateReview,
   onDeepDive,
-  onExploreCluster
+  onExploreCluster,
+  fullTextOnly = true
 }, ref) => {
   const { user } = useAuth();
   const [networkData, setNetworkData] = useState<NetworkData | null>(null);
@@ -582,17 +585,20 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       let usePubMed = false;
 
       // Determine endpoint based on navigation mode and source type
+      // Build OA filter parameter
+      const oaParam = fullTextOnly ? '&open_access_only=true' : '';
+
       switch (navigationMode) {
         case 'similar':
-          endpoint = `/api/proxy/pubmed/network?pmid=${sourceId}&type=similar&limit=15`;
+          endpoint = `/api/proxy/pubmed/network?pmid=${sourceId}&type=similar&limit=15${oaParam}`;
           usePubMed = true;
           break;
         case 'earlier':
-          endpoint = `/api/proxy/pubmed/network?pmid=${sourceId}&type=references&limit=15`;
+          endpoint = `/api/proxy/pubmed/network?pmid=${sourceId}&type=references&limit=15${oaParam}`;
           usePubMed = true;
           break;
         case 'later':
-          endpoint = `/api/proxy/pubmed/network?pmid=${sourceId}&type=citations&limit=15`;
+          endpoint = `/api/proxy/pubmed/network?pmid=${sourceId}&type=citations&limit=15${oaParam}`;
           usePubMed = true;
           break;
         case 'authors':
@@ -608,15 +614,15 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           if (sourceType === 'article') {
             // Use PubMed for article networks - mixed network with citations and references
             if (forceNetworkType === 'citations') {
-              endpoint = `/api/proxy/pubmed/network?pmid=${sourceId}&type=citations&limit=15`;
+              endpoint = `/api/proxy/pubmed/network?pmid=${sourceId}&type=citations&limit=15${oaParam}`;
               usePubMed = true;
             } else if (forceNetworkType === 'references') {
-              endpoint = `/api/proxy/pubmed/network?pmid=${sourceId}&type=references&limit=15`;
+              endpoint = `/api/proxy/pubmed/network?pmid=${sourceId}&type=references&limit=15${oaParam}`;
               usePubMed = true;
             } else {
               // Default: citations network (mixed type has issues on Vercel)
               // Using citations only for now until mixed network timeout issue is resolved
-              endpoint = `/api/proxy/pubmed/network?pmid=${sourceId}&type=citations&limit=12`;
+              endpoint = `/api/proxy/pubmed/network?pmid=${sourceId}&type=citations&limit=12${oaParam}`;
               usePubMed = true;
             }
           } else if (sourceType === 'collection') {
