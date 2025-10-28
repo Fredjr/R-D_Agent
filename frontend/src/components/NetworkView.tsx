@@ -1028,10 +1028,14 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
     }
 
     if (networkNode) {
-      console.log('📊 Setting selected node:', networkNode.id);
+      console.log('📊 [NetworkView] Setting selected node:', networkNode.id);
+      console.log('📊 [NetworkView] disableInternalSidebar:', disableInternalSidebar);
+      console.log('📊 [NetworkView] onNodeSelect callback:', !!onNodeSelect);
       setSelectedNode(networkNode);
       setShowSidebar(true);
+      console.log('📊 [NetworkView] Calling onNodeSelect callback...');
       onNodeSelect?.(networkNode);
+      console.log('📊 [NetworkView] onNodeSelect callback completed');
 
       // ResearchRabbit-style expansion: Double-click or Ctrl+Click to expand
       if (event.detail === 2 || event.ctrlKey || event.metaKey) {
@@ -1461,6 +1465,15 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       </ReactFlow>
 
       {/* Enhanced NetworkSidebar - Only show if not disabled */}
+      {(() => {
+        console.log('🔍 [NetworkView] Sidebar render check:', {
+          disableInternalSidebar,
+          showSidebar,
+          hasSelectedNode: !!selectedNode,
+          willRenderSidebar: !disableInternalSidebar && showSidebar && !!selectedNode
+        });
+        return null;
+      })()}
       {!disableInternalSidebar && showSidebar && selectedNode && (
         <div className="absolute top-0 right-0 h-full z-10">
           <NetworkSidebar
