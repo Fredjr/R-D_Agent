@@ -50,6 +50,12 @@ export default function MultiColumnNetworkView({
   onDeepDive,
   onExploreCluster
 }: MultiColumnNetworkViewProps) {
+  console.log('🎯🎯🎯 [MultiColumnNetworkView] COMPONENT RENDERING - THIS IS MULTI-COLUMN MODE!', {
+    sourceType,
+    sourceId,
+    projectId
+  });
+
   const { user } = useAuth();
   const [columns, setColumns] = useState<PaperColumn[]>([]);
   const [mainSelectedNode, setMainSelectedNode] = useState<NetworkNode | null>(null);
