@@ -279,6 +279,7 @@ export default function NetworkViewWithSidebar({
                 console.log('🔍 Explore people:', authors);
                 onNavigationChange('authors', authors.join(','));
               }}
+              supportsMultiColumn={false}
               fullTextOnly={fullTextOnly}
               onFullTextOnlyChange={setFullTextOnly}
             />

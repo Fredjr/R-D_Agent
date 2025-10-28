@@ -32,6 +32,8 @@ interface NetworkSidebarProps {
   // OA/Full-Text toggle control
   fullTextOnly?: boolean;
   onFullTextOnlyChange?: (value: boolean) => void;
+  // NEW: Context indicator for multi-column support
+  supportsMultiColumn?: boolean;
 }
 
 export default function NetworkSidebar({
@@ -54,14 +56,18 @@ export default function NetworkSidebar({
   onDeepDive,
   onExploreCluster,
   fullTextOnly: propFullTextOnly,
-  onFullTextOnlyChange
+  onFullTextOnlyChange,
+  supportsMultiColumn = false
 }: NetworkSidebarProps) {
   console.log('🔍 NetworkSidebar rendered with props:', {
     hasSelectedNode: !!selectedNode,
     hasOnAddExplorationNodes: !!onAddExplorationNodes,
     currentMode,
     projectId,
-    collectionsCount: collections?.length || 0
+    collectionsCount: collections?.length || 0,
+    supportsMultiColumn,
+    hasOnCreatePaperColumn: !!onCreatePaperColumn,
+    showCreateColumnButton
   });
   const { user } = useAuth();
 
@@ -447,6 +453,13 @@ export default function NetworkSidebar({
   };
 
   const handleExplorationPaperClick = (paper: any) => {
+    console.log('🔍 Exploration paper clicked:', {
+      paper,
+      supportsMultiColumn,
+      hasOnCreatePaperColumn: !!onCreatePaperColumn,
+      hasOnExpandNode: !!onExpandNode
+    });
+
     // Create a new node from the exploration result
     const newNode: NetworkNode = {
       id: paper.pmid || paper.id,
@@ -465,9 +478,24 @@ export default function NetworkSidebar({
       }
     };
 
-    // Trigger navigation to this new paper
+    // Priority 1: Create column if multi-column is supported
+    if (supportsMultiColumn && onCreatePaperColumn && showCreateColumnButton) {
+      console.log('✅ Creating new column for paper');
+      onCreatePaperColumn(newNode);
+      return;
+    }
+
+    // Priority 2: Expand node in current graph
     if (onExpandNode) {
+      console.log('✅ Expanding node in graph');
       onExpandNode(newNode.id, newNode.metadata);
+      return;
+    }
+
+    // Priority 3: Navigate to article (fallback)
+    console.log('⚠️ No handler available, opening in new tab');
+    if (newNode.metadata.url) {
+      window.open(newNode.metadata.url, '_blank');
     }
   };
 
@@ -780,17 +808,31 @@ export default function NetworkSidebar({
         </div>
       </div>
 
-      {/* Navigation Guide */}
-      <div className="p-3 bg-blue-50 border-b border-blue-200">
-        <div className="text-xs text-blue-900">
-          <div className="font-semibold mb-1">💡 Navigation:</div>
-          <div className="space-y-0.5 text-blue-700">
-            <div>• <strong>Explore buttons</strong> → Show article list</div>
-            <div>• <strong>Network buttons</strong> → Update graph</div>
-            <div>• <strong>Top navigation</strong> → Change entire view</div>
+      {/* Context-Aware Navigation Guide */}
+      {supportsMultiColumn ? (
+        <div className="p-3 bg-green-50 border-b border-green-200">
+          <div className="text-xs text-green-900">
+            <div className="font-semibold mb-1">🎯 Multi-Column Mode Active</div>
+            <div className="space-y-0.5 text-green-700">
+              <div>• <strong>Explore buttons</strong> → Show article list</div>
+              <div>• <strong>Click papers in list</strong> → Create new columns</div>
+              <div>• <strong>Network buttons</strong> → Update graph</div>
+              <div>• <strong>Scroll horizontally</strong> → View all columns</div>
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="p-3 bg-blue-50 border-b border-blue-200">
+          <div className="text-xs text-blue-900">
+            <div className="font-semibold mb-1">💡 Navigation:</div>
+            <div className="space-y-0.5 text-blue-700">
+              <div>• <strong>Explore buttons</strong> → Show article list</div>
+              <div>• <strong>Network buttons</strong> → Update graph</div>
+              <div>• <strong>Top navigation</strong> → Change entire view</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ResearchRabbit-style Exploration Sections */}
       <div className="flex-shrink-0">
@@ -798,7 +840,11 @@ export default function NetworkSidebar({
         <div className="border-b border-gray-200">
           <div className="p-3 bg-gray-50">
             <h4 className="font-medium text-sm text-gray-900">📄 Explore Papers</h4>
-            <p className="text-xs text-gray-600 mt-1">Shows article list below</p>
+            <p className="text-xs text-gray-600 mt-1">
+              {supportsMultiColumn
+                ? "Click papers in list to create new columns"
+                : "Shows article list below"}
+            </p>
           </div>
           <div className="p-2 space-y-1">
             <Button
@@ -832,7 +878,11 @@ export default function NetworkSidebar({
         <div className="border-b border-gray-200">
           <div className="p-3 bg-gray-50">
             <h4 className="font-medium text-sm text-gray-900">👥 Explore People</h4>
-            <p className="text-xs text-gray-600 mt-1">Shows article list below</p>
+            <p className="text-xs text-gray-600 mt-1">
+              {supportsMultiColumn
+                ? "Click papers in list to create new columns"
+                : "Shows article list below"}
+            </p>
           </div>
           <div className="p-2 space-y-1">
             <Button
@@ -892,7 +942,11 @@ export default function NetworkSidebar({
         <div className="border-b border-gray-200">
           <div className="p-3 bg-gray-50">
             <h4 className="font-medium text-sm text-gray-900">🔗 Explore Other Content</h4>
-            <p className="text-xs text-gray-600 mt-1">Shows article list below</p>
+            <p className="text-xs text-gray-600 mt-1">
+              {supportsMultiColumn
+                ? "Click papers in list to create new columns"
+                : "Shows article list below"}
+            </p>
           </div>
           <div className="p-2 space-y-1">
             <button

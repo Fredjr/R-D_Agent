@@ -522,6 +522,7 @@ export default function MultiColumnNetworkView({
                   onAddExplorationNodes={handleMainAddExplorationNodes}
                   onCreatePaperColumn={handleCreatePaperColumn}
                   showCreateColumnButton={true}
+                  supportsMultiColumn={true}
                   onGenerateReview={onGenerateReview}
                   onDeepDive={onDeepDive}
                   onExploreCluster={onExploreCluster}
@@ -695,6 +696,7 @@ export default function MultiColumnNetworkView({
                       }
                       onCreatePaperColumn={handleCreatePaperColumn}
                       showCreateColumnButton={true}
+                      supportsMultiColumn={true}
                       onGenerateReview={onGenerateReview}
                       onDeepDive={onDeepDive}
                       onExploreCluster={onExploreCluster}
