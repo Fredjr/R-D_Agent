@@ -212,69 +212,101 @@ export default function NetworkSidebar({
       const pmid = selectedNode?.metadata?.pmid || selectedNode?.id;
       const params = new URLSearchParams();
 
+      // Build OA filter parameter
+      const oaParam = fullTextOnly ? '&open_access_only=true' : '';
+
       switch (section) {
         case 'papers':
           switch (mode) {
             case 'similar':
               // Use PubMed eLink API for real similar articles
-              endpoint = `/api/proxy/pubmed/citations?pmid=${pmid}&type=similar&limit=20`;
+              endpoint = `/api/proxy/pubmed/citations?pmid=${pmid}&type=similar&limit=20${oaParam}`;
               usePubMed = true;
               break;
             case 'earlier':
               // Use PubMed eLink API for real reference articles
-              endpoint = `/api/proxy/pubmed/references?pmid=${pmid}&limit=20`;
+              endpoint = `/api/proxy/pubmed/references?pmid=${pmid}&limit=20${oaParam}`;
               usePubMed = true;
               break;
             case 'later':
               // Use PubMed eLink API for real citing articles
-              endpoint = `/api/proxy/pubmed/citations?pmid=${pmid}&type=citations&limit=20`;
+              endpoint = `/api/proxy/pubmed/citations?pmid=${pmid}&type=citations&limit=20${oaParam}`;
               usePubMed = true;
               break;
           }
           break;
         case 'people':
           if (mode === 'authors') {
-            // Get real author information from the selected article
-            endpoint = `/api/proxy/articles/${pmid}/authors?include_profiles=true`;
-            usePubMed = false; // This uses our backend which fetches real PubMed data
-            console.log('🔍 Real authors data for PMID:', { pmid, endpoint });
+            // Get papers by the article's authors from PubMed
+            const authors = selectedNode?.metadata?.authors || [];
+            if (authors.length > 0) {
+              // Use POST endpoint to search for papers by multiple authors
+              endpoint = `/api/proxy/pubmed/author-papers`;
+              usePubMed = true;
+              console.log('🔍 Fetching papers by authors:', { authors, fullTextOnly });
+            } else {
+              console.warn('⚠️ No authors found for selected node');
+              setExplorationResults([]);
+              setExplorationLoading(false);
+              return;
+            }
           } else if (mode === 'suggested') {
             // Use PubMed eLink to find related authors through similar articles
-            endpoint = `/api/proxy/pubmed/citations?pmid=${pmid}&type=similar&limit=10`;
+            endpoint = `/api/proxy/pubmed/citations?pmid=${pmid}&type=similar&limit=10${oaParam}`;
             usePubMed = true;
-            console.log('🔍 Suggested authors via similar articles for PMID:', { pmid, endpoint });
+            console.log('🔍 Suggested authors via similar articles for PMID:', { pmid, fullTextOnly });
           }
           break;
         case 'content':
           if (mode === 'linked') {
             // Use PubMed eLink to find related articles (comprehensive linkage)
-            endpoint = `/api/proxy/pubmed/network?pmid=${pmid}&type=mixed&limit=15`;
+            endpoint = `/api/proxy/pubmed/network?pmid=${pmid}&type=mixed&limit=15${oaParam}`;
             usePubMed = true;
-            console.log('🔍 Real linked content via PubMed network for PMID:', { pmid, endpoint });
+            console.log('🔍 Real linked content via PubMed network for PMID:', { pmid, fullTextOnly });
           }
           break;
       }
 
       if (endpoint) {
         let fetchUrl;
-        if (usePubMed) {
-          // PubMed endpoints already have their parameters
-          fetchUrl = endpoint;
-        } else {
-          // For non-PubMed endpoints, check if URL already has parameters
-          const hasParams = endpoint.includes('?');
-          const paramString = params.toString();
-          if (paramString) {
-            fetchUrl = hasParams ? `${endpoint}&${paramString}` : `${endpoint}?${paramString}`;
-          } else {
-            fetchUrl = endpoint;
-          }
-        }
-        console.log(`🌐 Fetching exploration data from: ${fetchUrl} (PubMed: ${usePubMed})`);
-
-        const response = await fetch(fetchUrl, {
+        let fetchOptions: RequestInit = {
           headers: { 'User-ID': user?.user_id || 'default_user' }
-        });
+        };
+
+        // Special handling for author papers POST request
+        if (section === 'people' && mode === 'authors' && endpoint.includes('author-papers')) {
+          const authors = selectedNode?.metadata?.authors || [];
+          fetchUrl = endpoint;
+          fetchOptions.method = 'POST';
+          fetchOptions.headers = {
+            ...fetchOptions.headers,
+            'Content-Type': 'application/json'
+          };
+          fetchOptions.body = JSON.stringify({
+            authors: authors,
+            limit: 10,
+            open_access_only: fullTextOnly
+          });
+          console.log(`🌐 POST request to ${fetchUrl} with authors:`, authors);
+        } else {
+          // Regular GET requests
+          if (usePubMed) {
+            // PubMed endpoints already have their parameters
+            fetchUrl = endpoint;
+          } else {
+            // For non-PubMed endpoints, check if URL already has parameters
+            const hasParams = endpoint.includes('?');
+            const paramString = params.toString();
+            if (paramString) {
+              fetchUrl = hasParams ? `${endpoint}&${paramString}` : `${endpoint}?${paramString}`;
+            } else {
+              fetchUrl = endpoint;
+            }
+          }
+          console.log(`🌐 Fetching exploration data from: ${fetchUrl} (PubMed: ${usePubMed})`);
+        }
+
+        const response = await fetch(fetchUrl, fetchOptions);
 
         if (response.ok) {
           const data = await response.json();
@@ -282,7 +314,10 @@ export default function NetworkSidebar({
 
           // Handle different response structures
           let results = [];
-          if (usePubMed) {
+          if (section === 'people' && mode === 'authors' && data.combined_articles) {
+            // Author papers response
+            results = data.combined_articles;
+          } else if (usePubMed) {
             // PubMed API responses
             results = data.citations || data.references || [];
           } else {

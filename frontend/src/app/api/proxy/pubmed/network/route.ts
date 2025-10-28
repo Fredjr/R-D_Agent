@@ -115,9 +115,33 @@ function parseArticleXML(xmlText: string): PubMedArticle[] {
 }
 
 /**
- * Fetch article details from PubMed by PMID
+ * Check if an article is Open Access based on XML content
  */
-async function fetchArticleDetails(pmids: string[]): Promise<PubMedArticle[]> {
+function isOpenAccessArticle(articleXml: string): boolean {
+  // Check for PMC ID (PubMed Central = Open Access)
+  if (articleXml.includes('<ArticleId IdType="pmc">')) {
+    return true;
+  }
+
+  // Check for free-pmc or PMC in article IDs
+  if (articleXml.includes('free-pmc') || articleXml.includes('PMC')) {
+    return true;
+  }
+
+  // Check for "open access" in publication type or keywords
+  if (articleXml.toLowerCase().includes('open access')) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Fetch article details from PubMed by PMID
+ * @param pmids Array of PMIDs to fetch
+ * @param filterOpenAccess If true, only return Open Access articles
+ */
+async function fetchArticleDetails(pmids: string[], filterOpenAccess: boolean = false): Promise<PubMedArticle[]> {
   if (pmids.length === 0) {
     console.log('⚠️ fetchArticleDetails called with empty pmids array');
     return [];
@@ -126,7 +150,7 @@ async function fetchArticleDetails(pmids: string[]): Promise<PubMedArticle[]> {
   try {
     const pmidList = pmids.join(',');
     const fetchUrl = `${PUBMED_FETCH_URL}?db=pubmed&id=${pmidList}&retmode=xml&rettype=abstract`;
-    console.log(`🔍 Fetching article details for ${pmids.length} PMIDs: ${pmidList.substring(0, 100)}...`);
+    console.log(`🔍 Fetching article details for ${pmids.length} PMIDs (OA filter: ${filterOpenAccess}): ${pmidList.substring(0, 100)}...`);
 
     const response = await fetch(fetchUrl, {
       headers: {
@@ -141,9 +165,21 @@ async function fetchArticleDetails(pmids: string[]): Promise<PubMedArticle[]> {
 
     const xmlText = await response.text();
     console.log(`📄 Received XML response: ${xmlText.length} characters`);
-    const articles = parseArticleXML(xmlText);
-    console.log(`✅ Parsed ${articles.length} articles from XML`);
-    return articles;
+
+    // If filtering for OA, we need to parse and filter
+    if (filterOpenAccess) {
+      const articleMatches = xmlText.match(/<PubmedArticle>[\s\S]*?<\/PubmedArticle>/g) || [];
+      const oaArticleXmls = articleMatches.filter(articleXml => isOpenAccessArticle(articleXml));
+      const oaXmlText = oaArticleXmls.join('\n');
+      console.log(`🔓 Filtered to ${oaArticleXmls.length} Open Access articles out of ${articleMatches.length} total`);
+      const articles = parseArticleXML(oaXmlText);
+      console.log(`✅ Parsed ${articles.length} OA articles from XML`);
+      return articles;
+    } else {
+      const articles = parseArticleXML(xmlText);
+      console.log(`✅ Parsed ${articles.length} articles from XML`);
+      return articles;
+    }
   } catch (error) {
     console.error('❌ Error fetching article details:', error);
     return [];
@@ -245,6 +281,7 @@ export async function GET(request: NextRequest) {
     const networkType = searchParams.get('type') || 'mixed'; // 'citations', 'references', 'similar', 'mixed'
     const limit = parseInt(searchParams.get('limit') || '10');
     const debug = searchParams.get('debug') === 'true'; // Debug mode to see raw data
+    const openAccessOnly = searchParams.get('open_access_only') === 'true'; // Filter for OA/Full-Text only
 
     if (!pmid) {
       return NextResponse.json(
@@ -252,6 +289,8 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    console.log(`🔍 Network request: PMID=${pmid}, type=${networkType}, limit=${limit}, OA only=${openAccessOnly}`);
 
     console.log(`🔍 PubMed Network API: Building ${networkType} network for PMID ${pmid} (limit: ${limit}, debug: ${debug})`);
 
@@ -302,7 +341,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch and add citing articles
     if (citingPmids.length > 0) {
-      const citingArticles = await fetchArticleDetails(citingPmids);
+      const citingArticles = await fetchArticleDetails(citingPmids, openAccessOnly);
       console.log(`✅ Fetched ${citingArticles.length} citing articles`);
       for (const article of citingArticles) {
         const node = createNetworkNode(article, 'citing_article');
@@ -321,7 +360,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch and add reference articles
     if (referencePmids.length > 0) {
-      const referenceArticles = await fetchArticleDetails(referencePmids);
+      const referenceArticles = await fetchArticleDetails(referencePmids, openAccessOnly);
       console.log(`✅ Fetched ${referenceArticles.length} reference articles`);
       for (const article of referenceArticles) {
         const node = createNetworkNode(article, 'reference_article');
@@ -340,7 +379,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch and add similar articles
     if (similarPmids.length > 0) {
-      const similarArticles = await fetchArticleDetails(similarPmids);
+      const similarArticles = await fetchArticleDetails(similarPmids, openAccessOnly);
       console.log(`✅ Fetched ${similarArticles.length} similar articles`);
       for (const article of similarArticles) {
         const node = createNetworkNode(article, 'similar_article');
