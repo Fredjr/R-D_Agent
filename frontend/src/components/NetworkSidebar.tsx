@@ -85,6 +85,10 @@ export default function NetworkSidebar({
   const [showReferences, setShowReferences] = useState(false);
   const [showCitations, setShowCitations] = useState(false);
   const [selectedCollection, setSelectedCollection] = useState<string>('');
+  const [showCreateCollectionModal, setShowCreateCollectionModal] = useState(false);
+  const [newCollectionName, setNewCollectionName] = useState('');
+  const [newCollectionDescription, setNewCollectionDescription] = useState('');
+  const [creatingCollection, setCreatingCollection] = useState(false);
 
   // ResearchRabbit-style exploration state
   const [expandedSection, setExpandedSection] = useState<'papers' | 'people' | 'content' | null>(null);
@@ -209,6 +213,72 @@ export default function NetworkSidebar({
     } catch (error) {
       console.error('Error adding to collection:', error);
       alert('Failed to add paper to collection');
+    }
+  };
+
+  // Handle quick collection creation
+  const handleQuickCreateCollection = async () => {
+    if (!newCollectionName.trim() || !projectId) return;
+
+    setCreatingCollection(true);
+    try {
+      const response = await fetch(`/api/proxy/projects/${projectId}/collections`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user?.user_id || 'default_user'
+        },
+        body: JSON.stringify({
+          collection_name: newCollectionName.trim(),
+          description: newCollectionDescription.trim() || `Collection for ${selectedNode?.metadata.title.substring(0, 50)}...`,
+          color: '#3B82F6',
+          icon: 'folder'
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create collection');
+      }
+
+      const createdCollection = await response.json();
+
+      // Auto-select the new collection
+      setSelectedCollection(createdCollection.collection_id);
+
+      // Add the paper to the newly created collection
+      if (selectedNode) {
+        const addResponse = await fetch(`/api/proxy/collections/${createdCollection.collection_id}/articles?projectId=${projectId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-ID': user?.user_id || 'default_user'
+          },
+          body: JSON.stringify({
+            pmid: selectedNode.metadata.pmid,
+            title: selectedNode.metadata.title,
+            authors: selectedNode.metadata.authors,
+            journal: selectedNode.metadata.journal,
+            year: selectedNode.metadata.year,
+            projectId: projectId
+          })
+        });
+
+        if (addResponse.ok) {
+          onAddToCollection(selectedNode.metadata.pmid);
+          alert(`✅ Collection "${newCollectionName}" created and paper added successfully!`);
+        }
+      }
+
+      // Reset form
+      setNewCollectionName('');
+      setNewCollectionDescription('');
+      setShowCreateCollectionModal(false);
+
+    } catch (error) {
+      console.error('Error creating collection:', error);
+      alert('❌ Failed to create collection. Please try again.');
+    } finally {
+      setCreatingCollection(false);
     }
   };
 
@@ -681,7 +751,7 @@ export default function NetworkSidebar({
             <Button
               variant="success"
               size="sm"
-              className="flex-1 text-xs"
+              className="flex-1 text-xs relative group"
               onClick={() => {
                 console.log('🎯 Create Paper Column button clicked!', selectedNode);
                 if (selectedNode) {
@@ -690,9 +760,15 @@ export default function NetworkSidebar({
                   console.error('❌ No selected node for column creation');
                 }
               }}
-              title="Create Paper Column"
+              title="Open this paper in a new side panel for deeper exploration"
             >
-              ➕ Column
+              <span className="flex items-center justify-center gap-1">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7" />
+                </svg>
+                Open Panel
+              </span>
             </Button>
           )}
         </div>
@@ -1088,33 +1164,87 @@ export default function NetworkSidebar({
 
       {/* Collection Management - Compact */}
       <div className="p-3 border-b border-gray-200 flex-shrink-0">
-        <h4 className="font-medium text-xs text-gray-900 mb-2">Add to Collection</h4>
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="font-medium text-xs text-gray-900">Add to Collection</h4>
+          {collections.length === 0 && (
+            <span className="text-xs text-orange-600 flex items-center gap-1">
+              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              No collections
+            </span>
+          )}
+        </div>
 
         <div className="space-y-1.5">
-          <select
-            value={selectedCollection}
-            onChange={(e) => setSelectedCollection(e.target.value)}
-            className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Select collection...</option>
-            {collections.map((collection) => (
-              <option key={collection.collection_id} value={collection.collection_id}>
-                {collection.name} ({collection.article_count || 0} papers)
-              </option>
-            ))}
-          </select>
+          {/* Collection selector with create option */}
+          {collections.length > 0 && (
+            <>
+              <select
+                value={selectedCollection}
+                onChange={(e) => {
+                  if (e.target.value === '__create_new__') {
+                    setShowCreateCollectionModal(true);
+                  } else {
+                    setSelectedCollection(e.target.value);
+                  }
+                }}
+                className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select collection...</option>
+                {collections.map((collection) => (
+                  <option key={collection.collection_id} value={collection.collection_id}>
+                    {collection.name} ({collection.article_count || 0} papers)
+                  </option>
+                ))}
+                <option value="__create_new__" className="font-semibold text-blue-600">
+                  ➕ Create New Collection...
+                </option>
+              </select>
 
-          <Button
-            variant="success"
-            size="sm"
-            className="w-full text-xs"
-            onClick={handleAddToCollection}
-            disabled={!selectedCollection || isLoading}
-            loading={isLoading}
-            loadingText="Adding..."
-          >
-            + Add Paper
-          </Button>
+              <Button
+                variant="success"
+                size="sm"
+                className="w-full text-xs"
+                onClick={handleAddToCollection}
+                disabled={!selectedCollection || isLoading}
+                loading={isLoading}
+                loadingText="Adding..."
+              >
+                + Add Paper
+              </Button>
+            </>
+          )}
+
+          {/* Quick create when no collections exist */}
+          {collections.length === 0 && (
+            <div className="space-y-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <p className="text-xs text-blue-800 mb-2">Create your first collection to save this paper:</p>
+              <input
+                type="text"
+                placeholder="Collection name (e.g., 'Key Papers')"
+                value={newCollectionName}
+                onChange={(e) => setNewCollectionName(e.target.value)}
+                className="w-full px-3 py-2 text-xs border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newCollectionName.trim()) {
+                    handleQuickCreateCollection();
+                  }
+                }}
+              />
+              <Button
+                variant="success"
+                size="sm"
+                className="w-full text-xs"
+                onClick={handleQuickCreateCollection}
+                disabled={!newCollectionName.trim() || creatingCollection}
+                loading={creatingCollection}
+                loadingText="Creating..."
+              >
+                ✨ Create & Add Paper
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1122,6 +1252,69 @@ export default function NetworkSidebar({
       {isLoading && (
         <div className="p-4 text-center">
           <div className="text-xs text-gray-500">Loading paper details...</div>
+        </div>
+      )}
+
+      {/* Create Collection Modal */}
+      {showCreateCollectionModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Create New Collection</h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Collection Name *
+                </label>
+                <input
+                  type="text"
+                  value={newCollectionName}
+                  onChange={(e) => setNewCollectionName(e.target.value)}
+                  placeholder="e.g., Key Papers, Literature Review"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description (optional)
+                </label>
+                <textarea
+                  value={newCollectionDescription}
+                  onChange={(e) => setNewCollectionDescription(e.target.value)}
+                  placeholder="Brief description of this collection..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateCollectionModal(false);
+                    setNewCollectionName('');
+                    setNewCollectionDescription('');
+                  }}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                  disabled={creatingCollection}
+                >
+                  Cancel
+                </button>
+                <Button
+                  variant="success"
+                  size="sm"
+                  onClick={handleQuickCreateCollection}
+                  disabled={!newCollectionName.trim() || creatingCollection}
+                  loading={creatingCollection}
+                  loadingText="Creating..."
+                >
+                  Create & Add Paper
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

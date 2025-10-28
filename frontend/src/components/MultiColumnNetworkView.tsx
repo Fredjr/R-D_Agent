@@ -388,6 +388,82 @@ export default function MultiColumnNetworkView({
   const mainViewWidth = `${MAIN_VIEW_MIN_WIDTH}px`;
   const columnWidth = `${COLUMN_MIN_WIDTH}px`;
 
+  // Scroll container ref for keyboard/mouse navigation
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartX, setDragStartX] = useState(0);
+  const [scrollStartX, setScrollStartX] = useState(0);
+
+  // Keyboard navigation for panels
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
+
+      // Don't interfere with input fields
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      switch(e.key) {
+        case 'ArrowLeft':
+          e.preventDefault();
+          container.scrollBy({ left: -COLUMN_MIN_WIDTH, behavior: 'smooth' });
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          container.scrollBy({ left: COLUMN_MIN_WIDTH, behavior: 'smooth' });
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          container.scrollBy({ top: -100, behavior: 'smooth' });
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          container.scrollBy({ top: 100, behavior: 'smooth' });
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [COLUMN_MIN_WIDTH]);
+
+  // Mouse drag navigation
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Only enable drag with right mouse button or middle button
+    if (e.button === 2 || e.button === 1) {
+      e.preventDefault();
+      setIsDragging(true);
+      setDragStartX(e.clientX);
+      setScrollStartX(scrollContainerRef.current?.scrollLeft || 0);
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    const dx = e.clientX - dragStartX;
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollLeft = scrollStartX - dx;
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
+  // Prevent context menu on right-click drag
+  const handleContextMenu = (e: React.MouseEvent) => {
+    if (isDragging) {
+      e.preventDefault();
+    }
+  };
+
   // Handle dynamic expansion for main view
   const handleMainAddExplorationNodes = useCallback((sourceNodeId: string, explorationResults: any[], relationType: 'similar' | 'citations' | 'references' | 'authors') => {
     console.log('🎯 Main onAddExplorationNodes called:', { sourceNodeId, resultsCount: explorationResults.length, relationType });
@@ -415,27 +491,44 @@ export default function MultiColumnNetworkView({
 
   return (
     <div className={`h-full relative ${className}`} style={{ backgroundColor: '#f8fafc' }}>
-      {/* Enhanced horizontal scroll indicator */}
+      {/* Enhanced navigation hints */}
       {columns.length > 0 && (
-        <div className="absolute top-4 right-4 z-20 bg-blue-500 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-lg border border-blue-600">
-          <div className="flex items-center gap-2">
-            <span>{columns.length} column{columns.length > 1 ? 's' : ''}</span>
-            <span className="text-blue-200">•</span>
-            <span className="flex items-center gap-1">
-              <span>Scroll</span>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </span>
+        <>
+          {/* Panel counter */}
+          <div className="absolute top-4 left-4 z-20 bg-white px-3 py-1 rounded-full text-xs font-medium shadow-md border border-gray-200">
+            {columns.length + 1} Panel{columns.length > 0 ? 's' : ''}
           </div>
-        </div>
+
+          {/* Keyboard shortcuts hint */}
+          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-20 bg-gray-900 bg-opacity-90 text-white px-4 py-2 rounded-full text-xs font-medium shadow-lg flex items-center gap-3">
+            <span className="flex items-center gap-1">
+              <kbd className="px-2 py-1 bg-gray-700 rounded text-xs">←</kbd>
+              <kbd className="px-2 py-1 bg-gray-700 rounded text-xs">→</kbd>
+              Navigate
+            </span>
+            <span className="text-gray-400">•</span>
+            <span className="flex items-center gap-1">
+              <kbd className="px-2 py-1 bg-gray-700 rounded text-xs">↑</kbd>
+              <kbd className="px-2 py-1 bg-gray-700 rounded text-xs">↓</kbd>
+              Scroll
+            </span>
+            <span className="text-gray-400">•</span>
+            <span>Right-click drag to pan</span>
+          </div>
+        </>
       )}
       <div
-        className="h-full overflow-x-auto overflow-y-hidden custom-scrollbar"
+        ref={scrollContainerRef}
+        className={`h-full overflow-x-auto overflow-y-hidden custom-scrollbar ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         style={{
           scrollbarWidth: 'thin',
           scrollBehavior: 'smooth'
         }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
+        onContextMenu={handleContextMenu}
       >
         <div className="flex h-full gap-1" style={{ minWidth: `${MAIN_VIEW_MIN_WIDTH + (columns.length * COLUMN_MIN_WIDTH) + (columns.length * 4)}px` }}>
         {/* Main Network View */}
