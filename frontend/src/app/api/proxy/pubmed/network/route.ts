@@ -118,26 +118,34 @@ function parseArticleXML(xmlText: string): PubMedArticle[] {
  * Fetch article details from PubMed by PMID
  */
 async function fetchArticleDetails(pmids: string[]): Promise<PubMedArticle[]> {
-  if (pmids.length === 0) return [];
-  
+  if (pmids.length === 0) {
+    console.log('⚠️ fetchArticleDetails called with empty pmids array');
+    return [];
+  }
+
   try {
     const pmidList = pmids.join(',');
     const fetchUrl = `${PUBMED_FETCH_URL}?db=pubmed&id=${pmidList}&retmode=xml&rettype=abstract`;
-    
+    console.log(`🔍 Fetching article details for ${pmids.length} PMIDs: ${pmidList.substring(0, 100)}...`);
+
     const response = await fetch(fetchUrl, {
       headers: {
         'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
       }
     });
-    
+
     if (!response.ok) {
+      console.error(`❌ PubMed efetch failed: ${response.status} ${response.statusText}`);
       throw new Error(`PubMed fetch failed: ${response.status}`);
     }
-    
+
     const xmlText = await response.text();
-    return parseArticleXML(xmlText);
+    console.log(`📄 Received XML response: ${xmlText.length} characters`);
+    const articles = parseArticleXML(xmlText);
+    console.log(`✅ Parsed ${articles.length} articles from XML`);
+    return articles;
   } catch (error) {
-    console.error('Error fetching article details:', error);
+    console.error('❌ Error fetching article details:', error);
     return [];
   }
 }
@@ -236,6 +244,7 @@ export async function GET(request: NextRequest) {
     const pmid = searchParams.get('pmid');
     const networkType = searchParams.get('type') || 'mixed'; // 'citations', 'references', 'similar', 'mixed'
     const limit = parseInt(searchParams.get('limit') || '10');
+    const debug = searchParams.get('debug') === 'true'; // Debug mode to see raw data
 
     if (!pmid) {
       return NextResponse.json(
@@ -244,7 +253,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log(`🔍 PubMed Network API: Building ${networkType} network for PMID ${pmid} (limit: ${limit})`);
+    console.log(`🔍 PubMed Network API: Building ${networkType} network for PMID ${pmid} (limit: ${limit}, debug: ${debug})`);
 
     // Fetch source article details
     const sourceArticles = await fetchArticleDetails([pmid]);
@@ -363,6 +372,23 @@ export async function GET(request: NextRequest) {
       nodeIds: nodes.map(n => n.id).slice(0, 10),
       metadata: networkData.metadata
     });
+
+    // If debug mode, include raw PMIDs in response
+    if (debug) {
+      return NextResponse.json({
+        ...networkData,
+        debug: {
+          citingPmids,
+          referencePmids,
+          similarPmids,
+          citingPmidsCount: citingPmids.length,
+          referencePmidsCount: referencePmids.length,
+          similarPmidsCount: similarPmids.length,
+          nodesCount: nodes.length,
+          edgesCount: edges.length
+        }
+      });
+    }
 
     return NextResponse.json(networkData);
 
