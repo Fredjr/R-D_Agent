@@ -68,6 +68,9 @@ export default function NetworkSidebar({
     currentMode,
     projectId,
     collectionsCount: collections?.length || 0,
+    collectionsArray: collections,
+    collectionsType: typeof collections,
+    collectionsIsArray: Array.isArray(collections),
     supportsMultiColumn,
     hasOnCreatePaperColumn: !!onCreatePaperColumn,
     showCreateColumnButton

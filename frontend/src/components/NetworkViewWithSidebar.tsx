@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import NetworkView from './NetworkView';
 import NetworkSidebar from './NetworkSidebar';
@@ -49,11 +49,50 @@ export default function NetworkViewWithSidebar({
   const [navigationMode, setNavigationMode] = useState<'default' | 'similar' | 'earlier' | 'later' | 'authors' | 'timeline'>('default');
   const [sourceId, setSourceId] = useState(initialSourceId); // Track current source ID for navigation
   const networkViewRef = useRef<any>(null);
+  const [collections, setCollections] = useState<any[]>([]);
 
   // OA/Full-Text toggle state - lifted up to share between NetworkView and NetworkSidebar
   const [fullTextOnly, setFullTextOnly] = useState(true); // Default to OA/Full-Text for better quality
 
   console.log('🔍 NetworkViewWithSidebar rendered with:', { sourceType, sourceId, projectId, fullTextOnly, navigationMode });
+
+  // Fetch collections for the project
+  const fetchCollections = useCallback(async () => {
+    if (!projectId) {
+      console.warn('⚠️ NetworkViewWithSidebar: No projectId available, cannot fetch collections');
+      return;
+    }
+
+    try {
+      console.log('🔍 NetworkViewWithSidebar fetching collections for project:', projectId);
+      const response = await fetch(`/api/proxy/projects/${projectId}/collections`, {
+        headers: {
+          'User-ID': user?.user_id || user?.email || 'default_user',
+        },
+      });
+
+      console.log('📡 NetworkViewWithSidebar Collections API response status:', response.status);
+
+      if (response.ok) {
+        const collectionsData = await response.json();
+        console.log('✅ NetworkViewWithSidebar collections fetched:', collectionsData);
+        console.log('📊 NetworkViewWithSidebar Collections count:', collectionsData.collections?.length || 0);
+        setCollections(collectionsData.collections || []);
+      } else {
+        const errorText = await response.text();
+        console.warn('⚠️ NetworkViewWithSidebar failed to fetch collections:', response.status, errorText);
+        setCollections([]);
+      }
+    } catch (error) {
+      console.error('❌ NetworkViewWithSidebar error fetching collections:', error);
+      setCollections([]);
+    }
+  }, [projectId, user]);
+
+  // Fetch collections on mount and when projectId changes
+  useEffect(() => {
+    fetchCollections();
+  }, [fetchCollections]);
 
   const handleNodeSelect = useCallback((node: any | null) => {
     if (node) {
@@ -258,10 +297,12 @@ export default function NetworkViewWithSidebar({
               onAddToCollection={(pmid) => {
                 // Handle adding to collection
                 console.log('Add to collection:', pmid);
+                // Refresh collections after adding
+                fetchCollections();
               }}
               currentMode={navigationMode}
               projectId={projectId || ''}
-              collections={[]}
+              collections={collections}
               onAddExplorationNodes={handleAddExplorationNodes}
               onShowCitations={(pmid) => {
                 console.log('🔍 Show citations for PMID:', pmid);
