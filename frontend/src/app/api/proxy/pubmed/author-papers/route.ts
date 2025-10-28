@@ -31,8 +31,8 @@ function parseArticleXML(xmlText: string): PubMedArticle[] {
         const pmidMatch = articleXml.match(/<PMID[^>]*>(\d+)<\/PMID>/);
         const pmid = pmidMatch ? pmidMatch[1] : '';
 
-        // Extract title
-        const titleMatch = articleXml.match(/<ArticleTitle>(.*?)<\/ArticleTitle>/s);
+        // Extract title (using [\s\S] instead of /s flag for ES2017 compatibility)
+        const titleMatch = articleXml.match(/<ArticleTitle>([\s\S]*?)<\/ArticleTitle>/);
         const title = titleMatch ? titleMatch[1].replace(/<[^>]+>/g, '').trim() : 'No title';
 
         // Extract authors
@@ -62,8 +62,8 @@ function parseArticleXML(xmlText: string): PubMedArticle[] {
         const doiMatch = articleXml.match(/<ArticleId IdType="doi">(.*?)<\/ArticleId>/);
         const doi = doiMatch ? doiMatch[1] : undefined;
 
-        // Extract abstract
-        const abstractMatch = articleXml.match(/<AbstractText[^>]*>(.*?)<\/AbstractText>/s);
+        // Extract abstract (using [\s\S] instead of /s flag for ES2017 compatibility)
+        const abstractMatch = articleXml.match(/<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/);
         const abstract = abstractMatch ? abstractMatch[1].replace(/<[^>]+>/g, '').trim() : undefined;
 
         // Check if Open Access
