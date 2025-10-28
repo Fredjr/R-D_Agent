@@ -1046,8 +1046,14 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         console.log('📊 [NetworkView] Internal sidebar disabled - relying on external sidebar');
       }
       console.log('📊 [NetworkView] Calling onNodeSelect callback...');
-      onNodeSelect?.(networkNode);
-      console.log('📊 [NetworkView] onNodeSelect callback completed');
+      console.log('📊 [NetworkView] onNodeSelect function:', onNodeSelect);
+      console.log('📊 [NetworkView] networkNode being passed:', networkNode);
+      try {
+        onNodeSelect?.(networkNode);
+        console.log('📊 [NetworkView] onNodeSelect callback completed successfully');
+      } catch (error) {
+        console.error('❌ [NetworkView] onNodeSelect callback threw error:', error);
+      }
 
       // ResearchRabbit-style expansion: Double-click or Ctrl+Click to expand
       if (event.detail === 2 || event.ctrlKey || event.metaKey) {
