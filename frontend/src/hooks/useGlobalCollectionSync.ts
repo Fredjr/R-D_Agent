@@ -291,13 +291,16 @@ export function useGlobalCollectionSync(projectId: string) {
     });
   }, [projectId]);
 
-  // Get collections for current project
-  const collections = syncManager.current.getCollectionsForProject(projectId);
+  // 🔧 FIX: Get collections for current project from state (reactive)
+  // This ensures the component re-renders when collections change
+  const collections = state.collections.filter(col =>
+    col.project_id === projectId || !col.project_id
+  );
 
   // Debug logging
   console.log('🔍 useGlobalCollectionSync returning:', {
     projectId,
-    allCollections: syncManager.current.getState().collections,
+    allCollections: state.collections,
     filteredCollections: collections,
     collectionsCount: collections.length,
     isLoading: state.isLoading,
