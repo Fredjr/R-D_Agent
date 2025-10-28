@@ -84,7 +84,7 @@ class CollectionSyncManager {
 
   private handleBroadcastMessage(event: MessageEvent<CollectionUpdateEvent>) {
     const { type, collectionId, projectId, data, timestamp } = event.data;
-    
+
     console.log('🔄 Received collection sync event:', { type, collectionId, projectId, timestamp });
 
     // Ignore old events
@@ -92,34 +92,37 @@ class CollectionSyncManager {
       return;
     }
 
+    // 🔧 FIX: Create new collections array to trigger React re-renders
+    let newCollections = this.state.collections;
+
     switch (type) {
       case 'collection_added':
         if (data) {
-          this.state.collections = [...this.state.collections, data];
+          newCollections = [...this.state.collections, data];
         }
         break;
-      
+
       case 'collection_updated':
         if (data) {
-          this.state.collections = this.state.collections.map(col => 
+          newCollections = this.state.collections.map(col =>
             col.collection_id === collectionId ? { ...col, ...data } : col
           );
         }
         break;
-      
+
       case 'collection_deleted':
-        this.state.collections = this.state.collections.filter(col => col.collection_id !== collectionId);
+        newCollections = this.state.collections.filter(col => col.collection_id !== collectionId);
         break;
-      
+
       case 'article_added':
       case 'article_removed':
         // Update article count for the collection
-        this.state.collections = this.state.collections.map(col => 
-          col.collection_id === collectionId 
-            ? { 
-                ...col, 
-                article_count: type === 'article_added' 
-                  ? col.article_count + 1 
+        newCollections = this.state.collections.map(col =>
+          col.collection_id === collectionId
+            ? {
+                ...col,
+                article_count: type === 'article_added'
+                  ? col.article_count + 1
                   : Math.max(0, col.article_count - 1),
                 updated_at: new Date().toISOString()
               }
@@ -128,7 +131,13 @@ class CollectionSyncManager {
         break;
     }
 
-    this.state.lastUpdated = timestamp;
+    // 🔧 FIX: Create a new state object to trigger React re-renders
+    this.state = {
+      ...this.state,
+      collections: newCollections,
+      lastUpdated: timestamp
+    };
+
     this.saveStateToStorage();
     this.notifyListeners();
   }
@@ -144,23 +153,35 @@ class CollectionSyncManager {
   }
 
   updateCollections(collections: Collection[], projectId: string) {
-    this.state.collections = collections;
-    this.state.lastUpdated = Date.now();
-    this.state.isLoading = false;
-    this.state.error = null;
-    
+    // 🔧 FIX: Create a new state object to trigger React re-renders
+    this.state = {
+      ...this.state,
+      collections,
+      lastUpdated: Date.now(),
+      isLoading: false,
+      error: null
+    };
+
     this.saveStateToStorage();
     this.notifyListeners();
   }
 
   setLoading(isLoading: boolean) {
-    this.state.isLoading = isLoading;
+    // 🔧 FIX: Create a new state object to trigger React re-renders
+    this.state = {
+      ...this.state,
+      isLoading
+    };
     this.notifyListeners();
   }
 
   setError(error: string | null) {
-    this.state.error = error;
-    this.state.isLoading = false;
+    // 🔧 FIX: Create a new state object to trigger React re-renders
+    this.state = {
+      ...this.state,
+      error,
+      isLoading: false
+    };
     this.notifyListeners();
   }
 
