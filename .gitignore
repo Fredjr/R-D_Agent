@@ -21,3 +21,11 @@ coverage.xml
 .mypy_cache
 .pytest_cache
 .hypothesis
+
+# ML Models cache (large files)
+models_cache/
+
+# Frontend build artifacts
+frontend/node_modules/
+frontend/.next/
+frontend/out/
