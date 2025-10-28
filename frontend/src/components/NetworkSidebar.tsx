@@ -780,13 +780,25 @@ export default function NetworkSidebar({
         </div>
       </div>
 
+      {/* Navigation Guide */}
+      <div className="p-3 bg-blue-50 border-b border-blue-200">
+        <div className="text-xs text-blue-900">
+          <div className="font-semibold mb-1">💡 Navigation:</div>
+          <div className="space-y-0.5 text-blue-700">
+            <div>• <strong>Explore buttons</strong> → Show article list</div>
+            <div>• <strong>Network buttons</strong> → Update graph</div>
+            <div>• <strong>Top navigation</strong> → Change entire view</div>
+          </div>
+        </div>
+      </div>
+
       {/* ResearchRabbit-style Exploration Sections */}
       <div className="flex-shrink-0">
         {/* Explore Papers Section */}
         <div className="border-b border-gray-200">
           <div className="p-3 bg-gray-50">
             <h4 className="font-medium text-sm text-gray-900">📄 Explore Papers</h4>
-            <p className="text-xs text-gray-600 mt-1">Creates columns with article cards</p>
+            <p className="text-xs text-gray-600 mt-1">Shows article list below</p>
           </div>
           <div className="p-2 space-y-1">
             <Button
@@ -820,7 +832,7 @@ export default function NetworkSidebar({
         <div className="border-b border-gray-200">
           <div className="p-3 bg-gray-50">
             <h4 className="font-medium text-sm text-gray-900">👥 Explore People</h4>
-            <p className="text-xs text-gray-600 mt-1">Creates columns with article cards</p>
+            <p className="text-xs text-gray-600 mt-1">Shows article list below</p>
           </div>
           <div className="p-2 space-y-1">
             <Button
@@ -846,7 +858,7 @@ export default function NetworkSidebar({
         <div className="border-b border-gray-200">
           <div className="p-3 bg-gray-50">
             <h4 className="font-medium text-sm text-gray-900">🕸️ Network Views</h4>
-            <p className="text-xs text-gray-600 mt-1">Creates columns with connected nodes</p>
+            <p className="text-xs text-gray-600 mt-1">Updates graph with connected nodes</p>
           </div>
           <div className="p-2 space-y-1">
             <Button
@@ -880,7 +892,7 @@ export default function NetworkSidebar({
         <div className="border-b border-gray-200">
           <div className="p-3 bg-gray-50">
             <h4 className="font-medium text-sm text-gray-900">🔗 Explore Other Content</h4>
-            <p className="text-xs text-gray-600 mt-1">Creates columns with article cards</p>
+            <p className="text-xs text-gray-600 mt-1">Shows article list below</p>
           </div>
           <div className="p-2 space-y-1">
             <button

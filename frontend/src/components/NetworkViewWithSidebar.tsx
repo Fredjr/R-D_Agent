@@ -37,7 +37,7 @@ interface NetworkViewWithSidebarProps {
 
 export default function NetworkViewWithSidebar({
   sourceType,
-  sourceId,
+  sourceId: initialSourceId,
   projectId,
   onDeepDiveCreated,
   onArticleSaved,
@@ -47,12 +47,13 @@ export default function NetworkViewWithSidebar({
   const { user } = useAuth();
   const [selectedNode, setSelectedNode] = useState<NetworkNode | null>(null);
   const [navigationMode, setNavigationMode] = useState<'default' | 'similar' | 'earlier' | 'later' | 'authors' | 'timeline'>('default');
+  const [sourceId, setSourceId] = useState(initialSourceId); // Track current source ID for navigation
   const networkViewRef = useRef<any>(null);
 
   // OA/Full-Text toggle state - lifted up to share between NetworkView and NetworkSidebar
   const [fullTextOnly, setFullTextOnly] = useState(true); // Default to OA/Full-Text for better quality
 
-  console.log('🔍 NetworkViewWithSidebar rendered with:', { sourceType, sourceId, projectId, fullTextOnly });
+  console.log('🔍 NetworkViewWithSidebar rendered with:', { sourceType, sourceId, projectId, fullTextOnly, navigationMode });
 
   const handleNodeSelect = useCallback((node: any | null) => {
     if (node) {
@@ -156,10 +157,11 @@ export default function NetworkViewWithSidebar({
     onArticleSaved?.();
   }, [onArticleSaved]);
 
-  const onNavigationChange = useCallback((mode: string, sourceId: string) => {
-    console.log('🔍 Navigation mode changed:', { mode, sourceId });
+  const onNavigationChange = useCallback((mode: string, newSourceId: string) => {
+    console.log('🔍 Navigation mode changed:', { mode, newSourceId, previousSourceId: sourceId });
     setNavigationMode(mode as any);
-  }, []);
+    setSourceId(newSourceId); // ✅ FIX: Update sourceId when navigating from sidebar
+  }, [sourceId]);
 
   const onExploreCluster = useCallback((pmid: string, title: string) => {
     console.log('🔍 Explore cluster triggered:', { pmid, title });
