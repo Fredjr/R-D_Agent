@@ -260,14 +260,22 @@ export default function NetworkSidebar({
         case 'people':
           if (mode === 'authors') {
             // Get papers by the article's authors from PubMed
+            console.log('🔍 [These Authors] Selected node:', selectedNode);
+            console.log('🔍 [These Authors] Selected node metadata:', selectedNode?.metadata);
             const authors = selectedNode?.metadata?.authors || [];
+            console.log('🔍 [These Authors] Authors array:', authors);
+            console.log('🔍 [These Authors] Authors length:', authors.length);
+            console.log('🔍 [These Authors] fullTextOnly:', fullTextOnly);
+
             if (authors.length > 0) {
               // Use POST endpoint to search for papers by multiple authors
               endpoint = `/api/proxy/pubmed/author-papers`;
               usePubMed = true;
-              console.log('🔍 Fetching papers by authors:', { authors, fullTextOnly });
+              console.log('🔍 [These Authors] Will fetch papers for authors:', authors);
+              console.log('🔍 [These Authors] Endpoint:', endpoint);
             } else {
-              console.warn('⚠️ No authors found for selected node');
+              console.error('❌ [These Authors] No authors found!');
+              console.error('❌ [These Authors] selectedNode structure:', JSON.stringify(selectedNode, null, 2));
               setExplorationResults([]);
               setExplorationLoading(false);
               return;
@@ -338,6 +346,10 @@ export default function NetworkSidebar({
           let results = [];
           if (section === 'people' && mode === 'authors' && data.combined_articles) {
             // Author papers response
+            console.log('🔍 [These Authors] Response data:', data);
+            console.log('🔍 [These Authors] combined_articles:', data.combined_articles);
+            console.log('🔍 [These Authors] combined_articles length:', data.combined_articles?.length);
+            console.log('🔍 [These Authors] author_results:', data.author_results);
             results = data.combined_articles;
           } else if (usePubMed) {
             // PubMed API responses

@@ -97,8 +97,28 @@ export default function MultiColumnNetworkView({
   const [defaultNetworkType, setDefaultNetworkType] = useState<'citations' | 'similar' | 'references'>('citations');
   const [defaultExplorationMode, setDefaultExplorationMode] = useState<'focused' | 'broad' | 'timeline'>('focused');
   const [showNetworkTypeSelector, setShowNetworkTypeSelector] = useState(false);
+  const [mainNetworkType, setMainNetworkType] = useState<'citations' | 'similar' | 'references'>('citations');
 
   console.log('🔍 MultiColumnNetworkView rendered with:', { sourceType, sourceId, projectId, columnsCount: columns.length });
+
+  // Handlers for Citations Network and References Network buttons
+  const handleShowCitations = useCallback((pmid: string) => {
+    console.log('🔍 [MultiColumnNetworkView] Showing citations network for PMID:', pmid);
+    setMainNetworkType('citations');
+    // Force re-render of main network view
+    if (mainNetworkViewRef.current) {
+      console.log('✅ [MultiColumnNetworkView] Changing main network to citations');
+    }
+  }, []);
+
+  const handleShowReferences = useCallback((pmid: string) => {
+    console.log('🔍 [MultiColumnNetworkView] Showing references network for PMID:', pmid);
+    setMainNetworkType('references');
+    // Force re-render of main network view
+    if (mainNetworkViewRef.current) {
+      console.log('✅ [MultiColumnNetworkView] Changing main network to references');
+    }
+  }, []);
 
   // Track mainSelectedNode changes
   useEffect(() => {
@@ -486,6 +506,7 @@ export default function MultiColumnNetworkView({
                 onGenerateReview={onGenerateReview}
                 onDeepDive={onDeepDive}
                 onExploreCluster={onExploreCluster}
+                forceNetworkType={mainNetworkType}
               />
             </ErrorBoundary>
           </div>
@@ -546,6 +567,8 @@ export default function MultiColumnNetworkView({
                   onGenerateReview={onGenerateReview}
                   onDeepDive={onDeepDive}
                   onExploreCluster={onExploreCluster}
+                  onShowCitations={handleShowCitations}
+                  onShowReferences={handleShowReferences}
                 />
               </ErrorBoundary>
               </div>
