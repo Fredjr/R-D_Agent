@@ -614,9 +614,9 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
               endpoint = `/api/proxy/pubmed/network?pmid=${sourceId}&type=references&limit=15`;
               usePubMed = true;
             } else {
-              // Default: mixed network with both citations and references
-              // Reduced limit to 12 to avoid Vercel timeout (6 citations + 6 references)
-              endpoint = `/api/proxy/pubmed/network?pmid=${sourceId}&type=mixed&limit=12`;
+              // Default: citations network (mixed type has issues on Vercel)
+              // Using citations only for now until mixed network timeout issue is resolved
+              endpoint = `/api/proxy/pubmed/network?pmid=${sourceId}&type=citations&limit=12`;
               usePubMed = true;
             }
           } else if (sourceType === 'collection') {
