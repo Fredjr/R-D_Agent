@@ -41,9 +41,15 @@ export default function CollectionsPage() {
   // Initialize real-time analytics
   const { trackCollectionAction } = useRealTimeAnalytics('collections');
 
+  // 🔧 FIX: Wait for user to be loaded before fetching collections
   useEffect(() => {
-    fetchCollections();
-  }, []);
+    if (user?.email) {
+      console.log('✅ User loaded, fetching collections for:', user.email);
+      fetchCollections();
+    } else {
+      console.log('⏳ Waiting for user session to load...');
+    }
+  }, [user?.email]); // Re-fetch when user changes
 
   // Demo collections for testing semantic features
   const demoCollections: Collection[] = [
