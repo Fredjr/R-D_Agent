@@ -384,7 +384,9 @@ export async function POST(request: NextRequest) {
     // Fetch papers for each author in parallel
     const authorResults = await Promise.all(
       authors.map(async (author) => {
+        console.log(`🔍 Searching for author: "${author}"`);
         const articles = await searchAuthorPapers(author, limit * 3, open_access_only); // Fetch 3x to account for filtering
+        console.log(`📊 Found ${articles.length} articles for "${author}"`);
         return {
           author,
           articles,
@@ -392,6 +394,8 @@ export async function POST(request: NextRequest) {
         };
       })
     );
+
+    console.log(`📚 Author results summary:`, authorResults.map(r => ({ author: r.author, count: r.count })));
 
     // Combine all articles and remove duplicates by PMID
     const allArticles = authorResults.flatMap(result => result.articles);
