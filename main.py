@@ -1,5 +1,5 @@
-# DATABASE_URL secret verified working - testing Cloud Run environment injection
-# Railway deployment fix: Force rebuild with fixed requirements.txt
+# Railway deployment: Using langchain==0.1.20 for import compatibility
+# Fixed: ModuleNotFoundError for langchain.prompts - Oct 27, 2025
 from fastapi import FastAPI, Response, Depends, HTTPException, WebSocket, WebSocketDisconnect, Request, Header, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import UploadFile, File, Form
@@ -12988,6 +12988,12 @@ async def get_semantic_service_status():
     except Exception as e:
         print(f"❌ Error getting service status: {e}")
         raise HTTPException(status_code=500, detail=f"Status check failed: {str(e)}")
+
+# Alias endpoint for backward compatibility (frontend calls /semantic/analyze-paper)
+@app.post("/semantic/analyze-paper")
+async def analyze_paper_alias(request: PaperAnalysisRequest):
+    """Alias for /api/semantic/analyze-paper for backward compatibility"""
+    return await analyze_paper(request)
 
 @app.post("/api/semantic/initialize-service")
 async def initialize_semantic_service():
