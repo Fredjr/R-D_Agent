@@ -745,13 +745,17 @@ export default function NetworkSidebar({
 
         {/* Quick Action Buttons - Compact */}
         <div className="mt-2 flex gap-1">
-          {metadata.url && (
+          {metadata.pmid && (
             <Button
               variant="default"
               size="sm"
               className="flex-1 text-xs"
-              onClick={() => window.open(metadata.url, '_blank', 'noopener,noreferrer')}
-              title="View Full Paper"
+              onClick={() => {
+                // Always construct PubMed URL from PMID to ensure correctness
+                const pubmedUrl = `https://pubmed.ncbi.nlm.nih.gov/${metadata.pmid}/`;
+                window.open(pubmedUrl, '_blank', 'noopener,noreferrer');
+              }}
+              title="View paper on PubMed"
             >
               📄 View
             </Button>
@@ -1138,8 +1142,9 @@ export default function NetworkSidebar({
                             handleExplorationPaperClick(paper);
                           }}
                           className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs font-medium transition-colors"
+                          title={supportsMultiColumn ? "Open this paper in a new column" : "View this paper's details"}
                         >
-                          Explore
+                          {supportsMultiColumn ? '📋 Open Panel' : '📄 View Details'}
                         </button>
                         {projectId && collections.length > 0 && (
                           <button
@@ -1148,8 +1153,9 @@ export default function NetworkSidebar({
                               handleSaveToCollection(paper);
                             }}
                             className="flex-1 bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs font-medium transition-colors"
+                            title="Save this paper to a collection"
                           >
-                            Save
+                            💾 Save
                           </button>
                         )}
                       </div>
