@@ -5169,16 +5169,9 @@ async def list_projects(request: Request, db: Session = Depends(get_db)):
     """List all projects for the current user"""
     current_user = request.headers.get("User-ID", "default_user")
 
-    # 🔧 FIX: Resolve email to UUID if current_user is an email
-    user_id = current_user
-    if "@" in current_user:
-        user = db.query(User).filter(User.email == current_user).first()
-        if user:
-            user_id = user.user_id
-            print(f"✅ Resolved email {current_user} to UUID {user_id}")
-        else:
-            print(f"⚠️ User not found for email: {current_user}")
-            return ProjectListResponse(projects=[])
+    # 🔧 FIX: Resolve email to UUID using helper function
+    user_id = resolve_user_id(current_user, db)
+    print(f"✅ Resolved user identifier '{current_user}' to UUID '{user_id}'")
 
     # Get projects owned by user (using UUID)
     owned_projects = db.query(Project).filter(
@@ -8394,15 +8387,19 @@ async def get_collection_articles(
     """Get all articles in a collection"""
     current_user = request.headers.get("User-ID", "default_user")
 
+    # 🔧 FIX: Resolve email to UUID
+    user_id = resolve_user_id(current_user, db)
+    print(f"✅ [Get Collection Articles] Resolved '{current_user}' to UUID '{user_id}'")
+
     # Check project access
     has_access = (
         db.query(Project).filter(
             Project.project_id == project_id,
-            Project.owner_user_id == current_user
+            Project.owner_user_id == user_id
         ).first() is not None or
         db.query(ProjectCollaborator).filter(
             ProjectCollaborator.project_id == project_id,
-            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.user_id == user_id,
             ProjectCollaborator.is_active == True
         ).first() is not None
     )
