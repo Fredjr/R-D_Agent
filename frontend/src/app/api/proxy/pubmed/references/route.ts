@@ -122,34 +122,52 @@ async function findReferenceArticles(pmid: string, limit: number = 20): Promise<
   try {
     // Use eLink to find articles referenced by this PMID
     const linkUrl = `${PUBMED_LINK_URL}?dbfrom=pubmed&id=${pmid}&db=pubmed&linkname=pubmed_pubmed_refs&retmode=json`;
-    
+
+    console.log(`🔗 Fetching references for PMID ${pmid} from: ${linkUrl}`);
+
     const response = await fetch(linkUrl, {
       headers: {
         'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
-      }
+      },
+      signal: AbortSignal.timeout(10000) // 10 second timeout
     });
-    
+
+    console.log(`📡 PubMed eLink response status: ${response.status}`);
+
     if (!response.ok) {
-      console.log(`PubMed eLink references failed for PMID ${pmid}: ${response.status}`);
+      console.error(`❌ PubMed eLink references failed for PMID ${pmid}: ${response.status} ${response.statusText}`);
       return [];
     }
-    
+
     const data = await response.json();
+    console.log(`📦 PubMed eLink response data:`, JSON.stringify(data).substring(0, 500));
+
     const linksets = data.linksets || [];
-    
+    console.log(`🔍 Found ${linksets.length} linksets`);
+
     for (const linkset of linksets) {
       const linksetdbs = linkset.linksetdbs || [];
+      console.log(`🔍 Linkset has ${linksetdbs.length} linksetdbs`);
+
       for (const linksetdb of linksetdbs) {
+        console.log(`🔍 Checking linksetdb with linkname: ${linksetdb.linkname}`);
+
         if (linksetdb.linkname === 'pubmed_pubmed_refs') {
           const links = linksetdb.links || [];
+          console.log(`✅ Found ${links.length} references for PMID ${pmid}`);
           return links.slice(0, limit).map((id: string) => id.toString());
         }
       }
     }
-    
+
+    console.log(`⚠️ No references found in linksets for PMID ${pmid}`);
     return [];
   } catch (error) {
-    console.error('Error finding reference articles:', error);
+    console.error(`❌ Error finding reference articles for PMID ${pmid}:`, error);
+    if (error instanceof Error) {
+      console.error(`Error message: ${error.message}`);
+      console.error(`Error stack: ${error.stack}`);
+    }
     return [];
   }
 }
