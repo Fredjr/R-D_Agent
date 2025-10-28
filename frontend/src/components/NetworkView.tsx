@@ -740,7 +740,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
       // ARTICLE NETWORK FALLBACK: If article network is empty or has only 1 node, try PubMed citations
       if (sourceType === 'article' && (!data.nodes || data.nodes.length <= 1)) {
-        console.log('Article similar-network empty/single node, trying PubMed citations...');
+        console.log('Article network empty/single node, trying PubMed citations fallback...');
         const fallbackResponse = await fetch(`/api/proxy/pubmed/network?pmid=${sourceId}&type=citations&limit=12`, {
           headers: {
             'User-ID': user?.email || 'default_user',
@@ -753,86 +753,49 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             edgesCount: fallbackData.edges?.length || 0
           });
           if (fallbackData.nodes && fallbackData.nodes.length > 1) {
-            // Add fallback indicator to metadata
+            // Successfully got citation network, use it
             fallbackData.metadata = {
               ...fallbackData.metadata,
               fallback_mode: true,
-              fallback_message: `Showing real citation network from PubMed (similar articles not found)`
+              fallback_message: `Showing citation network from PubMed`
             };
-            console.log('🔧 Using PubMed fallback data, will convert to React Flow format');
+            console.log('✅ Using PubMed citations fallback data');
             data = fallbackData;
-          }
-        }
-
-        // ARTICLE-SPECIFIC FALLBACK: Create a network based on the selected article's metadata
-        console.log('Both article networks empty, creating article-specific network...');
-
-        // Use passed articleMetadata if available, otherwise try to find in current network
-        let originalArticle;
-
-        if (articleMetadata) {
-          console.log('🎯 Using passed article metadata:', articleMetadata.title);
-          originalArticle = {
-            id: sourceId,
-            metadata: articleMetadata
-          };
-        } else {
-          // Try to get the original article data from the current network nodes
-          const currentNodes = networkData?.nodes || [];
-          originalArticle = currentNodes.find(node => node.id === sourceId);
-
-          // If not found in current network, create a basic article node from the sourceId
-          if (!originalArticle) {
-            console.log('🔧 Article not found in current network, creating from sourceId:', sourceId);
-            originalArticle = {
-              id: sourceId,
-              metadata: {
-                pmid: sourceId,
-                title: `Article ${sourceId}`,
-                authors: [],
-                journal: '',
-                year: new Date().getFullYear(),
-                citation_count: 0
+          } else {
+            // Citations fallback also failed, try references
+            console.log('Citations fallback empty, trying references...');
+            const refsResponse = await fetch(`/api/proxy/pubmed/network?pmid=${sourceId}&type=references&limit=12`, {
+              headers: {
+                'User-ID': user?.email || 'default_user',
+              },
+            });
+            if (refsResponse.ok) {
+              const refsData = await refsResponse.json();
+              console.log('🔄 Article PubMed references fallback:', {
+                nodesCount: refsData.nodes?.length || 0,
+                edgesCount: refsData.edges?.length || 0
+              });
+              if (refsData.nodes && refsData.nodes.length > 1) {
+                refsData.metadata = {
+                  ...refsData.metadata,
+                  fallback_mode: true,
+                  fallback_message: `Showing reference network from PubMed`
+                };
+                console.log('✅ Using PubMed references fallback data');
+                data = refsData;
               }
-            };
+            }
           }
         }
 
-        console.log('🎯 Creating article-specific network for:', originalArticle.metadata?.title);
+        // Only create synthetic network if all PubMed attempts failed
+        if (!data.nodes || data.nodes.length <= 1) {
+          console.log('⚠️ All PubMed network attempts failed, article may not have citations/references indexed in PubMed');
 
-        // Create a synthetic network based on the article's metadata
-        const syntheticNetwork = createArticleSpecificNetwork(originalArticle, sourceId);
-        console.log('🔧 Synthetic network created:', {
-          nodesCount: syntheticNetwork.nodes.length,
-          edgesCount: syntheticNetwork.edges.length
-        });
-
-        // Set the synthetic network data and let it fall through to React Flow conversion
-        data = syntheticNetwork;
-
-        // FINAL DEMO FALLBACK: If we can't create article-specific network, show demo
-        console.log('Creating final demo fallback network with real PubMed data...');
-        const demoResponse = await fetch('/api/proxy/pubmed/network?pmid=33462507&type=citations&limit=10', {
-          headers: {
-            'User-ID': user?.email || 'default_user',
-          },
-        });
-        if (demoResponse.ok) {
-          const demoData = await demoResponse.json();
-          console.log('🎯 Demo multi-column network:', {
-            nodesCount: demoData.nodes?.length || 0,
-            edgesCount: demoData.edges?.length || 0
-          });
-          if (demoData.nodes && demoData.nodes.length > 1) {
-            // Add demo indicator to metadata
-            demoData.metadata = {
-              ...demoData.metadata,
-              demo_mode: true,
-              demo_message: `Demo: Real PubMed citation network (original article data not available)`
-            };
-            console.log('🔧 Using final PubMed demo fallback, will convert to React Flow format');
-            data = demoData;
-          }
+          // Set error state instead of showing synthetic data
+          setError(`No citation network available for this article. The article may be too new or not have citations/references indexed in PubMed yet.`);
+          setLoading(false);
+          return;
         }
       }
 
@@ -1109,7 +1072,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
   if (loading) {
     return (
-      <div className={`flex items-center justify-center h-96 bg-gray-50 rounded-lg ${className}`}>
+      <div className={`flex items-center justify-center ${className || 'h-96'} bg-gray-50 rounded-lg`}>
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading network...</p>
@@ -1120,7 +1083,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
   if (error) {
     return (
-      <div className={`flex items-center justify-center h-96 bg-gray-50 rounded-lg ${className}`}>
+      <div className={`flex items-center justify-center ${className || 'h-96'} bg-gray-50 rounded-lg`}>
         <div className="text-center">
           <div className="text-red-500 mb-4">
             <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1142,7 +1105,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   // Timeline mode rendering
   if (navigationMode === 'timeline') {
     return (
-      <div className={`relative h-96 bg-white rounded-lg border ${className}`}>
+      <div className={`relative ${className || 'h-96'} bg-white rounded-lg border`}>
         <TimelineView
           pmid={sourceType === 'article' ? sourceId : undefined}
           projectId={sourceType === 'project' ? sourceId : undefined}
@@ -1185,7 +1148,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
     });
 
     return (
-      <div className={`flex items-center justify-center h-96 bg-gray-50 rounded-lg ${className}`}>
+      <div className={`flex items-center justify-center ${className || 'h-96'} bg-gray-50 rounded-lg`}>
         <div className="text-center max-w-md">
           <div className="text-gray-400 mb-4">
             <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1222,7 +1185,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   });
 
   return (
-    <div className={`network-view-container relative h-96 bg-white rounded-lg border ${className} overflow-hidden`}>
+    <div className={`network-view-container relative ${className || 'h-96'} bg-white rounded-lg border overflow-hidden`}>
       <ReactFlow
         key={`network-${nodes.length}-${edges.length}`}
         nodes={nodes}

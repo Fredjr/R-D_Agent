@@ -148,37 +148,44 @@ async function fetchArticleDetails(pmids: string[]): Promise<PubMedArticle[]> {
 async function findRelatedArticles(pmid: string, linkType: string, limit: number = 10): Promise<string[]> {
   try {
     const linkUrl = `${PUBMED_LINK_URL}?dbfrom=pubmed&id=${pmid}&db=pubmed&linkname=${linkType}&retmode=json`;
-    
+    console.log(`🔍 Fetching related articles: ${linkUrl}`);
+
     const response = await fetch(linkUrl, {
       headers: {
         'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
       }
     });
-    
+
     if (!response.ok) {
-      console.log(`PubMed eLink failed for PMID ${pmid}, linkType ${linkType}: ${response.status}`);
+      console.error(`❌ PubMed eLink failed for PMID ${pmid}, linkType ${linkType}: ${response.status}`);
       return [];
     }
-    
+
     const data = await response.json();
+    console.log(`📊 PubMed eLink response for ${pmid} (${linkType}):`, JSON.stringify(data).substring(0, 500));
+
     const linksets = data.linksets || [];
-    
+
     for (const linkset of linksets) {
       const linksetdbs = linkset.linksetdbs || [];
       for (const linksetdb of linksetdbs) {
         if (linksetdb.linkname === linkType) {
           const links = linksetdb.links || [];
-          return links
+          console.log(`✅ Found ${links.length} related articles for ${pmid} (${linkType})`);
+          const filtered = links
             .filter((id: string) => id.toString() !== pmid) // Exclude self
             .slice(0, limit)
             .map((id: string) => id.toString());
+          console.log(`📤 Returning ${filtered.length} articles after filtering and limiting`);
+          return filtered;
         }
       }
     }
-    
+
+    console.log(`⚠️ No linksetdb found with linkname ${linkType} for PMID ${pmid}`);
     return [];
   } catch (error) {
-    console.error(`Error finding related articles (${linkType}):`, error);
+    console.error(`❌ Error finding related articles (${linkType}):`, error);
     return [];
   }
 }
@@ -350,6 +357,12 @@ export async function GET(request: NextRequest) {
     };
 
     console.log(`✅ PubMed Network built: ${nodes.length} nodes, ${edges.length} edges`);
+    console.log(`📤 Returning network data:`, {
+      nodesCount: nodes.length,
+      edgesCount: edges.length,
+      nodeIds: nodes.map(n => n.id).slice(0, 10),
+      metadata: networkData.metadata
+    });
 
     return NextResponse.json(networkData);
 

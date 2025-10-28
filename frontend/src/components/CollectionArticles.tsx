@@ -74,7 +74,7 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
 
   if (showNetworkExploration && selectedArticle) {
     return (
-      <div className="h-full">
+      <div className="h-[calc(100vh-200px)] min-h-[600px]">
         <NetworkViewWithSidebar
           sourceType="article"
           sourceId={selectedArticle.article_pmid}
