@@ -272,20 +272,73 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * Calculate author overlap score between two author lists
- * Returns the number of matching authors (case-insensitive, normalized)
+ * Normalize author name for matching
+ * Handles variations like "Yang Q", "Q Yang", "Qing Yang"
  */
-function calculateAuthorOverlap(authors1: string[], authors2: string[]): number {
-  const normalize = (name: string) => name.toLowerCase().trim().replace(/\s+/g, ' ');
-  const set1 = new Set(authors1.map(normalize));
-  const set2 = new Set(authors2.map(normalize));
+function normalizeAuthorName(name: string): string[] {
+  const normalized = name.toLowerCase().trim().replace(/\s+/g, ' ');
+  const parts = normalized.split(' ');
 
-  let matches = 0;
-  for (const author of set2) {
-    if (set1.has(author)) {
-      matches++;
+  if (parts.length < 2) {
+    return [normalized];
+  }
+
+  // Generate variations:
+  // 1. Original: "qing yang"
+  // 2. "LastName FirstInitial": "yang q"
+  // 3. "FirstInitial LastName": "q yang"
+  // 4. "LastName FirstName": "yang qing"
+  const variations = [normalized];
+
+  const lastName = parts[parts.length - 1];
+  const firstNames = parts.slice(0, -1);
+  const firstInitial = firstNames[0].charAt(0);
+
+  variations.push(`${lastName} ${firstInitial}`); // "yang q"
+  variations.push(`${firstInitial} ${lastName}`); // "q yang"
+
+  if (firstNames.length > 0) {
+    variations.push(`${lastName} ${firstNames.join(' ')}`); // "yang qing"
+  }
+
+  return variations;
+}
+
+/**
+ * Check if two author names match (considering name variations)
+ */
+function authorsMatch(name1: string, name2: string): boolean {
+  const variations1 = normalizeAuthorName(name1);
+  const variations2 = normalizeAuthorName(name2);
+
+  // Check if any variation of name1 matches any variation of name2
+  for (const v1 of variations1) {
+    for (const v2 of variations2) {
+      if (v1 === v2) {
+        return true;
+      }
     }
   }
+
+  return false;
+}
+
+/**
+ * Calculate author overlap score between two author lists
+ * Returns the number of matching authors (handles name variations)
+ */
+function calculateAuthorOverlap(authors1: string[], authors2: string[]): number {
+  let matches = 0;
+
+  for (const author1 of authors1) {
+    for (const author2 of authors2) {
+      if (authorsMatch(author1, author2)) {
+        matches++;
+        break; // Count each author1 only once
+      }
+    }
+  }
+
   return matches;
 }
 
