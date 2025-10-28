@@ -1482,8 +1482,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             collections={collections}
             onExpandNode={(nodeId, nodeData) => expandNodeNetwork(nodeId, nodeData)}
             onShowSimilarWork={(pmid) => handleNavigationChange('similar', pmid)}
-            onShowCitations={(pmid) => handleNavigationChange('citations', pmid)}
-            onShowReferences={(pmid) => handleNavigationChange('references', pmid)}
+            onShowCitations={(pmid) => handleNavigationChange('later', pmid)}
+            onShowReferences={(pmid) => handleNavigationChange('earlier', pmid)}
             onExplorePeople={(authors) => handleNavigationChange('authors', authors.join(','))}
             onAddExplorationNodes={addExplorationNodesToGraph}
             onGenerateReview={onGenerateReview}

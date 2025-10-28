@@ -237,15 +237,42 @@ export default function NetworkViewWithSidebar({
               onNavigationChange={(mode) => {
                 // Handle navigation mode changes
                 console.log('Navigation mode changed:', mode);
+                // Map sidebar navigation modes to NetworkView navigation modes
+                const modeMap: Record<string, 'similar' | 'earlier' | 'later' | 'authors'> = {
+                  'similar': 'similar',
+                  'references': 'earlier',
+                  'citations': 'later',
+                  'authors': 'authors'
+                };
+                const mappedMode = modeMap[mode];
+                if (mappedMode && selectedNode?.metadata?.pmid) {
+                  onNavigationChange(mappedMode, selectedNode.metadata.pmid);
+                }
               }}
               onAddToCollection={(pmid) => {
                 // Handle adding to collection
                 console.log('Add to collection:', pmid);
               }}
-              currentMode="default"
+              currentMode={navigationMode}
               projectId={projectId || ''}
               collections={[]}
               onAddExplorationNodes={handleAddExplorationNodes}
+              onShowCitations={(pmid) => {
+                console.log('🔍 Show citations for PMID:', pmid);
+                onNavigationChange('later', pmid);
+              }}
+              onShowReferences={(pmid) => {
+                console.log('🔍 Show references for PMID:', pmid);
+                onNavigationChange('earlier', pmid);
+              }}
+              onShowSimilarWork={(pmid) => {
+                console.log('🔍 Show similar work for PMID:', pmid);
+                onNavigationChange('similar', pmid);
+              }}
+              onExplorePeople={(authors) => {
+                console.log('🔍 Explore people:', authors);
+                onNavigationChange('authors', authors.join(','));
+              }}
             />
           </ErrorBoundary>
         </div>
