@@ -273,7 +273,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * Normalize author name for matching
- * Handles variations like "Yang Q", "Q Yang", "Qing Yang"
+ * Handles variations like "Yang Q", "Q Yang", "Qing Yang", "Alfred K Cheung", "Cheung AK"
  */
 function normalizeAuthorName(name: string): string[] {
   const normalized = name.toLowerCase().trim().replace(/\s+/g, ' ');
@@ -283,23 +283,33 @@ function normalizeAuthorName(name: string): string[] {
     return [normalized];
   }
 
-  // Generate variations:
-  // 1. Original: "qing yang"
-  // 2. "LastName FirstInitial": "yang q"
-  // 3. "FirstInitial LastName": "q yang"
-  // 4. "LastName FirstName": "yang qing"
   const variations = [normalized];
-
   const lastName = parts[parts.length - 1];
   const firstNames = parts.slice(0, -1);
+
+  // Get all initials from first/middle names
+  const allInitials = firstNames.map(n => n.charAt(0)).join('');
   const firstInitial = firstNames[0].charAt(0);
 
-  variations.push(`${lastName} ${firstInitial}`); // "yang q"
-  variations.push(`${firstInitial} ${lastName}`); // "q yang"
+  // Generate variations:
+  // 1. "LastName FirstInitial": "yang q" or "cheung a"
+  variations.push(`${lastName} ${firstInitial}`);
 
-  if (firstNames.length > 0) {
-    variations.push(`${lastName} ${firstNames.join(' ')}`); // "yang qing"
+  // 2. "FirstInitial LastName": "q yang" or "a cheung"
+  variations.push(`${firstInitial} ${lastName}`);
+
+  // 3. "LastName AllInitials": "cheung ak"
+  if (allInitials.length > 1) {
+    variations.push(`${lastName} ${allInitials}`);
   }
+
+  // 4. "AllInitials LastName": "ak cheung"
+  if (allInitials.length > 1) {
+    variations.push(`${allInitials} ${lastName}`);
+  }
+
+  // 5. "LastName FirstNames": "yang qing" or "cheung alfred k"
+  variations.push(`${lastName} ${firstNames.join(' ')}`);
 
   return variations;
 }
