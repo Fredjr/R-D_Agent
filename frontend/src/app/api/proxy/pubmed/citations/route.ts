@@ -262,31 +262,11 @@ export async function GET(request: NextRequest) {
     console.log(`📊 Found ${relatedPmids.length} ${type} for PMID ${pmid}`);
 
     // Fetch details for related articles
-    let relatedArticles = await fetchArticleDetails(relatedPmids);
+    const relatedArticles = await fetchArticleDetails(relatedPmids);
 
-    // If no related articles found, provide helpful mock data to avoid empty results
+    // Log if no results found - this is legitimate, not an error
     if (relatedArticles.length === 0) {
-      console.log(`⚠️ No ${type} found for PMID ${pmid}, providing sample data`);
-      relatedArticles = [
-        {
-          pmid: "sample1",
-          title: `Sample ${type === 'similar' ? 'Similar' : 'Citing'} Article 1`,
-          authors: ['Sample Author'],
-          journal: 'Sample Journal',
-          year: new Date().getFullYear() - 1,
-          citation_count: 5,
-          abstract: `This is a sample ${type === 'similar' ? 'similar' : 'citing'} article for demonstration purposes.`
-        },
-        {
-          pmid: "sample2",
-          title: `Sample ${type === 'similar' ? 'Similar' : 'Citing'} Article 2`,
-          authors: ['Another Author'],
-          journal: 'Another Journal',
-          year: new Date().getFullYear() - 2,
-          citation_count: 3,
-          abstract: `Another sample ${type === 'similar' ? 'similar' : 'citing'} article for demonstration.`
-        }
-      ];
+      console.log(`ℹ️ No ${type} found for PMID ${pmid} in PubMed`);
     }
 
     const response: CitationNetworkResponse = {

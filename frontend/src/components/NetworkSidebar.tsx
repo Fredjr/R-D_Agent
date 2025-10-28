@@ -107,7 +107,8 @@ export default function NetworkSidebar({
 
   // OA/Full-Text toggle for smart actions
   // Use controlled state if provided, otherwise use internal state
-  const [internalFullTextOnly, setInternalFullTextOnly] = useState(true);
+  // Default to false to get ALL PubMed results, not just open access
+  const [internalFullTextOnly, setInternalFullTextOnly] = useState(false);
   const fullTextOnly = propFullTextOnly !== undefined ? propFullTextOnly : internalFullTextOnly;
 
   const handleFullTextOnlyChange = (value: boolean) => {
