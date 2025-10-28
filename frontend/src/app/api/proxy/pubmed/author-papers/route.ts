@@ -272,18 +272,52 @@ export async function GET(request: NextRequest) {
 }
 
 /**
+ * Calculate author overlap score between two author lists
+ * Returns the number of matching authors (case-insensitive, normalized)
+ */
+function calculateAuthorOverlap(authors1: string[], authors2: string[]): number {
+  const normalize = (name: string) => name.toLowerCase().trim().replace(/\s+/g, ' ');
+  const set1 = new Set(authors1.map(normalize));
+  const set2 = new Set(authors2.map(normalize));
+
+  let matches = 0;
+  for (const author of set2) {
+    if (set1.has(author)) {
+      matches++;
+    }
+  }
+  return matches;
+}
+
+/**
+ * Filter articles by co-author overlap
+ * Keeps articles that share at least minOverlap authors with the reference authors
+ */
+function filterByCoAuthorOverlap(
+  articles: PubMedArticle[],
+  referenceAuthors: string[],
+  minOverlap: number = 2
+): PubMedArticle[] {
+  return articles.filter(article => {
+    const overlap = calculateAuthorOverlap(referenceAuthors, article.authors);
+    return overlap >= minOverlap;
+  });
+}
+
+/**
  * POST /api/proxy/pubmed/author-papers
  * Search for papers by multiple authors
- * 
+ *
  * Request body:
  * - authors: Array of author names (required)
  * - limit: Maximum number of results per author (default: 10)
  * - open_access_only: Filter for OA/Full-Text articles only (default: false)
+ * - min_coauthor_overlap: Minimum number of co-authors to match (default: 2)
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { authors, limit = 10, open_access_only = false } = body;
+    const { authors, limit = 10, open_access_only = false, min_coauthor_overlap = 2 } = body;
 
     if (!authors || !Array.isArray(authors) || authors.length === 0) {
       return NextResponse.json(
@@ -292,12 +326,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`📚 Multi-author papers request: ${authors.length} authors (limit: ${limit} each, OA only: ${open_access_only})`);
+    console.log(`📚 Multi-author papers request: ${authors.length} authors (limit: ${limit} each, OA only: ${open_access_only}, min overlap: ${min_coauthor_overlap})`);
 
     // Fetch papers for each author in parallel
     const authorResults = await Promise.all(
       authors.map(async (author) => {
-        const articles = await searchAuthorPapers(author, limit, open_access_only);
+        const articles = await searchAuthorPapers(author, limit * 3, open_access_only); // Fetch 3x to account for filtering
         return {
           author,
           articles,
@@ -312,13 +346,36 @@ export async function POST(request: NextRequest) {
       new Map(allArticles.map(article => [article.pmid, article])).values()
     );
 
+    console.log(`🔍 Found ${uniqueArticles.length} unique articles before co-author filtering`);
+
+    // Filter by co-author overlap to remove false matches
+    const filteredArticles = filterByCoAuthorOverlap(uniqueArticles, authors, min_coauthor_overlap);
+
+    console.log(`✅ After co-author filtering (min ${min_coauthor_overlap} overlaps): ${filteredArticles.length} articles`);
+
+    // Sort by number of matching co-authors (descending) and take top results
+    const scoredArticles = filteredArticles.map(article => ({
+      ...article,
+      coauthor_overlap: calculateAuthorOverlap(authors, article.authors)
+    })).sort((a, b) => b.coauthor_overlap - a.coauthor_overlap);
+
+    const topArticles = scoredArticles.slice(0, limit * 2); // Return 2x limit after filtering
+
     return NextResponse.json({
       authors,
-      author_results: authorResults,
-      combined_articles: uniqueArticles,
-      total_unique_articles: uniqueArticles.length,
+      author_results: authorResults.map(result => ({
+        ...result,
+        articles: result.articles.slice(0, limit) // Trim to original limit
+      })),
+      combined_articles: topArticles,
+      total_unique_articles: topArticles.length,
       limit_per_author: limit,
-      open_access_only
+      open_access_only,
+      filtering: {
+        before_filter: uniqueArticles.length,
+        after_filter: filteredArticles.length,
+        min_coauthor_overlap
+      }
     });
 
   } catch (error) {
