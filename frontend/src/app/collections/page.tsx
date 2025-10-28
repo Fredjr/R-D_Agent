@@ -308,20 +308,20 @@ export default function CollectionsPage() {
                         onClick={() => {
                           console.log('Selected collection:', collection);
                           trackCollectionAction('view', collection.id);
-                          // Navigate to collection details
-                          router.push(`/projects/${collection.projectId}/collections/${collection.id}`);
+                          // Navigate to project page with collections tab active
+                          router.push(`/project/${collection.projectId}?tab=collections&collection=${collection.id}`);
                         }}
                         onExplore={() => {
                           console.log('Explore collection:', collection);
                           trackCollectionAction('view', collection.id);
-                          // Navigate to articles list
-                          router.push(`/projects/${collection.projectId}/collections/${collection.id}/articles`);
+                          // Navigate to project page with collections tab and articles view
+                          router.push(`/project/${collection.projectId}?tab=collections&collection=${collection.id}&view=articles`);
                         }}
                         onNetworkView={() => {
                           console.log('Network view for collection:', collection);
                           trackCollectionAction('view', collection.id);
-                          // Navigate to network view
-                          router.push(`/projects/${collection.projectId}/collections/${collection.id}/network`);
+                          // Navigate to project page with collections tab and network view
+                          router.push(`/project/${collection.projectId}?tab=collections&collection=${collection.id}&view=network`);
                         }}
                       />
                     ))}

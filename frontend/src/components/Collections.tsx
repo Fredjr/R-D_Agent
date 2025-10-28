@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { PlusIcon, FolderIcon, DocumentTextIcon, EyeIcon, ListBulletIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGlobalCollectionSync, type Collection } from '@/hooks/useGlobalCollectionSync';
@@ -30,6 +31,7 @@ export default function Collections({
   onExploreCluster
 }: CollectionsProps) {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
 
   // Initialize weekly mix integration
   const { trackCollectionAdd } = useWeeklyMixIntegration();
@@ -49,7 +51,7 @@ export default function Collections({
   const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null);
   const [showNetworkView, setShowNetworkView] = useState(false);
   const [showArticlesList, setShowArticlesList] = useState(false);
-  
+
   const [newCollection, setNewCollection] = useState({
     collection_name: '',
     description: '',
@@ -64,6 +66,30 @@ export default function Collections({
       refreshCollections();
     }
   }, [projectId, refreshCollections]);
+
+  // 🔧 Handle URL parameters to auto-open collection views
+  useEffect(() => {
+    const collectionId = searchParams.get('collection');
+    const view = searchParams.get('view');
+
+    if (collectionId && collections.length > 0) {
+      // Find the collection by ID
+      const collection = collections.find(c => c.collection_id === collectionId);
+
+      if (collection) {
+        console.log('📍 Auto-opening collection from URL:', { collectionId, view, collection });
+        setSelectedCollection(collection);
+
+        if (view === 'articles') {
+          setShowArticlesList(true);
+          setShowNetworkView(false);
+        } else if (view === 'network') {
+          setShowNetworkView(true);
+          setShowArticlesList(false);
+        }
+      }
+    }
+  }, [searchParams, collections]);
 
   // Debug logging for collections state
   useEffect(() => {
