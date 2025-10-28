@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { ArrowLeftIcon, BeakerIcon } from '@heroicons/react/24/outline';
 import { type Collection } from '@/hooks/useGlobalCollectionSync';
-import NetworkViewWithSidebar from './NetworkViewWithSidebar';
+import MultiColumnNetworkView from './MultiColumnNetworkView';
 
 interface Article {
   id: number;
@@ -75,11 +75,23 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
   if (showNetworkExploration && selectedArticle) {
     return (
       <div className="h-[calc(100vh-200px)] min-h-[600px]">
-        <NetworkViewWithSidebar
+        <div className="flex items-center gap-3 mb-4">
+          <button
+            onClick={() => setShowNetworkExploration(false)}
+            className="text-gray-600 hover:text-gray-900 text-sm"
+          >
+            ← Back to Articles
+          </button>
+          <h3 className="text-lg font-semibold text-gray-900">
+            Network Exploration: {selectedArticle.article_title.substring(0, 60)}...
+          </h3>
+        </div>
+        <MultiColumnNetworkView
           sourceType="article"
           sourceId={selectedArticle.article_pmid}
           projectId={projectId}
-          onBack={() => setShowNetworkExploration(false)}
+          onDeepDiveCreated={() => {}}
+          onArticleSaved={() => {}}
         />
       </div>
     );
