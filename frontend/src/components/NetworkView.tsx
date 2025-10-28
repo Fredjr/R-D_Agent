@@ -329,6 +329,12 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   onExploreCluster,
   fullTextOnly = true
 }, ref) => {
+  console.log('🚀 [NetworkView] Component rendering with props:', {
+    sourceType,
+    sourceId,
+    disableInternalSidebar,
+    hasOnNodeSelect: !!onNodeSelect
+  });
   const { user } = useAuth();
   const [networkData, setNetworkData] = useState<NetworkData | null>(null);
 

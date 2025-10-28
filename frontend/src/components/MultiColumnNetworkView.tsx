@@ -94,9 +94,14 @@ export default function MultiColumnNetworkView({
 
   console.log('🔍 MultiColumnNetworkView rendered with:', { sourceType, sourceId, projectId, columnsCount: columns.length });
 
+  // Track mainSelectedNode changes
+  useEffect(() => {
+    console.log('🔍 [MultiColumnNetworkView] mainSelectedNode changed:', mainSelectedNode);
+  }, [mainSelectedNode]);
+
   // Handle node selection in the main network view
   const handleMainNodeSelect = useCallback((node: any | null) => {
-    console.log('🔍 handleMainNodeSelect called with node:', node);
+    console.log('🔍 [MultiColumnNetworkView] handleMainNodeSelect called with node:', node);
     console.log('🔍 Node structure:', {
       id: node?.id,
       hasMetadata: !!node?.metadata,
