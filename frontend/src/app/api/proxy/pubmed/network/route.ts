@@ -286,23 +286,49 @@ export async function GET(request: NextRequest) {
     let referencePmids: string[] = [];
     let similarPmids: string[] = [];
 
-    if (networkType === 'citations' || networkType === 'mixed') {
-      citingPmids = await findRelatedArticles(pmid, 'pubmed_pubmed_citedin', Math.floor(limit / 2));
-    }
-
-    if (networkType === 'references' || networkType === 'mixed') {
-      referencePmids = await findRelatedArticles(pmid, 'pubmed_pubmed_refs', Math.floor(limit / 2));
-    }
-
-    if (networkType === 'similar') {
+    // Fetch PMIDs in parallel for better performance
+    if (networkType === 'mixed') {
+      // For mixed networks, fetch citations and references in parallel
+      const [citations, references] = await Promise.all([
+        findRelatedArticles(pmid, 'pubmed_pubmed_citedin', Math.floor(limit / 2)),
+        findRelatedArticles(pmid, 'pubmed_pubmed_refs', Math.floor(limit / 2))
+      ]);
+      citingPmids = citations;
+      referencePmids = references;
+    } else if (networkType === 'citations') {
+      citingPmids = await findRelatedArticles(pmid, 'pubmed_pubmed_citedin', limit);
+    } else if (networkType === 'references') {
+      referencePmids = await findRelatedArticles(pmid, 'pubmed_pubmed_refs', limit);
+    } else if (networkType === 'similar') {
       similarPmids = await findRelatedArticles(pmid, 'pubmed_pubmed', limit);
     }
 
     console.log(`📊 Found: ${citingPmids.length} citations, ${referencePmids.length} references, ${similarPmids.length} similar`);
 
-    // Fetch and add citing articles
+    // Fetch article details in parallel for better performance
+    const articleFetchPromises: Promise<PubMedArticle[]>[] = [];
+
     if (citingPmids.length > 0) {
-      const citingArticles = await fetchArticleDetails(citingPmids);
+      articleFetchPromises.push(fetchArticleDetails(citingPmids));
+    }
+
+    if (referencePmids.length > 0) {
+      articleFetchPromises.push(fetchArticleDetails(referencePmids));
+    }
+
+    if (similarPmids.length > 0) {
+      articleFetchPromises.push(fetchArticleDetails(similarPmids));
+    }
+
+    // Wait for all article fetches to complete
+    const articleResults = await Promise.all(articleFetchPromises);
+
+    // Process results based on what was fetched
+    let resultIndex = 0;
+
+    // Add citing articles
+    if (citingPmids.length > 0) {
+      const citingArticles = articleResults[resultIndex++];
       for (const article of citingArticles) {
         const node = createNetworkNode(article, 'citing_article');
         nodes.push(node);
@@ -318,9 +344,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch and add reference articles
+    // Add reference articles
     if (referencePmids.length > 0) {
-      const referenceArticles = await fetchArticleDetails(referencePmids);
+      const referenceArticles = articleResults[resultIndex++];
       for (const article of referenceArticles) {
         const node = createNetworkNode(article, 'reference_article');
         nodes.push(node);
@@ -336,9 +362,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch and add similar articles
+    // Add similar articles
     if (similarPmids.length > 0) {
-      const similarArticles = await fetchArticleDetails(similarPmids);
+      const similarArticles = articleResults[resultIndex++];
       for (const article of similarArticles) {
         const node = createNetworkNode(article, 'similar_article');
         nodes.push(node);
