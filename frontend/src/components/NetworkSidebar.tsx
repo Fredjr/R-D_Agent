@@ -796,21 +796,9 @@ export default function NetworkSidebar({
         </div>
       )}
 
-      {/* Navigation Instructions - Compact */}
-      <div className="p-2 border-b border-gray-200 bg-yellow-50 flex-shrink-0">
-        <div className="text-xs text-yellow-800">
-          <div className="font-medium mb-1">🧭 Navigation:</div>
-          <div className="space-y-0.5">
-            <div>• <strong>Cards</strong> → Explore article</div>
-            <div>• <strong>Nodes</strong> → See connections</div>
-            <div>• Buttons create new columns →</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Context-Aware Navigation Guide */}
+      {/* Context-Aware Navigation Guide - STICKY at top */}
       {supportsMultiColumn ? (
-        <div className="p-3 bg-green-50 border-b border-green-200">
+        <div className="sticky top-0 z-10 p-3 bg-green-50 border-b border-green-200 flex-shrink-0">
           <div className="text-xs text-green-900">
             <div className="font-semibold mb-1">🎯 Multi-Column Mode Active</div>
             <div className="space-y-0.5 text-green-700">
@@ -822,13 +810,13 @@ export default function NetworkSidebar({
           </div>
         </div>
       ) : (
-        <div className="p-3 bg-blue-50 border-b border-blue-200">
+        <div className="sticky top-0 z-10 p-3 bg-blue-50 border-b border-blue-200 flex-shrink-0">
           <div className="text-xs text-blue-900">
-            <div className="font-semibold mb-1">💡 Navigation:</div>
+            <div className="font-semibold mb-1">💡 Single-Panel Mode</div>
             <div className="space-y-0.5 text-blue-700">
-              <div>• <strong>Explore buttons</strong> → Show article list</div>
+              <div>• <strong>Explore buttons</strong> → Show article list below</div>
+              <div>• <strong>Click papers</strong> → Opens in new tab</div>
               <div>• <strong>Network buttons</strong> → Update graph</div>
-              <div>• <strong>Top navigation</strong> → Change entire view</div>
             </div>
           </div>
         </div>
