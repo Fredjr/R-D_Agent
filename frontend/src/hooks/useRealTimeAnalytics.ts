@@ -142,7 +142,7 @@ export function useRealTimeAnalytics(pageName: string) {
     });
   };
 
-  const trackCollectionAction = (action: 'create' | 'view' | 'edit' | 'delete', collectionId?: string, context?: any) => {
+  const trackCollectionAction = (action: 'create' | 'view' | 'edit' | 'delete' | 'network_view', collectionId?: string, context?: any) => {
     trackEvent('collection_action', {
       collection_action: action,
       collection_id: collectionId

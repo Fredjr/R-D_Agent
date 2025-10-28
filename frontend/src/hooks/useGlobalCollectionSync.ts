@@ -74,6 +74,11 @@ class CollectionSyncManager {
   }
 
   private notifyListeners() {
+    console.log('📢 CollectionSyncManager notifying', this.listeners.size, 'listeners with state:', {
+      collectionsCount: this.state.collections.length,
+      isLoading: this.state.isLoading,
+      error: this.state.error
+    });
     this.listeners.forEach(listener => listener(this.state));
   }
 
@@ -202,13 +207,30 @@ function getSyncManager(): CollectionSyncManager {
 // React hook for using the global collection sync
 export function useGlobalCollectionSync(projectId: string) {
   const { user } = useAuth();
-  const [state, setState] = useState<CollectionSyncState>(() => getSyncManager().getState());
   const syncManager = useRef(getSyncManager());
-  
+  const [state, setState] = useState<CollectionSyncState>(() => {
+    // Subscribe immediately during initialization to avoid missing updates
+    const initialState = syncManager.current.getState();
+    console.log('🔧 useGlobalCollectionSync initializing with state:', {
+      projectId,
+      collectionsCount: initialState.collections.length,
+      isLoading: initialState.isLoading
+    });
+    return initialState;
+  });
+
   useEffect(() => {
-    const unsubscribe = syncManager.current.subscribe(setState);
+    console.log('🔧 useGlobalCollectionSync subscribing to updates for projectId:', projectId);
+    const unsubscribe = syncManager.current.subscribe((newState) => {
+      console.log('🔔 useGlobalCollectionSync received state update:', {
+        projectId,
+        collectionsCount: newState.collections.length,
+        isLoading: newState.isLoading
+      });
+      setState(newState);
+    });
     return unsubscribe;
-  }, []);
+  }, [projectId]);
 
   const refreshCollections = useCallback(async () => {
     if (!projectId) return;
