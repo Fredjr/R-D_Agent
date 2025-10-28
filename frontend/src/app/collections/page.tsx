@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { BeakerIcon, PlusIcon, FolderIcon, EyeIcon, ShareIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { BeakerIcon, PlusIcon, FolderIcon, EyeIcon, ShareIcon, TrashIcon, XMarkIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { PageHeader } from '@/components/ui/Navigation';
 import { Button } from '@/components/ui/Button';
 import { SpotifyCollectionCard } from '@/components/ui/SpotifyCard';
@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import EnhancedCollectionNavigation from '@/components/EnhancedCollectionNavigation';
 import { useRealTimeAnalytics } from '@/hooks/useRealTimeAnalytics';
+import MultiColumnNetworkView from '@/components/MultiColumnNetworkView';
 
 interface Collection {
   id: string;
@@ -35,6 +36,12 @@ export default function CollectionsPage() {
   const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
+  // 🔧 NEW: State for article selection and network view
+  const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null);
+  const [showArticleSelector, setShowArticleSelector] = useState(false);
+  const [selectedArticle, setSelectedArticle] = useState<any | null>(null);
+  const [showNetworkView, setShowNetworkView] = useState(false);
 
   console.log('📚 Collections page loaded');
 
@@ -318,10 +325,11 @@ export default function CollectionsPage() {
                           router.push(`/project/${collection.projectId}?tab=collections&collection=${collection.id}&view=articles`);
                         }}
                         onNetworkView={() => {
-                          console.log('Network view for collection:', collection);
-                          trackCollectionAction('view', collection.id);
-                          // Navigate to project page with collections tab and network view
-                          router.push(`/project/${collection.projectId}?tab=collections&collection=${collection.id}&view=network`);
+                          console.log('🔵 Network view button clicked for collection:', collection);
+                          trackCollectionAction('network_view', collection.id);
+                          // 🔧 NEW: Show article selector modal instead of navigating
+                          setSelectedCollection(collection);
+                          setShowArticleSelector(true);
                         }}
                       />
                     ))}
@@ -376,7 +384,203 @@ export default function CollectionsPage() {
             </div>
           </div>
         )}
+
+        {/* 🔧 NEW: Article Selector Modal */}
+        {showArticleSelector && selectedCollection && (
+          <ArticleSelectorModal
+            collection={selectedCollection}
+            onClose={() => {
+              setShowArticleSelector(false);
+              setSelectedCollection(null);
+            }}
+            onArticleSelect={(article) => {
+              console.log('📄 Article selected:', article);
+              setSelectedArticle(article);
+              setShowArticleSelector(false);
+              setShowNetworkView(true);
+            }}
+          />
+        )}
+
+        {/* 🔧 NEW: Network View Modal */}
+        {showNetworkView && selectedArticle && selectedCollection && (
+          <NetworkViewModal
+            article={selectedArticle}
+            collection={selectedCollection}
+            onClose={() => {
+              setShowNetworkView(false);
+              setSelectedArticle(null);
+              setSelectedCollection(null);
+            }}
+          />
+        )}
       </div>
     </MobileResponsiveLayout>
+  );
+}
+
+// 🔧 NEW: Article Selector Modal Component
+function ArticleSelectorModal({
+  collection,
+  onClose,
+  onArticleSelect
+}: {
+  collection: Collection;
+  onClose: () => void;
+  onArticleSelect: (article: any) => void;
+}) {
+  const { user } = useAuth();
+  const [articles, setArticles] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchArticles = async () => {
+      try {
+        const response = await fetch(
+          `/api/proxy/collections/${collection.id}/articles?projectId=${collection.projectId}`,
+          {
+            headers: {
+              'User-ID': user?.email || 'default_user',
+            },
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          setArticles(data.articles || []);
+        }
+      } catch (error) {
+        console.error('Error fetching articles:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchArticles();
+  }, [collection.id, collection.projectId, user?.email]);
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[80vh] overflow-hidden">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-6 text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold mb-2">Select an Article</h2>
+              <p className="text-purple-100">{collection.name}</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+            >
+              <XMarkIcon className="w-6 h-6" />
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 overflow-y-auto max-h-[calc(80vh-140px)]">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                <p className="text-gray-600">Loading articles...</p>
+              </div>
+            </div>
+          ) : articles.length === 0 ? (
+            <div className="text-center py-12">
+              <FolderIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-600">No articles in this collection</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {articles.map((article) => (
+                <div
+                  key={article.id}
+                  onClick={() => onArticleSelect(article)}
+                  className="border border-gray-200 rounded-lg p-4 hover:border-purple-500 hover:bg-purple-50 cursor-pointer transition-all"
+                >
+                  <h3 className="font-semibold text-gray-900 mb-2">
+                    {article.article_title}
+                  </h3>
+                  <div className="flex items-center gap-4 text-sm text-gray-600">
+                    {article.article_authors && (
+                      <span>👥 {article.article_authors}</span>
+                    )}
+                    {article.article_journal && (
+                      <span>📚 {article.article_journal}</span>
+                    )}
+                    {article.article_year && (
+                      <span>📅 {article.article_year}</span>
+                    )}
+                  </div>
+                  {article.article_pmid && (
+                    <div className="mt-2">
+                      <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                        PMID: {article.article_pmid}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 🔧 NEW: Network View Modal Component
+function NetworkViewModal({
+  article,
+  collection,
+  onClose
+}: {
+  article: any;
+  collection: Collection;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full h-full max-w-[95vw] max-h-[95vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-4 text-white flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <ArrowLeftIcon className="w-5 h-5" />
+              </button>
+              <div>
+                <h2 className="text-xl font-bold">Network View</h2>
+                <p className="text-sm text-purple-100 truncate max-w-2xl">
+                  {article.article_title}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+            >
+              <XMarkIcon className="w-6 h-6" />
+            </button>
+          </div>
+        </div>
+
+        {/* Network View Content */}
+        <div className="flex-1 overflow-hidden">
+          <MultiColumnNetworkView
+            sourceType="article"
+            sourceId={article.article_pmid}
+            projectId={collection.projectId}
+            onDeepDiveCreated={() => {}}
+            onArticleSaved={() => {}}
+          />
+        </div>
+      </div>
+    </div>
   );
 }
