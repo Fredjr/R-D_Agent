@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui';
 import { useGlobalCollectionSync } from '../hooks/useGlobalCollectionSync';
 import { NetworkNode } from './NetworkView';
+import { useToast, ToastContainer } from './Toast';
 
 interface NetworkSidebarProps {
   selectedNode: NetworkNode | null;
@@ -89,6 +90,9 @@ export default function NetworkSidebar({
   const [newCollectionName, setNewCollectionName] = useState('');
   const [newCollectionDescription, setNewCollectionDescription] = useState('');
   const [creatingCollection, setCreatingCollection] = useState(false);
+
+  // Toast notifications
+  const { toasts, removeToast, success, error, info } = useToast();
 
   // ResearchRabbit-style exploration state
   const [expandedSection, setExpandedSection] = useState<'papers' | 'people' | 'content' | null>(null);
@@ -208,11 +212,13 @@ export default function NetworkSidebar({
       if (response.ok) {
         onAddToCollection(selectedNode.metadata.pmid);
         // Show success message
-        alert('Paper added to collection successfully!');
+        success('✅ Paper added to collection successfully!');
+      } else {
+        error('❌ Failed to add paper to collection');
       }
-    } catch (error) {
-      console.error('Error adding to collection:', error);
-      alert('Failed to add paper to collection');
+    } catch (err) {
+      console.error('Error adding to collection:', err);
+      error('❌ Failed to add paper to collection');
     }
   };
 
@@ -265,7 +271,9 @@ export default function NetworkSidebar({
 
         if (addResponse.ok) {
           onAddToCollection(selectedNode.metadata.pmid);
-          alert(`✅ Collection "${newCollectionName}" created and paper added successfully!`);
+          success(`✨ Collection "${newCollectionName}" created and paper added successfully!`);
+        } else {
+          error('❌ Failed to add paper to new collection');
         }
       }
 
@@ -274,9 +282,9 @@ export default function NetworkSidebar({
       setNewCollectionDescription('');
       setShowCreateCollectionModal(false);
 
-    } catch (error) {
-      console.error('Error creating collection:', error);
-      alert('❌ Failed to create collection. Please try again.');
+    } catch (err) {
+      console.error('Error creating collection:', err);
+      error('❌ Failed to create collection. Please try again.');
     } finally {
       setCreatingCollection(false);
     }
@@ -1384,6 +1392,9 @@ export default function NetworkSidebar({
           </div>
         </div>
       )}
+
+      {/* Toast notifications */}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   );
 }

@@ -422,6 +422,12 @@ export default function MultiColumnNetworkView({
           e.preventDefault();
           container.scrollBy({ top: 100, behavior: 'smooth' });
           break;
+        case 'Escape':
+          // Close all sidebars on Escape
+          e.preventDefault();
+          setMainSelectedNode(null);
+          setColumns(prev => prev.map(col => ({ ...col, selectedNode: null })));
+          break;
       }
     };
 
@@ -495,24 +501,38 @@ export default function MultiColumnNetworkView({
       {columns.length > 0 && (
         <>
           {/* Panel counter */}
-          <div className="absolute top-4 left-4 z-20 bg-white px-3 py-1 rounded-full text-xs font-medium shadow-md border border-gray-200">
+          <div
+            className="absolute top-4 left-4 z-20 bg-white px-3 py-1 rounded-full text-xs font-medium shadow-md border border-gray-200"
+            role="status"
+            aria-live="polite"
+            aria-label={`${columns.length + 1} panels open`}
+          >
             {columns.length + 1} Panel{columns.length > 0 ? 's' : ''}
           </div>
 
           {/* Keyboard shortcuts hint */}
-          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-20 bg-gray-900 bg-opacity-90 text-white px-4 py-2 rounded-full text-xs font-medium shadow-lg flex items-center gap-3">
+          <div
+            className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-20 bg-gray-900 bg-opacity-90 text-white px-4 py-2 rounded-full text-xs font-medium shadow-lg flex items-center gap-3"
+            role="complementary"
+            aria-label="Keyboard navigation shortcuts"
+          >
             <span className="flex items-center gap-1">
-              <kbd className="px-2 py-1 bg-gray-700 rounded text-xs">←</kbd>
-              <kbd className="px-2 py-1 bg-gray-700 rounded text-xs">→</kbd>
+              <kbd className="px-2 py-1 bg-gray-700 rounded text-xs" aria-label="Left arrow key">←</kbd>
+              <kbd className="px-2 py-1 bg-gray-700 rounded text-xs" aria-label="Right arrow key">→</kbd>
               Navigate
             </span>
-            <span className="text-gray-400">•</span>
+            <span className="text-gray-400" aria-hidden="true">•</span>
             <span className="flex items-center gap-1">
-              <kbd className="px-2 py-1 bg-gray-700 rounded text-xs">↑</kbd>
-              <kbd className="px-2 py-1 bg-gray-700 rounded text-xs">↓</kbd>
+              <kbd className="px-2 py-1 bg-gray-700 rounded text-xs" aria-label="Up arrow key">↑</kbd>
+              <kbd className="px-2 py-1 bg-gray-700 rounded text-xs" aria-label="Down arrow key">↓</kbd>
               Scroll
             </span>
-            <span className="text-gray-400">•</span>
+            <span className="text-gray-400" aria-hidden="true">•</span>
+            <span className="flex items-center gap-1">
+              <kbd className="px-2 py-1 bg-gray-700 rounded text-xs" aria-label="Escape key">Esc</kbd>
+              Close
+            </span>
+            <span className="text-gray-400" aria-hidden="true">•</span>
             <span>Right-click drag to pan</span>
           </div>
         </>
@@ -529,6 +549,9 @@ export default function MultiColumnNetworkView({
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
         onContextMenu={handleContextMenu}
+        role="region"
+        aria-label="Multi-panel network view"
+        tabIndex={0}
       >
         <div className="flex h-full gap-1" style={{ minWidth: `${MAIN_VIEW_MIN_WIDTH + (columns.length * COLUMN_MIN_WIDTH) + (columns.length * 4)}px` }}>
         {/* Main Network View */}
