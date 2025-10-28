@@ -1032,7 +1032,13 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       console.log('📊 [NetworkView] disableInternalSidebar:', disableInternalSidebar);
       console.log('📊 [NetworkView] onNodeSelect callback:', !!onNodeSelect);
       setSelectedNode(networkNode);
-      setShowSidebar(true);
+      // Only show internal sidebar if not disabled
+      if (!disableInternalSidebar) {
+        setShowSidebar(true);
+        console.log('📊 [NetworkView] Internal sidebar enabled');
+      } else {
+        console.log('📊 [NetworkView] Internal sidebar disabled - relying on external sidebar');
+      }
       console.log('📊 [NetworkView] Calling onNodeSelect callback...');
       onNodeSelect?.(networkNode);
       console.log('📊 [NetworkView] onNodeSelect callback completed');
