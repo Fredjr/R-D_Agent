@@ -95,51 +95,104 @@ function parseArticleXML(xmlText: string): PubMedArticle[] {
 }
 
 /**
+ * Generate alternative author name formats for PubMed search
+ * PubMed often uses "Last Name Initials" format (e.g., "Smith J" instead of "John Smith")
+ */
+function generateAuthorNameVariants(authorName: string): string[] {
+  const variants: string[] = [authorName]; // Always try the original name first
+
+  // Try to parse "FirstName MiddleInitial LastName" format
+  const parts = authorName.trim().split(/\s+/);
+
+  if (parts.length >= 2) {
+    const lastName = parts[parts.length - 1];
+    const firstNames = parts.slice(0, -1);
+
+    // Generate "LastName Initials" format (e.g., "Smith J" or "Smith JA")
+    const initials = firstNames.map(name => name.charAt(0).toUpperCase()).join(' ');
+    variants.push(`${lastName} ${initials}`);
+
+    // Generate "LastName FirstInitial" format (e.g., "Smith J")
+    if (firstNames.length > 0) {
+      variants.push(`${lastName} ${firstNames[0].charAt(0).toUpperCase()}`);
+    }
+
+    // Generate "FirstInitial LastName" format (e.g., "J Smith")
+    if (firstNames.length > 0) {
+      variants.push(`${firstNames[0].charAt(0).toUpperCase()} ${lastName}`);
+    }
+  }
+
+  return variants;
+}
+
+/**
  * Search PubMed for articles by author name
  */
 async function searchAuthorPapers(
-  authorName: string, 
+  authorName: string,
   limit: number = 20,
   openAccessOnly: boolean = false
 ): Promise<PubMedArticle[]> {
   try {
     console.log(`🔍 Searching PubMed for author: "${authorName}" (limit: ${limit}, OA only: ${openAccessOnly})`);
 
-    // Build search query
-    let searchQuery = `${authorName}[Author]`;
-    
-    // Add Open Access filter if requested
-    if (openAccessOnly) {
-      searchQuery += ' AND free fulltext[filter]';
-    }
+    // Generate alternative name formats
+    const nameVariants = generateAuthorNameVariants(authorName);
+    console.log(`📝 Trying author name variants:`, nameVariants);
 
-    // Step 1: Search for PMIDs
-    const searchParams = new URLSearchParams({
-      db: 'pubmed',
-      term: searchQuery,
-      retmax: limit.toString(),
-      retmode: 'json',
-      sort: 'relevance'
-    });
+    let pmids: string[] = [];
+    let successfulVariant = '';
 
-    const searchResponse = await fetch(`${PUBMED_SEARCH_URL}?${searchParams}`, {
-      headers: {
-        'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
+    // Try each name variant until we find results
+    for (const variant of nameVariants) {
+      // Build search query
+      let searchQuery = `${variant}[Author]`;
+
+      // Add Open Access filter if requested
+      if (openAccessOnly) {
+        searchQuery += ' AND free fulltext[filter]';
       }
-    });
 
-    if (!searchResponse.ok) {
-      throw new Error(`PubMed search failed: ${searchResponse.status}`);
+      // Step 1: Search for PMIDs
+      const searchParams = new URLSearchParams({
+        db: 'pubmed',
+        term: searchQuery,
+        retmax: limit.toString(),
+        retmode: 'json',
+        sort: 'relevance'
+      });
+
+      const searchResponse = await fetch(`${PUBMED_SEARCH_URL}?${searchParams}`, {
+        headers: {
+          'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
+        }
+      });
+
+      if (!searchResponse.ok) {
+        console.warn(`⚠️ PubMed search failed for variant "${variant}": ${searchResponse.status}`);
+        continue;
+      }
+
+      const searchData = await searchResponse.json();
+      const variantPmids = searchData.esearchresult?.idlist || [];
+
+      console.log(`🔍 Variant "${variant}" found ${variantPmids.length} PMIDs`);
+
+      if (variantPmids.length > 0) {
+        pmids = variantPmids;
+        successfulVariant = variant;
+        break; // Stop trying variants once we find results
+      }
     }
-
-    const searchData = await searchResponse.json();
-    const pmids = searchData.esearchresult?.idlist || [];
-
-    console.log(`✅ Found ${pmids.length} PMIDs for author: "${authorName}"`);
 
     if (pmids.length === 0) {
+      console.log(`❌ No results found for any variant of author: "${authorName}"`);
       return [];
     }
+
+    console.log(`✅ Found ${pmids.length} PMIDs for author: "${authorName}" using variant: "${successfulVariant}"`);
+
 
     // Step 2: Fetch article details
     const fetchParams = new URLSearchParams({
