@@ -135,27 +135,47 @@ async function fetchArticleAuthors(pmid: string): Promise<{ pmid: string; title:
 
 /**
  * Find suggested authors based on co-authorship and collaboration patterns
+ * Purpose: Return source paper authors + their frequent collaborators
+ * This should ALWAYS return results (at minimum, the source paper authors themselves)
  */
 async function findSuggestedAuthors(sourceAuthors: string[], meshTerms: string[], limit: number): Promise<SuggestedAuthor[]> {
-  if (sourceAuthors.length === 0) {
-    return [];
+  const suggestedAuthors: SuggestedAuthor[] = [];
+
+  // ALWAYS include source paper authors first
+  console.log(`📊 Source paper has ${sourceAuthors.length} authors`);
+  for (const author of sourceAuthors.slice(0, limit)) {
+    suggestedAuthors.push({
+      name: author,
+      collaboration_count: 1,
+      recent_papers: [],
+      relevance_score: 1.0,
+      reason: 'Author of selected paper'
+    });
   }
 
+  // If we already have enough authors, return them
+  if (suggestedAuthors.length >= limit) {
+    console.log(`✓ Returning ${suggestedAuthors.length} source authors`);
+    return suggestedAuthors;
+  }
+
+  // Now find collaborators
   const authorCollaborations = new Map<string, {
     count: number;
     papers: Array<{ pmid: string; title: string; year: number }>;
   }>();
 
   try {
-    // For each source author, find their other papers
-    const authorsToCheck = sourceAuthors.slice(0, 3); // Check top 3 authors to avoid too many requests
+    // Check first 3 source authors for collaborators
+    const authorsToCheck = sourceAuthors.slice(0, 3);
 
     for (const author of authorsToCheck) {
       console.log(`🔍 Finding collaborators for: ${author}`);
 
-      // Search for papers by this author
-      const searchQuery = `"${author}"[Author]`;
-      const searchUrl = `${PUBMED_SEARCH_URL}?db=pubmed&term=${encodeURIComponent(searchQuery)}&retmax=20&retmode=json&sort=pub_date`;
+      // Search for recent papers by this author (last 5 years)
+      const currentYear = new Date().getFullYear();
+      const searchQuery = `"${author}"[Author] AND ${currentYear - 5}:${currentYear}[dp]`;
+      const searchUrl = `${PUBMED_SEARCH_URL}?db=pubmed&term=${encodeURIComponent(searchQuery)}&retmax=15&retmode=json&sort=pub_date`;
 
       const searchResponse = await fetch(searchUrl, {
         headers: { 'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)' }
@@ -170,8 +190,11 @@ async function findSuggestedAuthors(sourceAuthors: string[], meshTerms: string[]
       const pmids = searchData.esearchresult?.idlist || [];
 
       if (pmids.length === 0) {
+        console.log(`ℹ️ No recent papers found for ${author}`);
         continue;
       }
+
+      console.log(`✓ Found ${pmids.length} papers for ${author}`);
 
       // Fetch details for these papers to extract co-authors
       const papers = await fetchPapersForAuthors(pmids.slice(0, 10));
@@ -179,7 +202,7 @@ async function findSuggestedAuthors(sourceAuthors: string[], meshTerms: string[]
       // Count co-author collaborations
       for (const paper of papers) {
         for (const coAuthor of paper.authors) {
-          // Skip if it's one of the source authors
+          // Skip if it's one of the source authors (already included)
           if (sourceAuthors.includes(coAuthor)) {
             continue;
           }
@@ -206,32 +229,36 @@ async function findSuggestedAuthors(sourceAuthors: string[], meshTerms: string[]
       }
     }
 
-    // Convert to suggested authors array
-    const suggestedAuthors: SuggestedAuthor[] = [];
+    // Add collaborators (require at least 1 collaboration, not 2)
+    const collaborators: SuggestedAuthor[] = [];
 
     for (const [authorName, collab] of authorCollaborations.entries()) {
-      // Only include authors with at least 2 collaborations
-      if (collab.count >= 2) {
-        suggestedAuthors.push({
+      if (collab.count >= 1) {
+        collaborators.push({
           name: authorName,
           collaboration_count: collab.count,
-          recent_papers: collab.papers.slice(0, 5),
-          relevance_score: Math.min(0.9, 0.5 + (collab.count * 0.1)),
+          recent_papers: collab.papers.slice(0, 3),
+          relevance_score: Math.min(0.9, 0.6 + (collab.count * 0.1)),
           reason: `Collaborated on ${collab.count} paper${collab.count > 1 ? 's' : ''} with source authors`
         });
       }
     }
 
-    // Sort by collaboration count
-    suggestedAuthors.sort((a, b) => b.collaboration_count - a.collaboration_count);
+    // Sort collaborators by collaboration count
+    collaborators.sort((a, b) => b.collaboration_count - a.collaboration_count);
 
-    console.log(`✓ Found ${suggestedAuthors.length} suggested authors`);
+    // Add collaborators up to limit
+    const remainingSlots = limit - suggestedAuthors.length;
+    suggestedAuthors.push(...collaborators.slice(0, remainingSlots));
 
-    return suggestedAuthors.slice(0, limit);
+    console.log(`✓ Returning ${suggestedAuthors.length} total authors (${sourceAuthors.length} source + ${collaborators.length} collaborators)`);
+
+    return suggestedAuthors;
 
   } catch (error) {
-    console.error('❌ Error finding suggested authors:', error);
-    return [];
+    console.error('❌ Error finding collaborators:', error);
+    // Even if error, return source authors
+    return suggestedAuthors;
   }
 }
 

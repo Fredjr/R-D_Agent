@@ -212,21 +212,36 @@ async function fetchCitations(pmid: string): Promise<LaterArticle[]> {
 
 /**
  * Find recent papers in same domain (newer, related)
+ * Purpose: Find papers published AFTER the source paper in the same research domain
  */
 async function findRecentPapers(meshTerms: string[], afterYear: number, limit: number, seenPmids: Set<string>): Promise<LaterArticle[]> {
   try {
-    // Use top 2 MeSH terms to find related newer papers
-    const topMeshTerms = meshTerms.slice(0, 2);
-    const meshQuery = topMeshTerms.map(term => `"${term}"[MeSH Terms]`).join(' OR ');
-
-    // Search for papers published after source year
     const currentYear = new Date().getFullYear();
-    const dateFilter = `${afterYear + 1}:${currentYear}[dp]`;
-    const fullQuery = `(${meshQuery}) AND ${dateFilter}`;
 
-    console.log(`🔍 Recent papers query: ${fullQuery}`);
+    // If no papers exist after source year, return empty (this is expected for very recent papers)
+    if (afterYear >= currentYear) {
+      console.log(`ℹ️ Source paper is from ${afterYear}, no later papers possible yet`);
+      return [];
+    }
 
-    const searchUrl = `${PUBMED_SEARCH_URL}?db=pubmed&term=${encodeURIComponent(fullQuery)}&retmax=${limit * 2}&retmode=json&sort=pub_date`;
+    // Build query: papers in same domain published after source year
+    let searchQuery = '';
+
+    if (meshTerms.length > 0) {
+      // Use MeSH terms to find domain-related papers
+      const topMeshTerms = meshTerms.slice(0, 3);
+      const meshQuery = topMeshTerms.map(term => `"${term}"[MeSH Terms]`).join(' OR ');
+      const dateFilter = `${afterYear + 1}:${currentYear}[dp]`;
+      searchQuery = `(${meshQuery}) AND ${dateFilter}`;
+      console.log(`🔍 Later Work query (with MeSH): ${searchQuery}`);
+    } else {
+      // No MeSH terms - just use date filter to get papers published after source
+      const dateFilter = `${afterYear + 1}:${currentYear}[dp]`;
+      searchQuery = dateFilter;
+      console.log(`🔍 Later Work query (date only): ${searchQuery}`);
+    }
+
+    const searchUrl = `${PUBMED_SEARCH_URL}?db=pubmed&term=${encodeURIComponent(searchQuery)}&retmax=${limit * 3}&retmode=json&sort=pub_date`;
 
     const response = await fetch(searchUrl, {
       headers: { 'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)' }
@@ -240,8 +255,15 @@ async function findRecentPapers(meshTerms: string[], afterYear: number, limit: n
     const searchData = await response.json();
     const pmids = searchData.esearchresult?.idlist || [];
 
+    if (pmids.length === 0) {
+      console.log(`ℹ️ No papers found published after ${afterYear} in this domain`);
+      return [];
+    }
+
+    console.log(`✓ Found ${pmids.length} papers published after ${afterYear}`);
+
     // Filter out already seen PMIDs
-    const newPmids = pmids.filter((id: string) => !seenPmids.has(id)).slice(0, limit);
+    const newPmids = pmids.filter((id: string) => !seenPmids.has(id)).slice(0, limit * 2);
 
     if (newPmids.length === 0) {
       return [];
@@ -249,11 +271,18 @@ async function findRecentPapers(meshTerms: string[], afterYear: number, limit: n
 
     const articles = await fetchArticlesDetails(newPmids);
 
-    return articles.map(article => ({
-      ...article,
-      relevance_score: 0.7,
-      reason: 'Recent work in same domain'
-    }));
+    // Filter to ensure all papers are actually after source year
+    const laterArticles = articles
+      .filter(article => article.year > afterYear)
+      .slice(0, limit)
+      .map(article => ({
+        ...article,
+        relevance_score: 0.75,
+        reason: meshTerms.length > 0 ? 'Later work in same domain' : 'Published after source paper'
+      }));
+
+    console.log(`✓ Returning ${laterArticles.length} later work papers`);
+    return laterArticles;
 
   } catch (error) {
     console.error('❌ Error finding recent papers:', error);
