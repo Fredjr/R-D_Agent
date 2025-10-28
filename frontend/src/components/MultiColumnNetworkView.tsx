@@ -480,7 +480,16 @@ export default function MultiColumnNetworkView({
           </div>
           
           {/* Main Sidebar */}
-          {mainSelectedNode && (
+          {mainSelectedNode && (() => {
+            // DEBUG: Log props being passed to NetworkSidebar
+            console.log('🔍 [MultiColumnNetworkView] Rendering NetworkSidebar with props:', {
+              hasMainSelectedNode: !!mainSelectedNode,
+              hasHandleCreatePaperColumn: !!handleCreatePaperColumn,
+              handleCreatePaperColumnType: typeof handleCreatePaperColumn,
+              showCreateColumnButton: true,
+              supportsMultiColumn: true
+            });
+            return (
               <div className="absolute top-0 right-0 h-full z-10 bg-white border-l-2 border-gray-300 shadow-xl" style={{ width: `${SIDEBAR_WIDTH}px` }}>
                 <div className="p-3 bg-blue-50 border-b border-blue-200">
                   <h3 className="text-sm font-semibold text-blue-800 mb-1">📄 Article Details</h3>
@@ -529,7 +538,8 @@ export default function MultiColumnNetworkView({
                 />
               </ErrorBoundary>
               </div>
-            )}
+            );
+          })()}
         </div>
       </div>
 
