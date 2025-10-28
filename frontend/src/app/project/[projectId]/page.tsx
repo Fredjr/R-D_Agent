@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { MobileResponsiveLayout } from '@/components/ui/MobileResponsiveLayout';
 import AnnotationsFeed from '@/components/AnnotationsFeed';
@@ -74,6 +74,7 @@ interface Project {
 
 export default function ProjectPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const projectId = params.projectId as string;
   const { user } = useAuth();
   const [project, setProject] = useState<Project | null>(null);
@@ -197,6 +198,15 @@ export default function ProjectPage() {
   // Comprehensive project summary state
   const [comprehensiveSummary, setComprehensiveSummary] = useState<any>(null);
   const [generatingComprehensiveSummary, setGeneratingComprehensiveSummary] = useState(false);
+
+  // 🔧 Handle URL parameters to set active tab
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && ['overview', 'collections', 'network', 'activity'].includes(tab)) {
+      console.log('📍 Setting active tab from URL:', tab);
+      setActiveTab(tab as 'overview' | 'collections' | 'network' | 'activity');
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (projectId && user) {
