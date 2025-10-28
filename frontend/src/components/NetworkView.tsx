@@ -615,7 +615,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
               usePubMed = true;
             } else {
               // Default: mixed network with both citations and references
-              endpoint = `/api/proxy/pubmed/network?pmid=${sourceId}&type=mixed&limit=20`;
+              // Reduced limit to 12 to avoid Vercel timeout (6 citations + 6 references)
+              endpoint = `/api/proxy/pubmed/network?pmid=${sourceId}&type=mixed&limit=12`;
               usePubMed = true;
             }
           } else if (sourceType === 'collection') {
@@ -743,7 +744,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       // ARTICLE NETWORK FALLBACK: If article network is empty or has only 1 node, try PubMed citations
       if (sourceType === 'article' && (!data.nodes || data.nodes.length <= 1)) {
         console.log('Article network empty/single node, trying PubMed citations fallback...');
-        const fallbackResponse = await fetch(`/api/proxy/pubmed/network?pmid=${sourceId}&type=citations&limit=12`, {
+        // Reduced limit to 8 to avoid timeout
+        const fallbackResponse = await fetch(`/api/proxy/pubmed/network?pmid=${sourceId}&type=citations&limit=8`, {
           headers: {
             'User-ID': user?.email || 'default_user',
           },
@@ -766,7 +768,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           } else {
             // Citations fallback also failed, try references
             console.log('Citations fallback empty, trying references...');
-            const refsResponse = await fetch(`/api/proxy/pubmed/network?pmid=${sourceId}&type=references&limit=12`, {
+            // Reduced limit to 8 to avoid timeout
+            const refsResponse = await fetch(`/api/proxy/pubmed/network?pmid=${sourceId}&type=references&limit=8`, {
               headers: {
                 'User-ID': user?.email || 'default_user',
               },
