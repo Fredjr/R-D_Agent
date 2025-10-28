@@ -962,11 +962,12 @@ export default function ProjectPage() {
                 icon: '📁',
                 count: (project as any).collections?.length || 0
               },
-              {
-                id: 'network',
-                label: 'Network View',
-                icon: '🕸️'
-              },
+              // Temporarily disabled until backend supports project-level network data
+              // {
+              //   id: 'network',
+              //   label: 'Network View',
+              //   icon: '🕸️'
+              // },
               {
                 id: 'activity',
                 label: 'Activity & Notes',
@@ -1792,8 +1793,8 @@ export default function ProjectPage() {
           </div>
         )}
 
-        {/* Network View Tab */}
-        {activeTab === 'network' && (
+        {/* Network View Tab - Temporarily disabled until backend supports project-level network data */}
+        {/* {activeTab === 'network' && (
           <div className="mb-8">
             <div className="bg-white rounded-lg shadow p-6">
               <div className="mb-4">
@@ -1817,7 +1818,7 @@ export default function ProjectPage() {
               </div>
             </div>
           </div>
-        )}
+        )} */}
 
         {/* Activity & Notes Tab */}
         {activeTab === 'activity' && (
