@@ -1492,6 +1492,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             onShowReferences={(pmid) => handleNavigationChange('earlier', pmid)}
             onExplorePeople={(authors) => handleNavigationChange('authors', authors.join(','))}
             onAddExplorationNodes={addExplorationNodesToGraph}
+            supportsMultiColumn={false}
             onGenerateReview={onGenerateReview}
             onDeepDive={onDeepDive}
             onExploreCluster={onExploreCluster}
