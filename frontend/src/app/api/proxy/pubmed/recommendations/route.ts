@@ -256,8 +256,11 @@ async function getSimilarPapers(pmid: string, limit: number): Promise<PubMedPape
 
     // Step 2: Fetch details for similar papers
     const papers = await fetchPaperDetails(similarPmids);
-    
-    return papers.map(paper => ({
+
+    // Filter out the source paper itself
+    const filteredPapers = papers.filter(paper => paper.pmid !== pmid);
+
+    return filteredPapers.map(paper => ({
       ...paper,
       relevance_score: 0.8,
       recommendation_reason: 'Similar to your selected paper',

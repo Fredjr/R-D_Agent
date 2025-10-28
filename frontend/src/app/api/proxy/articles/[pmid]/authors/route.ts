@@ -1,6 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = "https://r-dagent-production.up.railway.app";
+/**
+ * Suggested Authors API
+ * Finds key researchers related to the source paper
+ * Uses PubMed data to extract co-authors and find frequent collaborators
+ */
+
+interface SuggestedAuthor {
+  name: string;
+  full_name?: string;
+  affiliation?: string;
+  collaboration_count: number;
+  recent_papers: Array<{
+    pmid: string;
+    title: string;
+    year: number;
+  }>;
+  relevance_score: number;
+  reason: string;
+}
+
+// PubMed eUtils base URLs
+const PUBMED_FETCH_URL = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi';
+const PUBMED_SEARCH_URL = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi';
 
 export async function GET(
   request: NextRequest,
@@ -9,42 +31,279 @@ export async function GET(
   try {
     const { pmid } = await params;
     const { searchParams } = new URL(request.url);
-    
-    // Get query parameters
-    const include_profiles = searchParams.get('include_profiles') || 'true';
-    
-    // Get user ID header
-    const userIdHeader = request.headers.get('User-ID');
-    if (!userIdHeader) {
-      return NextResponse.json({ error: 'User-ID required' }, { status: 401 });
+
+    const limit = parseInt(searchParams.get('limit') || '10');
+
+    console.log(`👥 Suggested Authors request for PMID: ${pmid}, limit: ${limit}`);
+
+    // Step 1: Get source article authors
+    const sourceArticle = await fetchArticleAuthors(pmid);
+
+    if (!sourceArticle) {
+      return NextResponse.json({
+        source_article: { pmid, title: "Article not found" },
+        authors: [],
+        total_count: 0
+      });
     }
 
-    // Build backend URL with query parameters
-    const backendUrl = `${BACKEND_URL}/articles/${pmid}/authors?include_profiles=${include_profiles}`;
+    console.log(`📊 Source article has ${sourceArticle.authors.length} authors`);
 
-    const response = await fetch(backendUrl, {
-      method: 'GET',
-      headers: {
-        'User-ID': userIdHeader,
-        'Content-Type': 'application/json',
+    // Step 2: Find suggested authors (co-authors and collaborators)
+    const suggestedAuthors = await findSuggestedAuthors(sourceArticle.authors, sourceArticle.meshTerms, limit);
+
+    return NextResponse.json({
+      source_article: {
+        pmid: sourceArticle.pmid,
+        title: sourceArticle.title,
+        authors: sourceArticle.authors
       },
+      authors: suggestedAuthors,
+      total_count: suggestedAuthors.length
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      return NextResponse.json(
-        { error: `Backend error: ${errorText}` },
-        { status: response.status }
-      );
-    }
-
-    const data = await response.json();
-    return NextResponse.json(data);
   } catch (error) {
-    console.error('Article authors proxy error:', error);
+    console.error('❌ Suggested authors error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Failed to get suggested authors' },
       { status: 500 }
     );
   }
+}
+
+/**
+ * Fetch article authors and details
+ */
+async function fetchArticleAuthors(pmid: string): Promise<{ pmid: string; title: string; authors: string[]; meshTerms: string[] } | null> {
+  try {
+    const fetchUrl = `${PUBMED_FETCH_URL}?db=pubmed&id=${pmid}&retmode=xml&rettype=abstract`;
+
+    const response = await fetch(fetchUrl, {
+      headers: { 'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)' }
+    });
+
+    if (!response.ok) {
+      console.error(`❌ PubMed fetch failed: ${response.status}`);
+      return null;
+    }
+
+    const xmlText = await response.text();
+
+    // Extract title
+    const titleMatch = xmlText.match(/<ArticleTitle>([\s\S]*?)<\/ArticleTitle>/);
+    const title = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, '').trim() : 'Unknown';
+
+    // Extract authors
+    const authors: string[] = [];
+    const authorMatches = xmlText.match(/<Author[^>]*>[\s\S]*?<\/Author>/g) || [];
+
+    for (const authorXml of authorMatches) {
+      const lastNameMatch = authorXml.match(/<LastName>(.*?)<\/LastName>/);
+      const initialsMatch = authorXml.match(/<Initials>(.*?)<\/Initials>/);
+      const foreNameMatch = authorXml.match(/<ForeName>(.*?)<\/ForeName>/);
+
+      if (lastNameMatch) {
+        const lastName = lastNameMatch[1];
+        const initials = initialsMatch ? initialsMatch[1] : '';
+        const foreName = foreNameMatch ? foreNameMatch[1] : '';
+
+        // Store in format "LastName Initials"
+        authors.push(`${lastName} ${initials}`.trim());
+      }
+    }
+
+    // Extract MeSH terms
+    const meshTerms: string[] = [];
+    const meshMatches = xmlText.match(/<MeshHeading>[\s\S]*?<\/MeshHeading>/g) || [];
+
+    for (const meshXml of meshMatches) {
+      const descriptorMatch = meshXml.match(/<DescriptorName[^>]*>(.*?)<\/DescriptorName>/);
+      if (descriptorMatch) {
+        meshTerms.push(descriptorMatch[1].trim());
+      }
+    }
+
+    console.log(`📊 Extracted ${authors.length} authors, ${meshTerms.length} MeSH terms`);
+
+    return { pmid, title, authors, meshTerms };
+
+  } catch (error) {
+    console.error('❌ Error fetching article authors:', error);
+    return null;
+  }
+}
+
+/**
+ * Find suggested authors based on co-authorship and collaboration patterns
+ */
+async function findSuggestedAuthors(sourceAuthors: string[], meshTerms: string[], limit: number): Promise<SuggestedAuthor[]> {
+  if (sourceAuthors.length === 0) {
+    return [];
+  }
+
+  const authorCollaborations = new Map<string, {
+    count: number;
+    papers: Array<{ pmid: string; title: string; year: number }>;
+  }>();
+
+  try {
+    // For each source author, find their other papers
+    const authorsToCheck = sourceAuthors.slice(0, 3); // Check top 3 authors to avoid too many requests
+
+    for (const author of authorsToCheck) {
+      console.log(`🔍 Finding collaborators for: ${author}`);
+
+      // Search for papers by this author
+      const searchQuery = `"${author}"[Author]`;
+      const searchUrl = `${PUBMED_SEARCH_URL}?db=pubmed&term=${encodeURIComponent(searchQuery)}&retmax=20&retmode=json&sort=pub_date`;
+
+      const searchResponse = await fetch(searchUrl, {
+        headers: { 'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)' }
+      });
+
+      if (!searchResponse.ok) {
+        console.error(`❌ Search failed for ${author}: ${searchResponse.status}`);
+        continue;
+      }
+
+      const searchData = await searchResponse.json();
+      const pmids = searchData.esearchresult?.idlist || [];
+
+      if (pmids.length === 0) {
+        continue;
+      }
+
+      // Fetch details for these papers to extract co-authors
+      const papers = await fetchPapersForAuthors(pmids.slice(0, 10));
+
+      // Count co-author collaborations
+      for (const paper of papers) {
+        for (const coAuthor of paper.authors) {
+          // Skip if it's one of the source authors
+          if (sourceAuthors.includes(coAuthor)) {
+            continue;
+          }
+
+          if (!authorCollaborations.has(coAuthor)) {
+            authorCollaborations.set(coAuthor, {
+              count: 0,
+              papers: []
+            });
+          }
+
+          const collab = authorCollaborations.get(coAuthor)!;
+          collab.count++;
+
+          // Add paper if not already added
+          if (!collab.papers.some(p => p.pmid === paper.pmid)) {
+            collab.papers.push({
+              pmid: paper.pmid,
+              title: paper.title,
+              year: paper.year
+            });
+          }
+        }
+      }
+    }
+
+    // Convert to suggested authors array
+    const suggestedAuthors: SuggestedAuthor[] = [];
+
+    for (const [authorName, collab] of authorCollaborations.entries()) {
+      // Only include authors with at least 2 collaborations
+      if (collab.count >= 2) {
+        suggestedAuthors.push({
+          name: authorName,
+          collaboration_count: collab.count,
+          recent_papers: collab.papers.slice(0, 5),
+          relevance_score: Math.min(0.9, 0.5 + (collab.count * 0.1)),
+          reason: `Collaborated on ${collab.count} paper${collab.count > 1 ? 's' : ''} with source authors`
+        });
+      }
+    }
+
+    // Sort by collaboration count
+    suggestedAuthors.sort((a, b) => b.collaboration_count - a.collaboration_count);
+
+    console.log(`✓ Found ${suggestedAuthors.length} suggested authors`);
+
+    return suggestedAuthors.slice(0, limit);
+
+  } catch (error) {
+    console.error('❌ Error finding suggested authors:', error);
+    return [];
+  }
+}
+
+/**
+ * Fetch paper details to extract co-authors
+ */
+async function fetchPapersForAuthors(pmids: string[]): Promise<Array<{ pmid: string; title: string; year: number; authors: string[] }>> {
+  if (pmids.length === 0) return [];
+
+  try {
+    const fetchUrl = `${PUBMED_FETCH_URL}?db=pubmed&id=${pmids.join(',')}&retmode=xml&rettype=abstract`;
+
+    const response = await fetch(fetchUrl, {
+      headers: { 'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)' }
+    });
+
+    if (!response.ok) {
+      console.error(`❌ Fetch failed: ${response.status}`);
+      return [];
+    }
+
+    const xmlText = await response.text();
+    return parsePapersXML(xmlText);
+
+  } catch (error) {
+    console.error('❌ Error fetching papers:', error);
+    return [];
+  }
+}
+
+/**
+ * Parse XML to extract paper details with authors
+ */
+function parsePapersXML(xmlText: string): Array<{ pmid: string; title: string; year: number; authors: string[] }> {
+  const papers: Array<{ pmid: string; title: string; year: number; authors: string[] }> = [];
+
+  try {
+    const articleMatches = xmlText.match(/<PubmedArticle>[\s\S]*?<\/PubmedArticle>/g) || [];
+
+    for (const articleXml of articleMatches) {
+      const pmidMatch = articleXml.match(/<PMID[^>]*>(\d+)<\/PMID>/);
+      const pmid = pmidMatch ? pmidMatch[1] : '';
+
+      const titleMatch = articleXml.match(/<ArticleTitle>([\s\S]*?)<\/ArticleTitle>/);
+      const title = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, '').trim() : '';
+
+      const yearMatch = articleXml.match(/<PubDate>[\s\S]*?<Year>(\d{4})<\/Year>/);
+      const year = yearMatch ? parseInt(yearMatch[1]) : 0;
+
+      // Extract authors
+      const authors: string[] = [];
+      const authorMatches = articleXml.match(/<Author[^>]*>[\s\S]*?<\/Author>/g) || [];
+
+      for (const authorXml of authorMatches) {
+        const lastNameMatch = authorXml.match(/<LastName>(.*?)<\/LastName>/);
+        const initialsMatch = authorXml.match(/<Initials>(.*?)<\/Initials>/);
+
+        if (lastNameMatch) {
+          const lastName = lastNameMatch[1];
+          const initials = initialsMatch ? initialsMatch[1] : '';
+          authors.push(`${lastName} ${initials}`.trim());
+        }
+      }
+
+      if (pmid && title) {
+        papers.push({ pmid, title, year, authors });
+      }
+    }
+
+  } catch (error) {
+    console.error('❌ Error parsing papers XML:', error);
+  }
+
+  return papers;
 }
