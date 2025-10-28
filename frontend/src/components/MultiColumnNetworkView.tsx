@@ -744,6 +744,8 @@ export default function MultiColumnNetworkView({
                       onGenerateReview={onGenerateReview}
                       onDeepDive={onDeepDive}
                       onExploreCluster={onExploreCluster}
+                      onShowCitations={handleShowCitations}
+                      onShowReferences={handleShowReferences}
                     />
                   </ErrorBoundary>
                 </div>

@@ -62,6 +62,8 @@ export default function NetworkSidebar({
   console.log('🔍 NetworkSidebar rendered with props:', {
     hasSelectedNode: !!selectedNode,
     hasOnAddExplorationNodes: !!onAddExplorationNodes,
+    hasOnShowCitations: !!onShowCitations,
+    hasOnShowReferences: !!onShowReferences,
     currentMode,
     projectId,
     collectionsCount: collections?.length || 0,
@@ -344,13 +346,28 @@ export default function NetworkSidebar({
 
           // Handle different response structures
           let results = [];
-          if (section === 'people' && mode === 'authors' && data.combined_articles) {
-            // Author papers response
+          if (section === 'people' && mode === 'authors') {
+            // Author papers response - check for combined_articles
             console.log('🔍 [These Authors] Response data:', data);
             console.log('🔍 [These Authors] combined_articles:', data.combined_articles);
             console.log('🔍 [These Authors] combined_articles length:', data.combined_articles?.length);
             console.log('🔍 [These Authors] author_results:', data.author_results);
-            results = data.combined_articles;
+            console.log('🔍 [These Authors] Full data keys:', Object.keys(data));
+
+            // Try multiple possible response structures
+            if (data.combined_articles && Array.isArray(data.combined_articles)) {
+              results = data.combined_articles;
+              console.log('✅ [These Authors] Using combined_articles:', results.length);
+            } else if (data.articles && Array.isArray(data.articles)) {
+              results = data.articles;
+              console.log('✅ [These Authors] Using articles:', results.length);
+            } else if (data.results && Array.isArray(data.results)) {
+              results = data.results;
+              console.log('✅ [These Authors] Using results:', results.length);
+            } else {
+              console.error('❌ [These Authors] No valid articles array found in response!');
+              console.error('❌ [These Authors] Response structure:', JSON.stringify(data, null, 2));
+            }
           } else if (usePubMed) {
             // PubMed API responses
             results = data.citations || data.references || [];
@@ -917,8 +934,19 @@ export default function NetworkSidebar({
               size="sm"
               className="w-full text-xs justify-start"
               onClick={() => {
+                console.log('🔍 [NetworkSidebar] Citations Network button clicked!', {
+                  hasCallback: !!onShowCitations,
+                  hasPmid: !!selectedNode?.metadata?.pmid,
+                  pmid: selectedNode?.metadata?.pmid
+                });
                 if (onShowCitations && selectedNode?.metadata?.pmid) {
+                  console.log('✅ [NetworkSidebar] Calling onShowCitations with PMID:', selectedNode.metadata.pmid);
                   onShowCitations(selectedNode.metadata.pmid);
+                } else {
+                  console.error('❌ [NetworkSidebar] Cannot call onShowCitations:', {
+                    hasCallback: !!onShowCitations,
+                    hasPmid: !!selectedNode?.metadata?.pmid
+                  });
                 }
               }}
             >
@@ -929,8 +957,19 @@ export default function NetworkSidebar({
               size="sm"
               className="w-full text-xs justify-start"
               onClick={() => {
+                console.log('🔍 [NetworkSidebar] References Network button clicked!', {
+                  hasCallback: !!onShowReferences,
+                  hasPmid: !!selectedNode?.metadata?.pmid,
+                  pmid: selectedNode?.metadata?.pmid
+                });
                 if (onShowReferences && selectedNode?.metadata?.pmid) {
+                  console.log('✅ [NetworkSidebar] Calling onShowReferences with PMID:', selectedNode.metadata.pmid);
                   onShowReferences(selectedNode.metadata.pmid);
+                } else {
+                  console.error('❌ [NetworkSidebar] Cannot call onShowReferences:', {
+                    hasCallback: !!onShowReferences,
+                    hasPmid: !!selectedNode?.metadata?.pmid
+                  });
                 }
               }}
             >
