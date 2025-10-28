@@ -130,6 +130,37 @@ def verify_password(password: str, hashed: str) -> bool:
     """Verify a password against its hash"""
     return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
+# 🔧 AUTHENTICATION HELPER: Resolve email to UUID
+def resolve_user_id(user_identifier: str, db: Session) -> str:
+    """
+    Resolve user identifier (email or UUID) to UUID.
+
+    This fixes the authentication bug where frontend sends email addresses
+    but backend expects UUIDs for owner_user_id comparisons.
+
+    Args:
+        user_identifier: Either an email address or a UUID string
+        db: Database session
+
+    Returns:
+        UUID string if user found, otherwise returns original identifier
+    """
+    # Check if it's already a UUID format
+    try:
+        uuid.UUID(user_identifier)
+        return user_identifier  # Already a UUID
+    except (ValueError, AttributeError):
+        pass
+
+    # It's an email, resolve to UUID
+    if "@" in user_identifier:
+        user = db.query(User).filter(User.email == user_identifier).first()
+        if user:
+            return user.user_id
+
+    # Fallback to original identifier
+    return user_identifier
+
 # Initialize FastAPI app
 app = FastAPI(title="R&D Agent API", version="1.0.0")
 
@@ -5224,22 +5255,25 @@ async def run_database_migration(
 async def get_project(project_id: str, request: Request, db: Session = Depends(get_db)):
     """Get project details with associated reports and collaborators"""
     current_user = request.headers.get("User-ID", "default_user")
-    
+
+    # 🔧 FIX: Resolve email to UUID using helper function
+    user_id = resolve_user_id(current_user, db)
+
     # Check if user has access to this project
     project = db.query(Project).filter(Project.project_id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    
-    # Check permissions
+
+    # Check permissions (using UUID)
     has_access = (
-        project.owner_user_id == current_user or
+        project.owner_user_id == user_id or
         db.query(ProjectCollaborator).filter(
             ProjectCollaborator.project_id == project_id,
-            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.user_id == user_id,
             ProjectCollaborator.is_active == True
         ).first() is not None
     )
-    
+
     if not has_access:
         raise HTTPException(status_code=403, detail="Access denied")
     
