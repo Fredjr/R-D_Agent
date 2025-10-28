@@ -376,8 +376,13 @@ export async function GET(request: NextRequest) {
       metadata: networkData.metadata
     });
 
-    // If debug mode, include raw PMIDs in response
+    // If debug mode, include raw PMIDs and detailed fetch info in response
     if (debug) {
+      // Count how many articles were actually fetched for each type
+      const citingNodesCount = nodes.filter(n => n.metadata.node_type === 'citing_article').length;
+      const referenceNodesCount = nodes.filter(n => n.metadata.node_type === 'reference_article').length;
+      const similarNodesCount = nodes.filter(n => n.metadata.node_type === 'similar_article').length;
+
       return NextResponse.json({
         ...networkData,
         debug: {
@@ -387,6 +392,9 @@ export async function GET(request: NextRequest) {
           citingPmidsCount: citingPmids.length,
           referencePmidsCount: referencePmids.length,
           similarPmidsCount: similarPmids.length,
+          citingNodesFetched: citingNodesCount,
+          referenceNodesFetched: referenceNodesCount,
+          similarNodesFetched: similarNodesCount,
           nodesCount: nodes.length,
           edgesCount: edges.length
         }
