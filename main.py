@@ -5138,27 +5138,35 @@ async def list_projects(request: Request, db: Session = Depends(get_db)):
     """List all projects for the current user"""
     current_user = request.headers.get("User-ID", "default_user")
 
-    # TEMPORARY FIX: For testing, return all active projects if no user-specific projects found
-    # Get projects owned by user
+    # 🔧 FIX: Resolve email to UUID if current_user is an email
+    user_id = current_user
+    if "@" in current_user:
+        user = db.query(User).filter(User.email == current_user).first()
+        if user:
+            user_id = user.user_id
+            print(f"✅ Resolved email {current_user} to UUID {user_id}")
+        else:
+            print(f"⚠️ User not found for email: {current_user}")
+            return ProjectListResponse(projects=[])
+
+    # Get projects owned by user (using UUID)
     owned_projects = db.query(Project).filter(
-        Project.owner_user_id == current_user,
+        Project.owner_user_id == user_id,
         Project.is_active == True
     ).all()
 
-    # Get projects where user is a collaborator
+    # Get projects where user is a collaborator (using UUID)
     collaborated_projects = db.query(Project).join(ProjectCollaborator).filter(
-        ProjectCollaborator.user_id == current_user,
+        ProjectCollaborator.user_id == user_id,
         ProjectCollaborator.is_active == True,
         Project.is_active == True
     ).all()
 
-    # TEMPORARY: If no user-specific projects found, return all active projects for testing
-    if not owned_projects and not collaborated_projects:
-        owned_projects = db.query(Project).filter(Project.is_active == True).limit(20).all()
-    
     # Combine and deduplicate
     all_projects = list({p.project_id: p for p in owned_projects + collaborated_projects}.values())
-    
+
+    print(f"📊 Found {len(owned_projects)} owned + {len(collaborated_projects)} collaborated = {len(all_projects)} total projects for user {user_id}")
+
     project_responses = [
         ProjectResponse(
             project_id=p.project_id,
@@ -5169,7 +5177,7 @@ async def list_projects(request: Request, db: Session = Depends(get_db)):
             updated_at=p.updated_at
         ) for p in all_projects
     ]
-    
+
     return ProjectListResponse(projects=project_responses)
 
 @app.get("/debug/projects-owners")
@@ -7751,15 +7759,24 @@ async def get_project_collections(
     """Get all collections for a project"""
     current_user = request.headers.get("User-ID", "default_user")
 
-    # Check project access
+    # 🔧 FIX: Resolve email to UUID if current_user is an email
+    user_id = current_user
+    if "@" in current_user:
+        user = db.query(User).filter(User.email == current_user).first()
+        if user:
+            user_id = user.user_id
+        else:
+            raise HTTPException(status_code=403, detail="User not found")
+
+    # Check project access (using UUID)
     has_access = (
         db.query(Project).filter(
             Project.project_id == project_id,
-            Project.owner_user_id == current_user
+            Project.owner_user_id == user_id
         ).first() is not None or
         db.query(ProjectCollaborator).filter(
             ProjectCollaborator.project_id == project_id,
-            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.user_id == user_id,
             ProjectCollaborator.is_active == True
         ).first() is not None
     )
