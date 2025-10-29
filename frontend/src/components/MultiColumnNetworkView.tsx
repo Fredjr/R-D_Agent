@@ -77,7 +77,10 @@ export default function MultiColumnNetworkView({
       if (response.ok) {
         const collectionsData = await response.json();
         console.log('✅ Collections fetched:', collectionsData);
-        setCollections(collectionsData.collections || []);
+        // Backend returns collections directly as array, not wrapped in collections property
+        const collectionsArray = Array.isArray(collectionsData) ? collectionsData : (collectionsData.collections || []);
+        setCollections(collectionsArray);
+        console.log('✅ Collections set to state:', collectionsArray.length, 'collections');
       } else {
         console.warn('⚠️ Failed to fetch collections:', response.status);
         setCollections([]);
