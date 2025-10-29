@@ -6337,32 +6337,36 @@ async def get_analysis_by_id(
 ):
     """Get a specific deep dive analysis by ID (for direct access)"""
     current_user = request.headers.get("User-ID", "default_user")
-    
+
+    # 🔧 FIX: Resolve email to UUID
+    user_id = resolve_user_id(current_user, db)
+    print(f"✅ [Get Analysis] Resolved '{current_user}' to UUID '{user_id}'")
+
     # Get the analysis
     analysis = db.query(DeepDiveAnalysis).filter(
         DeepDiveAnalysis.analysis_id == analysis_id
     ).first()
-    
+
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis not found")
-    
+
     # Verify user has access to the project
     project = db.query(Project).filter(
         Project.project_id == analysis.project_id,
         or_(
-            Project.owner_user_id == current_user,
+            Project.owner_user_id == user_id,
             Project.project_id.in_(
                 db.query(ProjectCollaborator.project_id).filter(
-                    ProjectCollaborator.user_id == current_user,
+                    ProjectCollaborator.user_id == user_id,
                     ProjectCollaborator.is_active == True
                 )
             )
         )
     ).first()
-    
+
     if not project:
         raise HTTPException(status_code=403, detail="Access denied")
-    
+
     return {
         "analysis_id": analysis.analysis_id,
         "project_id": analysis.project_id,
@@ -6386,6 +6390,10 @@ async def get_report_by_id(
     """Get a specific report by ID (for direct access)"""
     current_user = request.headers.get("User-ID", "default_user")
 
+    # 🔧 FIX: Resolve email to UUID
+    user_id = resolve_user_id(current_user, db)
+    print(f"✅ [Get Report] Resolved '{current_user}' to UUID '{user_id}'")
+
     # Get the report
     report = db.query(Report).filter(
         Report.report_id == report_id
@@ -6398,10 +6406,10 @@ async def get_report_by_id(
     project = db.query(Project).filter(
         Project.project_id == report.project_id,
         or_(
-            Project.owner_user_id == current_user,
+            Project.owner_user_id == user_id,
             Project.project_id.in_(
                 db.query(ProjectCollaborator.project_id).filter(
-                    ProjectCollaborator.user_id == current_user,
+                    ProjectCollaborator.user_id == user_id,
                     ProjectCollaborator.is_active == True
                 )
             )
