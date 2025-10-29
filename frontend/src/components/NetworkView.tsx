@@ -1010,7 +1010,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
     // DOUBLE-CLICK: Show article summary modal
     if (isDoubleClick) {
-      const metadata = node.data?.metadata || node.data;
+      const metadata = (node.data?.metadata || node.data) as any;
       const pmid = metadata?.pmid || node.id;
       const title = metadata?.title || node.data?.label || 'Unknown Article';
 
