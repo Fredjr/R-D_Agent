@@ -1573,8 +1573,58 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         onClose={() => setShowSummaryModal(false)}
         onViewDetails={() => {
           // Close summary modal and open sidebar with full details
-          setShowSummaryModal(false);
-          setShowSidebar(true);
+          console.log('🔍 [NetworkView] View Details clicked - finding node for PMID:', summaryPmid);
+
+          // Find the node in the graph by PMID
+          const reactFlowNode = nodes.find(n => {
+            const metadata = (n.data?.metadata || n.data) as any;
+            const pmid = metadata?.pmid || n.id;
+            return pmid === summaryPmid;
+          });
+
+          if (reactFlowNode) {
+            console.log('✅ [NetworkView] Found React Flow node:', reactFlowNode.id);
+
+            // First try to find in original networkData
+            let networkNode = networkData?.nodes.find(n => n.id === reactFlowNode.id);
+
+            // If not found, create a networkNode from the React Flow node data
+            if (!networkNode && reactFlowNode.data) {
+              console.log('🔄 Creating networkNode from React Flow node data');
+              const metadata = (reactFlowNode.data?.metadata || reactFlowNode.data) as any;
+              const nodeData = reactFlowNode.data as any;
+              networkNode = {
+                id: reactFlowNode.id,
+                label: metadata?.title || nodeData?.label || 'Unknown Article',
+                size: (typeof nodeData?.size === 'number' ? nodeData.size : 20),
+                color: (typeof nodeData?.color === 'string' ? nodeData.color : '#4CAF50'),
+                metadata: {
+                  pmid: metadata?.pmid || reactFlowNode.id,
+                  title: metadata?.title || nodeData?.label || 'Unknown Article',
+                  authors: Array.isArray(metadata?.authors) ? metadata.authors : [],
+                  journal: (typeof metadata?.journal === 'string' ? metadata.journal : ''),
+                  year: (typeof metadata?.year === 'number' ? metadata.year : new Date().getFullYear()),
+                  citation_count: (typeof metadata?.citation_count === 'number' ? metadata.citation_count : 0),
+                  url: (typeof metadata?.url === 'string' ? metadata.url : `https://pubmed.ncbi.nlm.nih.gov/${metadata?.pmid || reactFlowNode.id}/`),
+                  abstract: (typeof metadata?.abstract === 'string' ? metadata.abstract : '')
+                }
+              };
+              console.log('✅ Created networkNode:', networkNode);
+            }
+
+            if (networkNode) {
+              console.log('📊 [NetworkView] Setting selected node and opening sidebar');
+              setSelectedNode(networkNode);
+              setShowSidebar(true);
+              setShowSummaryModal(false);
+            } else {
+              console.error('❌ [NetworkView] Could not create networkNode');
+              setShowSummaryModal(false);
+            }
+          } else {
+            console.error('❌ [NetworkView] Could not find node with PMID:', summaryPmid);
+            setShowSummaryModal(false);
+          }
         }}
       />
     </div>
