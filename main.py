@@ -5901,15 +5901,18 @@ async def get_project_reports(
     """Get reports for a specific project with pagination, filtering, and sorting"""
     current_user = request.headers.get("User-ID", "default_user")
 
+    # 🔧 FIX: Resolve email to UUID
+    user_id = resolve_user_id(current_user, db)
+
     # Check project access
     has_access = (
         db.query(Project).filter(
             Project.project_id == project_id,
-            Project.owner_user_id == current_user
+            Project.owner_user_id == user_id
         ).first() is not None or
         db.query(ProjectCollaborator).filter(
             ProjectCollaborator.project_id == project_id,
-            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.user_id == user_id,
             ProjectCollaborator.is_active == True
         ).first() is not None
     )
@@ -5992,15 +5995,18 @@ async def get_project_report_by_id(
     """Get a specific report by ID within a project"""
     current_user = request.headers.get("User-ID", "default_user")
 
+    # 🔧 FIX: Resolve email to UUID
+    user_id = resolve_user_id(current_user, db)
+
     # Check project access
     has_access = (
         db.query(Project).filter(
             Project.project_id == project_id,
-            Project.owner_user_id == current_user
+            Project.owner_user_id == user_id
         ).first() is not None or
         db.query(ProjectCollaborator).filter(
             ProjectCollaborator.project_id == project_id,
-            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.user_id == user_id,
             ProjectCollaborator.is_active == True
         ).first() is not None
     )
