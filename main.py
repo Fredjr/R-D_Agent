@@ -834,6 +834,21 @@ from performance_optimization_endpoints import register_performance_endpoints
 register_performance_endpoints(app)
 add_test_citation_endpoint(app)
 
+# =============================================================================
+# ARTICLE SUMMARY ENDPOINTS - AI-Powered Article Summaries
+# =============================================================================
+
+# Import and register article summary routers
+try:
+    from backend.app.routers.article_summary import router as article_summary_router
+    from backend.app.routers.summary_analytics import router as summary_analytics_router
+    app.include_router(article_summary_router)
+    app.include_router(summary_analytics_router)
+    print("✅ Article summary and analytics endpoints registered successfully")
+except ImportError as e:
+    print(f"⚠️ Failed to import article summary routers: {e}")
+    print("   Article summary feature will not be available")
+
 # Database migration endpoint for Phase 5
 @app.post("/admin/migrate-citation-schema")
 async def migrate_citation_schema(user_id: str = Header(..., alias="User-ID")):

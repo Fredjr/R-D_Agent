@@ -402,6 +402,13 @@ class Article(Base):
     centrality_score = Column(Float, default=0.0)  # Network centrality measure
     cluster_id = Column(String, nullable=True)  # Research cluster/topic
 
+    # AI-generated summary (Article Summary Feature)
+    ai_summary = Column(Text, nullable=True)  # Short AI-generated summary (3-5 sentences)
+    ai_summary_expanded = Column(Text, nullable=True)  # Expanded AI-generated summary
+    summary_generated_at = Column(DateTime(timezone=True), nullable=True)  # When summary was generated
+    summary_model = Column(String, nullable=True)  # Model used (e.g., "llama-3.1-8b")
+    summary_version = Column(Integer, default=1)  # Version for future regeneration
+
     # Data freshness tracking
     citation_data_updated = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -415,6 +422,7 @@ class Article(Base):
         Index('idx_article_citation_count', 'citation_count'),
         Index('idx_article_relevance', 'relevance_score'),
         Index('idx_article_updated', 'citation_data_updated'),
+        Index('idx_article_summary_generated', 'summary_generated_at'),
     )
 
 class ArticleCitation(Base):

@@ -21,6 +21,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import NetworkSidebar from './NetworkSidebar';
 import TimelineView from './TimelineView';
+import ArticleSummaryModal from './ArticleSummaryModal';
 import { useLazyNetworkLoading } from '@/hooks/useLazyNetworkLoading';
 import { pubmedCache } from '@/utils/pubmedCache';
 import { NetworkLoadingProgress, LoadingOverlay, useLoadingState } from './LoadingStates';
@@ -346,6 +347,11 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   const [navigationTrail, setNavigationTrail] = useState<NavigationStep[]>([]);
   const [showSidebar, setShowSidebar] = useState(false);
   const [collections, setCollections] = useState<any[]>([]);
+
+  // Article Summary Modal state
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [summaryPmid, setSummaryPmid] = useState<string>('');
+  const [summaryTitle, setSummaryTitle] = useState<string>('');
 
   // Enhanced state for ResearchRabbit-style navigation
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
@@ -980,13 +986,15 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
   // Handle node click with navigation support and expansion
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    const isDoubleClick = event.detail === 2;
+
     console.log('🎯 NODE CLICK DETECTED:', {
       nodeId: node.id,
       nodeType: node.type,
       hasData: !!node.data,
       dataKeys: node.data ? Object.keys(node.data) : [],
       position: node.position,
-      clickType: event.detail === 2 ? 'double' : event.ctrlKey || event.metaKey ? 'ctrl' : 'single'
+      clickType: isDoubleClick ? 'double' : event.ctrlKey || event.metaKey ? 'ctrl' : 'single'
     });
 
     // Track network navigation for weekly mix
@@ -998,6 +1006,22 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         navigationMode || 'default',
         projectId
       );
+    }
+
+    // DOUBLE-CLICK: Show article summary modal
+    if (isDoubleClick) {
+      const metadata = node.data?.metadata || node.data;
+      const pmid = metadata?.pmid || node.id;
+      const title = metadata?.title || node.data?.label || 'Unknown Article';
+
+      console.log('🤖 [NetworkView] Double-click detected - showing summary modal for:', { pmid, title });
+
+      setSummaryPmid(pmid);
+      setSummaryTitle(title);
+      setShowSummaryModal(true);
+
+      // Don't proceed with sidebar opening on double-click
+      return;
     }
 
     // First try to find in original networkData
@@ -1485,7 +1509,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
                 )}
               </div>
               <div className="text-xs text-gray-500 mt-1">
-                Double-click or Ctrl+Click nodes to expand
+                Double-click for AI summary • Ctrl+Click to expand
               </div>
             </div>
           </Panel>
@@ -1540,6 +1564,19 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           />
         </div>
       )}
+
+      {/* Article Summary Modal - Shows on double-click */}
+      <ArticleSummaryModal
+        pmid={summaryPmid}
+        title={summaryTitle}
+        isOpen={showSummaryModal}
+        onClose={() => setShowSummaryModal(false)}
+        onViewDetails={() => {
+          // Close summary modal and open sidebar with full details
+          setShowSummaryModal(false);
+          setShowSidebar(true);
+        }}
+      />
     </div>
   );
 });
