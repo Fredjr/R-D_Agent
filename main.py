@@ -5658,23 +5658,26 @@ async def create_report(
 ):
     """Create a new report in a project"""
     current_user = request.headers.get("User-ID", "default_user")
-    
+
+    # 🔧 FIX: Resolve email to UUID
+    user_id = resolve_user_id(current_user, db)
+
     # Check project access
     has_access = (
         db.query(Project).filter(
             Project.project_id == project_id,
-            Project.owner_user_id == current_user
+            Project.owner_user_id == user_id
         ).first() is not None or
         db.query(ProjectCollaborator).filter(
             ProjectCollaborator.project_id == project_id,
-            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.user_id == user_id,
             ProjectCollaborator.is_active == True
         ).first() is not None
     )
-    
+
     if not has_access:
         raise HTTPException(status_code=403, detail="Access denied")
-    
+
     # Create report
     report_id = str(uuid.uuid4())
     report = Report(
@@ -5687,7 +5690,7 @@ async def create_report(
         dag_mode=report_data.dag_mode,
         full_text_only=report_data.full_text_only,
         preference=report_data.preference,
-        created_by=current_user,
+        created_by=user_id,  # 🔧 FIX: Use resolved user_id
         content={},  # Will be populated by background processing
         status="pending"
     )
@@ -6045,14 +6048,17 @@ async def get_deep_dive_analyses(
     """Get deep dive analyses for a project with pagination, filtering, and sorting"""
     current_user = request.headers.get("User-ID", "default_user")
 
+    # 🔧 FIX: Resolve email to UUID
+    user_id = resolve_user_id(current_user, db)
+
     # Verify project access
     project = db.query(Project).filter(
         Project.project_id == project_id,
         or_(
-            Project.owner_user_id == current_user,
+            Project.owner_user_id == user_id,
             Project.project_id.in_(
                 db.query(ProjectCollaborator.project_id).filter(
-                    ProjectCollaborator.user_id == current_user,
+                    ProjectCollaborator.user_id == user_id,
                     ProjectCollaborator.is_active == True
                 )
             )
@@ -6219,21 +6225,24 @@ async def get_deep_dive_analysis(
 ):
     """Get a specific deep dive analysis"""
     current_user = request.headers.get("User-ID", "default_user")
-    
+
+    # 🔧 FIX: Resolve email to UUID
+    user_id = resolve_user_id(current_user, db)
+
     # Verify project access
     project = db.query(Project).filter(
         Project.project_id == project_id,
         or_(
-            Project.owner_user_id == current_user,
+            Project.owner_user_id == user_id,
             Project.project_id.in_(
                 db.query(ProjectCollaborator.project_id).filter(
-                    ProjectCollaborator.user_id == current_user,
+                    ProjectCollaborator.user_id == user_id,
                     ProjectCollaborator.is_active == True
                 )
             )
         )
     ).first()
-    
+
     if not project:
         raise HTTPException(status_code=404, detail="Project not found or access denied")
     
@@ -6905,20 +6914,23 @@ async def create_deep_dive_analysis(
 ):
     """Create a new deep dive analysis in a project"""
     current_user = request.headers.get("User-ID", "default_user")
-    
+
+    # 🔧 FIX: Resolve email to UUID
+    user_id = resolve_user_id(current_user, db)
+
     # Check project access
     has_access = (
         db.query(Project).filter(
             Project.project_id == project_id,
-            Project.owner_user_id == current_user
+            Project.owner_user_id == user_id
         ).first() is not None or
         db.query(ProjectCollaborator).filter(
             ProjectCollaborator.project_id == project_id,
-            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.user_id == user_id,
             ProjectCollaborator.is_active == True
         ).first() is not None
     )
-    
+
     if not has_access:
         raise HTTPException(status_code=403, detail="Access denied")
     
@@ -6942,7 +6954,7 @@ async def create_deep_dive_analysis(
         article_title=article_title,
         article_pmid=analysis_data.article_pmid,
         article_url=analysis_data.article_url,
-        created_by=current_user,
+        created_by=user_id,  # 🔧 FIX: Use resolved user_id
         processing_status="processing"
     )
 
