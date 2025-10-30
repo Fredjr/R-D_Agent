@@ -165,20 +165,46 @@ async function fetchArticleFromPubMed(pmid: string): Promise<ArticleData> {
   try {
     // Use PubMed eFetch API to get article details
     const efetchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=${pmid}&retmode=xml`;
-    
-    const response = await fetch(efetchUrl);
+
+    console.log(`📡 Fetching article from PubMed: ${efetchUrl}`);
+
+    const response = await fetch(efetchUrl, {
+      headers: {
+        'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
+      }
+    });
+
     if (!response.ok) {
+      console.error(`❌ PubMed API returned status: ${response.status}`);
       throw new Error(`PubMed API error: ${response.status}`);
     }
 
     const xmlText = await response.text();
-    
+    console.log(`📄 Received XML (${xmlText.length} chars) for PMID: ${pmid}`);
+
+    // Check if XML contains error
+    if (xmlText.includes('<ERROR>') || xmlText.includes('error')) {
+      console.error(`❌ PubMed returned error in XML for PMID: ${pmid}`);
+      throw new Error('PubMed returned error response');
+    }
+
     // Parse XML to extract article data
     const article = parseArticleXML(xmlText, pmid);
-    
+
+    // Validate that we got meaningful data
+    if (!article.title || article.title === 'Unknown Title') {
+      console.error(`❌ Failed to parse title from XML for PMID: ${pmid}`);
+      throw new Error('Failed to parse article data from PubMed');
+    }
+
+    console.log(`✅ Successfully parsed article: ${article.title.substring(0, 50)}...`);
+
     return article;
   } catch (error) {
-    console.error(`❌ Error fetching article from PubMed:`, error);
+    console.error(`❌ Error fetching article from PubMed for PMID ${pmid}:`, error);
+    if (error instanceof Error) {
+      throw error;
+    }
     throw new Error('Failed to fetch article from PubMed');
   }
 }
@@ -187,49 +213,109 @@ async function fetchArticleFromPubMed(pmid: string): Promise<ArticleData> {
  * Parse PubMed XML response
  */
 function parseArticleXML(xml: string, pmid: string): ArticleData {
-  // Extract title
-  const titleMatch = xml.match(/<ArticleTitle>(.*?)<\/ArticleTitle>/s);
-  const title = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, '').trim() : 'Unknown Title';
-
-  // Extract abstract
-  const abstractMatch = xml.match(/<Abstract>(.*?)<\/Abstract>/s);
-  let abstract = '';
-  if (abstractMatch) {
-    const abstractTexts = abstractMatch[1].match(/<AbstractText[^>]*>(.*?)<\/AbstractText>/gs);
-    if (abstractTexts) {
-      abstract = abstractTexts
-        .map(text => text.replace(/<[^>]*>/g, '').trim())
-        .join(' ')
-        .trim();
+  try {
+    // Extract title - handle both ArticleTitle and BookTitle
+    let titleMatch = xml.match(/<ArticleTitle>(.*?)<\/ArticleTitle>/s);
+    if (!titleMatch) {
+      titleMatch = xml.match(/<BookTitle>(.*?)<\/BookTitle>/s);
     }
+    const title = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, '').replace(/&[^;]+;/g, '').trim() : 'Unknown Title';
+
+    // Extract abstract - handle multiple AbstractText elements with labels
+    const abstractMatch = xml.match(/<Abstract>(.*?)<\/Abstract>/s);
+    let abstract = '';
+    if (abstractMatch) {
+      const abstractTexts = abstractMatch[1].match(/<AbstractText[^>]*>(.*?)<\/AbstractText>/gs);
+      if (abstractTexts) {
+        abstract = abstractTexts
+          .map(text => text.replace(/<[^>]*>/g, '').replace(/&[^;]+;/g, '').trim())
+          .filter(text => text.length > 0)
+          .join(' ')
+          .trim();
+      }
+    }
+
+    // Extract authors - handle both Author and CollectiveName
+    const authorMatches = xml.match(/<Author[^>]*>.*?<\/Author>/gs) || [];
+    const authors = authorMatches.map(authorXml => {
+      // Try CollectiveName first (for group authors)
+      const collectiveMatch = authorXml.match(/<CollectiveName>(.*?)<\/CollectiveName>/);
+      if (collectiveMatch) {
+        return collectiveMatch[1].trim();
+      }
+
+      // Otherwise use LastName and ForeName
+      const lastNameMatch = authorXml.match(/<LastName>(.*?)<\/LastName>/);
+      const foreNameMatch = authorXml.match(/<ForeName>(.*?)<\/ForeName>/);
+      const initialsMatch = authorXml.match(/<Initials>(.*?)<\/Initials>/);
+
+      const lastName = lastNameMatch ? lastNameMatch[1].trim() : '';
+      const foreName = foreNameMatch ? foreNameMatch[1].trim() : '';
+      const initials = initialsMatch ? initialsMatch[1].trim() : '';
+
+      if (lastName && foreName) {
+        return `${foreName} ${lastName}`;
+      } else if (lastName && initials) {
+        return `${initials} ${lastName}`;
+      } else if (lastName) {
+        return lastName;
+      }
+      return '';
+    }).filter(name => name.length > 0);
+
+    // Extract journal - try multiple possible locations
+    let journalMatch = xml.match(/<Journal>.*?<Title>(.*?)<\/Title>.*?<\/Journal>/s);
+    if (!journalMatch) {
+      journalMatch = xml.match(/<MedlineTA>(.*?)<\/MedlineTA>/);
+    }
+    if (!journalMatch) {
+      journalMatch = xml.match(/<ISOAbbreviation>(.*?)<\/ISOAbbreviation>/);
+    }
+    const journal = journalMatch ? journalMatch[1].replace(/<[^>]*>/g, '').trim() : 'Unknown Journal';
+
+    // Extract year - try multiple date formats
+    let yearMatch = xml.match(/<PubDate>.*?<Year>(\d{4})<\/Year>.*?<\/PubDate>/s);
+    if (!yearMatch) {
+      yearMatch = xml.match(/<Year>(\d{4})<\/Year>/);
+    }
+    if (!yearMatch) {
+      // Try MedlineDate format like "2024 Jan-Feb"
+      const medlineDateMatch = xml.match(/<MedlineDate>(\d{4})/);
+      if (medlineDateMatch) {
+        yearMatch = [medlineDateMatch[0], medlineDateMatch[1]];
+      }
+    }
+    const year = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
+
+    console.log(`📊 Parsed article data:`, {
+      pmid,
+      title: title.substring(0, 50) + '...',
+      authors: authors.length,
+      journal,
+      year,
+      abstractLength: abstract.length
+    });
+
+    return {
+      pmid,
+      title,
+      abstract,
+      authors,
+      journal,
+      year
+    };
+  } catch (error) {
+    console.error(`❌ Error parsing XML for PMID ${pmid}:`, error);
+    // Return minimal data to avoid complete failure
+    return {
+      pmid,
+      title: 'Unknown Title',
+      abstract: '',
+      authors: [],
+      journal: 'Unknown Journal',
+      year: new Date().getFullYear()
+    };
   }
-
-  // Extract authors
-  const authorMatches = xml.match(/<Author[^>]*>.*?<\/Author>/gs) || [];
-  const authors = authorMatches.map(authorXml => {
-    const lastNameMatch = authorXml.match(/<LastName>(.*?)<\/LastName>/);
-    const foreNameMatch = authorXml.match(/<ForeName>(.*?)<\/ForeName>/);
-    const lastName = lastNameMatch ? lastNameMatch[1] : '';
-    const foreName = foreNameMatch ? foreNameMatch[1] : '';
-    return `${foreName} ${lastName}`.trim();
-  }).filter(name => name.length > 0);
-
-  // Extract journal
-  const journalMatch = xml.match(/<Title>(.*?)<\/Title>/);
-  const journal = journalMatch ? journalMatch[1].trim() : 'Unknown Journal';
-
-  // Extract year
-  const yearMatch = xml.match(/<PubDate>.*?<Year>(\d{4})<\/Year>.*?<\/PubDate>/s);
-  const year = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
-
-  return {
-    pmid,
-    title,
-    abstract,
-    authors,
-    journal,
-    year
-  };
 }
 
 /**

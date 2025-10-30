@@ -375,12 +375,13 @@ function filterByCoAuthorOverlap(
  * - authors: Array of author names (required)
  * - limit: Maximum number of results per author (default: 10)
  * - open_access_only: Filter for OA/Full-Text articles only (default: false)
- * - min_coauthor_overlap: Minimum number of co-authors to match (default: 2)
+ * - min_coauthor_overlap: Minimum number of co-authors to match (default: 1 for OR logic)
+ * - use_or_logic: If true, returns papers by ANY of the authors (OR). If false, requires multiple authors (AND). Default: true
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { authors, limit = 10, open_access_only = false, min_coauthor_overlap = 2 } = body;
+    const { authors, limit = 10, open_access_only = false, min_coauthor_overlap = 1, use_or_logic = true } = body;
 
     if (!authors || !Array.isArray(authors) || authors.length === 0) {
       return NextResponse.json(
@@ -389,11 +390,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Adjust min_coauthor_overlap based on number of search authors
-    // If searching for 1 author, require 1 match. If 2+, require min 2 matches
-    const effectiveMinOverlap = Math.min(min_coauthor_overlap, authors.length);
+    // For OR logic (default), we want papers by ANY author (min overlap = 1)
+    // For AND logic, we want papers with multiple authors (min overlap = 2 or more)
+    const effectiveMinOverlap = use_or_logic ? 1 : Math.max(2, Math.min(min_coauthor_overlap, authors.length));
 
-    console.log(`📚 Multi-author papers request: ${authors.length} authors (limit: ${limit} each, OA only: ${open_access_only}, min overlap: ${effectiveMinOverlap})`);
+    console.log(`📚 Multi-author papers request: ${authors.length} authors (limit: ${limit} each, OA only: ${open_access_only}, logic: ${use_or_logic ? 'OR' : 'AND'}, min overlap: ${effectiveMinOverlap})`);
+    console.log(`📝 Searching for authors:`, authors);
 
     // Fetch papers for each author in parallel
     const authorResults = await Promise.all(
@@ -419,10 +421,12 @@ export async function POST(request: NextRequest) {
 
     console.log(`🔍 Found ${uniqueArticles.length} unique articles before co-author filtering`);
 
-    // Filter by co-author overlap to remove false matches
+    // Filter by co-author overlap
+    // With OR logic (min overlap = 1), this keeps papers by ANY of the authors
+    // With AND logic (min overlap >= 2), this keeps papers with multiple matching authors
     const filteredArticles = filterByCoAuthorOverlap(uniqueArticles, authors, effectiveMinOverlap);
 
-    console.log(`✅ After co-author filtering (min ${effectiveMinOverlap} overlaps): ${filteredArticles.length} articles`);
+    console.log(`✅ After co-author filtering (${use_or_logic ? 'OR' : 'AND'} logic, min ${effectiveMinOverlap} overlaps): ${filteredArticles.length} articles`);
 
     // Sort by number of matching co-authors (descending) and take top results
     const scoredArticles = filteredArticles.map(article => ({
@@ -442,11 +446,13 @@ export async function POST(request: NextRequest) {
       total_unique_articles: topArticles.length,
       limit_per_author: limit,
       open_access_only,
+      logic_mode: use_or_logic ? 'OR' : 'AND',
       filtering: {
         before_filter: uniqueArticles.length,
         after_filter: filteredArticles.length,
         min_coauthor_overlap: effectiveMinOverlap,
-        requested_min_overlap: min_coauthor_overlap
+        requested_min_overlap: min_coauthor_overlap,
+        use_or_logic
       }
     });
 

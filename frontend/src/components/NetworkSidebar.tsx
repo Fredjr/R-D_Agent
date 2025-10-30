@@ -400,9 +400,11 @@ export default function NetworkSidebar({
           fetchOptions.body = JSON.stringify({
             authors: authors,
             limit: 10,
-            open_access_only: fullTextOnly
+            open_access_only: fullTextOnly,
+            use_or_logic: true,  // Use OR logic: return papers by ANY of the authors
+            min_coauthor_overlap: 1  // Minimum 1 author match (OR logic)
           });
-          console.log(`🌐 POST request to ${fetchUrl} with authors:`, authors);
+          console.log(`🌐 POST request to ${fetchUrl} with authors (OR logic):`, authors);
         } else {
           // Regular GET requests
           if (usePubMed) {
