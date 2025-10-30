@@ -9405,11 +9405,9 @@ async def deep_dive(request: DeepDiveRequest, db: Session = Depends(get_db)):
                 "DeepDiveModel",
                 retries=0,
             )
-            md_json = {
-                "summary": md_structured.get("protocol_summary", ""),
-                "relevance_justification": "",
-                "fact_anchors": [],
-            }
+            # 🔧 FIX: Use full structured data instead of simplified version
+            # md_structured already contains all the rich fields we need
+
             # Modules 2 and 3 with enhanced timeouts and processing
             mth_task = _with_timeout(
                 run_in_threadpool(run_methods_pipeline, text, request.objective, get_llm_analyzer()),
@@ -9471,11 +9469,12 @@ async def deep_dive(request: DeepDiveRequest, db: Session = Depends(get_db)):
             **({k: v for k, v in (meta or {}).items() if v is not None}),
         }
         
+        # 🔧 FIX: Use full structured data for all analysis fields
         response_data = {
             "source": source_info,
-            "scientific_model_analysis": md_json,
+            "scientific_model_analysis": md_structured,  # Full structured data with all fields
             "model_description_structured": md_structured,
-            "model_description": md_json,
+            "model_description": md_structured,  # Full structured data
             "experimental_methods_analysis": mth,
             "experimental_methods_structured": mth,
             "results_interpretation_analysis": res,
@@ -9503,13 +9502,14 @@ async def deep_dive(request: DeepDiveRequest, db: Session = Depends(get_db)):
                     if has_access:
                         # Create deep dive analysis record
                         analysis_id = str(uuid.uuid4())
+                        # 🔧 FIX: Save full structured data to database
                         analysis = DeepDiveAnalysis(
                             analysis_id=analysis_id,
                             project_id=request.project_id,
                             article_pmid=request.pmid,
                             article_url=request.url,
                             article_title=request.title or "Unknown Article",
-                            scientific_model_analysis=json.dumps(md_json) if md_json else None,
+                            scientific_model_analysis=json.dumps(md_structured) if md_structured else None,  # Full structured data
                             experimental_methods_analysis=json.dumps(mth) if mth else None,
                             results_interpretation_analysis=json.dumps(res) if res else None,
                             created_by=current_user,
