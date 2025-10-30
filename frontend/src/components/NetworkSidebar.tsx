@@ -203,11 +203,12 @@ export default function NetworkSidebar({
           'User-ID': user?.user_id || 'default_user'
         },
         body: JSON.stringify({
-          pmid: selectedNode.metadata.pmid,
-          title: selectedNode.metadata.title,
-          authors: selectedNode.metadata.authors,
-          journal: selectedNode.metadata.journal,
-          year: selectedNode.metadata.year,
+          article_pmid: selectedNode.metadata.pmid,
+          article_title: selectedNode.metadata.title,
+          article_authors: selectedNode.metadata.authors,
+          article_journal: selectedNode.metadata.journal,
+          article_year: selectedNode.metadata.year,
+          source_type: 'manual',
           projectId: projectId
         })
       });
@@ -263,11 +264,12 @@ export default function NetworkSidebar({
             'User-ID': user?.user_id || 'default_user'
           },
           body: JSON.stringify({
-            pmid: selectedNode.metadata.pmid,
-            title: selectedNode.metadata.title,
-            authors: selectedNode.metadata.authors,
-            journal: selectedNode.metadata.journal,
-            year: selectedNode.metadata.year,
+            article_pmid: selectedNode.metadata.pmid,
+            article_title: selectedNode.metadata.title,
+            article_authors: selectedNode.metadata.authors,
+            article_journal: selectedNode.metadata.journal,
+            article_year: selectedNode.metadata.year,
+            source_type: 'manual',
             projectId: projectId
           })
         });
