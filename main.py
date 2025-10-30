@@ -9398,25 +9398,26 @@ async def deep_dive(request: DeepDiveRequest, db: Session = Depends(get_db)):
             meta = {}
         # Run three specialist modules in parallel
         try:
-            # Module 1 with timeout - Enhanced model analysis
+            # Module 1 with timeout - COMPREHENSIVE model analysis with all 18 fields
+            # 🔧 FIX: Use analyze_scientific_model instead of run_enhanced_model_pipeline
+            # This provides the full 18-field structure matching existing analyses
             md_structured = await _with_timeout(
-                run_in_threadpool(run_enhanced_model_pipeline, text, request.objective, get_llm_analyzer()),
-                120.0,  # 2 minutes for enhanced analysis
+                run_in_threadpool(analyze_scientific_model, text, request.objective, get_llm_analyzer()),
+                120.0,  # 2 minutes for comprehensive analysis
                 "DeepDiveModel",
                 retries=0,
             )
-            # 🔧 FIX: Use full structured data instead of simplified version
-            # md_structured already contains all the rich fields we need
 
             # Modules 2 and 3 with enhanced timeouts and processing
+            # 🔧 FIX: Use comprehensive analyst functions for consistency
             mth_task = _with_timeout(
-                run_in_threadpool(run_methods_pipeline, text, request.objective, get_llm_analyzer()),
+                run_in_threadpool(analyze_experimental_methods, text, request.objective, get_llm_analyzer()),
                 120.0,  # Increased to 2 minutes for enhanced content processing
                 "DeepDiveMethods",
                 retries=0,
             )
             res_task = _with_timeout(
-                run_in_threadpool(run_results_pipeline, text, request.objective, get_llm_analyzer(), request.pmid),
+                run_in_threadpool(analyze_results_interpretation, text, request.objective, get_llm_analyzer()),
                 120.0,  # Increased to 2 minutes for enhanced content processing
                 "DeepDiveResults",
                 retries=0,
