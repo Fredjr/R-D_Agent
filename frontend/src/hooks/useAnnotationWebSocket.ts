@@ -11,9 +11,12 @@ interface UseAnnotationWebSocketOptions {
 }
 
 interface WebSocketMessage {
-  type: 'new_annotation' | 'update_annotation' | 'delete_annotation';
+  type: 'new_annotation' | 'update_annotation' | 'delete_annotation' | 'connection_established' | 'pong' | 'echo' | 'error';
   annotation?: Annotation;
   annotation_id?: string;
+  project_id?: string;
+  timestamp?: string;
+  message?: string;
 }
 
 export function useAnnotationWebSocket({
@@ -33,9 +36,10 @@ export function useAnnotationWebSocket({
     if (!enabled || !projectId) return;
 
     try {
-      // Get backend URL from environment
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
-      const wsUrl = backendUrl.replace(/^https?:\/\//, (match) => 
+      // WebSocket connections MUST use direct backend URL (cannot go through proxy)
+      // Always use production Railway URL for WebSocket
+      const backendUrl = 'https://r-dagent-production.up.railway.app';
+      const wsUrl = backendUrl.replace(/^https?:\/\//, (match) =>
         match === 'https://' ? 'wss://' : 'ws://'
       );
       const websocketUrl = `${wsUrl}/ws/project/${projectId}`;
@@ -56,6 +60,10 @@ export function useAnnotationWebSocket({
           console.log('📥 Annotation WebSocket message:', message);
 
           switch (message.type) {
+            case 'connection_established':
+              console.log('✅ WebSocket connection established:', message.message);
+              break;
+
             case 'new_annotation':
               if (message.annotation && onNewAnnotation) {
                 onNewAnnotation(message.annotation);
@@ -74,8 +82,20 @@ export function useAnnotationWebSocket({
               }
               break;
 
+            case 'pong':
+              // Heartbeat response - connection is alive
+              break;
+
+            case 'echo':
+              // Echo response - for testing
+              break;
+
+            case 'error':
+              console.error('❌ WebSocket error message:', message.message);
+              break;
+
             default:
-              console.log('Unknown message type:', message.type);
+              console.log('⚠️ Unknown WebSocket message type:', message.type);
           }
         } catch (err) {
           console.error('❌ Error parsing WebSocket message:', err);
