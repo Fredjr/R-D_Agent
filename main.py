@@ -5541,6 +5541,67 @@ async def check_migration_status(db: Session = Depends(get_db)):
     except Exception as e:
         return {"error": str(e)}
 
+# Migration Endpoint (Temporary - for applying collection support migration)
+@app.post("/api/admin/apply-collection-to-annotations-migration")
+async def apply_collection_to_annotations_migration(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Temporary endpoint to apply collection support migration to production database.
+    This adds the collection_id field to the annotations table.
+    """
+    try:
+        from sqlalchemy import text, inspect
+
+        # Check if column already exists
+        inspector = inspect(db.bind)
+        existing_columns = [col['name'] for col in inspector.get_columns('annotations')]
+
+        if 'collection_id' in existing_columns:
+            return {
+                "status": "already_applied",
+                "message": "collection_id column already exists in annotations table"
+            }
+
+        # Add collection_id column
+        db.execute(text("""
+            ALTER TABLE annotations
+            ADD COLUMN collection_id VARCHAR;
+        """))
+
+        # Add foreign key constraint
+        db.execute(text("""
+            ALTER TABLE annotations
+            ADD CONSTRAINT fk_annotation_collection
+            FOREIGN KEY (collection_id) REFERENCES collections(collection_id)
+            ON DELETE CASCADE;
+        """))
+
+        # Add index for performance
+        db.execute(text("""
+            CREATE INDEX idx_annotation_collection
+            ON annotations(collection_id);
+        """))
+
+        db.commit()
+
+        return {
+            "status": "success",
+            "message": "Collection support migration applied successfully",
+            "changes": [
+                "Added collection_id column to annotations table",
+                "Added foreign key constraint to collections table",
+                "Added index on collection_id"
+            ]
+        }
+    except Exception as e:
+        db.rollback()
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+
 # Migration Endpoint (Temporary - for applying contextual notes migration)
 @app.post("/api/admin/apply-contextual-notes-migration")
 async def apply_contextual_notes_migration(
