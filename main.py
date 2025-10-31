@@ -5519,6 +5519,26 @@ async def remove_collaborator(
 
     return {"message": "Collaborator removed successfully"}
 
+# Health check for migration status
+@app.get("/api/admin/migration-status")
+async def check_migration_status(db: Session = Depends(get_db)):
+    """Check if contextual notes migration has been applied"""
+    try:
+        from sqlalchemy import inspect
+        inspector = inspect(db.bind)
+        existing_columns = [col['name'] for col in inspector.get_columns('annotations')]
+
+        required_columns = ['note_type', 'priority', 'status', 'tags', 'action_items', 'parent_annotation_id']
+        missing_columns = [col for col in required_columns if col not in existing_columns]
+
+        return {
+            "migration_applied": len(missing_columns) == 0,
+            "existing_columns": existing_columns,
+            "missing_columns": missing_columns
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
 # Migration Endpoint (Temporary - for applying contextual notes migration)
 @app.post("/api/admin/apply-contextual-notes-migration")
 async def apply_contextual_notes_migration(
