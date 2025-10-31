@@ -910,11 +910,71 @@ class SpotifyInspiredRecommendationsService:
             resolved_user_id = await self._resolve_user_id(user_id, db)
             logger.info(f"🔍 Resolving user_id '{user_id}' to '{resolved_user_id}'")
 
+            # PRIORITY 0: Check for onboarding preferences first (highest priority for new users)
+            from database import User
+            user_record = db.query(User).filter(
+                or_(User.email == user_id, User.user_id == user_id)
+            ).first()
+
+            onboarding_preferences = None
+            if user_record and user_record.preferences:
+                onboarding_preferences = user_record.preferences.get('research_interests', {})
+                if onboarding_preferences:
+                    logger.info(f"🎯 Found onboarding preferences: {onboarding_preferences}")
+
+                    # Extract topics and keywords from onboarding
+                    topics = onboarding_preferences.get('topics', [])
+                    keywords = onboarding_preferences.get('keywords', [])
+                    career_stage = onboarding_preferences.get('careerStage', '')
+
+                    # Combine topics and keywords as primary domains
+                    onboarding_domains = []
+
+                    # Map topic IDs to readable names
+                    topic_map = {
+                        'machine_learning': 'machine learning',
+                        'biotechnology': 'biotechnology',
+                        'drug_discovery': 'drug discovery',
+                        'clinical_research': 'clinical research',
+                        'neuroscience': 'neuroscience',
+                        'materials_science': 'materials science',
+                        'physics': 'physics',
+                        'chemistry': 'chemistry',
+                        'environmental_science': 'environmental science',
+                        'immunology': 'immunology',
+                        'oncology': 'oncology'
+                    }
+
+                    for topic_id in topics:
+                        topic_name = topic_map.get(topic_id, topic_id.replace('_', ' '))
+                        onboarding_domains.append(topic_name)
+
+                    # Add keywords as domains
+                    onboarding_domains.extend([kw.lower() for kw in keywords])
+
+                    if onboarding_domains:
+                        logger.info(f"🎯 Using onboarding domains: {onboarding_domains}")
+                        profile["primary_domains"] = onboarding_domains[:5]  # Limit to top 5
+                        profile["topic_preferences"] = {domain: 1.0 for domain in onboarding_domains[:5]}
+                        profile["onboarding_based"] = True
+                        profile["career_stage"] = career_stage
+                        logger.info(f"✅ Created onboarding-based profile with domains: {profile['primary_domains']}")
+
             # PRIORITY 1: Get search history from frontend weekly mix automation
             search_history_domains = await self._get_search_history_domains(user_id)
-            if search_history_domains:
+            if search_history_domains and not onboarding_preferences:
+                # Only use search history if we don't have onboarding preferences
                 logger.info(f"🔍 Found search history domains: {search_history_domains}")
                 profile["primary_domains"] = search_history_domains
+                profile["search_history_available"] = True
+            elif search_history_domains and onboarding_preferences:
+                # Merge search history with onboarding preferences
+                logger.info(f"🔍 Merging search history with onboarding preferences")
+                existing_domains = set(profile.get("primary_domains", []))
+                for domain in search_history_domains:
+                    if domain not in existing_domains:
+                        existing_domains.add(domain)
+                profile["primary_domains"] = list(existing_domains)[:7]  # Expand to 7 domains
                 profile["search_history_available"] = True
             else:
                 logger.info(f"🔍 No search history found for user {user_id}")
@@ -1344,7 +1404,46 @@ class SpotifyInspiredRecommendationsService:
 
             # Add user-specific info if available
             if user:
-                if user.subject_area:
+                # PRIORITY: Check for onboarding preferences first
+                if user.preferences:
+                    onboarding_preferences = user.preferences.get('research_interests', {})
+                    if onboarding_preferences:
+                        logger.info(f"🎯 Found onboarding preferences in fallback: {onboarding_preferences}")
+
+                        topics = onboarding_preferences.get('topics', [])
+                        keywords = onboarding_preferences.get('keywords', [])
+
+                        # Map topic IDs to readable names
+                        topic_map = {
+                            'machine_learning': 'machine learning',
+                            'biotechnology': 'biotechnology',
+                            'drug_discovery': 'drug discovery',
+                            'clinical_research': 'clinical research',
+                            'neuroscience': 'neuroscience',
+                            'materials_science': 'materials science',
+                            'physics': 'physics',
+                            'chemistry': 'chemistry',
+                            'environmental_science': 'environmental science',
+                            'immunology': 'immunology',
+                            'oncology': 'oncology'
+                        }
+
+                        onboarding_domains = []
+                        for topic_id in topics:
+                            topic_name = topic_map.get(topic_id, topic_id.replace('_', ' '))
+                            onboarding_domains.append(topic_name)
+
+                        onboarding_domains.extend([kw.lower() for kw in keywords])
+
+                        if onboarding_domains:
+                            fallback_profile["primary_domains"] = onboarding_domains[:5]
+                            fallback_profile["topic_preferences"] = {domain: 1.0 for domain in onboarding_domains[:5]}
+                            fallback_profile["is_fallback"] = False  # Not really a fallback if we have onboarding data
+                            fallback_profile["onboarding_based"] = True
+                            logger.info(f"✅ Using onboarding preferences in fallback profile: {fallback_profile['primary_domains']}")
+
+                # Fallback to subject area if no onboarding preferences
+                if fallback_profile["is_fallback"] and user.subject_area:
                     fallback_profile["primary_domains"] = [user.subject_area.lower()]
                 if user.category:
                     fallback_profile["user_category"] = user.category

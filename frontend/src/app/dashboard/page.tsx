@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { PlusIcon, FolderIcon, UsersIcon, CalendarIcon, BeakerIcon, UserIcon, MusicalNoteIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
@@ -36,7 +36,8 @@ interface ProjectListResponse {
   projects: Project[];
 }
 
-export default function Dashboard() {
+// Component that uses searchParams - must be wrapped in Suspense
+function DashboardContent() {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -558,5 +559,14 @@ export default function Dashboard() {
         )}
       </div>
     </MobileResponsiveLayout>
+  );
+}
+
+// Main component with Suspense boundary
+export default function Dashboard() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <DashboardContent />
+    </Suspense>
   );
 }
