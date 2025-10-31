@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { ArrowLeftIcon, BeakerIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, BeakerIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
 import { type Collection } from '@/hooks/useGlobalCollectionSync';
 import MultiColumnNetworkView from './MultiColumnNetworkView';
+import { AnnotationList } from './annotations';
 
 interface Article {
   id: number;
@@ -129,6 +130,28 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
             <h2 className="text-2xl font-bold text-gray-900">{collection.collection_name}</h2>
             <p className="text-gray-600">{collection.article_count} articles • Click any article to explore its network</p>
           </div>
+        </div>
+      </div>
+
+      {/* Collection Notes Section */}
+      <div className="bg-white rounded-lg shadow border border-gray-200">
+        <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
+          <div className="flex items-center gap-2">
+            <ChatBubbleLeftRightIcon className="w-5 h-5 text-blue-600" />
+            <h3 className="font-semibold text-gray-900">Collection Notes</h3>
+          </div>
+          <p className="text-xs text-gray-600 mt-1">
+            Add notes about this collection's theme, research questions, or key findings
+          </p>
+        </div>
+        <div className="p-4">
+          <AnnotationList
+            projectId={projectId}
+            userId={user?.email}
+            collectionId={collection.collection_id}
+            showForm={true}
+            compact={false}
+          />
         </div>
       </div>
 
