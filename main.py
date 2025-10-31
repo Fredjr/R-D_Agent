@@ -8037,15 +8037,18 @@ async def add_article_to_collection(
     """Add an article to a collection"""
     current_user = request.headers.get("User-ID", "default_user")
 
+    # Resolve email to UUID
+    user_id = resolve_user_id(current_user, db)
+
     # Check project access
     has_access = (
         db.query(Project).filter(
             Project.project_id == project_id,
-            Project.owner_user_id == current_user
+            Project.owner_user_id == user_id
         ).first() is not None or
         db.query(ProjectCollaborator).filter(
             ProjectCollaborator.project_id == project_id,
-            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.user_id == user_id,
             ProjectCollaborator.is_active == True
         ).first() is not None
     )
@@ -8105,7 +8108,7 @@ async def add_article_to_collection(
             source_type=article_data.source_type,
             source_report_id=article_data.source_report_id,
             source_analysis_id=article_data.source_analysis_id,
-            added_by=current_user,
+            added_by=user_id,
             notes=article_data.notes
         )
 
@@ -8116,7 +8119,7 @@ async def add_article_to_collection(
         # Log activity
         await log_activity(
             project_id=project_id,
-            user_id=current_user,
+            user_id=user_id,
             activity_type="article_added_to_collection",
             description=f"Added article '{article_data.article_title}' to collection '{collection.collection_name}'",
             metadata={
