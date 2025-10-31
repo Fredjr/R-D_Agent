@@ -1824,8 +1824,11 @@ export default function ProjectPage() {
         {activeTab === 'activity' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Annotations</h2>
-              <AnnotationsFeed projectId={projectId} />
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Notes</h2>
+              <AnnotationsFeed
+                projectId={projectId}
+                useEnhancedNotes={true}
+              />
             </div>
             <div>
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Activity</h2>
