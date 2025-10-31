@@ -44,27 +44,37 @@ interface UseAnnotationsReturn {
 
 export function useAnnotations(options: UseAnnotationsOptions): UseAnnotationsReturn {
   const { projectId, userId, autoFetch = true, filters: initialFilters } = options;
-  
+
   // State
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [threads, setThreads] = useState<AnnotationThread[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  
+
+  // Store initial filters in ref to avoid infinite re-renders
+  const initialFiltersRef = useRef(initialFilters);
+
+  // Update ref when filters change (but don't trigger re-fetch)
+  useEffect(() => {
+    initialFiltersRef.current = initialFilters;
+  }, [initialFilters]);
+
   // Fetch annotations
   const fetch = useCallback(async (filters?: AnnotationFilters) => {
     setLoading(true);
     setError(null);
-    
+
     try {
+      console.log('📡 Fetching annotations for project:', projectId, 'with filters:', filters);
       const response = await getAnnotations(projectId, filters, userId);
+      console.log('✅ Annotations fetched:', response.annotations.length, 'annotations');
       setAnnotations(response.annotations);
     } catch (err) {
-      const errorMessage = err instanceof AnnotationAPIError 
-        ? err.message 
+      const errorMessage = err instanceof AnnotationAPIError
+        ? err.message
         : 'Failed to fetch annotations';
       setError(errorMessage);
-      console.error('Error fetching annotations:', err);
+      console.error('❌ Error fetching annotations:', err);
     } finally {
       setLoading(false);
     }
@@ -171,15 +181,19 @@ export function useAnnotations(options: UseAnnotationsOptions): UseAnnotationsRe
   
   // Refresh (re-fetch with current filters)
   const refresh = useCallback(async () => {
-    await fetch(initialFilters);
-  }, [fetch, initialFilters]);
-  
-  // Auto-fetch on mount
+    await fetch(initialFiltersRef.current);
+  }, [fetch]);
+
+  // Auto-fetch on mount only (not on every filter change)
+  const hasFetchedRef = useRef(false);
+
   useEffect(() => {
-    if (autoFetch) {
-      fetch(initialFilters);
+    if (autoFetch && !hasFetchedRef.current) {
+      console.log('🚀 Auto-fetching annotations on mount');
+      hasFetchedRef.current = true;
+      fetch(initialFiltersRef.current);
     }
-  }, [autoFetch, fetch, initialFilters]);
+  }, [autoFetch, fetch]);
   
   return {
     // State

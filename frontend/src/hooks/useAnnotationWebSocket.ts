@@ -31,9 +31,44 @@ export function useAnnotationWebSocket({
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const maxReconnectAttempts = 5;
+  const isConnectingRef = useRef(false);
+
+  // Store callbacks in refs to avoid recreating connect function
+  const callbacksRef = useRef({
+    onNewAnnotation,
+    onUpdateAnnotation,
+    onDeleteAnnotation,
+  });
+
+  // Update callbacks ref when they change
+  useEffect(() => {
+    callbacksRef.current = {
+      onNewAnnotation,
+      onUpdateAnnotation,
+      onDeleteAnnotation,
+    };
+  }, [onNewAnnotation, onUpdateAnnotation, onDeleteAnnotation]);
 
   const connect = useCallback(() => {
     if (!enabled || !projectId) return;
+
+    // Prevent multiple simultaneous connection attempts
+    if (isConnectingRef.current) {
+      console.log('⚠️ Connection attempt already in progress, skipping...');
+      return;
+    }
+
+    // Close existing connection if any
+    if (wsRef.current) {
+      if (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING) {
+        console.log('⚠️ WebSocket already connected or connecting, skipping...');
+        return;
+      }
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+
+    isConnectingRef.current = true;
 
     try {
       // WebSocket connections MUST use direct backend URL (cannot go through proxy)
@@ -51,6 +86,7 @@ export function useAnnotationWebSocket({
 
       ws.onopen = () => {
         console.log('✅ Annotation WebSocket connected');
+        isConnectingRef.current = false;
         reconnectAttemptsRef.current = 0;
       };
 
@@ -65,20 +101,20 @@ export function useAnnotationWebSocket({
               break;
 
             case 'new_annotation':
-              if (message.annotation && onNewAnnotation) {
-                onNewAnnotation(message.annotation);
+              if (message.annotation && callbacksRef.current.onNewAnnotation) {
+                callbacksRef.current.onNewAnnotation(message.annotation);
               }
               break;
 
             case 'update_annotation':
-              if (message.annotation && onUpdateAnnotation) {
-                onUpdateAnnotation(message.annotation);
+              if (message.annotation && callbacksRef.current.onUpdateAnnotation) {
+                callbacksRef.current.onUpdateAnnotation(message.annotation);
               }
               break;
 
             case 'delete_annotation':
-              if (message.annotation_id && onDeleteAnnotation) {
-                onDeleteAnnotation(message.annotation_id);
+              if (message.annotation_id && callbacksRef.current.onDeleteAnnotation) {
+                callbacksRef.current.onDeleteAnnotation(message.annotation_id);
               }
               break;
 
@@ -105,6 +141,7 @@ export function useAnnotationWebSocket({
       ws.onclose = (event) => {
         console.log('🔌 Annotation WebSocket disconnected:', event.code, event.reason);
         wsRef.current = null;
+        isConnectingRef.current = false;
 
         // Attempt to reconnect if not a normal closure
         if (
@@ -114,7 +151,7 @@ export function useAnnotationWebSocket({
         ) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
           console.log(`🔄 Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current + 1}/${maxReconnectAttempts})...`);
-          
+
           reconnectTimeoutRef.current = setTimeout(() => {
             reconnectAttemptsRef.current += 1;
             connect();
@@ -124,11 +161,13 @@ export function useAnnotationWebSocket({
 
       ws.onerror = (error) => {
         console.error('❌ Annotation WebSocket error:', error);
+        isConnectingRef.current = false;
       };
     } catch (err) {
       console.error('❌ Failed to create WebSocket connection:', err);
+      isConnectingRef.current = false;
     }
-  }, [projectId, enabled, onNewAnnotation, onUpdateAnnotation, onDeleteAnnotation]);
+  }, [projectId, enabled]); // Removed callback dependencies - using refs instead
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
