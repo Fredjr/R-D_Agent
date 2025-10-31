@@ -69,6 +69,18 @@ from database import (
     Article, NetworkGraph, AuthorCollaboration, create_tables
 )
 
+# Annotation models
+from models.annotation_models import (
+    CreateAnnotationRequest,
+    UpdateAnnotationRequest,
+    AnnotationResponse as AnnotationResponseModel,
+    ActionItem,
+    NoteType,
+    Priority,
+    Status,
+    AnnotationFilters
+)
+
 # AI Recommendations Service
 from services.ai_recommendations_service import get_spotify_recommendations_service
 
@@ -4072,20 +4084,8 @@ class CollaboratorInvite(BaseModel):
     email: str
     role: str = Field(default="viewer", pattern="^(owner|editor|viewer)$")
 
-class AnnotationCreate(BaseModel):
-    content: str = Field(..., min_length=1)
-    article_pmid: Optional[str] = None
-    report_id: Optional[str] = None
-    analysis_id: Optional[str] = None
-
-class AnnotationResponse(BaseModel):
-    annotation_id: str
-    content: str
-    author_id: str
-    created_at: datetime
-    article_pmid: Optional[str]
-    report_id: Optional[str]
-    analysis_id: Optional[str]
+# Annotation models moved to models/annotation_models.py
+# Using CreateAnnotationRequest, UpdateAnnotationRequest, AnnotationResponseModel
 
 class ReportCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
@@ -5521,16 +5521,16 @@ async def remove_collaborator(
 
 # Annotation Endpoints
 
-@app.post("/projects/{project_id}/annotations", response_model=AnnotationResponse)
+@app.post("/projects/{project_id}/annotations", response_model=AnnotationResponseModel)
 async def create_annotation(
     project_id: str,
-    annotation_data: AnnotationCreate,
+    annotation_data: CreateAnnotationRequest,
     request: Request,
     db: Session = Depends(get_db)
 ):
-    """Create a new annotation in a project"""
+    """Create a new annotation in a project with contextual structure"""
     current_user = request.headers.get("User-ID", "default_user")
-    
+
     # Check project access
     has_access = (
         db.query(Project).filter(
@@ -5543,12 +5543,23 @@ async def create_annotation(
             ProjectCollaborator.is_active == True
         ).first() is not None
     )
-    
+
     if not has_access:
         raise HTTPException(status_code=403, detail="Access denied")
-    
-    # Create annotation
+
+    # Validate at least one context is provided
+    if not any([annotation_data.article_pmid, annotation_data.report_id, annotation_data.analysis_id]):
+        raise HTTPException(
+            status_code=400,
+            detail="At least one context (article_pmid, report_id, or analysis_id) must be provided"
+        )
+
+    # Create annotation with new fields
     annotation_id = str(uuid.uuid4())
+
+    # Convert action_items to dict format for JSON storage
+    action_items_data = [item.dict() for item in annotation_data.action_items] if annotation_data.action_items else []
+
     annotation = Annotation(
         annotation_id=annotation_id,
         project_id=project_id,
@@ -5556,24 +5567,63 @@ async def create_annotation(
         article_pmid=annotation_data.article_pmid,
         report_id=annotation_data.report_id,
         analysis_id=annotation_data.analysis_id,
-        author_id=current_user
+        author_id=current_user,
+        # NEW: Contextual fields
+        note_type=annotation_data.note_type,
+        priority=annotation_data.priority,
+        status=annotation_data.status,
+        parent_annotation_id=annotation_data.parent_annotation_id,
+        related_pmids=annotation_data.related_pmids,
+        tags=annotation_data.tags,
+        action_items=action_items_data,
+        exploration_session_id=annotation_data.exploration_session_id,
+        research_question=annotation_data.research_question,
+        is_private=annotation_data.is_private
     )
     
     db.add(annotation)
     db.commit()
     db.refresh(annotation)
-    
-    # Create response object
-    response = AnnotationResponse(
+
+    # Parse JSON fields if they're strings (SQLite compatibility)
+    if isinstance(annotation.related_pmids, str):
+        related_pmids = json.loads(annotation.related_pmids) if annotation.related_pmids else []
+    else:
+        related_pmids = annotation.related_pmids if annotation.related_pmids else []
+
+    if isinstance(annotation.tags, str):
+        tags = json.loads(annotation.tags) if annotation.tags else []
+    else:
+        tags = annotation.tags if annotation.tags else []
+
+    if isinstance(annotation.action_items, str):
+        action_items = json.loads(annotation.action_items) if annotation.action_items else []
+    else:
+        action_items = annotation.action_items if annotation.action_items else []
+
+    # Create response object with new fields
+    response = AnnotationResponseModel(
         annotation_id=annotation.annotation_id,
+        project_id=annotation.project_id,
         content=annotation.content,
-        author_id=annotation.author_id,
-        created_at=annotation.created_at,
         article_pmid=annotation.article_pmid,
         report_id=annotation.report_id,
-        analysis_id=annotation.analysis_id
+        analysis_id=annotation.analysis_id,
+        note_type=annotation.note_type,
+        priority=annotation.priority,
+        status=annotation.status,
+        parent_annotation_id=annotation.parent_annotation_id,
+        related_pmids=related_pmids,
+        tags=tags,
+        action_items=action_items,
+        exploration_session_id=annotation.exploration_session_id,
+        research_question=annotation.research_question,
+        created_at=annotation.created_at,
+        updated_at=annotation.updated_at,
+        author_id=annotation.author_id,
+        is_private=annotation.is_private
     )
-    
+
     # Broadcast new annotation to all connected clients in the project room
     broadcast_message = {
         "type": "new_annotation",
@@ -5584,7 +5634,11 @@ async def create_annotation(
             "created_at": annotation.created_at.isoformat(),
             "article_pmid": annotation.article_pmid,
             "report_id": annotation.report_id,
-            "analysis_id": annotation.analysis_id
+            "analysis_id": annotation.analysis_id,
+            "note_type": annotation.note_type,
+            "priority": annotation.priority,
+            "status": annotation.status,
+            "tags": tags
         }
     }
     
@@ -5612,10 +5666,20 @@ async def create_annotation(
     return response
 
 @app.get("/projects/{project_id}/annotations")
-async def get_annotations(project_id: str, request: Request, db: Session = Depends(get_db)):
-    """Get all annotations for a project"""
+async def get_annotations(
+    project_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    # Filter parameters
+    note_type: Optional[str] = Query(None, description="Filter by note type"),
+    priority: Optional[str] = Query(None, description="Filter by priority"),
+    status: Optional[str] = Query(None, description="Filter by status"),
+    article_pmid: Optional[str] = Query(None, description="Filter by article PMID"),
+    author_id: Optional[str] = Query(None, description="Filter by author")
+):
+    """Get all annotations for a project with optional filters"""
     current_user = request.headers.get("User-ID", "default_user")
-    
+
     # Check project access
     has_access = (
         db.query(Project).filter(
@@ -5628,14 +5692,35 @@ async def get_annotations(project_id: str, request: Request, db: Session = Depen
             ProjectCollaborator.is_active == True
         ).first() is not None
     )
-    
+
     if not has_access:
         raise HTTPException(status_code=403, detail="Access denied")
-    
-    annotations = db.query(Annotation).join(User).filter(
+
+    # Build query with filters
+    query = db.query(Annotation).join(User).filter(
         Annotation.project_id == project_id
-    ).order_by(Annotation.created_at.desc()).all()
-    
+    )
+
+    # Apply filters
+    if note_type:
+        query = query.filter(Annotation.note_type == note_type)
+    if priority:
+        query = query.filter(Annotation.priority == priority)
+    if status:
+        query = query.filter(Annotation.status == status)
+    if article_pmid:
+        query = query.filter(Annotation.article_pmid == article_pmid)
+    if author_id:
+        query = query.filter(Annotation.author_id == author_id)
+
+    annotations = query.order_by(Annotation.created_at.desc()).all()
+
+    # Helper function to parse JSON fields
+    def parse_json_field(field):
+        if isinstance(field, str):
+            return json.loads(field) if field else []
+        return field if field else []
+
     return {
         "annotations": [
             {
@@ -5644,12 +5729,395 @@ async def get_annotations(project_id: str, request: Request, db: Session = Depen
                 "author_id": a.author_id,
                 "author_username": a.author.username if a.author else "Unknown",
                 "created_at": a.created_at.isoformat(),
+                "updated_at": a.updated_at.isoformat() if a.updated_at else a.created_at.isoformat(),
                 "article_pmid": a.article_pmid,
                 "report_id": a.report_id,
-                "analysis_id": a.analysis_id
+                "analysis_id": a.analysis_id,
+                # NEW: Contextual fields
+                "note_type": a.note_type,
+                "priority": a.priority,
+                "status": a.status,
+                "parent_annotation_id": a.parent_annotation_id,
+                "related_pmids": parse_json_field(a.related_pmids),
+                "tags": parse_json_field(a.tags),
+                "action_items": parse_json_field(a.action_items),
+                "exploration_session_id": a.exploration_session_id,
+                "research_question": a.research_question,
+                "is_private": a.is_private
             }
             for a in annotations
         ]
+    }
+
+@app.put("/projects/{project_id}/annotations/{annotation_id}", response_model=AnnotationResponseModel)
+async def update_annotation(
+    project_id: str,
+    annotation_id: str,
+    annotation_data: UpdateAnnotationRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Update an existing annotation with contextual fields"""
+    current_user = request.headers.get("User-ID", "default_user")
+
+    # Check project access
+    has_access = (
+        db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == current_user
+        ).first() is not None or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Get annotation
+    annotation = db.query(Annotation).filter(
+        Annotation.annotation_id == annotation_id,
+        Annotation.project_id == project_id
+    ).first()
+
+    if not annotation:
+        raise HTTPException(status_code=404, detail="Annotation not found")
+
+    # Check if user is author or project owner
+    project = db.query(Project).filter(Project.project_id == project_id).first()
+    if annotation.author_id != current_user and project.owner_user_id != current_user:
+        raise HTTPException(status_code=403, detail="Only the author or project owner can update this annotation")
+
+    # Update fields (only if provided)
+    if annotation_data.content is not None:
+        annotation.content = annotation_data.content
+
+    if annotation_data.note_type is not None:
+        annotation.note_type = annotation_data.note_type
+
+    if annotation_data.priority is not None:
+        annotation.priority = annotation_data.priority
+
+    if annotation_data.status is not None:
+        annotation.status = annotation_data.status
+
+    if annotation_data.parent_annotation_id is not None:
+        annotation.parent_annotation_id = annotation_data.parent_annotation_id
+
+    if annotation_data.related_pmids is not None:
+        annotation.related_pmids = annotation_data.related_pmids
+
+    if annotation_data.tags is not None:
+        annotation.tags = annotation_data.tags
+
+    if annotation_data.action_items is not None:
+        # Convert action_items to dict format for JSON storage
+        action_items_data = [item.dict() for item in annotation_data.action_items]
+        annotation.action_items = action_items_data
+
+    if annotation_data.exploration_session_id is not None:
+        annotation.exploration_session_id = annotation_data.exploration_session_id
+
+    if annotation_data.research_question is not None:
+        annotation.research_question = annotation_data.research_question
+
+    if annotation_data.is_private is not None:
+        annotation.is_private = annotation_data.is_private
+
+    # Update timestamp
+    annotation.updated_at = datetime.now()
+
+    db.commit()
+    db.refresh(annotation)
+
+    # Parse JSON fields if they're strings (SQLite compatibility)
+    if isinstance(annotation.related_pmids, str):
+        related_pmids = json.loads(annotation.related_pmids) if annotation.related_pmids else []
+    else:
+        related_pmids = annotation.related_pmids if annotation.related_pmids else []
+
+    if isinstance(annotation.tags, str):
+        tags = json.loads(annotation.tags) if annotation.tags else []
+    else:
+        tags = annotation.tags if annotation.tags else []
+
+    if isinstance(annotation.action_items, str):
+        action_items = json.loads(annotation.action_items) if annotation.action_items else []
+    else:
+        action_items = annotation.action_items if annotation.action_items else []
+
+    # Create response object
+    response = AnnotationResponseModel(
+        annotation_id=annotation.annotation_id,
+        project_id=annotation.project_id,
+        content=annotation.content,
+        article_pmid=annotation.article_pmid,
+        report_id=annotation.report_id,
+        analysis_id=annotation.analysis_id,
+        note_type=annotation.note_type,
+        priority=annotation.priority,
+        status=annotation.status,
+        parent_annotation_id=annotation.parent_annotation_id,
+        related_pmids=related_pmids,
+        tags=tags,
+        action_items=action_items,
+        exploration_session_id=annotation.exploration_session_id,
+        research_question=annotation.research_question,
+        created_at=annotation.created_at,
+        updated_at=annotation.updated_at,
+        author_id=annotation.author_id,
+        is_private=annotation.is_private
+    )
+
+    # Broadcast update to all connected clients in the project room
+    broadcast_message = {
+        "type": "annotation_updated",
+        "annotation": {
+            "annotation_id": annotation.annotation_id,
+            "content": annotation.content,
+            "author_id": annotation.author_id,
+            "updated_at": annotation.updated_at.isoformat(),
+            "note_type": annotation.note_type,
+            "priority": annotation.priority,
+            "status": annotation.status,
+            "tags": tags
+        }
+    }
+
+    # Send broadcast asynchronously (non-blocking)
+    asyncio.create_task(
+        manager.broadcast_to_project(json.dumps(broadcast_message), project_id)
+    )
+
+    # Log activity
+    await log_activity(
+        project_id=project_id,
+        user_id=current_user,
+        activity_type="annotation_updated",
+        description=f"Updated annotation: {annotation.content[:100]}{'...' if len(annotation.content) > 100 else ''}",
+        metadata={
+            "annotation_id": annotation.annotation_id,
+            "fields_updated": [k for k, v in annotation_data.dict(exclude_unset=True).items() if v is not None]
+        },
+        db=db
+    )
+
+    return response
+
+@app.get("/projects/{project_id}/annotations/{annotation_id}/thread")
+async def get_annotation_thread(
+    project_id: str,
+    annotation_id: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Get an annotation thread (parent and all children recursively)"""
+    current_user = request.headers.get("User-ID", "default_user")
+
+    # Check project access
+    has_access = (
+        db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == current_user
+        ).first() is not None or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Get root annotation
+    root_annotation = db.query(Annotation).filter(
+        Annotation.annotation_id == annotation_id,
+        Annotation.project_id == project_id
+    ).first()
+
+    if not root_annotation:
+        raise HTTPException(status_code=404, detail="Annotation not found")
+
+    # Helper function to parse JSON fields
+    def parse_json_field(field):
+        if isinstance(field, str):
+            return json.loads(field) if field else []
+        return field if field else []
+
+    # Helper function to build annotation dict
+    def build_annotation_dict(annotation):
+        return {
+            "annotation_id": annotation.annotation_id,
+            "project_id": annotation.project_id,
+            "content": annotation.content,
+            "article_pmid": annotation.article_pmid,
+            "report_id": annotation.report_id,
+            "analysis_id": annotation.analysis_id,
+            "note_type": annotation.note_type,
+            "priority": annotation.priority,
+            "status": annotation.status,
+            "parent_annotation_id": annotation.parent_annotation_id,
+            "related_pmids": parse_json_field(annotation.related_pmids),
+            "tags": parse_json_field(annotation.tags),
+            "action_items": parse_json_field(annotation.action_items),
+            "exploration_session_id": annotation.exploration_session_id,
+            "research_question": annotation.research_question,
+            "created_at": annotation.created_at.isoformat(),
+            "updated_at": annotation.updated_at.isoformat() if annotation.updated_at else annotation.created_at.isoformat(),
+            "author_id": annotation.author_id,
+            "author_username": annotation.author.username if annotation.author else "Unknown",
+            "is_private": annotation.is_private
+        }
+
+    # Recursive function to get all children
+    def get_children_recursive(parent_id, depth=0, max_depth=10):
+        if depth >= max_depth:
+            return []
+
+        children = db.query(Annotation).filter(
+            Annotation.parent_annotation_id == parent_id,
+            Annotation.project_id == project_id
+        ).order_by(Annotation.created_at.asc()).all()
+
+        result = []
+        for child in children:
+            child_dict = build_annotation_dict(child)
+            child_dict["depth"] = depth + 1
+            child_dict["children"] = get_children_recursive(child.annotation_id, depth + 1, max_depth)
+            result.append(child_dict)
+
+        return result
+
+    # Build thread
+    root_dict = build_annotation_dict(root_annotation)
+    root_dict["depth"] = 0
+    root_dict["children"] = get_children_recursive(root_annotation.annotation_id)
+
+    return {
+        "thread": root_dict,
+        "total_annotations": 1 + sum(1 for _ in get_all_descendants(root_dict))
+    }
+
+def get_all_descendants(node):
+    """Helper to count all descendants"""
+    for child in node.get("children", []):
+        yield child
+        yield from get_all_descendants(child)
+
+@app.get("/projects/{project_id}/annotations/threads")
+async def get_all_annotation_threads(
+    project_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    # Filter parameters
+    note_type: Optional[str] = Query(None, description="Filter by note type"),
+    priority: Optional[str] = Query(None, description="Filter by priority"),
+    status: Optional[str] = Query(None, description="Filter by status"),
+    article_pmid: Optional[str] = Query(None, description="Filter by article PMID")
+):
+    """Get all annotation threads for a project (grouped by root annotations)"""
+    current_user = request.headers.get("User-ID", "default_user")
+
+    # Check project access
+    has_access = (
+        db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == current_user
+        ).first() is not None or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Build query for root annotations (no parent)
+    query = db.query(Annotation).filter(
+        Annotation.project_id == project_id,
+        Annotation.parent_annotation_id == None
+    )
+
+    # Apply filters
+    if note_type:
+        query = query.filter(Annotation.note_type == note_type)
+    if priority:
+        query = query.filter(Annotation.priority == priority)
+    if status:
+        query = query.filter(Annotation.status == status)
+    if article_pmid:
+        query = query.filter(Annotation.article_pmid == article_pmid)
+
+    root_annotations = query.order_by(Annotation.created_at.desc()).all()
+
+    # Helper function to parse JSON fields
+    def parse_json_field(field):
+        if isinstance(field, str):
+            return json.loads(field) if field else []
+        return field if field else []
+
+    # Helper function to build annotation dict
+    def build_annotation_dict(annotation):
+        return {
+            "annotation_id": annotation.annotation_id,
+            "project_id": annotation.project_id,
+            "content": annotation.content,
+            "article_pmid": annotation.article_pmid,
+            "report_id": annotation.report_id,
+            "analysis_id": annotation.analysis_id,
+            "note_type": annotation.note_type,
+            "priority": annotation.priority,
+            "status": annotation.status,
+            "parent_annotation_id": annotation.parent_annotation_id,
+            "related_pmids": parse_json_field(annotation.related_pmids),
+            "tags": parse_json_field(annotation.tags),
+            "action_items": parse_json_field(annotation.action_items),
+            "exploration_session_id": annotation.exploration_session_id,
+            "research_question": annotation.research_question,
+            "created_at": annotation.created_at.isoformat(),
+            "updated_at": annotation.updated_at.isoformat() if annotation.updated_at else annotation.created_at.isoformat(),
+            "author_id": annotation.author_id,
+            "author_username": annotation.author.username if annotation.author else "Unknown",
+            "is_private": annotation.is_private
+        }
+
+    # Recursive function to get all children
+    def get_children_recursive(parent_id, depth=0, max_depth=10):
+        if depth >= max_depth:
+            return []
+
+        children = db.query(Annotation).filter(
+            Annotation.parent_annotation_id == parent_id,
+            Annotation.project_id == project_id
+        ).order_by(Annotation.created_at.asc()).all()
+
+        result = []
+        for child in children:
+            child_dict = build_annotation_dict(child)
+            child_dict["depth"] = depth + 1
+            child_dict["children"] = get_children_recursive(child.annotation_id, depth + 1, max_depth)
+            result.append(child_dict)
+
+        return result
+
+    # Build all threads
+    threads = []
+    for root in root_annotations:
+        root_dict = build_annotation_dict(root)
+        root_dict["depth"] = 0
+        root_dict["children"] = get_children_recursive(root.annotation_id)
+        root_dict["total_in_thread"] = 1 + sum(1 for _ in get_all_descendants(root_dict))
+        threads.append(root_dict)
+
+    return {
+        "threads": threads,
+        "total_threads": len(threads),
+        "total_annotations": sum(thread["total_in_thread"] for thread in threads)
     }
 
 # Report Endpoints

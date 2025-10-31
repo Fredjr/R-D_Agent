@@ -6,6 +6,7 @@ import { Button } from '@/components/ui';
 import { useGlobalCollectionSync } from '../hooks/useGlobalCollectionSync';
 import { NetworkNode } from './NetworkView';
 import { useToast, ToastContainer } from './Toast';
+import { AnnotationList } from './annotations';
 
 interface NetworkSidebarProps {
   selectedNode: NetworkNode | null;
@@ -1268,6 +1269,20 @@ export default function NetworkSidebar({
           )}
         </div>
       </div>
+
+      {/* Notes Section - NEW: Contextual Notes */}
+      {selectedNode && projectId && (
+        <div className="border-t border-gray-200 flex-shrink-0">
+          <AnnotationList
+            projectId={projectId}
+            userId={user?.user_id}
+            articlePmid={selectedNode.id}
+            showForm={true}
+            compact={true}
+            className="p-3"
+          />
+        </div>
+      )}
 
       {/* Loading State */}
       {isLoading && (

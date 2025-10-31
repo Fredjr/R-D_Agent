@@ -2,12 +2,14 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { 
-  ChatBubbleLeftRightIcon, 
+import {
+  ChatBubbleLeftRightIcon,
   PaperAirplaneIcon,
   UserCircleIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  SparklesIcon
 } from '@heroicons/react/24/outline';
+import { AnnotationList } from './annotations';
 
 interface Annotation {
   annotation_id: string;
@@ -25,23 +27,56 @@ interface AnnotationsFeedProps {
   reportId?: string;
   analysisId?: string;
   className?: string;
+  // NEW: Option to use enhanced contextual notes
+  useEnhancedNotes?: boolean;
 }
 
-export default function AnnotationsFeed({ 
-  projectId, 
-  articlePmid, 
-  reportId, 
+export default function AnnotationsFeed({
+  projectId,
+  articlePmid,
+  reportId,
   analysisId,
-  className = '' 
+  className = '',
+  useEnhancedNotes = false
 }: AnnotationsFeedProps) {
   const { user } = useAuth();
+
+  // If enhanced notes are enabled, use the new AnnotationList component
+  if (useEnhancedNotes) {
+    return (
+      <div className={`flex flex-col h-full ${className}`}>
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
+          <div className="flex items-center gap-2">
+            <SparklesIcon className="w-5 h-5 text-blue-600" />
+            <h3 className="font-semibold text-gray-900">Contextual Notes</h3>
+          </div>
+          <div className="text-xs text-gray-500">
+            Enhanced with types, priorities & threads
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          <AnnotationList
+            projectId={projectId}
+            userId={user?.user_id}
+            articlePmid={articlePmid}
+            reportId={reportId}
+            analysisId={analysisId}
+            showForm={true}
+            compact={false}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Legacy annotations feed (backward compatibility)
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [newAnnotation, setNewAnnotation] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [wsConnected, setWsConnected] = useState(false);
-  
+
   const wsRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 

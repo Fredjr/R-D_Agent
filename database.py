@@ -253,29 +253,57 @@ class DeepDiveAnalysis(Base):
     report = relationship("Report")
 
 class Annotation(Base):
-    """Shared annotations within projects"""
+    """Shared annotations within projects with contextual structure"""
     __tablename__ = "annotations"
-    
+
     annotation_id = Column(String, primary_key=True)  # UUID
     project_id = Column(String, ForeignKey("projects.project_id"), nullable=False)
     content = Column(Text, nullable=False)
-    
+
     # Optional links to specific items
     article_pmid = Column(String, nullable=True)
     report_id = Column(String, ForeignKey("reports.report_id"), nullable=True)
     analysis_id = Column(String, ForeignKey("deep_dive_analyses.analysis_id"), nullable=True)
-    
+
     # Annotation metadata
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     author_id = Column(String, ForeignKey("users.user_id"), nullable=False)
     is_private = Column(Boolean, default=False)  # Private vs shared annotations
-    
+
+    # NEW: Contextual structure fields
+    note_type = Column(String, default="general")  # general, finding, hypothesis, question, todo, comparison, critique
+    priority = Column(String, default="medium")  # low, medium, high, critical
+    status = Column(String, default="active")  # active, resolved, archived
+
+    # NEW: Relationships and context
+    parent_annotation_id = Column(String, ForeignKey("annotations.annotation_id"), nullable=True)
+    related_pmids = Column(JSON, default=list)  # Related paper PMIDs
+    tags = Column(JSON, default=list)  # Tags for organization
+    action_items = Column(JSON, default=list)  # Action items with completion status
+
+    # NEW: Research journey tracking (Phase 2)
+    exploration_session_id = Column(String, nullable=True)
+    research_question = Column(Text, nullable=True)
+
     # Relationships
     project = relationship("Project", back_populates="annotations")
     author = relationship("User", back_populates="annotations")
     report = relationship("Report")
     analysis = relationship("DeepDiveAnalysis")
+    parent_annotation = relationship("Annotation", remote_side=[annotation_id], backref="child_annotations")
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_annotation_project', 'project_id'),
+        Index('idx_annotation_author', 'author_id'),
+        Index('idx_annotation_article', 'article_pmid'),
+        Index('idx_annotation_type', 'note_type'),
+        Index('idx_annotation_priority', 'priority'),
+        Index('idx_annotation_status', 'status'),
+        Index('idx_annotation_session', 'exploration_session_id'),
+        Index('idx_annotation_parent', 'parent_annotation_id'),
+    )
 
 class Collection(Base):
     """User-curated collections for organizing articles within projects"""
