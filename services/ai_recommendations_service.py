@@ -1151,7 +1151,36 @@ class SpotifyInspiredRecommendationsService:
                             # Continue with recommendation generation instead of fallback
                             logger.info(f"✅ Generated enhanced profile with {len(research_domains)} domains")
                         else:
-                            logger.info(f"📝 No research domains detected, trying user subject area")
+                            # Only use subject area if we don't already have onboarding preferences
+                            if not profile.get("onboarding_based"):
+                                logger.info(f"📝 No research domains detected, trying user subject area")
+                                # Try to get user's subject area for recommendations
+                                from database import User
+                                user_record = db.query(User).filter(
+                                    or_(User.email == user_id, User.user_id == user_id)
+                                ).first()
+
+                                if user_record and user_record.subject_area:
+                                    logger.info(f"🎓 Creating profile based on user's subject area: {user_record.subject_area}")
+                                    # Create a profile based on subject area
+                                    profile["primary_domains"] = [user_record.subject_area.lower()]
+                                    profile["topic_preferences"] = {user_record.subject_area.lower(): 0.9}
+                                    profile["activity_level"] = "new_user"
+                                    profile["discovery_preference"] = "exploratory"
+                                    profile["collaboration_score"] = 0.5
+                                    profile["research_velocity"] = "getting_started"
+                                    profile["recency_bias"] = 0.7
+                                    profile["total_saved_papers"] = 0
+                                    profile["is_subject_area_based"] = True
+                                    logger.info(f"✅ Created subject-area-based profile for {user_record.subject_area}")
+                                else:
+                                    return await self._generate_fallback_profile(user_id, db)
+                            else:
+                                logger.info(f"✅ Skipping subject area fallback - already have onboarding-based profile")
+                    else:
+                        # Only use subject area if we don't already have onboarding preferences
+                        if not profile.get("onboarding_based"):
+                            logger.info(f"📝 No user collections found, trying user subject area")
                             # Try to get user's subject area for recommendations
                             from database import User
                             user_record = db.query(User).filter(
@@ -1173,29 +1202,8 @@ class SpotifyInspiredRecommendationsService:
                                 logger.info(f"✅ Created subject-area-based profile for {user_record.subject_area}")
                             else:
                                 return await self._generate_fallback_profile(user_id, db)
-                    else:
-                        logger.info(f"📝 No user collections found, trying user subject area")
-                        # Try to get user's subject area for recommendations
-                        from database import User
-                        user_record = db.query(User).filter(
-                            or_(User.email == user_id, User.user_id == user_id)
-                        ).first()
-
-                        if user_record and user_record.subject_area:
-                            logger.info(f"🎓 Creating profile based on user's subject area: {user_record.subject_area}")
-                            # Create a profile based on subject area
-                            profile["primary_domains"] = [user_record.subject_area.lower()]
-                            profile["topic_preferences"] = {user_record.subject_area.lower(): 0.9}
-                            profile["activity_level"] = "new_user"
-                            profile["discovery_preference"] = "exploratory"
-                            profile["collaboration_score"] = 0.5
-                            profile["research_velocity"] = "getting_started"
-                            profile["recency_bias"] = 0.7
-                            profile["total_saved_papers"] = 0
-                            profile["is_subject_area_based"] = True
-                            logger.info(f"✅ Created subject-area-based profile for {user_record.subject_area}")
                         else:
-                            return await self._generate_fallback_profile(user_id, db)
+                            logger.info(f"✅ Skipping subject area fallback - already have onboarding-based profile")
 
                 except Exception as e:
                     logger.error(f"❌ Error in alternative recommendation approach: {e}")
