@@ -5519,6 +5519,103 @@ async def remove_collaborator(
 
     return {"message": "Collaborator removed successfully"}
 
+# Migration Endpoint (Temporary - for applying contextual notes migration)
+@app.post("/api/admin/apply-contextual-notes-migration")
+async def apply_contextual_notes_migration(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Temporary endpoint to apply contextual notes migration to production database.
+    This adds the 9 new fields to the annotations table.
+    """
+    try:
+        from sqlalchemy import text, inspect
+
+        # Check if columns already exist
+        inspector = inspect(db.bind)
+        existing_columns = [col['name'] for col in inspector.get_columns('annotations')]
+
+        new_columns = {
+            'note_type': 'VARCHAR',
+            'priority': 'VARCHAR',
+            'status': 'VARCHAR',
+            'tags': 'JSON',
+            'action_items': 'JSON',
+            'parent_annotation_id': 'VARCHAR',
+            'is_private': 'BOOLEAN',
+            'report_id': 'VARCHAR',
+            'analysis_id': 'VARCHAR'
+        }
+
+        columns_to_add = []
+        for col_name, col_type in new_columns.items():
+            if col_name not in existing_columns:
+                columns_to_add.append((col_name, col_type))
+
+        if not columns_to_add:
+            return {
+                "status": "success",
+                "message": "All columns already exist",
+                "columns_checked": list(new_columns.keys())
+            }
+
+        # Add missing columns
+        added_columns = []
+        for col_name, col_type in columns_to_add:
+            try:
+                if col_type == 'JSON':
+                    sql = f"ALTER TABLE annotations ADD COLUMN {col_name} JSON"
+                elif col_type == 'BOOLEAN':
+                    sql = f"ALTER TABLE annotations ADD COLUMN {col_name} BOOLEAN DEFAULT FALSE"
+                else:
+                    sql = f"ALTER TABLE annotations ADD COLUMN {col_name} {col_type}"
+
+                db.execute(text(sql))
+                db.commit()
+                added_columns.append(col_name)
+                print(f"✅ Added column: {col_name}")
+            except Exception as col_error:
+                print(f"❌ Error adding column {col_name}: {col_error}")
+                # Continue with other columns
+
+        # Create indexes
+        indexes_to_create = [
+            ("idx_annotations_note_type", "note_type"),
+            ("idx_annotations_priority", "priority"),
+            ("idx_annotations_status", "status"),
+            ("idx_annotations_parent", "parent_annotation_id"),
+            ("idx_annotations_report", "report_id"),
+            ("idx_annotations_analysis", "analysis_id")
+        ]
+
+        created_indexes = []
+        for idx_name, col_name in indexes_to_create:
+            if col_name in added_columns or col_name in existing_columns:
+                try:
+                    sql = f"CREATE INDEX IF NOT EXISTS {idx_name} ON annotations({col_name})"
+                    db.execute(text(sql))
+                    db.commit()
+                    created_indexes.append(idx_name)
+                    print(f"✅ Created index: {idx_name}")
+                except Exception as idx_error:
+                    print(f"⚠️ Index {idx_name} may already exist: {idx_error}")
+
+        return {
+            "status": "success",
+            "message": "Migration applied successfully",
+            "columns_added": added_columns,
+            "indexes_created": created_indexes,
+            "total_columns": len(added_columns)
+        }
+
+    except Exception as e:
+        print(f"❌ Migration failed: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
 # Annotation Endpoints
 
 @app.post("/projects/{project_id}/annotations", response_model=AnnotationResponseModel)
