@@ -155,12 +155,16 @@ export default function CompleteProfile() {
 
       // Redirect based on first action
       if (firstAction === 'search') {
-        router.push('/dashboard?action=search');
+        // Redirect to Research Hub (home page) which has MeSH search
+        router.push('/?onboarding=search');
       } else if (firstAction === 'import') {
-        router.push('/dashboard?action=import');
+        // Redirect to Research Hub with import hint
+        router.push('/?onboarding=import');
       } else if (firstAction === 'trending') {
-        router.push('/discover?category=trending');
+        // Redirect to Discover page
+        router.push('/discover?onboarding=trending');
       } else if (firstAction === 'project') {
+        // Redirect to Dashboard with create project modal trigger
         router.push('/dashboard?action=create_project');
       } else {
         router.push('/dashboard');

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { PlusIcon, FolderIcon, UsersIcon, CalendarIcon, BeakerIcon, UserIcon, MusicalNoteIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Button,
   FullPageLoading,
@@ -39,6 +39,7 @@ interface ProjectListResponse {
 export default function Dashboard() {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +65,18 @@ export default function Dashboard() {
       fetchProjects();
     }
   }, [user, authLoading]);
+
+  // Handle URL parameters from onboarding
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action === 'create_project' && user && !authLoading) {
+      // Auto-open create project modal after a short delay
+      const timer = setTimeout(() => {
+        setShowCreateModal(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams, user, authLoading]);
 
   // Auto-dismiss errors after 10 seconds
   useEffect(() => {

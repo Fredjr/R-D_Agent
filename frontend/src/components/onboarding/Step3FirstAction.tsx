@@ -39,30 +39,30 @@ export function Step3FirstAction({
     {
       id: 'search',
       title: 'Search for Papers',
-      description: 'Find papers in your research area using PubMed search',
+      description: 'Use our Research Hub to search PubMed with MeSH terms',
       icon: <MagnifyingGlassIcon className="w-8 h-8" />,
       color: 'blue',
       recommended: hasTopics
     },
     {
       id: 'import',
-      title: 'Import from PubMed',
-      description: 'Add papers you\'re already working with by PMID',
+      title: 'Import Papers',
+      description: 'Import papers you\'re already working with using PMIDs or DOIs',
       icon: <DocumentPlusIcon className="w-8 h-8" />,
       color: 'green'
     },
     {
       id: 'trending',
-      title: 'Browse Trending Papers',
-      description: 'Explore what\'s popular and highly cited in your field',
+      title: 'Discover Papers',
+      description: 'Explore personalized recommendations based on your interests',
       icon: <FireIcon className="w-8 h-8" />,
       color: 'orange',
-      recommended: !hasTopics
+      recommended: hasTopics
     },
     {
       id: 'project',
       title: 'Create a Project',
-      description: 'Organize your research from the start with a project workspace',
+      description: 'Start organizing your research with a project workspace',
       icon: <FolderPlusIcon className="w-8 h-8" />,
       color: 'purple'
     }
