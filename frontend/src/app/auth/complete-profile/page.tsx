@@ -7,6 +7,9 @@ import Image from 'next/image';
 import { CheckCircleIcon, UserIcon, BuildingOfficeIcon, AcademicCapIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import { validateObject, userProfileRules, formatValidationErrors } from '@/lib/validation';
+import { StepIndicator } from '@/components/onboarding/StepIndicator';
+import { Step2ResearchInterests } from '@/components/onboarding/Step2ResearchInterests';
+import { Step3FirstAction, FirstActionType } from '@/components/onboarding/Step3FirstAction';
 
 const CATEGORY_ROLES = {
   Student: ['Undergraduate', 'Postgraduate', 'PhD Student'],
@@ -17,18 +20,33 @@ const CATEGORY_ROLES = {
 export default function CompleteProfile() {
   const router = useRouter();
   const { completeRegistration } = useAuth();
+
+  // Multi-step wizard state
+  const [currentStep, setCurrentStep] = useState(1);
+  const totalSteps = 3;
+
+  // Step 1: Personal Information
   const [formData, setFormData] = useState({
-    firstName: 'Fred',
-    lastName: 'Le',
-    category: 'Academic',
-    role: 'Researcher',
-    institution: 'Research Institution',
-    subjectArea: 'Medical Research',
-    howHeardAboutUs: 'Direct',
-    joinMailingList: false,
-    password: 'qwerty1234',
-    confirmPassword: 'qwerty1234'
+    firstName: '',
+    lastName: '',
+    category: '',
+    role: '',
+    institution: '',
+    subjectArea: '',
+    howHeardAboutUs: '',
+    joinMailingList: false
   });
+
+  // Step 2: Research Interests
+  const [researchInterests, setResearchInterests] = useState({
+    topics: [] as string[],
+    keywords: [] as string[],
+    careerStage: ''
+  });
+
+  // Step 3: First Action
+  const [firstAction, setFirstAction] = useState<FirstActionType | null>(null);
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string>('');
@@ -68,8 +86,8 @@ export default function CompleteProfile() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Step navigation handlers
+  const handleStep1Next = () => {
     setError(null);
     setValidationErrors('');
 
@@ -92,14 +110,61 @@ export default function CompleteProfile() {
       return;
     }
 
+    // Move to step 2
+    setCurrentStep(2);
+  };
+
+  const handleStep2Next = () => {
+    // Validate research interests
+    if (researchInterests.topics.length === 0 || !researchInterests.careerStage) {
+      setError('Please select at least one research topic and your career stage');
+      return;
+    }
+
+    setError(null);
+    setCurrentStep(3);
+  };
+
+  const handleStep3Complete = async () => {
+    setError(null);
     setIsLoading(true);
 
     try {
+      // Prepare data for backend
+      const validationData = {
+        first_name: formData.firstName.trim(),
+        last_name: formData.lastName.trim(),
+        category: formData.category,
+        role: formData.role,
+        institution: formData.institution.trim(),
+        subject_area: formData.subjectArea.trim(),
+        how_heard_about_us: formData.howHeardAboutUs.trim()
+      };
+
+      // Complete registration with preferences
       await completeRegistration({
         ...validationData,
-        join_mailing_list: formData.joinMailingList
+        join_mailing_list: formData.joinMailingList,
+        preferences: {
+          research_interests: researchInterests,
+          first_action: firstAction,
+          onboarding_completed: true,
+          onboarding_completed_at: new Date().toISOString()
+        }
       });
-      router.push('/dashboard');
+
+      // Redirect based on first action
+      if (firstAction === 'search') {
+        router.push('/dashboard?action=search');
+      } else if (firstAction === 'import') {
+        router.push('/dashboard?action=import');
+      } else if (firstAction === 'trending') {
+        router.push('/discover?category=trending');
+      } else if (firstAction === 'project') {
+        router.push('/dashboard?action=create_project');
+      } else {
+        router.push('/dashboard');
+      }
     } catch (error: any) {
       setError(error.message || 'Registration failed. Please try again.');
     } finally {
@@ -107,9 +172,22 @@ export default function CompleteProfile() {
     }
   };
 
+  const handleBack = () => {
+    setError(null);
+    setValidationErrors('');
+    setCurrentStep(prev => Math.max(1, prev - 1));
+  };
+
+  // Step definitions for indicator
+  const steps = [
+    { number: 1, label: 'Profile', description: 'Basic info' },
+    { number: 2, label: 'Interests', description: 'Research areas' },
+    { number: 3, label: 'Get Started', description: 'First action' }
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="max-w-2xl w-full bg-white rounded-xl shadow-lg p-8">
+      <div className="max-w-4xl w-full bg-white rounded-xl shadow-lg p-8">
         {/* Logo and Title */}
         <div className="text-center mb-8">
           <Image
@@ -124,7 +202,25 @@ export default function CompleteProfile() {
           <p className="text-gray-600">Tell us about yourself to personalize your experience</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Step Indicator */}
+        <StepIndicator currentStep={currentStep} totalSteps={totalSteps} steps={steps} />
+
+        {/* Error Messages */}
+        {validationErrors && (
+          <div className="mb-6 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-yellow-800 text-sm whitespace-pre-line">{validationErrors}</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-800 text-sm">{error}</p>
+          </div>
+        )}
+
+        {/* Step Content */}
+        {currentStep === 1 && (
+          <form onSubmit={(e) => { e.preventDefault(); handleStep1Next(); }} className="space-y-6">
           {/* Personal Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -272,44 +368,68 @@ export default function CompleteProfile() {
             </label>
           </div>
 
-          {/* Validation Errors */}
-          {validationErrors && (
-            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-yellow-800 text-sm whitespace-pre-line">{validationErrors}</p>
-            </div>
-          )}
+          {/* Mailing List Checkbox */}
+          <div className="flex items-start gap-3">
+            <input
+              id="joinMailingList"
+              type="checkbox"
+              checked={formData.joinMailingList}
+              onChange={(e) => handleInputChange('joinMailingList', e.target.checked)}
+              className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <label htmlFor="joinMailingList" className="text-sm text-gray-700">
+              Join our mailing list for updates about new features and research insights
+            </label>
+          </div>
 
-          {/* Error Message */}
-          {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-800 text-sm">{error}</p>
-            </div>
-          )}
+          {/* Navigation Buttons */}
+          <div className="flex justify-end pt-6 border-t border-gray-200">
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
+            >
+              Continue →
+            </button>
+          </div>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
-          >
-            {isLoading ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                Completing Profile...
-              </>
-            ) : (
-              <>
-                <CheckIcon className="h-5 w-5" />
-                Complete Registration
-              </>
-            )}
-          </button>
+          {/* Required Fields Note */}
+          <div className="text-center">
+            <p className="text-xs text-gray-500">* Required fields</p>
+          </div>
         </form>
+        )}
 
-        {/* Required Fields Note */}
-        <div className="mt-6 text-center">
-          <p className="text-xs text-gray-500">* Required fields</p>
-        </div>
+        {/* Step 2: Research Interests */}
+        {currentStep === 2 && (
+          <Step2ResearchInterests
+            data={researchInterests}
+            onChange={setResearchInterests}
+            onNext={handleStep2Next}
+            onBack={handleBack}
+          />
+        )}
+
+        {/* Step 3: First Action */}
+        {currentStep === 3 && (
+          <Step3FirstAction
+            selectedAction={firstAction}
+            onSelectAction={setFirstAction}
+            onBack={handleBack}
+            onComplete={handleStep3Complete}
+            hasTopics={researchInterests.topics.length > 0}
+          />
+        )}
+
+        {/* Loading Overlay */}
+        {isLoading && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 flex flex-col items-center gap-4">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              <p className="text-gray-700 font-medium">Completing your profile...</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

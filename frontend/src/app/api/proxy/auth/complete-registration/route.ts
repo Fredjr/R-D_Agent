@@ -6,7 +6,7 @@ const BACKEND_BASE = "https://r-dagent-production.up.railway.app";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    
+
     // Add user_id to the request body for the backend
     const requestBody = {
       user_id: body.user_id || body.email, // Use email as fallback user_id
@@ -17,7 +17,8 @@ export async function POST(request: NextRequest) {
       institution: body.institution,
       subject_area: body.subject_area,
       how_heard_about_us: body.how_heard_about_us,
-      join_mailing_list: body.join_mailing_list || false
+      join_mailing_list: body.join_mailing_list || false,
+      preferences: body.preferences || {} // Include preferences for onboarding data
     };
     
     const response = await fetch(`${BACKEND_BASE}/auth/complete-registration`, {

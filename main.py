@@ -5018,6 +5018,7 @@ class CompleteRegistrationRequest(BaseModel):
     how_heard_about_us: str = Field(..., min_length=1, max_length=255, description="How heard about us")
     join_mailing_list: bool = False
     password: Optional[str] = Field(None, min_length=6, description="User password")
+    preferences: Optional[dict] = Field(default_factory=dict, description="User preferences including onboarding data")
 
     @validator('category')
     def validate_category(cls, v):
@@ -5045,6 +5046,10 @@ async def complete_registration(request: CompleteRegistrationRequest, db: Sessio
         user.how_heard_about_us = request.how_heard_about_us
         user.join_mailing_list = request.join_mailing_list
         user.registration_completed = True
+
+        # Store user preferences (onboarding data, research interests, etc.)
+        if request.preferences:
+            user.preferences = request.preferences
 
         # CRITICAL FIX: Set password hash if provided
         if hasattr(request, 'password') and request.password:
