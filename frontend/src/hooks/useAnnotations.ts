@@ -3,7 +3,7 @@
  * React hook for managing annotations with contextual notes support
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   createAnnotation,
   getAnnotations,
