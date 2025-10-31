@@ -635,6 +635,78 @@ a:hover {
   color: #1a1a1a !important;
 }
 
+/* ========================================
+   FORM ELEMENTS ON WHITE BACKGROUNDS FIX
+   ======================================== */
+
+/* Fix input, textarea, and select elements on white/light backgrounds */
+.bg-white input,
+.bg-white textarea,
+.bg-white select,
+.bg-gray-50 input,
+.bg-gray-50 textarea,
+.bg-gray-50 select,
+.bg-gray-100 input,
+.bg-gray-100 textarea,
+.bg-gray-100 select {
+  background-color: #ffffff !important;
+  color: #1a1a1a !important;
+  border: 1px solid #d1d5db !important; /* gray-300 */
+}
+
+/* Fix placeholder text on white backgrounds */
+.bg-white input::placeholder,
+.bg-white textarea::placeholder,
+.bg-white select::placeholder,
+.bg-gray-50 input::placeholder,
+.bg-gray-50 textarea::placeholder,
+.bg-gray-50 select::placeholder,
+.bg-gray-100 input::placeholder,
+.bg-gray-100 textarea::placeholder,
+.bg-gray-100 select::placeholder {
+  color: #9ca3af !important; /* gray-400 */
+}
+
+/* Fix labels on white backgrounds */
+.bg-white label,
+.bg-white .form-label,
+.bg-gray-50 label,
+.bg-gray-50 .form-label,
+.bg-gray-100 label,
+.bg-gray-100 .form-label {
+  color: #374151 !important; /* gray-700 */
+}
+
+/* Fix focus states on white backgrounds */
+.bg-white input:focus,
+.bg-white textarea:focus,
+.bg-white select:focus,
+.bg-gray-50 input:focus,
+.bg-gray-50 textarea:focus,
+.bg-gray-50 select:focus,
+.bg-gray-100 input:focus,
+.bg-gray-100 textarea:focus,
+.bg-gray-100 select:focus {
+  border-color: #3b82f6 !important; /* blue-500 */
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Fix disabled states on white backgrounds */
+.bg-white input:disabled,
+.bg-white textarea:disabled,
+.bg-white select:disabled,
+.bg-gray-50 input:disabled,
+.bg-gray-50 textarea:disabled,
+.bg-gray-50 select:disabled,
+.bg-gray-100 input:disabled,
+.bg-gray-100 textarea:disabled,
+.bg-gray-100 select:disabled {
+  background-color: #f3f4f6 !important; /* gray-100 */
+  color: #9ca3af !important; /* gray-400 */
+  cursor: not-allowed !important;
+}
+
 /* Specific fix for report iteration cards */
 .bg-white .version-number,
 .bg-white .date-text,
