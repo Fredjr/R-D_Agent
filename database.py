@@ -264,6 +264,7 @@ class Annotation(Base):
     article_pmid = Column(String, nullable=True)
     report_id = Column(String, ForeignKey("reports.report_id"), nullable=True)
     analysis_id = Column(String, ForeignKey("deep_dive_analyses.analysis_id"), nullable=True)
+    collection_id = Column(String, ForeignKey("collections.collection_id"), nullable=True)
 
     # Annotation metadata
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -291,6 +292,7 @@ class Annotation(Base):
     author = relationship("User", back_populates="annotations")
     report = relationship("Report")
     analysis = relationship("DeepDiveAnalysis")
+    collection = relationship("Collection")
     parent_annotation = relationship("Annotation", remote_side=[annotation_id], backref="child_annotations")
 
     # Indexes for performance
@@ -298,6 +300,7 @@ class Annotation(Base):
         Index('idx_annotation_project', 'project_id'),
         Index('idx_annotation_author', 'author_id'),
         Index('idx_annotation_article', 'article_pmid'),
+        Index('idx_annotation_collection', 'collection_id'),
         Index('idx_annotation_type', 'note_type'),
         Index('idx_annotation_priority', 'priority'),
         Index('idx_annotation_status', 'status'),

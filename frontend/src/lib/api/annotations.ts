@@ -39,6 +39,7 @@ export interface CreateAnnotationRequest {
   article_pmid?: string;
   report_id?: string;
   analysis_id?: string;
+  collection_id?: string;
   note_type?: NoteType;
   priority?: Priority;
   status?: Status;
@@ -72,6 +73,7 @@ export interface Annotation {
   article_pmid?: string;
   report_id?: string;
   analysis_id?: string;
+  collection_id?: string;
   note_type: NoteType;
   priority: Priority;
   status: Status;
@@ -95,6 +97,7 @@ export interface AnnotationThread {
   article_pmid?: string;
   report_id?: string;
   analysis_id?: string;
+  collection_id?: string;
   note_type: NoteType;
   priority: Priority;
   status: Status;
@@ -119,6 +122,7 @@ export interface AnnotationFilters {
   priority?: Priority;
   status?: Status;
   article_pmid?: string;
+  collection_id?: string;
   author_id?: string;
 }
 

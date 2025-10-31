@@ -21,6 +21,7 @@ interface AnnotationFormProps {
   articlePmid?: string;
   reportId?: string;
   analysisId?: string;
+  collectionId?: string;
   parentAnnotationId?: string;
   onSubmit: (data: CreateAnnotationRequest) => Promise<void>;
   onCancel?: () => void;
@@ -36,6 +37,7 @@ export default function AnnotationForm({
   articlePmid,
   reportId,
   analysisId,
+  collectionId,
   parentAnnotationId,
   onSubmit,
   onCancel,
@@ -70,6 +72,7 @@ export default function AnnotationForm({
         article_pmid: articlePmid,
         report_id: reportId,
         analysis_id: analysisId,
+        collection_id: collectionId,
         parent_annotation_id: parentAnnotationId,
         note_type: noteType,
         priority,

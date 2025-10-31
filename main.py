@@ -5669,12 +5669,10 @@ async def create_annotation(
     if not has_access:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    # Validate at least one context is provided
-    if not any([annotation_data.article_pmid, annotation_data.report_id, annotation_data.analysis_id]):
-        raise HTTPException(
-            status_code=400,
-            detail="At least one context (article_pmid, report_id, or analysis_id) must be provided"
-        )
+    # Validate at least one context is provided (or it's a project-level note)
+    if not any([annotation_data.article_pmid, annotation_data.report_id, annotation_data.analysis_id, annotation_data.collection_id]):
+        # Allow project-level notes (no context required)
+        pass
 
     # Create annotation with new fields
     annotation_id = str(uuid.uuid4())
@@ -5689,6 +5687,7 @@ async def create_annotation(
         article_pmid=annotation_data.article_pmid,
         report_id=annotation_data.report_id,
         analysis_id=annotation_data.analysis_id,
+        collection_id=annotation_data.collection_id,
         author_id=current_user,
         # NEW: Contextual fields
         note_type=annotation_data.note_type,
@@ -5797,6 +5796,7 @@ async def get_annotations(
     priority: Optional[str] = Query(None, description="Filter by priority"),
     status: Optional[str] = Query(None, description="Filter by status"),
     article_pmid: Optional[str] = Query(None, description="Filter by article PMID"),
+    collection_id: Optional[str] = Query(None, description="Filter by collection ID"),
     author_id: Optional[str] = Query(None, description="Filter by author")
 ):
     """Get all annotations for a project with optional filters"""
@@ -5832,6 +5832,8 @@ async def get_annotations(
         query = query.filter(Annotation.status == status)
     if article_pmid:
         query = query.filter(Annotation.article_pmid == article_pmid)
+    if collection_id:
+        query = query.filter(Annotation.collection_id == collection_id)
     if author_id:
         query = query.filter(Annotation.author_id == author_id)
 

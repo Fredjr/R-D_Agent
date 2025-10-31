@@ -26,6 +26,7 @@ interface AnnotationListProps {
   articlePmid?: string;
   reportId?: string;
   analysisId?: string;
+  collectionId?: string;
   initialFilters?: AnnotationFilters;
   showForm?: boolean;
   compact?: boolean;
@@ -38,6 +39,7 @@ export default function AnnotationList({
   articlePmid,
   reportId,
   analysisId,
+  collectionId,
   initialFilters,
   showForm = true,
   compact = false,
@@ -63,6 +65,7 @@ export default function AnnotationList({
     filters: {
       ...initialFilters,
       article_pmid: articlePmid,
+      collection_id: collectionId,
     },
   });
 
@@ -305,6 +308,7 @@ export default function AnnotationList({
             articlePmid={articlePmid}
             reportId={reportId}
             analysisId={analysisId}
+            collectionId={collectionId}
             onSubmit={handleCreate}
             onCancel={() => setShowNewForm(false)}
             compact={compact}
@@ -340,6 +344,7 @@ export default function AnnotationList({
                     articlePmid={annotation.article_pmid}
                     reportId={annotation.report_id}
                     analysisId={annotation.analysis_id}
+                    collectionId={annotation.collection_id}
                     onSubmit={(data) => handleUpdate(annotation.annotation_id, data)}
                     onCancel={() => setEditingAnnotation(null)}
                     defaultNoteType={annotation.note_type}
@@ -366,6 +371,7 @@ export default function AnnotationList({
                     articlePmid={annotation.article_pmid}
                     reportId={annotation.report_id}
                     analysisId={annotation.analysis_id}
+                    collectionId={annotation.collection_id}
                     parentAnnotationId={annotation.annotation_id}
                     onSubmit={handleCreate}
                     onCancel={() => setReplyToId(null)}

@@ -53,6 +53,7 @@ class CreateAnnotationRequest(BaseModel):
     article_pmid: Optional[str] = Field(None, description="Link to article")
     report_id: Optional[str] = Field(None, description="Link to report")
     analysis_id: Optional[str] = Field(None, description="Link to analysis")
+    collection_id: Optional[str] = Field(None, description="Link to collection")
     
     # Contextual structure
     note_type: NoteType = Field(default=NoteType.GENERAL, description="Type of note")
@@ -178,6 +179,7 @@ class AnnotationResponse(BaseModel):
     article_pmid: Optional[str] = None
     report_id: Optional[str] = None
     analysis_id: Optional[str] = None
+    collection_id: Optional[str] = None
     
     # Contextual structure
     note_type: str
@@ -223,6 +225,7 @@ class AnnotationFilters(BaseModel):
     priority: Optional[Priority] = Field(None, description="Filter by priority")
     status: Optional[Status] = Field(None, description="Filter by status")
     article_pmid: Optional[str] = Field(None, description="Filter by article")
+    collection_id: Optional[str] = Field(None, description="Filter by collection")
     author_id: Optional[str] = Field(None, description="Filter by author")
     tags: Optional[List[str]] = Field(None, description="Filter by tags (OR logic)")
     
