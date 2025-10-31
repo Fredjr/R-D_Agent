@@ -966,12 +966,20 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 # Enable CORS for frontend dev (broad for local dev)
+# Updated: Use allow_origins with wildcard for production compatibility
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=os.getenv('ALLOW_ORIGIN_REGEX', '.*'),
-    allow_credentials=False,
-    allow_methods=['*'],
-    allow_headers=['*'],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://frontend-psi-seven-85.vercel.app",
+        "https://*.vercel.app",  # All Vercel deployments
+    ],
+    allow_origin_regex=r"https://.*\.vercel\.app",  # Regex for all Vercel domains
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 
