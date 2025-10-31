@@ -5565,7 +5565,10 @@ async def apply_contextual_notes_migration(
             'parent_annotation_id': 'VARCHAR',
             'is_private': 'BOOLEAN',
             'report_id': 'VARCHAR',
-            'analysis_id': 'VARCHAR'
+            'analysis_id': 'VARCHAR',
+            'exploration_session_id': 'VARCHAR',
+            'research_question': 'TEXT',
+            'related_pmids': 'JSON'
         }
 
         columns_to_add = []
