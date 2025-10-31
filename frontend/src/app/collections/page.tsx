@@ -58,48 +58,7 @@ export default function CollectionsPage() {
     }
   }, [user?.email]); // Re-fetch when user changes
 
-  // Demo collections for testing semantic features
-  const demoCollections: Collection[] = [
-    {
-      id: 'demo-1',
-      name: 'Machine Learning in Drug Discovery',
-      description: 'Semantic analysis of ML applications in pharmaceutical research',
-      color: '#3B82F6',
-      icon: '🧠',
-      articleCount: 24,
-      projectName: 'AI Research Project',
-      projectId: 'project-1',
-      createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      updatedAt: new Date().toISOString(),
-      isShared: false
-    },
-    {
-      id: 'demo-2',
-      name: 'Cross-Domain Biomedical Research',
-      description: 'Interdisciplinary papers with semantic connections',
-      color: '#10B981',
-      icon: '🌐',
-      articleCount: 18,
-      projectName: 'Cross-Domain Analysis',
-      projectId: 'project-2',
-      createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-      updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      isShared: true
-    },
-    {
-      id: 'demo-3',
-      name: 'Semantic Literature Review',
-      description: 'AI-curated papers for systematic review',
-      color: '#8B5CF6',
-      icon: '📚',
-      articleCount: 31,
-      projectName: 'Literature Analysis',
-      projectId: 'project-3',
-      createdAt: new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString(),
-      updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-      isShared: false
-    }
-  ];
+  // REMOVED: Demo collections - should not be shown to real users
 
   const fetchCollections = async () => {
     try {
@@ -340,48 +299,23 @@ export default function CollectionsPage() {
           </div>
         )}
 
-        {/* Demo Collections Display (if no real collections) */}
+        {/* Empty State - No Collections */}
         {!isLoading && !error && collections.length === 0 && (
-          <div className="mt-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-white">Demo Collections</h2>
-              <span className="text-sm text-gray-400">Semantic features preview</span>
+          <div className="mt-8 text-center py-12">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[var(--spotify-medium-gray)] mb-4">
+              <FolderIcon className="w-8 h-8 text-gray-400" />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {demoCollections.map((collection) => (
-                <div
-                  key={collection.id}
-                  className="bg-[var(--spotify-dark-gray)] rounded-lg p-6 border border-[var(--spotify-border-gray)] hover:border-[var(--spotify-green)] transition-colors cursor-pointer"
-                  onClick={() => {
-                    trackCollectionAction('view', collection.id);
-                    // Navigate to discover page with semantic search for demo collections
-                    router.push(`/discover?mode=semantic_search&query=${encodeURIComponent(collection.name)}&collection_demo=${collection.id}`);
-                  }}
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-3">
-                      <span className="text-2xl">{collection.icon}</span>
-                      <div>
-                        <h3 className="text-white font-medium">{collection.name}</h3>
-                        <p className="text-sm text-gray-400">{collection.articleCount} articles</p>
-                      </div>
-                    </div>
-                    {collection.isShared && (
-                      <span className="px-2 py-1 bg-[var(--spotify-green)] text-black text-xs rounded-full">
-                        Shared
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-300 mb-4">{collection.description}</p>
-                  <div className="flex items-center justify-between text-xs text-gray-400">
-                    <span>Updated {new Date(collection.updatedAt).toLocaleDateString()}</span>
-                    <span className="px-2 py-1 bg-[var(--spotify-medium-gray)] rounded">
-                      {collection.projectName}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <h3 className="text-xl font-semibold text-white mb-2">No collections yet</h3>
+            <p className="text-gray-400 mb-6 max-w-md mx-auto">
+              Create your first collection to organize and manage your research articles.
+            </p>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="inline-flex items-center px-6 py-3 bg-[var(--spotify-green)] hover:bg-[#1ed760] text-black font-semibold rounded-full transition-colors"
+            >
+              <PlusIcon className="w-5 h-5 mr-2" />
+              Create Collection
+            </button>
           </div>
         )}
 
