@@ -11,12 +11,13 @@ interface UseAnnotationWebSocketOptions {
 }
 
 interface WebSocketMessage {
-  type: 'new_annotation' | 'update_annotation' | 'delete_annotation' | 'connection_established' | 'pong' | 'echo' | 'error';
+  type: 'new_annotation' | 'update_annotation' | 'delete_annotation' | 'connection_established' | 'pong' | 'echo' | 'error' | 'new_activity';
   annotation?: Annotation;
   annotation_id?: string;
   project_id?: string;
   timestamp?: string;
   message?: string;
+  activity?: any; // Activity data (optional)
 }
 
 export function useAnnotationWebSocket({
@@ -124,6 +125,10 @@ export function useAnnotationWebSocket({
 
             case 'echo':
               // Echo response - for testing
+              break;
+
+            case 'new_activity':
+              // Activity feed update - ignore for now (handled by ActivityFeed component)
               break;
 
             case 'error':
