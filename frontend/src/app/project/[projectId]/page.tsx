@@ -22,6 +22,7 @@ import { SpotifyProjectTabs } from '@/components/ui/SpotifyProjectTabs';
 import { SpotifyQuickActions, createQuickActions } from '@/components/ui/SpotifyQuickActions';
 import { ResearchQuestionTab } from '@/components/project/ResearchQuestionTab';
 import { NotesTab } from '@/components/project/NotesTab';
+import { ExploreTab } from '@/components/project/ExploreTab';
 import {
   Button,
   Card,
@@ -1454,29 +1455,10 @@ export default function ProjectPage() {
         {/* Explore Papers Tab */}
         {activeTab === 'explore' && (
           <div className="mb-8">
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="mb-4">
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                  🔍 Explore Papers
-                </h2>
-                <p className="text-gray-600">
-                  Discover and explore related papers through citation networks.
-                  Click on nodes to see article details and discover related research.
-                </p>
-              </div>
-              <div className="h-[600px]">
-                <MultiColumnNetworkView
-                  sourceType="project"
-                  sourceId={projectId}
-                  projectId={projectId}
-                  onDeepDiveCreated={fetchProjectData}
-                  onArticleSaved={fetchProjectData}
-                  onGenerateReview={handleGenerateReviewFromNetwork}
-                  onDeepDive={handleDeepDiveFromNetwork}
-                  onExploreCluster={handleExploreClusterFromNetwork}
-                />
-              </div>
-            </div>
+            <ExploreTab
+              project={project}
+              onRefresh={fetchProjectData}
+            />
           </div>
         )}
 
