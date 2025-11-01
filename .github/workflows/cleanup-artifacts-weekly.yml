@@ -1,0 +1,128 @@
+name: Weekly Artifact Registry Cleanup
+
+on:
+  schedule:
+    # Run every Sunday at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: r-and-d-agent-mvp
+      
+      - name: Cleanup Backend Images
+        run: |
+          echo "🧹 Cleaning up backend Docker images..."
+          echo "Keeping only the 3 most recent images"
+          
+          # List all images sorted by creation time (newest first)
+          IMAGES=$(gcloud artifacts docker images list \
+            us-central1-docker.pkg.dev/r-and-d-agent-mvp/rd-agent/backend \
+            --format='value(IMAGE)' \
+            --sort-by=~CREATE_TIME)
+          
+          # Count total images
+          TOTAL=$(echo "$IMAGES" | wc -l)
+          echo "📊 Total images found: $TOTAL"
+          
+          # Skip first 3 (keep them), delete the rest
+          TO_DELETE=$(echo "$IMAGES" | tail -n +4)
+          DELETE_COUNT=$(echo "$TO_DELETE" | grep -c . || echo 0)
+          
+          if [ "$DELETE_COUNT" -gt 0 ]; then
+            echo "🗑️ Deleting $DELETE_COUNT old images..."
+            echo "$TO_DELETE" | while read image; do
+              if [ -n "$image" ]; then
+                echo "  Deleting: $image"
+                gcloud artifacts docker images delete "$image" --quiet || echo "  ⚠️ Failed to delete $image"
+              fi
+            done
+            echo "✅ Cleanup complete! Deleted $DELETE_COUNT images"
+          else
+            echo "✅ No old images to delete (only 3 or fewer images exist)"
+          fi
+      
+      - name: Cleanup Cloud Run Source Deploy Images
+        run: |
+          echo "🧹 Cleaning up cloud-run-source-deploy images..."
+          echo "Keeping only the 3 most recent images"
+          
+          # Check if repository exists
+          if gcloud artifacts repositories describe cloud-run-source-deploy \
+            --location=us-central1 &>/dev/null; then
+            
+            # List all images
+            IMAGES=$(gcloud artifacts docker images list \
+              us-central1-docker.pkg.dev/r-and-d-agent-mvp/cloud-run-source-deploy \
+              --format='value(IMAGE)' \
+              --sort-by=~CREATE_TIME 2>/dev/null || echo "")
+            
+            if [ -n "$IMAGES" ]; then
+              TOTAL=$(echo "$IMAGES" | wc -l)
+              echo "📊 Total images found: $TOTAL"
+              
+              # Skip first 3, delete the rest
+              TO_DELETE=$(echo "$IMAGES" | tail -n +4)
+              DELETE_COUNT=$(echo "$TO_DELETE" | grep -c . || echo 0)
+              
+              if [ "$DELETE_COUNT" -gt 0 ]; then
+                echo "🗑️ Deleting $DELETE_COUNT old images..."
+                echo "$TO_DELETE" | while read image; do
+                  if [ -n "$image" ]; then
+                    echo "  Deleting: $image"
+                    gcloud artifacts docker images delete "$image" --quiet || echo "  ⚠️ Failed to delete $image"
+                  fi
+                done
+                echo "✅ Cleanup complete! Deleted $DELETE_COUNT images"
+              else
+                echo "✅ No old images to delete"
+              fi
+            else
+              echo "ℹ️ No images found in cloud-run-source-deploy"
+            fi
+          else
+            echo "ℹ️ cloud-run-source-deploy repository not found (may have been deleted)"
+          fi
+      
+      - name: Report Storage Savings
+        run: |
+          echo "📊 Artifact Registry Storage Report"
+          echo "===================================="
+          
+          # Get current storage usage
+          gcloud artifacts repositories list \
+            --location=us-central1 \
+            --format="table(name,sizeBytes)" || echo "Unable to fetch storage info"
+          
+          echo ""
+          echo "💰 Estimated Monthly Savings:"
+          echo "  - Storage cost: ~£0.10/GB/month"
+          echo "  - Average Docker image: ~500MB"
+          echo "  - Images deleted: Check logs above"
+          echo "  - Estimated savings: £5-40/month"
+      
+      - name: Send Cleanup Summary
+        if: always()
+        run: |
+          echo "✅ Artifact Registry cleanup workflow completed"
+          echo "Next cleanup: Next Sunday at 2 AM UTC"
+          echo ""
+          echo "To run manually:"
+          echo "  1. Go to Actions tab"
+          echo "  2. Select 'Weekly Artifact Registry Cleanup'"
+          echo "  3. Click 'Run workflow'"
+
