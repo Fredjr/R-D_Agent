@@ -20,6 +20,7 @@ import { SpotifyCollectionCard } from '@/components/ui/SpotifyCard';
 import { SpotifyProjectHeader } from '@/components/ui/SpotifyProjectHeader';
 import { SpotifyProjectTabs } from '@/components/ui/SpotifyProjectTabs';
 import { SpotifyQuickActions, createQuickActions } from '@/components/ui/SpotifyQuickActions';
+import { ResearchQuestionTab } from '@/components/project/ResearchQuestionTab';
 import {
   Button,
   Card,
@@ -1420,366 +1421,33 @@ export default function ProjectPage() {
 
         {/* Tab Content */}
         {activeTab === 'research-question' && (
-          <>
-            {/* Project Data Sections */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-8 mb-8">
-          {/* Reports Section */}
-          <div className="bg-[var(--spotify-dark-gray)] rounded-lg shadow p-6 border border-[var(--spotify-border-gray)]">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-[var(--spotify-white)] flex items-center">
-                <span className="text-green-400 mr-2">📊</span>
-                Reports
-              </h3>
-              <span className="text-xs bg-[var(--spotify-green)]/20 text-[var(--spotify-green)] px-2 py-1 rounded-full">
-                {project.reports?.length || 0} reports
-              </span>
-            </div>
-            <div className="text-sm text-[var(--spotify-light-text)] mb-4">
-              Generated research reports and analyses
-            </div>
-            {project.reports && project.reports.length > 0 ? (
-              <div className="max-h-80 overflow-y-auto scrollbar-thin scrollbar-track-[var(--spotify-medium-gray)] scrollbar-thumb-[var(--spotify-light-gray)] space-y-3">
-                {project.reports.map((report) => (
-                  <DeletableReportCard
-                    key={report.report_id}
-                    title={report.title}
-                    objective={report.objective}
-                    status="completed"
-                    createdAt={new Date(report.created_at).toLocaleDateString()}
-                    reportId={report.report_id}
-                    className="relative"
-                    onClick={() => window.open(`/report/${report.report_id}`, '_blank')}
-                    onDelete={() => {
-                      // Refresh project data after deletion
-                      fetchProjectData();
-                    }}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <div className="text-green-400 text-4xl mb-4">📊</div>
-                <p className="text-[var(--spotify-light-text)] text-sm">No reports yet.</p>
-                <p className="text-[var(--spotify-muted-text)] text-xs mt-1">Create your first report to get started</p>
-              </div>
-            )}
+          <div className="mb-8">
+            <ResearchQuestionTab
+              project={project}
+              onUpdateProject={async (updates) => {
+                try {
+                  const response = await fetch(`/api/proxy/projects/${projectId}`, {
+                    method: 'PATCH',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'User-ID': user?.email || ''
+                    },
+                    body: JSON.stringify(updates)
+                  });
+
+                  if (!response.ok) {
+                    throw new Error('Failed to update project');
+                  }
+
+                  // Refresh project data
+                  await fetchProjectData();
+                } catch (error) {
+                  console.error('Error updating project:', error);
+                  throw error;
+                }
+              }}
+            />
           </div>
-
-          {/* Report Iterations Section */}
-          <div className="bg-[var(--spotify-dark-gray)] rounded-lg shadow p-6 border border-[var(--spotify-border-gray)]">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-[var(--spotify-white)]">Report Iterations</h3>
-              <span className="text-xs bg-[var(--spotify-medium-gray)] text-[var(--spotify-light-text)] px-2 py-1 rounded-full">
-                {project.reports?.length || 0} versions
-              </span>
-            </div>
-            {project.reports && project.reports.length > 0 ? (
-              <div className="space-y-3">
-                <div className="text-sm text-[var(--spotify-light-text)] mb-3">
-                  Track how your research evolves with each report iteration
-                </div>
-                <div className="max-h-80 overflow-y-auto scrollbar-thin scrollbar-track-[var(--spotify-medium-gray)] scrollbar-thumb-[var(--spotify-light-gray)] space-y-3">
-                  {project.reports
-                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                    .map((report, index) => (
-                    <div
-                      key={report.report_id}
-                      className="border border-[var(--spotify-border-gray)] rounded-lg p-3 hover:border-[var(--spotify-green)] hover:bg-[var(--spotify-medium-gray)] transition-all cursor-pointer relative"
-                      onClick={() => window.open(`/report/${report.report_id}`, '_blank')}
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-[var(--spotify-blue)]/20 text-[var(--spotify-blue)]">
-                          v{project.reports.length - index}
-                        </span>
-                        <span className="text-xs text-[var(--spotify-light-text)]">
-                          {new Date(report.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <h4 className="font-medium text-[var(--spotify-white)] text-sm mb-1 line-clamp-2">{report.title}</h4>
-                      <p className="text-xs text-[var(--spotify-light-text)] line-clamp-2">{report.objective}</p>
-                      {index === 0 && (
-                        <div className="absolute top-2 right-2">
-                          <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded bg-[var(--spotify-green)] text-black">
-                            Latest
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4 p-3 bg-[var(--spotify-blue)]/10 rounded-lg border border-[var(--spotify-blue)]/20">
-                  <div className="flex items-center gap-2 text-sm text-[var(--spotify-blue)]">
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
-                    <span className="font-medium">Iteration Insights</span>
-                  </div>
-                  <p className="text-xs text-[var(--spotify-light-text)] mt-1">
-                    Each report builds on previous research. Compare versions to see how your understanding evolves with new analyses and data.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <svg className="w-12 h-12 text-[var(--spotify-muted-text)] mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <p className="text-[var(--spotify-light-text)] text-sm">No report iterations yet.</p>
-                <p className="text-[var(--spotify-muted-text)] text-xs mt-1">Create multiple reports to track research evolution</p>
-              </div>
-            )}
-          </div>
-
-          {/* Deep Dive Analyses Section */}
-          <div className="bg-[var(--spotify-dark-gray)] rounded-lg shadow p-6 border border-[var(--spotify-border-gray)]">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-[var(--spotify-white)] flex items-center">
-                <span className="text-purple-400 mr-2">🔬</span>
-                Deep Dive Analyses
-              </h3>
-              <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-1 rounded-full">
-                {project.deep_dive_analyses?.length || 0} analyses
-              </span>
-            </div>
-            {project.deep_dive_analyses && project.deep_dive_analyses.length > 0 ? (
-              <div className="max-h-80 overflow-y-auto scrollbar-thin scrollbar-track-[var(--spotify-medium-gray)] scrollbar-thumb-[var(--spotify-light-gray)] space-y-3">
-                {project.deep_dive_analyses.map((analysis) => (
-                  <div
-                    key={analysis.analysis_id}
-                    className="border border-[var(--spotify-border-gray)] rounded-lg p-4 hover:border-purple-400/40 hover:bg-[var(--spotify-medium-gray)] transition-all"
-                  >
-                    <div
-                      className="cursor-pointer"
-                      onClick={() => window.open(`/analysis/${analysis.analysis_id}`, '_blank')}
-                    >
-                      <h4 className="font-medium text-[var(--spotify-white)] mb-1">{analysis.article_title}</h4>
-                      {analysis.article_pmid && (
-                        <p className="text-sm text-[var(--spotify-blue)] mb-1">PMID: {analysis.article_pmid}</p>
-                      )}
-                      <div className="flex justify-between items-center mb-2">
-                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                          analysis.processing_status === 'completed'
-                            ? 'bg-[var(--spotify-green)]/20 text-[var(--spotify-green)]'
-                            : analysis.processing_status === 'processing'
-                            ? 'bg-[var(--spotify-yellow)]/20 text-[var(--spotify-yellow)]'
-                            : 'bg-[var(--spotify-muted-text)]/20 text-[var(--spotify-muted-text)]'
-                        }`}>
-                          {analysis.processing_status}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs text-[var(--spotify-light-text)] mb-3">
-                        <span>By {analysis.created_by}</span>
-                        <span>{new Date(analysis.created_at).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 pt-2 border-t border-[var(--spotify-border-gray)]">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAddToCollection({
-                            title: analysis.article_title,
-                            pmid: analysis.article_pmid,
-                            source: 'deep_dive',
-                            source_id: analysis.analysis_id
-                          });
-                        }}
-                        className="flex-1 px-3 py-1.5 text-xs bg-[var(--spotify-green)] text-black rounded hover:bg-[var(--spotify-green-hover)] transition-colors font-medium"
-                        title="Add this analyzed article to a collection"
-                      >
-                        📚 Add to Collection
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          window.open(`/analysis/${analysis.analysis_id}`, '_blank');
-                        }}
-                        className="px-3 py-1.5 text-xs bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors font-medium"
-                      >
-                        View Analysis
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <div className="text-purple-400 text-4xl mb-4">🔬</div>
-                <p className="text-[var(--spotify-light-text)] text-sm">No deep dive analyses yet.</p>
-                <p className="text-[var(--spotify-muted-text)] text-xs mt-1">Start your first analysis to explore articles in detail</p>
-              </div>
-            )}
-          </div>
-
-          {/* Collaborators Section */}
-          <div className="bg-[var(--spotify-dark-gray)] rounded-lg shadow p-6 border border-[var(--spotify-border-gray)]">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-[var(--spotify-white)] flex items-center">
-                <span className="text-orange-400 mr-2">👥</span>
-                Collaborators
-              </h3>
-              <span className="text-xs bg-orange-500/20 text-orange-300 px-2 py-1 rounded-full">
-                {project.collaborators?.length || 0} members
-              </span>
-            </div>
-            {project.collaborators && project.collaborators.length > 0 ? (
-              <div className="max-h-60 overflow-y-auto scrollbar-thin scrollbar-track-[var(--spotify-medium-gray)] scrollbar-thumb-[var(--spotify-light-gray)] space-y-3">
-                {project.collaborators.map((collaborator) => (
-                  <div key={collaborator.user_id} className="flex items-center justify-between p-3 border border-[var(--spotify-border-gray)] rounded-lg hover:bg-[var(--spotify-medium-gray)] transition-colors">
-                    <div>
-                      <p className="font-medium text-[var(--spotify-white)]">{collaborator.username}</p>
-                      <p className="text-sm text-[var(--spotify-light-text)] capitalize">{collaborator.role}</p>
-                    </div>
-                    <span className="text-xs text-[var(--spotify-muted-text)]">
-                      {new Date(collaborator.invited_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <div className="text-orange-400 text-4xl mb-4">👥</div>
-                <p className="text-[var(--spotify-light-text)] text-sm">No collaborators yet.</p>
-                <p className="text-[var(--spotify-muted-text)] text-xs mt-1">Invite team members to collaborate on this project</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Comprehensive Summary Results */}
-        {comprehensiveSummary && (
-          <div className="bg-white rounded-lg shadow p-6 mb-8">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Comprehensive Project Analysis</h2>
-              <p className="text-gray-600 mb-4">Generated on {new Date(comprehensiveSummary.generated_at).toLocaleDateString()}</p>
-
-              {/* Executive Summary */}
-              {comprehensiveSummary.analysis_results?.synthesis?.executive_summary && (
-                <div className="bg-blue-50 p-4 rounded-lg mb-6">
-                  <h3 className="font-semibold text-blue-900 mb-2">Executive Summary</h3>
-                  <p className="text-blue-800 text-sm leading-relaxed">
-                    {comprehensiveSummary.analysis_results.synthesis.executive_summary}
-                  </p>
-                </div>
-              )}
-
-              {/* Key Achievements */}
-              {comprehensiveSummary.analysis_results?.synthesis?.key_achievements && (
-                <div className="mb-6">
-                  <h3 className="font-semibold text-gray-900 mb-3">Key Achievements</h3>
-                  <ul className="space-y-2">
-                    {comprehensiveSummary.analysis_results.synthesis.key_achievements.map((achievement: string, idx: number) => (
-                      <li key={idx} className="flex items-start">
-                        <span className="text-green-500 mr-2">✓</span>
-                        <span className="text-gray-700 text-sm">{achievement}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Strategic Recommendations */}
-              {comprehensiveSummary.analysis_results?.synthesis?.strategic_recommendations && (
-                <div className="mb-6">
-                  <h3 className="font-semibold text-gray-900 mb-3">Strategic Recommendations</h3>
-                  <ul className="space-y-2">
-                    {comprehensiveSummary.analysis_results.synthesis.strategic_recommendations.map((rec: string, idx: number) => (
-                      <li key={idx} className="flex items-start">
-                        <span className="text-blue-500 mr-2">→</span>
-                        <span className="text-gray-700 text-sm">{rec}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Project Metrics */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-gray-900">{comprehensiveSummary.metadata?.total_reports || 0}</div>
-                  <div className="text-sm text-gray-600">Reports</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-gray-900">{comprehensiveSummary.metadata?.total_deep_dives || 0}</div>
-                  <div className="text-sm text-gray-600">Deep Dives</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-gray-900">{comprehensiveSummary.metadata?.total_annotations || 0}</div>
-                  <div className="text-sm text-gray-600">Annotations</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-gray-900">{comprehensiveSummary.metadata?.project_duration_days || 0}</div>
-                  <div className="text-sm text-gray-600">Days Active</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Async Job Progress */}
-        {reviewJob.jobId && (
-          <AsyncJobProgress
-            jobId={reviewJob.jobId}
-            status={reviewJob.status}
-            progress={reviewJob.progress}
-            error={reviewJob.error}
-            startedAt={reviewJob.startedAt}
-            completedAt={reviewJob.completedAt}
-            onCancel={reviewJob.cancelJob}
-            onReset={reviewJob.resetJob}
-            jobType="Generate Review"
-            className="mb-6"
-          />
-        )}
-
-        {/* Deep Dive Job Progress */}
-        {deepDiveJob.jobId && (
-          <AsyncJobProgress
-            jobId={deepDiveJob.jobId}
-            status={deepDiveJob.status}
-            progress={deepDiveJob.progress}
-            error={deepDiveJob.error}
-            startedAt={deepDiveJob.startedAt}
-            completedAt={deepDiveJob.completedAt}
-            onCancel={deepDiveJob.cancelJob}
-            onReset={deepDiveJob.resetJob}
-            jobType="Deep Dive Analysis"
-            className="mb-6"
-          />
-        )}
-
-        {/* Report Results Section (same as Welcome Page) */}
-        {reportResults.length > 0 && (
-          <div className="bg-white rounded-lg shadow p-6 mb-8">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">{reportTitle}</h2>
-              <p className="text-gray-600 mb-4">{reportObjective}</p>
-
-              {/* Diagnostics (same as Welcome Page) */}
-              {reportDiagnostics && (
-                <div className="p-3 sm:p-4 rounded-md bg-slate-50 border border-slate-200 text-slate-800 text-xs sm:text-sm mb-6">
-                  <div className="font-medium mb-2">Run details</div>
-                  <div className="flex flex-wrap gap-2 sm:gap-3 text-xs sm:text-sm">
-                    <span>Pool: {reportDiagnostics.pool_size || 0}</span>
-                    <span>Shortlist: {reportDiagnostics.shortlist_size || 0}</span>
-                    <span>Deep-dive: {reportDiagnostics.deep_dive_count || 0}</span>
-                    {reportDiagnostics.timings_ms && (
-                      <>
-                        <span>Plan: {reportDiagnostics.timings_ms.plan_ms || 0}ms</span>
-                        <span>Harvest: {reportDiagnostics.timings_ms.harvest_ms || 0}ms</span>
-                        <span>Deep-dive: {reportDiagnostics.timings_ms.deepdive_ms || 0}ms</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Results List (same as Welcome Page) */}
-            <ResultsList results={reportResults} />
-          </div>
-        )}
-
-            </>
         )}
 
         {/* Explore Papers Tab */}
