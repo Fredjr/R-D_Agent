@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { FunnelIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '@/contexts/AuthContext';
 import AnnotationList from '@/components/annotations/AnnotationList';
 import type { NoteType, Priority, Status } from '@/lib/api/annotations';
 
@@ -16,15 +17,57 @@ type StatusFilter = 'all' | Status;
 type ViewMode = 'all' | 'project' | 'collection' | 'paper';
 
 export function NotesTab({ project, onRefresh }: NotesTabProps) {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<NoteTypeFilter>('all');
   const [selectedPriority, setSelectedPriority] = useState<PriorityFilter>('all');
   const [selectedStatus, setSelectedStatus] = useState<StatusFilter>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [annotations, setAnnotations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Get all annotations from project
-  const allAnnotations = project.annotations || [];
+  // Fetch annotations when component mounts or project changes
+  useEffect(() => {
+    const fetchAnnotations = async () => {
+      if (!project?.project_id || !user?.email) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetch(`/api/proxy/projects/${project.project_id}/annotations`, {
+          headers: {
+            'User-ID': user.email,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch annotations: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        // Handle both {annotations: [...]} and [...] response formats
+        const annotationsData = data.annotations || data || [];
+        setAnnotations(annotationsData);
+      } catch (err) {
+        console.error('❌ Error fetching annotations:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load annotations');
+        setAnnotations([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAnnotations();
+  }, [project?.project_id, user?.email]);
+
+  // Get all annotations
+  const allAnnotations = annotations;
 
   // Filter annotations based on criteria
   const filteredAnnotations = useMemo(() => {
@@ -111,6 +154,47 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
     setViewMode('all');
     setSearchQuery('');
   };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg p-6 border border-purple-200">
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading notes...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-lg p-6 border border-red-200">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center">
+              <span className="text-2xl">⚠️</span>
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Error Loading Notes</h2>
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            Reload Page
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

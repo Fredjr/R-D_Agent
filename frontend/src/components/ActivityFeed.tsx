@@ -61,7 +61,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({
       
       const response = await fetch(`/api/proxy/projects/${projectId}/activities?${params}`, {
         headers: {
-          'User-ID': user?.user_id || 'anonymous',
+          'User-ID': user?.email || 'anonymous',
           'Content-Type': 'application/json',
         },
       });

@@ -940,7 +940,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       console.log('🔍 NetworkView fetching collections for project:', projectId);
       const response = await fetch(`/api/proxy/projects/${projectId}/collections`, {
         headers: {
-          'User-ID': user?.user_id || user?.email || 'default_user',
+          'User-ID': user?.email || 'default_user',
         },
       });
 

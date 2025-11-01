@@ -191,18 +191,18 @@ export default function AnnotationsFeed({
     try {
       setLoading(true);
       setError(null);
-      
+
       const params = new URLSearchParams();
       if (articlePmid) params.append('article_pmid', articlePmid);
       if (reportId) params.append('report_id', reportId);
       if (analysisId) params.append('analysis_id', analysisId);
-      
+
       const queryString = params.toString();
       const url = `/api/proxy/projects/${projectId}/annotations${queryString ? `?${queryString}` : ''}`;
-      
+
       const response = await fetch(url, {
         headers: {
-          'User-ID': user?.user_id || 'anonymous',
+          'User-ID': user?.email || 'anonymous',
           'Content-Type': 'application/json',
         },
       });
@@ -241,7 +241,7 @@ export default function AnnotationsFeed({
       const response = await fetch(`/api/proxy/projects/${projectId}/annotations`, {
         method: 'POST',
         headers: {
-          'User-ID': user.user_id,
+          'User-ID': user.email,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(annotationData),
