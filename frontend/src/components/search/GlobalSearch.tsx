@@ -177,6 +177,7 @@ export default function GlobalSearch({
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Search papers, collections, notes, reports..."
             className="flex-1 bg-transparent text-[var(--spotify-white)] placeholder-[var(--spotify-subdued)] outline-none"
             data-testid="global-search-input"
