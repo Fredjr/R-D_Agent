@@ -10,12 +10,15 @@ import {
   ArrowTrendingUpIcon,
   CalendarIcon
 } from '@heroicons/react/24/outline';
+import EnhancedActivityFeed from '@/components/activity/EnhancedActivityFeed';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ProgressTabProps {
   project: any;
 }
 
 export function ProgressTab({ project }: ProgressTabProps) {
+  const { user } = useAuth();
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'all'>('week');
   
   // Calculate metrics
@@ -204,38 +207,13 @@ export function ProgressTab({ project }: ProgressTabProps) {
         </div>
       </div>
       
-      {/* Activity Timeline */}
-      <div className="bg-white rounded-lg p-6 border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
-        
-        {recentActivities.length > 0 ? (
-          <div className="space-y-4">
-            {recentActivities.map((activity) => {
-              const Icon = activity.icon;
-              const colors = getColorClasses(activity.color);
-              
-              return (
-                <div key={activity.id} className="flex items-start gap-4 p-4 rounded-lg hover:bg-gray-50 transition-colors">
-                  <div className={`w-10 h-10 ${colors.bg} rounded-lg flex items-center justify-center flex-shrink-0`}>
-                    <Icon className={`w-5 h-5 ${colors.icon}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">{activity.title}</p>
-                    <p className="text-sm text-gray-600 mt-1">{activity.description}</p>
-                    <p className="text-xs text-gray-500 mt-1">{formatTimestamp(activity.timestamp)}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <ClockIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-            <p className="text-sm text-gray-600">No recent activity</p>
-            <p className="text-xs text-gray-500 mt-1">Start exploring papers to see your progress</p>
-          </div>
-        )}
-      </div>
+      {/* Enhanced Activity Feed */}
+      <EnhancedActivityFeed
+        projectId={project.project_id}
+        currentUserEmail={user?.email || ''}
+        limit={20}
+        showFilters={true}
+      />
       
       {/* Insights */}
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 border border-blue-200">
