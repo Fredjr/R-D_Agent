@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { PlusIcon, FolderIcon, DocumentTextIcon, EyeIcon, ListBulletIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, FolderIcon, DocumentTextIcon, EyeIcon, ListBulletIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGlobalCollectionSync, type Collection } from '@/hooks/useGlobalCollectionSync';
 import NetworkViewWithSidebar from './NetworkViewWithSidebar';
@@ -13,6 +13,8 @@ import { CollectionLoadingSkeleton, InlineLoading } from './LoadingStates';
 import { SourceBadge } from './DataSourceIndicators';
 import { DeletableCollectionCard } from './ui/DeletableCard';
 import { useWeeklyMixIntegration } from '@/hooks/useWeeklyMixIntegration';
+import FilterPanel, { type FilterSection } from './filters/FilterPanel';
+import FilterChips, { type FilterChip } from './filters/FilterChips';
 
 interface CollectionsProps {
   projectId: string;
@@ -57,6 +59,15 @@ export default function Collections({
     description: '',
     color: '#3B82F6',
     icon: 'folder'
+  });
+
+  // 🔍 Week 6: Filter state
+  const [showFilters, setShowFilters] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState<Record<string, any>>({
+    sortBy: 'recent',
+    sizeFilter: 'all',
+    dateFilter: 'all'
   });
 
   // Initial load and refresh on projectId change
@@ -164,9 +175,148 @@ export default function Collections({
   };
 
   const colors = [
-    '#3B82F6', '#EF4444', '#10B981', '#F59E0B', 
+    '#3B82F6', '#EF4444', '#10B981', '#F59E0B',
     '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'
   ];
+
+  // 🔍 Week 6: Filter and sort collections
+  const filteredCollections = useMemo(() => {
+    let filtered = [...collections];
+
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(c =>
+        c.collection_name.toLowerCase().includes(query) ||
+        c.description?.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply size filter
+    if (filters.sizeFilter === 'small') {
+      filtered = filtered.filter(c => c.article_count < 5);
+    } else if (filters.sizeFilter === 'medium') {
+      filtered = filtered.filter(c => c.article_count >= 5 && c.article_count < 20);
+    } else if (filters.sizeFilter === 'large') {
+      filtered = filtered.filter(c => c.article_count >= 20);
+    }
+
+    // Apply date filter
+    if (filters.dateFilter === 'today') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      filtered = filtered.filter(c => new Date(c.created_at) >= today);
+    } else if (filters.dateFilter === 'week') {
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      filtered = filtered.filter(c => new Date(c.created_at) >= weekAgo);
+    } else if (filters.dateFilter === 'month') {
+      const monthAgo = new Date();
+      monthAgo.setMonth(monthAgo.getMonth() - 1);
+      filtered = filtered.filter(c => new Date(c.created_at) >= monthAgo);
+    }
+
+    // Apply sorting
+    if (filters.sortBy === 'recent') {
+      filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    } else if (filters.sortBy === 'alphabetical') {
+      filtered.sort((a, b) => a.collection_name.localeCompare(b.collection_name));
+    } else if (filters.sortBy === 'size') {
+      filtered.sort((a, b) => b.article_count - a.article_count);
+    } else if (filters.sortBy === 'updated') {
+      filtered.sort((a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime());
+    }
+
+    return filtered;
+  }, [collections, searchQuery, filters]);
+
+  // 🔍 Week 6: Filter configuration
+  const filterSections: FilterSection[] = [
+    {
+      title: 'Collections',
+      filters: [
+        {
+          id: 'sortBy',
+          label: 'Sort By',
+          type: 'select',
+          value: filters.sortBy,
+          options: [
+            { value: 'recent', label: 'Most Recent' },
+            { value: 'alphabetical', label: 'Alphabetical (A-Z)' },
+            { value: 'size', label: 'Size (Largest First)' },
+            { value: 'updated', label: 'Recently Updated' }
+          ]
+        },
+        {
+          id: 'sizeFilter',
+          label: 'Collection Size',
+          type: 'select',
+          value: filters.sizeFilter,
+          options: [
+            { value: 'all', label: 'All Sizes' },
+            { value: 'small', label: 'Small (< 5 papers)' },
+            { value: 'medium', label: 'Medium (5-19 papers)' },
+            { value: 'large', label: 'Large (20+ papers)' }
+          ]
+        },
+        {
+          id: 'dateFilter',
+          label: 'Created',
+          type: 'select',
+          value: filters.dateFilter,
+          options: [
+            { value: 'all', label: 'All Time' },
+            { value: 'today', label: 'Today' },
+            { value: 'week', label: 'This Week' },
+            { value: 'month', label: 'This Month' }
+          ]
+        }
+      ]
+    }
+  ];
+
+  // 🔍 Week 6: Active filter chips
+  const activeFilterChips: FilterChip[] = [];
+  if (filters.sortBy !== 'recent') {
+    const sortOption = filterSections[0].filters[0].options?.find(o => o.value === filters.sortBy);
+    activeFilterChips.push({
+      id: 'sortBy',
+      label: 'Sort',
+      value: filters.sortBy,
+      displayValue: sortOption?.label
+    });
+  }
+  if (filters.sizeFilter !== 'all') {
+    const sizeOption = filterSections[0].filters[1].options?.find(o => o.value === filters.sizeFilter);
+    activeFilterChips.push({
+      id: 'sizeFilter',
+      label: 'Size',
+      value: filters.sizeFilter,
+      displayValue: sizeOption?.label
+    });
+  }
+  if (filters.dateFilter !== 'all') {
+    const dateOption = filterSections[0].filters[2].options?.find(o => o.value === filters.dateFilter);
+    activeFilterChips.push({
+      id: 'dateFilter',
+      label: 'Created',
+      value: filters.dateFilter,
+      displayValue: dateOption?.label
+    });
+  }
+
+  const handleFilterChange = (filterId: string, value: any) => {
+    setFilters(prev => ({ ...prev, [filterId]: value }));
+  };
+
+  const handleClearAllFilters = () => {
+    setFilters({
+      sortBy: 'recent',
+      sizeFilter: 'all',
+      dateFilter: 'all'
+    });
+    setSearchQuery('');
+  };
 
   if (loading) {
     return (
@@ -269,8 +419,54 @@ export default function Collections({
         </button>
       </div>
 
+      {/* 🔍 Week 6: Search Bar */}
+      <div className="relative">
+        <MagnifyingGlassIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search collections by name or description..."
+          className="w-full pl-12 pr-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
+          data-testid="collections-search-input"
+        />
+      </div>
+
+      {/* 🔍 Week 6: Filter Panel */}
+      <FilterPanel
+        sections={filterSections}
+        activeFilters={filters}
+        onFilterChange={handleFilterChange}
+        onClearAll={handleClearAllFilters}
+        isOpen={showFilters}
+        onToggle={() => setShowFilters(!showFilters)}
+      />
+
+      {/* 🔍 Week 6: Active Filter Chips */}
+      {(activeFilterChips.length > 0 || searchQuery) && (
+        <FilterChips
+          chips={[
+            ...activeFilterChips,
+            ...(searchQuery ? [{
+              id: 'search',
+              label: 'Search',
+              value: searchQuery,
+              displayValue: `"${searchQuery}"`
+            }] : [])
+          ]}
+          onRemove={(chipId) => {
+            if (chipId === 'search') {
+              setSearchQuery('');
+            } else {
+              handleFilterChange(chipId, chipId === 'sortBy' ? 'recent' : 'all');
+            }
+          }}
+          onClearAll={handleClearAllFilters}
+        />
+      )}
+
       {/* Collections Grid */}
-      {collections.length === 0 ? (
+      {filteredCollections.length === 0 && collections.length === 0 ? (
         <div className="text-center py-12">
           <FolderIcon className="w-12 h-12 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No collections yet</h3>
@@ -282,9 +478,27 @@ export default function Collections({
             Create Collection
           </button>
         </div>
+      ) : filteredCollections.length === 0 ? (
+        <div className="text-center py-12">
+          <FolderIcon className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No collections match your filters</h3>
+          <p className="text-gray-500 mb-4">Try adjusting your search or filters</p>
+          <button
+            onClick={handleClearAllFilters}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+          >
+            Clear Filters
+          </button>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {collections.map((collection, index) => (
+        <>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm text-gray-400">
+              Showing {filteredCollections.length} of {collections.length} collections
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredCollections.map((collection, index) => (
             <DeletableCollectionCard
               key={collection.collection_id}
               title={collection.collection_name}
@@ -305,7 +519,8 @@ export default function Collections({
               }}
             />
           ))}
-        </div>
+          </div>
+        </>
       )}
 
       {/* Create Collection Modal */}
