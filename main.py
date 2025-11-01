@@ -6885,6 +6885,8 @@ async def search_project_content(
             ).all()
 
             collection_ids = [c.collection_id for c in project_collections]
+            logger.info(f"🔍 [Search Papers] Found {len(collection_ids)} collections for project {project_id}")
+            logger.info(f"🔍 [Search Papers] Query pattern: {query_pattern}")
 
             if collection_ids:
                 # Search in ArticleCollection (papers in project)
@@ -6897,6 +6899,8 @@ async def search_project_content(
                         cast(ArticleCollection.article_authors, String).ilike(query_pattern)
                     )
                 ).limit(limit).all()
+
+                logger.info(f"🔍 [Search Papers] Found {len(paper_results)} papers matching query")
 
                 # Also try to join with Article table for abstract search
                 paper_results_with_abstract = db.query(ArticleCollection, Article).join(
