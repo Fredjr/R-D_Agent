@@ -1,4 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  decodeHTMLEntities,
+  extractAuthors,
+  extractTitle,
+  extractJournal,
+  extractAbstract,
+  extractPMID,
+  extractYear,
+  extractDOI
+} from '@/lib/pubmed-utils';
 
 /**
  * PubMed Citation Network API
@@ -42,44 +52,17 @@ function parseArticleXML(xmlText: string): PubMedArticle[] {
     console.log(`🔍 Found ${articleMatches.length} PubmedArticle elements in XML`);
 
     for (const articleXML of articleMatches) {
-      // Extract PMID - handle both Version="1" and without version
-      const pmidMatch = articleXML.match(/<PMID[^>]*>(\d+)<\/PMID>/);
-      const pmid = pmidMatch ? pmidMatch[1] : '';
-
+      const pmid = extractPMID(articleXML);
       console.log(`📄 Processing article with PMID: ${pmid}`);
 
-      // Extract title - handle HTML entities and nested tags
-      const titleMatch = articleXML.match(/<ArticleTitle>([\s\S]*?)<\/ArticleTitle>/);
-      const title = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, '').replace(/&[^;]+;/g, '').trim() : '';
+      const title = extractTitle(articleXML);
+      const authors = extractAuthors(articleXML);
+      const journal = extractJournal(articleXML);
+      const year = extractYear(articleXML);
+      const abstract = extractAbstract(articleXML);
+      const doi = extractDOI(articleXML);
 
-      // Extract authors
-      const authors: string[] = [];
-      const authorMatches = articleXML.match(/<Author[^>]*>[\s\S]*?<\/Author>/g) || [];
-      for (const authorXML of authorMatches) {
-        const lastNameMatch = authorXML.match(/<LastName>(.*?)<\/LastName>/);
-        const firstNameMatch = authorXML.match(/<ForeName>(.*?)<\/ForeName>/);
-        if (lastNameMatch) {
-          const lastName = lastNameMatch[1];
-          const firstName = firstNameMatch ? firstNameMatch[1] : '';
-          authors.push(firstName ? `${firstName} ${lastName}` : lastName);
-        }
-      }
-
-      // Extract journal
-      const journalMatch = articleXML.match(/<Title>(.*?)<\/Title>/);
-      const journal = journalMatch ? journalMatch[1].replace(/<[^>]*>/g, '').trim() : '';
-
-      // Extract year
-      const yearMatch = articleXML.match(/<PubDate>[\s\S]*?<Year>(\d{4})<\/Year>/);
-      const year = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
-
-      // Extract abstract
-      const abstractMatch = articleXML.match(/<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/);
-      const abstract = abstractMatch ? abstractMatch[1].replace(/<[^>]*>/g, '').trim() : '';
-
-      // Extract DOI
-      const doiMatch = articleXML.match(/<ArticleId IdType="doi">(.*?)<\/ArticleId>/);
-      const doi = doiMatch ? doiMatch[1] : '';
+      console.log(`👥 Extracted ${authors.length} authors for PMID ${pmid}:`, authors);
 
       if (pmid && title) {
         console.log(`✅ Successfully parsed article: ${pmid} - ${title.substring(0, 50)}...`);
