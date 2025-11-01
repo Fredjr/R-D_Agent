@@ -6902,6 +6902,11 @@ async def search_project_content(
 
                 logger.info(f"🔍 [Search Papers] Found {len(paper_results)} papers matching query")
 
+                # 🐛 DEBUG: Log first paper if any
+                if paper_results:
+                    first_paper = paper_results[0]
+                    logger.info(f"🐛 [DEBUG] First paper: pmid={first_paper.article_pmid}, title={first_paper.article_title[:50]}")
+
                 # Also try to join with Article table for abstract search
                 paper_results_with_abstract = db.query(ArticleCollection, Article).join(
                     Article, ArticleCollection.article_pmid == Article.pmid, isouter=True
@@ -6915,7 +6920,9 @@ async def search_project_content(
 
                 # Combine and deduplicate results
                 seen_pmids = set()
+                logger.info(f"🐛 [DEBUG] Processing {len(paper_results)} paper_results")
                 for paper in paper_results:
+                    logger.info(f"🐛 [DEBUG] Paper: pmid={paper.article_pmid}, has_pmid={bool(paper.article_pmid)}")
                     if paper.article_pmid and paper.article_pmid not in seen_pmids:
                         seen_pmids.add(paper.article_pmid)
                         results["papers"].append({
