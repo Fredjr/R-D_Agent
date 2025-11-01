@@ -50,7 +50,7 @@ export function AnalysisTab({ project, onGenerateReport, onGenerateDeepDive }: A
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="analysis-tab-content">
       {/* Header with actions */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
@@ -61,6 +61,7 @@ export function AnalysisTab({ project, onGenerateReport, onGenerateDeepDive }: A
         </div>
         <div className="flex gap-3">
           <button
+            data-testid="generate-report-button"
             onClick={onGenerateReport}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
           >
@@ -68,6 +69,7 @@ export function AnalysisTab({ project, onGenerateReport, onGenerateDeepDive }: A
             <span>Generate Report</span>
           </button>
           <button
+            data-testid="generate-deep-dive-button"
             onClick={onGenerateDeepDive}
             className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
           >
@@ -83,6 +85,7 @@ export function AnalysisTab({ project, onGenerateReport, onGenerateDeepDive }: A
           <div className="flex-1">
             <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Type</label>
             <select
+              data-testid="analysis-filter-dropdown"
               value={filterType}
               onChange={(e) => setFilterType(e.target.value as any)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -92,10 +95,11 @@ export function AnalysisTab({ project, onGenerateReport, onGenerateDeepDive }: A
               <option value="deep-dives">Deep Dives Only ({allAnalyses.filter(a => a.type === 'deep-dive').length})</option>
             </select>
           </div>
-          
+
           <div className="flex-1">
             <label className="block text-sm font-medium text-gray-700 mb-2">Sort by</label>
             <select
+              data-testid="analysis-sort-dropdown"
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"

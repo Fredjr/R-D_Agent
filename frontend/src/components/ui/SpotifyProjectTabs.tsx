@@ -32,6 +32,9 @@ export function SpotifyProjectTabs({
           {tabs.map((tab) => (
             <button
               key={tab.id}
+              data-testid={`tab-${tab.id}`}
+              data-tab-id={tab.id}
+              data-active={activeTab === tab.id}
               onClick={() => onTabChange(tab.id)}
               className={cn(
                 "flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
@@ -65,6 +68,9 @@ export function SpotifyProjectTabs({
           {tabs.map((tab) => (
             <button
               key={tab.id}
+              data-testid={`tab-${tab.id}`}
+              data-tab-id={tab.id}
+              data-active={activeTab === tab.id}
               onClick={() => onTabChange(tab.id)}
               className={cn(
                 "flex items-center space-x-3 px-1 py-4 text-sm font-medium border-b-2 transition-colors",

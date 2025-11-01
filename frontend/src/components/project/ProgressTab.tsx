@@ -104,7 +104,7 @@ export function ProgressTab({ project }: ProgressTabProps) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="progress-tab-content">
       {/* Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
@@ -114,6 +114,7 @@ export function ProgressTab({ project }: ProgressTabProps) {
           </p>
         </div>
         <select
+          data-testid="time-range-selector"
           value={timeRange}
           onChange={(e) => setTimeRange(e.target.value as any)}
           className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
