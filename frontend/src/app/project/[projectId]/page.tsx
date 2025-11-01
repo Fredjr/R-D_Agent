@@ -23,6 +23,8 @@ import { SpotifyQuickActions, createQuickActions } from '@/components/ui/Spotify
 import { ResearchQuestionTab } from '@/components/project/ResearchQuestionTab';
 import { NotesTab } from '@/components/project/NotesTab';
 import { ExploreTab } from '@/components/project/ExploreTab';
+import { AnalysisTab } from '@/components/project/AnalysisTab';
+import { ProgressTab } from '@/components/project/ProgressTab';
 import {
   Button,
   Card,
@@ -131,7 +133,7 @@ export default function ProjectPage() {
   } | null>(null);
 
   // Tab navigation state
-  const [activeTab, setActiveTab] = useState<'research-question' | 'explore' | 'collections' | 'notes'>('research-question');
+  const [activeTab, setActiveTab] = useState<'research-question' | 'explore' | 'collections' | 'notes' | 'analysis' | 'progress'>('research-question');
 
   // Report generation results (same as Welcome Page)
   const [reportResults, setReportResults] = useState<any[]>([]);
@@ -205,9 +207,9 @@ export default function ProjectPage() {
   // 🔧 Handle URL parameters to set active tab
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab && ['research-question', 'explore', 'collections', 'notes'].includes(tab)) {
+    if (tab && ['research-question', 'explore', 'collections', 'notes', 'analysis', 'progress'].includes(tab)) {
       console.log('📍 Setting active tab from URL:', tab);
-      setActiveTab(tab as 'research-question' | 'explore' | 'collections' | 'notes');
+      setActiveTab(tab as 'research-question' | 'explore' | 'collections' | 'notes' | 'analysis' | 'progress');
     }
   }, [searchParams]);
 
@@ -951,7 +953,7 @@ export default function ProjectPage() {
         <div className="py-4">
           <SpotifyProjectTabs
             activeTab={activeTab}
-            onTabChange={(tab) => setActiveTab(tab as 'research-question' | 'explore' | 'collections' | 'notes')}
+            onTabChange={(tab) => setActiveTab(tab as 'research-question' | 'explore' | 'collections' | 'notes' | 'analysis' | 'progress')}
             tabs={[
               {
                 id: 'research-question',
@@ -978,6 +980,19 @@ export default function ProjectPage() {
                 icon: '📝',
                 count: (project as any).annotations?.length || 0,
                 description: 'All your research notes'
+              },
+              {
+                id: 'analysis',
+                label: 'Analysis',
+                icon: '📊',
+                count: ((project as any).reports?.length || 0) + ((project as any).deep_dives?.length || 0),
+                description: 'Reports and deep dive analyses'
+              },
+              {
+                id: 'progress',
+                label: 'Progress',
+                icon: '📈',
+                description: 'Activity timeline and metrics'
               }
             ]}
           />
@@ -1482,6 +1497,24 @@ export default function ProjectPage() {
               project={project}
               onRefresh={fetchProjectData}
             />
+          </div>
+        )}
+
+        {/* Analysis Tab */}
+        {activeTab === 'analysis' && (
+          <div className="mb-8">
+            <AnalysisTab
+              project={project}
+              onGenerateReport={() => setShowReportModal(true)}
+              onGenerateDeepDive={() => setShowDeepDiveModal(true)}
+            />
+          </div>
+        )}
+
+        {/* Progress Tab */}
+        {activeTab === 'progress' && (
+          <div className="mb-8">
+            <ProgressTab project={project} />
           </div>
         )}
       </div>
