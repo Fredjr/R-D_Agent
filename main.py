@@ -7103,6 +7103,16 @@ async def search_project_content(
     # Calculate total results
     total_found = sum(len(v) for v in results.values())
 
+    # 🐛 DEBUG: Add debug info to response (TEMPORARY)
+    debug_info = {
+        "project_collections_count": len(db.query(Collection).filter(
+            Collection.project_id == project_id,
+            Collection.is_active == True
+        ).all()),
+        "query_pattern": query_pattern,
+        "search_types_requested": list(search_types)
+    }
+
     return {
         "query": q,
         "results": results,
@@ -7114,7 +7124,8 @@ async def search_project_content(
             "notes": len(results["notes"]),
             "reports": len(results["reports"]),
             "analyses": len(results["analyses"])
-        }
+        },
+        "debug": debug_info  # TEMPORARY: Remove after debugging
     }
 
 
