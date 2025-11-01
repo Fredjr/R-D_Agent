@@ -25,6 +25,7 @@ import { NotesTab } from '@/components/project/NotesTab';
 import { ExploreTab } from '@/components/project/ExploreTab';
 import { AnalysisTab } from '@/components/project/AnalysisTab';
 import { ProgressTab } from '@/components/project/ProgressTab';
+import GlobalSearch from '@/components/search/GlobalSearch';
 import {
   Button,
   Card,
@@ -135,6 +136,9 @@ export default function ProjectPage() {
   // Tab navigation state
   const [activeTab, setActiveTab] = useState<'research-question' | 'explore' | 'collections' | 'notes' | 'analysis' | 'progress'>('research-question');
 
+  // Global search state
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
   // Report generation results (same as Welcome Page)
   const [reportResults, setReportResults] = useState<any[]>([]);
   const [reportDiagnostics, setReportDiagnostics] = useState<any | null>(null);
@@ -219,6 +223,50 @@ export default function ProjectPage() {
       fetchCollections();
     }
   }, [projectId, user]);
+
+  // 🔍 Global search keyboard shortcut (Cmd+K / Ctrl+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsSearchOpen(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // 🔍 Handle search result navigation
+  const handleSearchResultClick = (result: any) => {
+    console.log('🔍 [Global Search] Result clicked:', result);
+
+    // Navigate to appropriate tab based on result type
+    switch (result.type) {
+      case 'paper':
+        // Navigate to collections tab (papers are in collections)
+        setActiveTab('collections');
+        break;
+      case 'collection':
+        // Navigate to collections tab
+        setActiveTab('collections');
+        break;
+      case 'note':
+        // Navigate to notes tab
+        setActiveTab('notes');
+        break;
+      case 'report':
+        // Navigate to research question tab (reports are shown there)
+        setActiveTab('research-question');
+        break;
+      case 'analysis':
+        // Navigate to analysis tab
+        setActiveTab('analysis');
+        break;
+      default:
+        console.warn('Unknown result type:', result.type);
+    }
+  };
 
   const fetchProjectData = async () => {
     try {
@@ -1685,6 +1733,14 @@ export default function ProjectPage() {
           }}
         />
       )}
+
+      {/* Global Search Modal (Cmd+K) */}
+      <GlobalSearch
+        projectId={projectId}
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        onResultClick={handleSearchResultClick}
+      />
     </MobileResponsiveLayout>
   );
 }
