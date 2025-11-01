@@ -1,4 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  decodeHTMLEntities,
+  extractAuthors,
+  extractTitle,
+  extractJournal,
+  extractAbstract,
+  extractPMID,
+  extractYear,
+  extractDOI
+} from '@/lib/pubmed-utils';
 
 // PubMed eUtils URLs
 const PUBMED_SEARCH_URL = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi';
@@ -30,54 +40,23 @@ function parseArticleXML(xmlText: string): PubMedArticle[] {
 
     for (const articleXml of articleMatches) {
       try {
-        // Extract PMID
-        const pmidMatch = articleXml.match(/<PMID[^>]*>(\d+)<\/PMID>/);
-        const pmid = pmidMatch ? pmidMatch[1] : '';
-
+        const pmid = extractPMID(articleXml);
         if (!pmid) continue;
 
-        // Extract title
-        const titleMatch = articleXml.match(/<ArticleTitle>([\s\S]*?)<\/ArticleTitle>/);
-        const title = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, '').trim() : 'No title available';
-
-        // Extract authors
-        const authors: string[] = [];
-        const authorMatches = articleXml.match(/<Author[^>]*>[\s\S]*?<\/Author>/g) || [];
-        
-        for (const authorXml of authorMatches) {
-          const lastNameMatch = authorXml.match(/<LastName>(.*?)<\/LastName>/);
-          const foreNameMatch = authorXml.match(/<ForeName>(.*?)<\/ForeName>/);
-          
-          if (lastNameMatch) {
-            const lastName = lastNameMatch[1];
-            const foreName = foreNameMatch ? foreNameMatch[1] : '';
-            authors.push(foreName ? `${foreName} ${lastName}` : lastName);
-          }
-        }
-
-        // Extract journal
-        const journalMatch = articleXml.match(/<Title>(.*?)<\/Title>/);
-        const journal = journalMatch ? journalMatch[1].replace(/<[^>]*>/g, '').trim() : 'Unknown Journal';
-
-        // Extract publication year
-        const yearMatch = articleXml.match(/<PubDate>[\s\S]*?<Year>(\d{4})<\/Year>/);
-        const year = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
-
-        // Extract abstract
-        const abstractMatch = articleXml.match(/<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/);
-        const abstract = abstractMatch ? abstractMatch[1].replace(/<[^>]*>/g, '').trim() : 'No abstract available';
-
-        // Extract DOI if available
-        const doiMatch = articleXml.match(/<ArticleId IdType="doi">(.*?)<\/ArticleId>/);
-        const doi = doiMatch ? doiMatch[1] : undefined;
+        const title = extractTitle(articleXml);
+        const authors = extractAuthors(articleXml);
+        const journal = extractJournal(articleXml);
+        const year = extractYear(articleXml);
+        const abstract = extractAbstract(articleXml);
+        const doi = extractDOI(articleXml);
 
         articles.push({
           pmid,
-          title,
+          title: title || 'No title available',
           authors: authors.slice(0, 10), // Limit to first 10 authors
-          journal,
+          journal: journal || 'Unknown Journal',
           year,
-          abstract,
+          abstract: abstract || 'No abstract available',
           url: `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`,
           doi
         });
