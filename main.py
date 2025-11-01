@@ -6803,21 +6803,42 @@ async def search_project_content(
     request: Request,
     db: Session = Depends(get_db),
     q: str = "",
-    content_type: Optional[str] = None,  # "reports", "analyses", or None for both
-    limit: int = 20
+    content_types: Optional[str] = None,  # "papers,collections,notes,reports,analyses" or None for all
+    limit: int = 50
 ):
-    """Search reports and deep dive analyses within a project"""
+    """
+    Global search across ALL project content.
+
+    Searches:
+    - Papers (title, abstract, authors, journal)
+    - Collections (name, description)
+    - Notes/Annotations (content, tags, note_type)
+    - Reports (title, objective, molecule)
+    - Deep Dive Analyses (article_title)
+
+    Args:
+        project_id: Project UUID
+        q: Search query string
+        content_types: Comma-separated list of types to search (default: all)
+        limit: Maximum results per category (default: 50)
+
+    Returns:
+        Categorized search results with metadata
+    """
     current_user = request.headers.get("User-ID", "default_user")
+
+    # 🔧 Resolve email to UUID
+    user_id = resolve_user_id(current_user, db)
 
     # Check project access
     has_access = (
         db.query(Project).filter(
             Project.project_id == project_id,
-            Project.owner_user_id == current_user
+            Project.owner_user_id == user_id
         ).first() is not None or
         db.query(ProjectCollaborator).filter(
             ProjectCollaborator.project_id == project_id,
-            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.user_id == user_id,
             ProjectCollaborator.is_active == True
         ).first() is not None
     )
@@ -6825,60 +6846,311 @@ async def search_project_content(
     if not has_access:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    results = []
+    # Parse content types filter
+    search_types = set()
+    if content_types:
+        search_types = set(content_types.lower().split(','))
+    else:
+        search_types = {'papers', 'collections', 'notes', 'reports', 'analyses'}
 
-    # Search reports if requested
-    if content_type is None or content_type == "reports":
-        reports = db.query(Report).filter(
-            Report.project_id == project_id,
-            or_(
-                Report.title.ilike(f"%{q}%"),
-                Report.objective.ilike(f"%{q}%"),
-                Report.molecule.ilike(f"%{q}%")
-            )
-        ).limit(limit // 2 if content_type is None else limit).all()
+    # Initialize results structure
+    results = {
+        "papers": [],
+        "collections": [],
+        "notes": [],
+        "reports": [],
+        "analyses": []
+    }
 
-        for report in reports:
-            results.append({
-                "type": "report",
-                "id": report.report_id,
-                "title": report.title,
-                "subtitle": f"{report.molecule} - {report.objective}",
-                "status": report.status,
-                "created_at": report.created_at,
-                "article_count": report.article_count
-            })
+    # Return empty results if query is empty
+    if not q or len(q.strip()) < 2:
+        return {
+            "query": q,
+            "results": results,
+            "total_found": 0,
+            "search_types": list(search_types)
+        }
 
-    # Search deep dive analyses if requested
-    if content_type is None or content_type == "analyses":
-        analyses = db.query(DeepDiveAnalysis).filter(
-            DeepDiveAnalysis.project_id == project_id,
-            DeepDiveAnalysis.article_title.ilike(f"%{q}%")
-        ).limit(limit // 2 if content_type is None else limit).all()
+    query_pattern = f"%{q}%"
 
-        for analysis in analyses:
-            results.append({
-                "type": "analysis",
-                "id": analysis.analysis_id,
-                "title": analysis.article_title,
-                "subtitle": f"PMID: {analysis.article_pmid}",
-                "status": analysis.processing_status,
-                "created_at": analysis.created_at,
-                "has_results": (
-                    analysis.scientific_model_analysis is not None and
-                    analysis.experimental_methods_analysis is not None and
-                    analysis.results_interpretation_analysis is not None
+    # ═══════════════════════════════════════════════════════════
+    # SEARCH PAPERS
+    # ═══════════════════════════════════════════════════════════
+    if 'papers' in search_types:
+        try:
+            # Get all collections for this project to find papers
+            project_collections = db.query(Collection).filter(
+                Collection.project_id == project_id,
+                Collection.is_active == True
+            ).all()
+
+            collection_ids = [c.collection_id for c in project_collections]
+
+            if collection_ids:
+                # Search in ArticleCollection (papers in project)
+                paper_results = db.query(ArticleCollection).filter(
+                    ArticleCollection.collection_id.in_(collection_ids),
+                    or_(
+                        ArticleCollection.article_title.ilike(query_pattern),
+                        ArticleCollection.article_journal.ilike(query_pattern),
+                        # Search in authors JSON array (PostgreSQL specific)
+                        cast(ArticleCollection.article_authors, String).ilike(query_pattern)
+                    )
+                ).limit(limit).all()
+
+                # Also try to join with Article table for abstract search
+                paper_results_with_abstract = db.query(ArticleCollection, Article).join(
+                    Article, ArticleCollection.article_pmid == Article.pmid, isouter=True
+                ).filter(
+                    ArticleCollection.collection_id.in_(collection_ids),
+                    or_(
+                        Article.abstract.ilike(query_pattern),
+                        Article.title.ilike(query_pattern)
+                    )
+                ).limit(limit).all()
+
+                # Combine and deduplicate results
+                seen_pmids = set()
+                for paper in paper_results:
+                    if paper.article_pmid and paper.article_pmid not in seen_pmids:
+                        seen_pmids.add(paper.article_pmid)
+                        results["papers"].append({
+                            "type": "paper",
+                            "id": paper.article_pmid or f"paper-{paper.id}",
+                            "pmid": paper.article_pmid,
+                            "title": paper.article_title,
+                            "subtitle": f"{paper.article_journal or 'Unknown Journal'} ({paper.article_year or 'N/A'})",
+                            "authors": paper.article_authors if isinstance(paper.article_authors, list) else [],
+                            "collection_id": paper.collection_id,
+                            "added_at": paper.added_at,
+                            "highlight": _extract_highlight(paper.article_title, q)
+                        })
+
+                for paper, article in paper_results_with_abstract:
+                    if paper.article_pmid and paper.article_pmid not in seen_pmids:
+                        seen_pmids.add(paper.article_pmid)
+                        results["papers"].append({
+                            "type": "paper",
+                            "id": paper.article_pmid or f"paper-{paper.id}",
+                            "pmid": paper.article_pmid,
+                            "title": paper.article_title,
+                            "subtitle": f"{paper.article_journal or 'Unknown Journal'} ({paper.article_year or 'N/A'})",
+                            "authors": paper.article_authors if isinstance(paper.article_authors, list) else [],
+                            "collection_id": paper.collection_id,
+                            "added_at": paper.added_at,
+                            "highlight": _extract_highlight(article.abstract if article else paper.article_title, q)
+                        })
+
+                # Limit to requested amount
+                results["papers"] = results["papers"][:limit]
+
+        except Exception as e:
+            logger.error(f"Error searching papers: {e}")
+            # Continue with other searches even if papers search fails
+
+    # ═══════════════════════════════════════════════════════════
+    # SEARCH COLLECTIONS
+    # ═══════════════════════════════════════════════════════════
+    if 'collections' in search_types:
+        try:
+            collections = db.query(Collection).filter(
+                Collection.project_id == project_id,
+                Collection.is_active == True,
+                or_(
+                    Collection.collection_name.ilike(query_pattern),
+                    Collection.description.ilike(query_pattern)
                 )
-            })
+            ).limit(limit).all()
 
-    # Sort by relevance (created_at desc for now)
-    results.sort(key=lambda x: x["created_at"], reverse=True)
+            for collection in collections:
+                # Count papers in collection
+                paper_count = db.query(ArticleCollection).filter(
+                    ArticleCollection.collection_id == collection.collection_id
+                ).count()
+
+                results["collections"].append({
+                    "type": "collection",
+                    "id": collection.collection_id,
+                    "title": collection.collection_name,
+                    "subtitle": f"{paper_count} papers",
+                    "description": collection.description,
+                    "color": collection.color,
+                    "icon": collection.icon,
+                    "created_at": collection.created_at,
+                    "paper_count": paper_count,
+                    "highlight": _extract_highlight(collection.description or collection.collection_name, q)
+                })
+
+        except Exception as e:
+            logger.error(f"Error searching collections: {e}")
+
+    # ═══════════════════════════════════════════════════════════
+    # SEARCH NOTES/ANNOTATIONS
+    # ═══════════════════════════════════════════════════════════
+    if 'notes' in search_types:
+        try:
+            notes = db.query(Annotation).filter(
+                Annotation.project_id == project_id,
+                or_(
+                    Annotation.content.ilike(query_pattern),
+                    # Search in tags JSON array
+                    cast(Annotation.tags, String).ilike(query_pattern),
+                    Annotation.note_type.ilike(query_pattern),
+                    Annotation.research_question.ilike(query_pattern)
+                )
+            ).limit(limit).all()
+
+            for note in notes:
+                # Determine context
+                context_parts = []
+                if note.article_pmid:
+                    context_parts.append(f"Paper: {note.article_pmid}")
+                if note.collection_id:
+                    collection = db.query(Collection).filter(
+                        Collection.collection_id == note.collection_id
+                    ).first()
+                    if collection:
+                        context_parts.append(f"Collection: {collection.collection_name}")
+                if note.report_id:
+                    context_parts.append("Report")
+                if note.analysis_id:
+                    context_parts.append("Analysis")
+
+                context = " • ".join(context_parts) if context_parts else "General note"
+
+                results["notes"].append({
+                    "type": "note",
+                    "id": note.annotation_id,
+                    "title": note.content[:100] + ("..." if len(note.content) > 100 else ""),
+                    "subtitle": context,
+                    "content": note.content,
+                    "note_type": note.note_type,
+                    "priority": note.priority,
+                    "status": note.status,
+                    "tags": note.tags if isinstance(note.tags, list) else [],
+                    "created_at": note.created_at,
+                    "article_pmid": note.article_pmid,
+                    "collection_id": note.collection_id,
+                    "highlight": _extract_highlight(note.content, q)
+                })
+
+        except Exception as e:
+            logger.error(f"Error searching notes: {e}")
+
+    # ═══════════════════════════════════════════════════════════
+    # SEARCH REPORTS
+    # ═══════════════════════════════════════════════════════════
+    if 'reports' in search_types:
+        try:
+            reports = db.query(Report).filter(
+                Report.project_id == project_id,
+                or_(
+                    Report.title.ilike(query_pattern),
+                    Report.objective.ilike(query_pattern),
+                    Report.molecule.ilike(query_pattern)
+                )
+            ).limit(limit).all()
+
+            for report in reports:
+                results["reports"].append({
+                    "type": "report",
+                    "id": report.report_id,
+                    "title": report.title,
+                    "subtitle": f"{report.molecule} - {report.objective}",
+                    "status": report.status,
+                    "created_at": report.created_at,
+                    "article_count": report.article_count,
+                    "highlight": _extract_highlight(f"{report.title} {report.objective}", q)
+                })
+
+        except Exception as e:
+            logger.error(f"Error searching reports: {e}")
+
+    # ═══════════════════════════════════════════════════════════
+    # SEARCH DEEP DIVE ANALYSES
+    # ═══════════════════════════════════════════════════════════
+    if 'analyses' in search_types:
+        try:
+            analyses = db.query(DeepDiveAnalysis).filter(
+                DeepDiveAnalysis.project_id == project_id,
+                DeepDiveAnalysis.article_title.ilike(query_pattern)
+            ).limit(limit).all()
+
+            for analysis in analyses:
+                results["analyses"].append({
+                    "type": "analysis",
+                    "id": analysis.analysis_id,
+                    "title": analysis.article_title,
+                    "subtitle": f"PMID: {analysis.article_pmid}",
+                    "status": analysis.processing_status,
+                    "created_at": analysis.created_at,
+                    "pmid": analysis.article_pmid,
+                    "has_results": (
+                        analysis.scientific_model_analysis is not None and
+                        analysis.experimental_methods_analysis is not None and
+                        analysis.results_interpretation_analysis is not None
+                    ),
+                    "highlight": _extract_highlight(analysis.article_title, q)
+                })
+
+        except Exception as e:
+            logger.error(f"Error searching analyses: {e}")
+
+    # Calculate total results
+    total_found = sum(len(v) for v in results.values())
 
     return {
         "query": q,
-        "results": results[:limit],
-        "total_found": len(results)
+        "results": results,
+        "total_found": total_found,
+        "search_types": list(search_types),
+        "counts": {
+            "papers": len(results["papers"]),
+            "collections": len(results["collections"]),
+            "notes": len(results["notes"]),
+            "reports": len(results["reports"]),
+            "analyses": len(results["analyses"])
+        }
     }
+
+
+def _extract_highlight(text: str, query: str, context_length: int = 100) -> str:
+    """
+    Extract a highlighted snippet from text containing the query.
+
+    Args:
+        text: Full text to search
+        query: Search query
+        context_length: Characters of context around match
+
+    Returns:
+        Snippet with query highlighted
+    """
+    if not text or not query:
+        return ""
+
+    text_lower = text.lower()
+    query_lower = query.lower()
+
+    # Find query position
+    pos = text_lower.find(query_lower)
+    if pos == -1:
+        # Query not found, return beginning of text
+        return text[:context_length] + ("..." if len(text) > context_length else "")
+
+    # Extract context around query
+    start = max(0, pos - context_length // 2)
+    end = min(len(text), pos + len(query) + context_length // 2)
+
+    snippet = text[start:end]
+
+    # Add ellipsis if truncated
+    if start > 0:
+        snippet = "..." + snippet
+    if end < len(text):
+        snippet = snippet + "..."
+
+    return snippet
 
 @app.get("/projects/{project_id}/deep-dive-analyses/{analysis_id}")
 async def get_deep_dive_analysis(
