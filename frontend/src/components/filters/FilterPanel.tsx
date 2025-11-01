@@ -6,7 +6,7 @@ import { FunnelIcon, XMarkIcon } from '@heroicons/react/24/outline';
 export interface FilterOption {
   id: string;
   label: string;
-  value: string | number | boolean;
+  value: string | number | boolean | string[] | number[];
   type: 'select' | 'range' | 'checkbox' | 'multi-select';
   options?: Array<{ value: string; label: string }>;
   min?: number;

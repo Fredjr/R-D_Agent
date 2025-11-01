@@ -1,11 +1,13 @@
 'use client';
 
-// CACHE BUSTER: Force new bundle hash - v2.0.1 - 2025-11-01T14:40:00Z
+// CACHE BUSTER: Force new bundle hash - v2.0.2 - 2025-11-01T16:00:00Z
 import React, { useState, useMemo, useEffect } from 'react';
 import { FunnelIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import AnnotationList from '@/components/annotations/AnnotationList';
 import type { NoteType, Priority, Status } from '@/lib/api/annotations';
+import FilterPanel, { type FilterSection } from '@/components/filters/FilterPanel';
+import FilterChips, { type FilterChip } from '@/components/filters/FilterChips';
 
 interface NotesTabProps {
   project: any;
@@ -28,6 +30,12 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
   const [annotations, setAnnotations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // 🔍 Week 6 Day 4-5: Enhanced filters
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [dateRange, setDateRange] = useState<[number, number] | null>(null);
+  const [hasActionItems, setHasActionItems] = useState(false);
+  const [selectedAuthor, setSelectedAuthor] = useState<string>('all');
 
   // Fetch annotations when component mounts or project changes
   useEffect(() => {
@@ -77,7 +85,7 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
       // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
-        const matchesSearch = 
+        const matchesSearch =
           note.content?.toLowerCase().includes(query) ||
           note.note_type?.toLowerCase().includes(query) ||
           note.tags?.some((tag: string) => tag.toLowerCase().includes(query));
@@ -110,9 +118,39 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
         return false;
       }
 
+      // 🔍 Week 6: Tags filter
+      if (selectedTags.length > 0) {
+        const noteTags = note.tags || [];
+        const hasSelectedTag = selectedTags.some(tag => noteTags.includes(tag));
+        if (!hasSelectedTag) return false;
+      }
+
+      // 🔍 Week 6: Date range filter
+      if (dateRange) {
+        const noteDate = new Date(note.created_at).getTime();
+        const [startDate, endDate] = dateRange;
+        if (noteDate < startDate || noteDate > endDate) return false;
+      }
+
+      // 🔍 Week 6: Has action items filter
+      if (hasActionItems) {
+        const content = note.content?.toLowerCase() || '';
+        const hasActionItem =
+          content.includes('todo') ||
+          content.includes('action:') ||
+          content.includes('[ ]') ||
+          note.note_type === 'todo';
+        if (!hasActionItem) return false;
+      }
+
+      // 🔍 Week 6: Author filter (for collaboration)
+      if (selectedAuthor !== 'all' && note.created_by !== selectedAuthor) {
+        return false;
+      }
+
       return true;
     });
-  }, [allAnnotations, searchQuery, selectedType, selectedPriority, selectedStatus, viewMode]);
+  }, [allAnnotations, searchQuery, selectedType, selectedPriority, selectedStatus, viewMode, selectedTags, dateRange, hasActionItems, selectedAuthor]);
 
   // Group annotations by hierarchy
   const groupedAnnotations = useMemo(() => {
@@ -142,12 +180,37 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
     return groups;
   }, [filteredAnnotations]);
 
+  // 🔍 Week 6: Get unique tags and authors from all annotations
+  const availableTags = useMemo(() => {
+    const tags = new Set<string>();
+    allAnnotations.forEach(note => {
+      if (note.tags && Array.isArray(note.tags)) {
+        note.tags.forEach((tag: string) => tags.add(tag));
+      }
+    });
+    return Array.from(tags).sort();
+  }, [allAnnotations]);
+
+  const availableAuthors = useMemo(() => {
+    const authors = new Set<string>();
+    allAnnotations.forEach(note => {
+      if (note.created_by) {
+        authors.add(note.created_by);
+      }
+    });
+    return Array.from(authors).sort();
+  }, [allAnnotations]);
+
   // Count active filters
-  const activeFiltersCount = 
+  const activeFiltersCount =
     (selectedType !== 'all' ? 1 : 0) +
     (selectedPriority !== 'all' ? 1 : 0) +
     (selectedStatus !== 'all' ? 1 : 0) +
-    (viewMode !== 'all' ? 1 : 0);
+    (viewMode !== 'all' ? 1 : 0) +
+    (selectedTags.length > 0 ? 1 : 0) +
+    (dateRange ? 1 : 0) +
+    (hasActionItems ? 1 : 0) +
+    (selectedAuthor !== 'all' ? 1 : 0);
 
   const clearFilters = () => {
     setSelectedType('all');
@@ -155,6 +218,10 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
     setSelectedStatus('all');
     setViewMode('all');
     setSearchQuery('');
+    setSelectedTags([]);
+    setDateRange(null);
+    setHasActionItems(false);
+    setSelectedAuthor('all');
   };
 
   // Show loading state
@@ -241,126 +308,152 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
         </div>
       </div>
 
-      {/* Search and Filters */}
-      <div className="bg-white rounded-lg p-4 border border-gray-200">
-        <div className="flex flex-col md:flex-row gap-4">
-          {/* Search Bar */}
-          <div className="flex-1">
-            <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search notes by content, type, or tags..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          {/* Filter Toggle */}
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
-              showFilters || activeFiltersCount > 0
-                ? 'bg-purple-100 border-purple-300 text-purple-700'
-                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            <FunnelIcon className="w-5 h-5" />
-            <span className="font-medium">Filters</span>
-            {activeFiltersCount > 0 && (
-              <span className="bg-purple-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                {activeFiltersCount}
-              </span>
-            )}
-          </button>
-        </div>
-
-        {/* Filter Options */}
-        {showFilters && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* View Mode Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">View</label>
-                <select
-                  value={viewMode}
-                  onChange={(e) => setViewMode(e.target.value as ViewMode)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-                  <option value="all">All Notes</option>
-                  <option value="project">Project Only</option>
-                  <option value="collection">Collection Only</option>
-                  <option value="paper">Paper Only</option>
-                </select>
-              </div>
-
-              {/* Type Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
-                <select
-                  value={selectedType}
-                  onChange={(e) => setSelectedType(e.target.value as NoteTypeFilter)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-                  <option value="all">All Types</option>
-                  <option value="general">📝 General</option>
-                  <option value="finding">🔍 Finding</option>
-                  <option value="hypothesis">💡 Hypothesis</option>
-                  <option value="question">❓ Question</option>
-                  <option value="todo">✅ To-Do</option>
-                  <option value="comparison">⚖️ Comparison</option>
-                  <option value="critique">🔎 Critique</option>
-                </select>
-              </div>
-
-              {/* Priority Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
-                <select
-                  value={selectedPriority}
-                  onChange={(e) => setSelectedPriority(e.target.value as PriorityFilter)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-                  <option value="all">All Priorities</option>
-                  <option value="low">🟢 Low</option>
-                  <option value="medium">🟡 Medium</option>
-                  <option value="high">🟠 High</option>
-                  <option value="critical">🔴 Critical</option>
-                </select>
-              </div>
-
-              {/* Status Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value as StatusFilter)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-                  <option value="all">All Status</option>
-                  <option value="active">🟢 Active</option>
-                  <option value="resolved">✅ Resolved</option>
-                  <option value="archived">📦 Archived</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Clear Filters */}
-            {activeFiltersCount > 0 && (
-              <div className="mt-4 flex justify-end">
-                <button
-                  onClick={clearFilters}
-                  className="text-sm text-purple-600 hover:text-purple-700 font-medium"
-                >
-                  Clear all filters
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+      {/* Search Bar */}
+      <div className="relative">
+        <MagnifyingGlassIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search notes by content, type, or tags..."
+          className="w-full pl-12 pr-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900 placeholder-gray-500"
+        />
       </div>
+
+      {/* 🔍 Week 6: Enhanced Filter Panel */}
+      <FilterPanel
+        sections={[
+          {
+            title: 'Notes',
+            filters: [
+              {
+                id: 'viewMode',
+                label: 'View',
+                type: 'select',
+                value: viewMode,
+                options: [
+                  { value: 'all', label: 'All Notes' },
+                  { value: 'project', label: 'Project Only' },
+                  { value: 'collection', label: 'Collection Only' },
+                  { value: 'paper', label: 'Paper Only' }
+                ]
+              },
+              {
+                id: 'selectedType',
+                label: 'Type',
+                type: 'select',
+                value: selectedType,
+                options: [
+                  { value: 'all', label: 'All Types' },
+                  { value: 'general', label: '📝 General' },
+                  { value: 'finding', label: '🔍 Finding' },
+                  { value: 'hypothesis', label: '💡 Hypothesis' },
+                  { value: 'question', label: '❓ Question' },
+                  { value: 'todo', label: '✅ To-Do' },
+                  { value: 'comparison', label: '⚖️ Comparison' },
+                  { value: 'critique', label: '🔎 Critique' }
+                ]
+              },
+              {
+                id: 'selectedPriority',
+                label: 'Priority',
+                type: 'select',
+                value: selectedPriority,
+                options: [
+                  { value: 'all', label: 'All Priorities' },
+                  { value: 'low', label: '🟢 Low' },
+                  { value: 'medium', label: '🟡 Medium' },
+                  { value: 'high', label: '🟠 High' },
+                  { value: 'critical', label: '🔴 Critical' }
+                ]
+              },
+              {
+                id: 'selectedStatus',
+                label: 'Status',
+                type: 'select',
+                value: selectedStatus,
+                options: [
+                  { value: 'all', label: 'All Status' },
+                  { value: 'active', label: '🟢 Active' },
+                  { value: 'resolved', label: '✅ Resolved' },
+                  { value: 'archived', label: '📦 Archived' }
+                ]
+              },
+              {
+                id: 'selectedTags',
+                label: 'Tags',
+                type: 'multi-select',
+                value: selectedTags,
+                options: availableTags.map(tag => ({ value: tag, label: tag }))
+              },
+              {
+                id: 'hasActionItems',
+                label: 'Has Action Items',
+                type: 'checkbox',
+                value: hasActionItems
+              },
+              ...(availableAuthors.length > 1 ? [{
+                id: 'selectedAuthor',
+                label: 'Author',
+                type: 'select' as const,
+                value: selectedAuthor,
+                options: [
+                  { value: 'all', label: 'All Authors' },
+                  ...availableAuthors.map(author => ({ value: author, label: author }))
+                ]
+              }] : [])
+            ]
+          }
+        ]}
+        activeFilters={{
+          viewMode,
+          selectedType,
+          selectedPriority,
+          selectedStatus,
+          selectedTags,
+          hasActionItems,
+          selectedAuthor
+        }}
+        onFilterChange={(filterId, value) => {
+          if (filterId === 'viewMode') setViewMode(value as ViewMode);
+          else if (filterId === 'selectedType') setSelectedType(value as NoteTypeFilter);
+          else if (filterId === 'selectedPriority') setSelectedPriority(value as PriorityFilter);
+          else if (filterId === 'selectedStatus') setSelectedStatus(value as StatusFilter);
+          else if (filterId === 'selectedTags') setSelectedTags(value);
+          else if (filterId === 'hasActionItems') setHasActionItems(value);
+          else if (filterId === 'selectedAuthor') setSelectedAuthor(value);
+        }}
+        onClearAll={clearFilters}
+        isOpen={showFilters}
+        onToggle={() => setShowFilters(!showFilters)}
+      />
+
+      {/* 🔍 Week 6: Active Filter Chips */}
+      {(activeFiltersCount > 0 || searchQuery) && (
+        <FilterChips
+          chips={[
+            ...(viewMode !== 'all' ? [{ id: 'viewMode', label: 'View', value: viewMode, displayValue: viewMode }] : []),
+            ...(selectedType !== 'all' ? [{ id: 'selectedType', label: 'Type', value: selectedType, displayValue: selectedType }] : []),
+            ...(selectedPriority !== 'all' ? [{ id: 'selectedPriority', label: 'Priority', value: selectedPriority, displayValue: selectedPriority }] : []),
+            ...(selectedStatus !== 'all' ? [{ id: 'selectedStatus', label: 'Status', value: selectedStatus, displayValue: selectedStatus }] : []),
+            ...(selectedTags.length > 0 ? [{ id: 'selectedTags', label: 'Tags', value: selectedTags, displayValue: selectedTags.join(', ') }] : []),
+            ...(hasActionItems ? [{ id: 'hasActionItems', label: 'Action Items', value: true, displayValue: 'Yes' }] : []),
+            ...(selectedAuthor !== 'all' ? [{ id: 'selectedAuthor', label: 'Author', value: selectedAuthor, displayValue: selectedAuthor }] : []),
+            ...(searchQuery ? [{ id: 'search', label: 'Search', value: searchQuery, displayValue: `"${searchQuery}"` }] : [])
+          ]}
+          onRemove={(chipId) => {
+            if (chipId === 'search') setSearchQuery('');
+            else if (chipId === 'viewMode') setViewMode('all');
+            else if (chipId === 'selectedType') setSelectedType('all');
+            else if (chipId === 'selectedPriority') setSelectedPriority('all');
+            else if (chipId === 'selectedStatus') setSelectedStatus('all');
+            else if (chipId === 'selectedTags') setSelectedTags([]);
+            else if (chipId === 'hasActionItems') setHasActionItems(false);
+            else if (chipId === 'selectedAuthor') setSelectedAuthor('all');
+          }}
+          onClearAll={clearFilters}
+        />
+      )}
 
       {/* Results Summary */}
       <div className="flex items-center justify-between">
