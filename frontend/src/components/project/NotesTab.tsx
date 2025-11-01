@@ -383,6 +383,7 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
         <div className="bg-white rounded-lg border border-gray-200">
           <AnnotationList
             projectId={project.project_id}
+            userId={user?.email} // CRITICAL FIX: Must pass user email for authentication
             initialFilters={{
               note_type: selectedType !== 'all' ? selectedType : undefined,
               priority: selectedPriority !== 'all' ? selectedPriority : undefined,

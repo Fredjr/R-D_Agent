@@ -58,7 +58,7 @@ export default function AnnotationsFeed({
         <div className="flex-1 overflow-y-auto">
           <AnnotationList
             projectId={projectId}
-            userId={user?.user_id}
+            userId={user?.email} // CRITICAL FIX: Must use user.email, not user.user_id
             articlePmid={articlePmid}
             reportId={reportId}
             analysisId={analysisId}
