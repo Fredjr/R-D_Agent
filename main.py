@@ -5521,6 +5521,86 @@ async def remove_collaborator(
 
     return {"message": "Collaborator removed successfully"}
 
+@app.get("/projects/{project_id}/collaborators")
+async def get_collaborators(
+    project_id: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Get all collaborators for a project"""
+    try:
+        current_user = request.headers.get("User-ID", "default_user")
+
+        # Check project access
+        has_access = (
+            db.query(Project).filter(
+                Project.project_id == project_id,
+                Project.owner_user_id == current_user
+            ).first() is not None or
+            db.query(ProjectCollaborator).filter(
+                ProjectCollaborator.project_id == project_id,
+                ProjectCollaborator.user_id == current_user,
+                ProjectCollaborator.is_active == True
+            ).first() is not None
+        )
+
+        if not has_access:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # Get project owner
+        project = db.query(Project).filter(Project.project_id == project_id).first()
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        owner = db.query(User).filter(User.user_id == project.owner_user_id).first()
+
+        # Get collaborators
+        collaborators = db.query(ProjectCollaborator, User).join(
+            User, ProjectCollaborator.user_id == User.user_id
+        ).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.is_active == True
+        ).all()
+
+        # Format response
+        result = []
+
+        # Add owner first
+        if owner:
+            result.append({
+                "user_id": owner.user_id,
+                "email": owner.email,
+                "first_name": owner.first_name or "",
+                "last_name": owner.last_name or "",
+                "username": owner.username,
+                "role": "owner",
+                "invited_at": project.created_at.isoformat() if project.created_at else None,
+                "accepted_at": project.created_at.isoformat() if project.created_at else None,
+                "is_active": True
+            })
+
+        # Add collaborators
+        for collab, user in collaborators:
+            result.append({
+                "user_id": user.user_id,
+                "email": user.email,
+                "first_name": user.first_name or "",
+                "last_name": user.last_name or "",
+                "username": user.username,
+                "role": collab.role,
+                "invited_at": collab.invited_at.isoformat() if collab.invited_at else None,
+                "accepted_at": collab.accepted_at.isoformat() if collab.accepted_at else None,
+                "is_active": collab.is_active
+            })
+
+        return {"collaborators": result}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching collaborators: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
 # Health check for migration status
 @app.get("/api/admin/migration-status")
 async def check_migration_status(db: Session = Depends(get_db)):
