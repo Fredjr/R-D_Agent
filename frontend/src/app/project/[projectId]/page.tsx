@@ -21,6 +21,7 @@ import { SpotifyProjectHeader } from '@/components/ui/SpotifyProjectHeader';
 import { SpotifyProjectTabs } from '@/components/ui/SpotifyProjectTabs';
 import { SpotifyQuickActions, createQuickActions } from '@/components/ui/SpotifyQuickActions';
 import { ResearchQuestionTab } from '@/components/project/ResearchQuestionTab';
+import { NotesTab } from '@/components/project/NotesTab';
 import {
   Button,
   Card,
@@ -1494,18 +1495,11 @@ export default function ProjectPage() {
 
         {/* Notes & Ideas Tab */}
         {activeTab === 'notes' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Notes</h2>
-              <AnnotationsFeed
-                projectId={projectId}
-                useEnhancedNotes={true}
-              />
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Activity</h2>
-              <ActivityFeed projectId={projectId} />
-            </div>
+          <div className="mb-8">
+            <NotesTab
+              project={project}
+              onRefresh={fetchProjectData}
+            />
           </div>
         )}
       </div>
