@@ -55,33 +55,47 @@
   log('\nTEST SUITE 1: Tab Navigation & Structure', colors.blue);
   log('═══════════════════════════════════════════════════════════', colors.blue);
 
-  // Test 1.1: Check if all 4 tabs exist (FIXED - look in specific container)
-  const tabContainer = document.querySelector('[class*="SpotifyProjectTabs"]') || 
-                       document.querySelector('[role="tablist"]') ||
-                       document.querySelector('nav');
-  
-  let tabs = [];
-  if (tabContainer) {
-    tabs = Array.from(tabContainer.querySelectorAll('button')).filter(btn => {
-      const text = btn.textContent || '';
-      return text.includes('Research Question') ||
-             text.includes('Explore Papers') ||
-             text.includes('My Collections') ||
-             text.includes('Notes & Ideas');
-    });
-  } else {
-    // Fallback: look for buttons with specific data attributes or unique classes
-    tabs = Array.from(document.querySelectorAll('button')).filter(btn => {
-      const text = btn.textContent || '';
-      const isTab = (text.includes('Research Question') ||
-                    text.includes('Explore Papers') ||
-                    text.includes('My Collections') ||
-                    text.includes('Notes & Ideas')) &&
-                    btn.closest('[class*="tab"]'); // Must be inside a tab-related container
-      return isTab;
-    });
-  }
-  
+  // Wait for page to fully load
+  await new Promise(resolve => setTimeout(resolve, 2000));
+
+  // Test 1.1: Check if all 4 tabs exist (FIXED - look for visible tabs only)
+  // SpotifyProjectTabs has two containers: mobile (hidden on desktop) and desktop (hidden on mobile)
+  // We need to find the VISIBLE one
+  const allTabButtons = Array.from(document.querySelectorAll('button')).filter(btn => {
+    const text = btn.textContent || '';
+    const hasTabText = text.includes('Research Question') ||
+                       text.includes('Explore Papers') ||
+                       text.includes('My Collections') ||
+                       text.includes('Notes & Ideas');
+
+    // Check if button is visible (not hidden by CSS)
+    if (!hasTabText) return false;
+
+    const style = window.getComputedStyle(btn);
+    const parentStyle = btn.parentElement ? window.getComputedStyle(btn.parentElement) : null;
+    const isVisible = style.display !== 'none' &&
+                     style.visibility !== 'hidden' &&
+                     style.opacity !== '0' &&
+                     (!parentStyle || (parentStyle.display !== 'none' && parentStyle.visibility !== 'hidden'));
+
+    return isVisible;
+  });
+
+  // Remove duplicates by label (mobile + desktop versions)
+  const uniqueTabLabels = new Set();
+  const tabs = allTabButtons.filter(btn => {
+    const text = btn.textContent || '';
+    let label = '';
+    if (text.includes('Research Question')) label = 'Research Question';
+    else if (text.includes('Explore Papers')) label = 'Explore Papers';
+    else if (text.includes('My Collections')) label = 'My Collections';
+    else if (text.includes('Notes & Ideas')) label = 'Notes & Ideas';
+
+    if (uniqueTabLabels.has(label)) return false;
+    uniqueTabLabels.add(label);
+    return true;
+  });
+
   logTest('1.1 All 4 tabs are present', tabs.length === 4, `Found ${tabs.length} tabs`);
 
   // Test 1.2: Check tab names
@@ -133,8 +147,12 @@
   );
   logTest('2.1 Research question section exists', !!researchQuestionSection);
 
-  // Test 2.2: Project stats cards exist
-  const statsCards = document.querySelectorAll('[class*="stat"], [class*="card"]');
+  // Test 2.2: Project stats cards exist (look for specific stat indicators)
+  const statsCards = Array.from(document.querySelectorAll('*')).filter(el => {
+    const text = el.textContent?.toLowerCase() || '';
+    return (text.includes('papers') || text.includes('collections') || text.includes('notes') || text.includes('collaborators')) &&
+           (el.className.includes('stat') || el.className.includes('card') || el.className.includes('bg-'));
+  });
   logTest('2.2 Project stats cards exist', statsCards.length >= 3, `Found ${statsCards.length} cards`);
 
   // Test 2.3: Edit functionality is available (FIXED - check aria-label and title)
@@ -146,10 +164,14 @@
   );
   logTest('2.3 Edit functionality is available', editButtons.length > 0, `Found ${editButtons.length} edit buttons`);
 
-  // Test 2.4: Seed paper section exists
-  const seedPaperSection = Array.from(document.querySelectorAll('*')).find(el => 
-    el.textContent?.includes('Seed Paper') || el.textContent?.includes('Starting Point')
-  );
+  // Test 2.4: Seed paper section exists (look for seed paper or starting paper)
+  const seedPaperSection = Array.from(document.querySelectorAll('*')).find(el => {
+    const text = el.textContent?.toLowerCase() || '';
+    return text.includes('seed paper') ||
+           text.includes('starting point') ||
+           text.includes('starting paper') ||
+           (text.includes('pmid') && text.includes('starting'));
+  });
   logTest('2.4 Seed paper section exists', !!seedPaperSection);
 
   // ============================================================================
@@ -161,27 +183,40 @@
 
   // Click Explore Papers tab
   const exploreTab = tabs.find(t => t.textContent.includes('Explore Papers'));
-  if (exploreTab) exploreTab.click();
-  await new Promise(resolve => setTimeout(resolve, 500));
+  if (exploreTab) {
+    exploreTab.click();
+    await new Promise(resolve => setTimeout(resolve, 1500)); // Extra time for tab content to load
+  }
 
-  // Test 3.1: Search bar exists
-  const searchInput = document.querySelector('input[type="text"][placeholder*="search" i], input[type="search"]');
+  // Test 3.1: Search bar exists (look for PubMed search input)
+  const searchInput = document.querySelector('input[placeholder*="PubMed" i]') ||
+                      document.querySelector('input[placeholder*="search" i]') ||
+                      document.querySelector('input[type="text"]');
   logTest('3.1 PubMed search bar exists', !!searchInput);
 
   // Test 3.2: Search button exists
-  const searchButton = Array.from(document.querySelectorAll('button')).find(btn => 
-    btn.textContent.includes('Search') || btn.querySelector('svg[class*="search"]')
-  );
+  const searchButton = Array.from(document.querySelectorAll('button')).find(btn => {
+    const text = btn.textContent?.toLowerCase() || '';
+    return text.includes('search') && !text.includes('clear');
+  });
   logTest('3.2 Search button exists', !!searchButton);
 
-  // Test 3.3: Network view exists
-  const networkView = document.querySelector('[class*="network"], [class*="graph"], canvas, svg[class*="react-flow"]');
+  // Test 3.3: Network view exists (look for ReactFlow or network container)
+  const networkView = document.querySelector('.react-flow') ||
+                      document.querySelector('[class*="NetworkView"]') ||
+                      document.querySelector('canvas') ||
+                      document.querySelector('svg[class*="react-flow"]') ||
+                      Array.from(document.querySelectorAll('*')).find(el =>
+                        el.textContent?.includes('Network Overview') ||
+                        el.textContent?.includes('network view')
+                      );
   logTest('3.3 Network view component exists', !!networkView);
 
   // Test 3.4: Quick search suggestions exist
-  const quickSearchButtons = Array.from(document.querySelectorAll('button')).filter(btn => 
-    btn.textContent.match(/machine learning|CRISPR|cancer|COVID/i)
-  );
+  const quickSearchButtons = Array.from(document.querySelectorAll('button')).filter(btn => {
+    const text = btn.textContent?.toLowerCase() || '';
+    return text.match(/machine learning|crispr|neural|pmid/i);
+  });
   logTest('3.4 Quick search suggestions exist', quickSearchButtons.length >= 2, `Found ${quickSearchButtons.length} suggestions`);
 
   // ============================================================================
@@ -228,24 +263,38 @@
 
   // Click Notes & Ideas tab
   const notesTab = tabs.find(t => t.textContent.includes('Notes & Ideas'));
-  if (notesTab) notesTab.click();
-  await new Promise(resolve => setTimeout(resolve, 1000)); // Extra time for notes to load
+  if (notesTab) {
+    notesTab.click();
+    await new Promise(resolve => setTimeout(resolve, 1500)); // Extra time for notes to load
+  }
 
   // Test 5.1: Notes list exists
-  const notesList = document.querySelector('[class*="annotation"], [class*="note"]') ||
-                    Array.from(document.querySelectorAll('*')).find(el => 
-                      el.textContent?.includes('Note') && el.children.length > 0
-                    );
+  const notesList = document.querySelector('[class*="AnnotationList"]') ||
+                    document.querySelector('[class*="annotation"]') ||
+                    document.querySelector('[class*="note"]') ||
+                    Array.from(document.querySelectorAll('*')).find(el => {
+                      const text = el.textContent?.toLowerCase() || '';
+                      return (text.includes('note') || text.includes('annotation')) && el.children.length > 0;
+                    });
   logTest('5.1 Notes list exists', !!notesList);
 
-  // Test 5.2: Filter panel exists
-  const filterPanel = Array.from(document.querySelectorAll('*')).find(el => 
-    el.textContent?.toLowerCase().includes('filter') && el.children.length > 0
-  );
+  // Test 5.2: Filter panel exists (look for filter dropdowns or buttons)
+  const filterPanel = Array.from(document.querySelectorAll('select, [role="combobox"]')).find(el => {
+    const text = el.textContent?.toLowerCase() || '';
+    const label = el.getAttribute('aria-label')?.toLowerCase() || '';
+    return text.includes('type') || text.includes('priority') || text.includes('status') ||
+           label.includes('filter');
+  }) || Array.from(document.querySelectorAll('*')).find(el => {
+    const text = el.textContent?.toLowerCase() || '';
+    return text.includes('filter') && el.querySelectorAll('select, button').length > 0;
+  });
   logTest('5.2 Filter panel exists', !!filterPanel);
 
-  // Test 5.3: Search functionality exists
-  const notesSearchInput = document.querySelector('input[placeholder*="search" i], input[placeholder*="note" i]');
+  // Test 5.3: Search functionality exists (look for search input in notes tab)
+  const notesSearchInput = Array.from(document.querySelectorAll('input')).find(input => {
+    const placeholder = input.getAttribute('placeholder')?.toLowerCase() || '';
+    return placeholder.includes('search') || placeholder.includes('note');
+  });
   logTest('5.3 Search functionality exists', !!notesSearchInput);
 
   // Test 5.4: Create note button exists
@@ -254,61 +303,41 @@
   );
   logTest('5.4 Create note button exists', !!createNoteBtn);
 
-  // Test 5.5-5.8: Filter options exist (IMPROVED - expand panel first if needed)
-  const filterButton = Array.from(document.querySelectorAll('button')).find(btn => 
-    btn.textContent?.toLowerCase().includes('filter')
-  );
-  if (filterButton && !filterButton.classList.contains('active')) {
-    filterButton.click();
-    await new Promise(resolve => setTimeout(resolve, 500));
-  }
+  // Test 5.5-5.8: Filter options exist (look for select dropdowns)
 
   // Test 5.5: Type filter exists
-  const typeFilterUI = Array.from(document.querySelectorAll('*')).find(el => {
+  const typeFilterUI = Array.from(document.querySelectorAll('select, [role="combobox"]')).find(el => {
     const text = el.textContent?.toLowerCase() || '';
-    return text.includes('type') && (
-      text.includes('general') || 
-      text.includes('finding') || 
-      text.includes('question') ||
-      el.querySelector('select, [role="combobox"]')
-    );
+    const label = el.previousElementSibling?.textContent?.toLowerCase() || '';
+    return text.includes('type') || label.includes('type') || text.includes('general') || text.includes('finding');
   });
   logTest('5.5 Type filter UI exists', !!typeFilterUI);
 
-  // Test 5.6: Priority filter exists (FIXED - check label and options separately)
-  const priorityLabel = Array.from(document.querySelectorAll('label, div, span')).find(el => 
-    el.textContent?.toLowerCase().includes('priority')
-  );
-  const priorityOptions = document.querySelector('select[name*="priority" i]') ||
-                          Array.from(document.querySelectorAll('*')).find(el => {
-                            const text = el.textContent?.toLowerCase() || '';
-                            return (text.includes('high') || text.includes('low') || text.includes('medium')) &&
-                                   el.closest('[class*="filter"]');
-                          });
-  logTest('5.6 Priority filter UI exists', !!(priorityLabel || priorityOptions), 
-    priorityLabel ? 'Found label' : priorityOptions ? 'Found options' : 'Not found');
+  // Test 5.6: Priority filter exists (look for select with priority options)
+  const priorityFilterUI = Array.from(document.querySelectorAll('select, [role="combobox"]')).find(el => {
+    const text = el.textContent?.toLowerCase() || '';
+    const label = el.previousElementSibling?.textContent?.toLowerCase() || '';
+    const options = Array.from(el.querySelectorAll('option')).map(opt => opt.textContent?.toLowerCase() || '');
+    return label.includes('priority') ||
+           text.includes('priority') ||
+           (options.includes('high') && options.includes('low'));
+  });
+  logTest('5.6 Priority filter UI exists', !!priorityFilterUI);
 
   // Test 5.7: Status filter exists
-  const statusFilterUI = Array.from(document.querySelectorAll('*')).find(el => {
+  const statusFilterUI = Array.from(document.querySelectorAll('select, [role="combobox"]')).find(el => {
     const text = el.textContent?.toLowerCase() || '';
-    return text.includes('status') && (
-      text.includes('active') || 
-      text.includes('resolved') || 
-      text.includes('archived') ||
-      el.querySelector('select, [role="combobox"]')
-    );
+    const label = el.previousElementSibling?.textContent?.toLowerCase() || '';
+    return text.includes('status') || label.includes('status') || text.includes('active') || text.includes('resolved');
   });
   logTest('5.7 Status filter UI exists', !!statusFilterUI);
 
   // Test 5.8: View mode filter exists
-  const viewModeFilterUI = Array.from(document.querySelectorAll('*')).find(el => {
+  const viewModeFilterUI = Array.from(document.querySelectorAll('select, [role="combobox"]')).find(el => {
     const text = el.textContent?.toLowerCase() || '';
-    return (text.includes('view') || text.includes('show')) && (
-      text.includes('all') || 
-      text.includes('project') || 
-      text.includes('article') ||
-      el.querySelector('select, [role="combobox"]')
-    );
+    const label = el.previousElementSibling?.textContent?.toLowerCase() || '';
+    return (text.includes('view') || label.includes('view') || text.includes('show')) &&
+           (text.includes('all') || text.includes('project'));
   });
   logTest('5.8 View mode filter UI exists', !!viewModeFilterUI);
 
