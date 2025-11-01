@@ -53,6 +53,7 @@ export function ResearchQuestionTab({ project, onUpdateProject }: ResearchQuesti
               onClick={() => setIsEditing(true)}
               className="p-2 text-gray-600 hover:text-gray-900 hover:bg-white rounded-lg transition-colors"
               title="Edit research question"
+              aria-label="Edit research question"
             >
               <PencilIcon className="w-5 h-5" />
             </button>

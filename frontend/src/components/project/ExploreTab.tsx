@@ -40,8 +40,8 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
     try {
       console.log('🔍 Searching PubMed for:', searchQuery);
 
-      // Call PubMed search API
-      const response = await fetch(`/api/proxy/pubmed/search?query=${encodeURIComponent(searchQuery)}&limit=20`);
+      // Call PubMed search API - FIXED: Use 'q' parameter instead of 'query'
+      const response = await fetch(`/api/proxy/pubmed/search?q=${encodeURIComponent(searchQuery)}&limit=20`);
 
       if (!response.ok) {
         throw new Error(`Search failed: ${response.statusText}`);
