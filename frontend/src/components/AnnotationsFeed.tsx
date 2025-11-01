@@ -1,5 +1,6 @@
 'use client';
 
+// CACHE BUSTER: Force new bundle hash - v2.0.1 - 2025-11-01T14:40:00Z
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -200,9 +201,10 @@ export default function AnnotationsFeed({
       const queryString = params.toString();
       const url = `/api/proxy/projects/${projectId}/annotations${queryString ? `?${queryString}` : ''}`;
 
+      console.log('📡 AnnotationsFeed fetching with User-ID:', user?.email); // DEBUG: Verify correct header
       const response = await fetch(url, {
         headers: {
-          'User-ID': user?.email || 'anonymous',
+          'User-ID': user?.email || 'anonymous', // CRITICAL: Must use user.email, not user.user_id
           'Content-Type': 'application/json',
         },
       });

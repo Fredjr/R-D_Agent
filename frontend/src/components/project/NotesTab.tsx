@@ -1,5 +1,6 @@
 'use client';
 
+// CACHE BUSTER: Force new bundle hash - v2.0.1 - 2025-11-01T14:40:00Z
 import React, { useState, useMemo, useEffect } from 'react';
 import { FunnelIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
@@ -40,9 +41,10 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
         setLoading(true);
         setError(null);
 
+        console.log('📡 Fetching annotations with User-ID:', user.email); // DEBUG: Verify correct header
         const response = await fetch(`/api/proxy/projects/${project.project_id}/annotations`, {
           headers: {
-            'User-ID': user.email,
+            'User-ID': user.email, // CRITICAL: Must use user.email, not user.user_id
           },
         });
 
