@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { MagnifyingGlassIcon, SparklesIcon, XMarkIcon, BookmarkIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
 import { BookmarkIcon as BookmarkSolidIcon } from '@heroicons/react/24/solid';
 import MultiColumnNetworkView from '@/components/MultiColumnNetworkView';
 import { useAuth } from '@/contexts/AuthContext';
+import FilterPanel, { type FilterSection } from '@/components/filters/FilterPanel';
+import FilterChips, { type FilterChip } from '@/components/filters/FilterChips';
 
 interface ExploreTabProps {
   project: any;
@@ -30,6 +32,15 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState<PubMedArticle | null>(null);
   const [savingPmids, setSavingPmids] = useState<Set<string>>(new Set());
+
+  // 🔍 Week 6: Filter state
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<Record<string, any>>({
+    sortBy: 'relevance',
+    yearRange: [2000, 2024],
+    citationFilter: 'all',
+    hasAbstract: false
+  });
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,6 +115,147 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
         return next;
       });
     }
+  };
+
+  // 🔍 Week 6: Filter and sort search results
+  const filteredResults = useMemo(() => {
+    let filtered = [...searchResults];
+
+    // Apply year range filter
+    if (filters.yearRange) {
+      const [minYear, maxYear] = filters.yearRange;
+      filtered = filtered.filter(article =>
+        article.year >= minYear && article.year <= maxYear
+      );
+    }
+
+    // Apply citation count filter
+    if (filters.citationFilter === 'low') {
+      filtered = filtered.filter(article => (article.citation_count || 0) < 10);
+    } else if (filters.citationFilter === 'medium') {
+      filtered = filtered.filter(article => (article.citation_count || 0) >= 10 && (article.citation_count || 0) < 100);
+    } else if (filters.citationFilter === 'high') {
+      filtered = filtered.filter(article => (article.citation_count || 0) >= 100);
+    }
+
+    // Apply has abstract filter
+    if (filters.hasAbstract) {
+      filtered = filtered.filter(article => article.abstract && article.abstract.length > 0);
+    }
+
+    // Apply sorting
+    if (filters.sortBy === 'date') {
+      filtered.sort((a, b) => b.year - a.year);
+    } else if (filters.sortBy === 'citations') {
+      filtered.sort((a, b) => (b.citation_count || 0) - (a.citation_count || 0));
+    }
+    // 'relevance' keeps original order from PubMed
+
+    return filtered;
+  }, [searchResults, filters]);
+
+  // 🔍 Week 6: Get unique journals for filter
+  const availableJournals = useMemo(() => {
+    const journals = new Set(searchResults.map(article => article.journal));
+    return Array.from(journals).sort();
+  }, [searchResults]);
+
+  // 🔍 Week 6: Filter configuration
+  const currentYear = new Date().getFullYear();
+  const filterSections: FilterSection[] = [
+    {
+      title: 'Search Results',
+      filters: [
+        {
+          id: 'sortBy',
+          label: 'Sort By',
+          type: 'select',
+          value: filters.sortBy,
+          options: [
+            { value: 'relevance', label: 'Relevance (PubMed)' },
+            { value: 'date', label: 'Publication Date (Newest)' },
+            { value: 'citations', label: 'Citations (Most Cited)' }
+          ]
+        },
+        {
+          id: 'yearRange',
+          label: 'Publication Year',
+          type: 'range',
+          value: filters.yearRange,
+          min: 2000,
+          max: currentYear,
+          step: 1
+        },
+        {
+          id: 'citationFilter',
+          label: 'Citation Count',
+          type: 'select',
+          value: filters.citationFilter,
+          options: [
+            { value: 'all', label: 'All Papers' },
+            { value: 'low', label: 'Low (< 10 citations)' },
+            { value: 'medium', label: 'Medium (10-99 citations)' },
+            { value: 'high', label: 'High (100+ citations)' }
+          ]
+        },
+        {
+          id: 'hasAbstract',
+          label: 'Has Abstract',
+          type: 'checkbox',
+          value: filters.hasAbstract
+        }
+      ]
+    }
+  ];
+
+  // 🔍 Week 6: Active filter chips
+  const activeFilterChips: FilterChip[] = [];
+  if (filters.sortBy !== 'relevance') {
+    const sortOption = filterSections[0].filters[0].options?.find(o => o.value === filters.sortBy);
+    activeFilterChips.push({
+      id: 'sortBy',
+      label: 'Sort',
+      value: filters.sortBy,
+      displayValue: sortOption?.label
+    });
+  }
+  if (filters.yearRange[0] !== 2000 || filters.yearRange[1] !== currentYear) {
+    activeFilterChips.push({
+      id: 'yearRange',
+      label: 'Year',
+      value: filters.yearRange,
+      displayValue: `${filters.yearRange[0]} - ${filters.yearRange[1]}`
+    });
+  }
+  if (filters.citationFilter !== 'all') {
+    const citationOption = filterSections[0].filters[2].options?.find(o => o.value === filters.citationFilter);
+    activeFilterChips.push({
+      id: 'citationFilter',
+      label: 'Citations',
+      value: filters.citationFilter,
+      displayValue: citationOption?.label
+    });
+  }
+  if (filters.hasAbstract) {
+    activeFilterChips.push({
+      id: 'hasAbstract',
+      label: 'Has Abstract',
+      value: true,
+      displayValue: 'Yes'
+    });
+  }
+
+  const handleFilterChange = (filterId: string, value: any) => {
+    setFilters(prev => ({ ...prev, [filterId]: value }));
+  };
+
+  const handleClearAllFilters = () => {
+    setFilters({
+      sortBy: 'relevance',
+      yearRange: [2000, currentYear],
+      citationFilter: 'all',
+      hasAbstract: false
+    });
   };
 
   return (
@@ -185,24 +337,54 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
 
       {/* Search Results or Network View */}
       {hasSearched ? (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="p-4 border-b border-gray-200 bg-gray-50">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Search Results for "{searchQuery}"
-            </h3>
-            <p className="text-sm text-gray-600 mt-1">
-              {isSearching ? 'Searching...' : `Found ${searchResults.length} articles`}
-            </p>
-          </div>
+        <>
+          {/* 🔍 Week 6: Filter Panel */}
+          {searchResults.length > 0 && !isSearching && (
+            <FilterPanel
+              sections={filterSections}
+              activeFilters={filters}
+              onFilterChange={handleFilterChange}
+              onClearAll={handleClearAllFilters}
+              isOpen={showFilters}
+              onToggle={() => setShowFilters(!showFilters)}
+            />
+          )}
+
+          {/* 🔍 Week 6: Active Filter Chips */}
+          {activeFilterChips.length > 0 && !isSearching && (
+            <FilterChips
+              chips={activeFilterChips}
+              onRemove={(chipId) => {
+                if (chipId === 'yearRange') {
+                  handleFilterChange('yearRange', [2000, currentYear]);
+                } else if (chipId === 'hasAbstract') {
+                  handleFilterChange('hasAbstract', false);
+                } else {
+                  handleFilterChange(chipId, chipId === 'sortBy' ? 'relevance' : 'all');
+                }
+              }}
+              onClearAll={handleClearAllFilters}
+            />
+          )}
+
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <div className="p-4 border-b border-gray-200 bg-gray-50">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Search Results for "{searchQuery}"
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                {isSearching ? 'Searching...' : `Showing ${filteredResults.length} of ${searchResults.length} articles`}
+              </p>
+            </div>
 
           {isSearching ? (
             <div className="p-12 text-center">
               <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
               <p className="mt-4 text-gray-600">Searching PubMed...</p>
             </div>
-          ) : searchResults.length > 0 ? (
+          ) : filteredResults.length > 0 ? (
             <div className="p-4 space-y-4 max-h-[600px] overflow-y-auto">
-              {searchResults.map((article) => (
+              {filteredResults.map((article) => (
                 <div
                   key={article.pmid}
                   className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
@@ -275,6 +457,17 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
                 </div>
               ))}
             </div>
+          ) : searchResults.length > 0 ? (
+            <div className="p-12 text-center">
+              <p className="text-gray-600">No articles match your filters</p>
+              <p className="text-sm text-gray-500 mt-2">Try adjusting your filters</p>
+              <button
+                onClick={handleClearAllFilters}
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Clear Filters
+              </button>
+            </div>
           ) : (
             <div className="p-12 text-center">
               <p className="text-gray-600">No results found for "{searchQuery}"</p>
@@ -282,6 +475,7 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
             </div>
           )}
         </div>
+        </>
       ) : (
         <>
           {/* Network Visualization */}
