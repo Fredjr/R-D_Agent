@@ -26,6 +26,7 @@ import { ExploreTab } from '@/components/project/ExploreTab';
 import { AnalysisTab } from '@/components/project/AnalysisTab';
 import { ProgressTab } from '@/components/project/ProgressTab';
 import GlobalSearch from '@/components/search/GlobalSearch';
+import CollaboratorsList from '@/components/collaboration/CollaboratorsList';
 import {
   Button,
   Card,
@@ -1486,7 +1487,7 @@ export default function ProjectPage() {
 
         {/* Tab Content */}
         {activeTab === 'research-question' && (
-          <div className="mb-8">
+          <div className="mb-8 space-y-6">
             <ResearchQuestionTab
               project={project}
               onUpdateProject={async (updates) => {
@@ -1511,6 +1512,14 @@ export default function ProjectPage() {
                   throw error;
                 }
               }}
+            />
+
+            {/* Collaborators List */}
+            <CollaboratorsList
+              projectId={projectId as string}
+              currentUserEmail={user?.email || ''}
+              isOwner={project.owner_user_id === user?.email}
+              onInviteClick={() => setShowInviteModal(true)}
             />
           </div>
         )}
