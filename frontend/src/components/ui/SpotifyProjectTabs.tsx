@@ -8,6 +8,7 @@ interface Tab {
   label: string;
   icon?: React.ReactNode;
   count?: number;
+  description?: string;
 }
 
 interface SpotifyProjectTabsProps {

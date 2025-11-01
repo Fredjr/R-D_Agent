@@ -128,7 +128,7 @@ export default function ProjectPage() {
   } | null>(null);
 
   // Tab navigation state
-  const [activeTab, setActiveTab] = useState<'overview' | 'collections' | 'network' | 'activity'>('overview');
+  const [activeTab, setActiveTab] = useState<'research-question' | 'explore' | 'collections' | 'notes'>('research-question');
 
   // Report generation results (same as Welcome Page)
   const [reportResults, setReportResults] = useState<any[]>([]);
@@ -202,9 +202,9 @@ export default function ProjectPage() {
   // 🔧 Handle URL parameters to set active tab
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab && ['overview', 'collections', 'network', 'activity'].includes(tab)) {
+    if (tab && ['research-question', 'explore', 'collections', 'notes'].includes(tab)) {
       console.log('📍 Setting active tab from URL:', tab);
-      setActiveTab(tab as 'overview' | 'collections' | 'network' | 'activity');
+      setActiveTab(tab as 'research-question' | 'explore' | 'collections' | 'notes');
     }
   }, [searchParams]);
 
@@ -917,7 +917,7 @@ export default function ProjectPage() {
           project={project}
           onPlay={() => {
             // Navigate to first tab or main view
-            setActiveTab('overview');
+            setActiveTab('research-question');
           }}
           onShare={() => setShowShareModal(true)}
           onSettings={() => setShowSettingsModal(true)}
@@ -948,31 +948,33 @@ export default function ProjectPage() {
         <div className="py-4">
           <SpotifyProjectTabs
             activeTab={activeTab}
-            onTabChange={(tab) => setActiveTab(tab as 'overview' | 'collections' | 'network' | 'activity')}
+            onTabChange={(tab) => setActiveTab(tab as 'research-question' | 'explore' | 'collections' | 'notes')}
             tabs={[
               {
-                id: 'overview',
-                label: 'Overview',
-                icon: '📊',
-                count: (project.reports?.length || 0) + ((project as any).deep_dives?.length || 0)
+                id: 'research-question',
+                label: 'Research Question',
+                icon: '🎯',
+                description: 'Project overview and objectives'
+              },
+              {
+                id: 'explore',
+                label: 'Explore Papers',
+                icon: '🔍',
+                description: 'Discover and explore related papers'
               },
               {
                 id: 'collections',
-                label: 'Collections',
-                icon: '📁',
-                count: (project as any).collections?.length || 0
+                label: 'My Collections',
+                icon: '📚',
+                count: (project as any).collections?.length || 0,
+                description: 'Organized paper collections'
               },
-              // Temporarily disabled until backend supports project-level network data
-              // {
-              //   id: 'network',
-              //   label: 'Network View',
-              //   icon: '🕸️'
-              // },
               {
-                id: 'activity',
-                label: 'Activity & Notes',
+                id: 'notes',
+                label: 'Notes & Ideas',
                 icon: '📝',
-                count: (project as any).annotations?.length || 0
+                count: (project as any).annotations?.length || 0,
+                description: 'All your research notes'
               }
             ]}
           />
@@ -1417,7 +1419,7 @@ export default function ProjectPage() {
         )}
 
         {/* Tab Content */}
-        {activeTab === 'overview' && (
+        {activeTab === 'research-question' && (
           <>
             {/* Project Data Sections */}
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-8 mb-8">
@@ -1780,27 +1782,16 @@ export default function ProjectPage() {
             </>
         )}
 
-        {/* Collections Tab */}
-        {activeTab === 'collections' && (
-          <div className="mb-8">
-            <Collections
-              projectId={projectId}
-              onRefresh={fetchProjectData}
-              onGenerateReview={handleGenerateReviewFromNetwork}
-              onDeepDive={handleDeepDiveFromNetwork}
-              onExploreCluster={handleExploreClusterFromNetwork}
-            />
-          </div>
-        )}
-
-        {/* Network View Tab - Temporarily disabled until backend supports project-level network data */}
-        {/* {activeTab === 'network' && (
+        {/* Explore Papers Tab */}
+        {activeTab === 'explore' && (
           <div className="mb-8">
             <div className="bg-white rounded-lg shadow p-6">
               <div className="mb-4">
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Citation Network</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                  🔍 Explore Papers
+                </h2>
                 <p className="text-gray-600">
-                  Explore the relationships between articles in this project through citation networks.
+                  Discover and explore related papers through citation networks.
                   Click on nodes to see article details and discover related research.
                 </p>
               </div>
@@ -1818,10 +1809,23 @@ export default function ProjectPage() {
               </div>
             </div>
           </div>
-        )} */}
+        )}
 
-        {/* Activity & Notes Tab */}
-        {activeTab === 'activity' && (
+        {/* Collections Tab */}
+        {activeTab === 'collections' && (
+          <div className="mb-8">
+            <Collections
+              projectId={projectId}
+              onRefresh={fetchProjectData}
+              onGenerateReview={handleGenerateReviewFromNetwork}
+              onDeepDive={handleDeepDiveFromNetwork}
+              onExploreCluster={handleExploreClusterFromNetwork}
+            />
+          </div>
+        )}
+
+        {/* Notes & Ideas Tab */}
+        {activeTab === 'notes' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div>
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Notes</h2>
@@ -1998,9 +2002,9 @@ export default function ProjectPage() {
           result={inlineResults.result}
           onClose={() => setInlineResults({ show: false, jobType: null, result: null })}
           onViewFullResults={() => {
-            // Close inline results and switch to overview tab where results are displayed
+            // Close inline results and switch to research question tab where results are displayed
             setInlineResults({ show: false, jobType: null, result: null });
-            setActiveTab('overview');
+            setActiveTab('research-question');
           }}
         />
       )}
