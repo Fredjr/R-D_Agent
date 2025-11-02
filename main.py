@@ -5799,6 +5799,91 @@ async def apply_contextual_notes_migration(
             "message": str(e)
         }
 
+
+# Migration Endpoint (Week 11 Day 1 - PDF Annotations)
+@app.post("/api/admin/apply-pdf-annotations-migration")
+async def apply_pdf_annotations_migration(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Temporary endpoint to apply PDF annotations migration to production database.
+    This adds PDF annotation fields to the annotations table.
+    """
+    try:
+        from sqlalchemy import text, inspect
+
+        # Check if columns already exist
+        inspector = inspect(db.bind)
+        existing_columns = [col['name'] for col in inspector.get_columns('annotations')]
+
+        pdf_columns = ['pdf_page', 'pdf_coordinates', 'highlight_color', 'highlight_text']
+        existing_pdf_columns = [col for col in pdf_columns if col in existing_columns]
+
+        if len(existing_pdf_columns) == 4:
+            return {
+                "status": "already_applied",
+                "message": "All PDF annotation columns already exist in annotations table"
+            }
+
+        changes = []
+
+        # Add columns that don't exist
+        if 'pdf_page' not in existing_columns:
+            db.execute(text("""
+                ALTER TABLE annotations
+                ADD COLUMN pdf_page INTEGER
+            """))
+            changes.append("Added pdf_page column")
+
+        if 'pdf_coordinates' not in existing_columns:
+            db.execute(text("""
+                ALTER TABLE annotations
+                ADD COLUMN pdf_coordinates JSONB
+            """))
+            changes.append("Added pdf_coordinates column")
+
+        if 'highlight_color' not in existing_columns:
+            db.execute(text("""
+                ALTER TABLE annotations
+                ADD COLUMN highlight_color VARCHAR(7)
+            """))
+            changes.append("Added highlight_color column")
+
+        if 'highlight_text' not in existing_columns:
+            db.execute(text("""
+                ALTER TABLE annotations
+                ADD COLUMN highlight_text TEXT
+            """))
+            changes.append("Added highlight_text column")
+
+        # Create index for efficient querying
+        try:
+            db.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_annotation_pdf_page
+                ON annotations(article_pmid, pdf_page)
+                WHERE pdf_page IS NOT NULL
+            """))
+            changes.append("Added index idx_annotation_pdf_page")
+        except Exception as e:
+            changes.append(f"Index creation warning: {str(e)}")
+
+        db.commit()
+
+        return {
+            "status": "success",
+            "message": "PDF annotations migration applied successfully",
+            "changes": changes
+        }
+
+    except Exception as e:
+        db.rollback()
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+
 # Annotation Endpoints
 
 @app.post("/projects/{project_id}/annotations", response_model=AnnotationResponseModel)
