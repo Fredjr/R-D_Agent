@@ -131,7 +131,7 @@ export default function Step7FirstNote({
               onClick={() => setNoteType(type.value)}
               className={`p-3 border-2 rounded-lg text-left transition-all ${
                 noteType === type.value
-                  ? `border-${type.color}-500 bg-${type.color}-50`
+                  ? 'border-purple-500 bg-purple-50'
                   : 'border-gray-200 hover:border-gray-300 bg-white'
               }`}
             >
@@ -148,19 +148,41 @@ export default function Step7FirstNote({
           Priority
         </label>
         <div className="flex gap-3">
-          {PRIORITIES.map((p) => (
-            <button
-              key={p.value}
-              onClick={() => setPriority(p.value)}
-              className={`flex-1 px-4 py-2 border-2 rounded-lg font-medium transition-all ${
-                priority === p.value
-                  ? `border-${p.color}-500 bg-${p.color}-50 text-${p.color}-700`
-                  : 'border-gray-200 hover:border-gray-300 bg-white text-gray-700'
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
+          {PRIORITIES.map((p) => {
+            const isSelected = priority === p.value;
+            let selectedClasses = '';
+
+            if (isSelected) {
+              switch (p.value) {
+                case 'critical':
+                  selectedClasses = 'border-red-500 bg-red-50 text-red-700';
+                  break;
+                case 'high':
+                  selectedClasses = 'border-orange-500 bg-orange-50 text-orange-700';
+                  break;
+                case 'medium':
+                  selectedClasses = 'border-yellow-500 bg-yellow-50 text-yellow-700';
+                  break;
+                case 'low':
+                  selectedClasses = 'border-gray-500 bg-gray-50 text-gray-700';
+                  break;
+              }
+            }
+
+            return (
+              <button
+                key={p.value}
+                onClick={() => setPriority(p.value)}
+                className={`flex-1 px-4 py-2 border-2 rounded-lg font-medium transition-all ${
+                  isSelected
+                    ? selectedClasses
+                    : 'border-gray-200 hover:border-gray-300 bg-white text-gray-700'
+                }`}
+              >
+                {p.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
