@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
-import { XMarkIcon, ChevronLeftIcon, ChevronRightIcon, MagnifyingGlassMinusIcon, MagnifyingGlassPlusIcon, PencilIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, ChevronLeftIcon, ChevronRightIcon, MagnifyingGlassMinusIcon, MagnifyingGlassPlusIcon, PencilIcon, Bars3Icon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import HighlightTool from './HighlightTool';
 import HighlightLayer from './HighlightLayer';
+import AnnotationsSidebar from './AnnotationsSidebar';
 import type { Highlight, TextSelection, PDFCoordinates } from '@/types/pdf-annotations';
 
 // Import CSS for react-pdf (using correct paths for Next.js)
@@ -37,6 +38,9 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
   const [highlightMode, setHighlightMode] = useState<boolean>(false);
   const [highlights, setHighlights] = useState<Highlight[]>([]);
   const [loadingHighlights, setLoadingHighlights] = useState<boolean>(false);
+
+  // Sidebar state
+  const [showSidebar, setShowSidebar] = useState<boolean>(true);
 
   useEffect(() => {
     fetchPDFUrl();
@@ -264,11 +268,128 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
     [projectId, user, pmid]
   );
 
-  // Handle clicking on a highlight
+  // Handle clicking on a highlight - navigate to page
   const handleHighlightClick = useCallback((highlight: Highlight) => {
-    console.log('🖱️ Clicked highlight:', highlight.annotation_id);
-    // TODO: Show highlight details or navigate to annotation
-  }, []);
+    console.log('🖱️ Clicked highlight:', highlight.annotation_id, 'on page', highlight.pdf_page);
+
+    // Navigate to the page containing the highlight
+    if (highlight.pdf_page !== pageNumber) {
+      setPageNumber(highlight.pdf_page);
+    }
+
+    // Open sidebar if closed
+    if (!showSidebar) {
+      setShowSidebar(true);
+    }
+  }, [pageNumber, showSidebar]);
+
+  // Handle deleting a highlight
+  const handleHighlightDelete = useCallback(
+    async (annotationId: string) => {
+      if (!projectId || !user) return;
+
+      try {
+        const response = await fetch(`/api/proxy/projects/${projectId}/annotations/${annotationId}`, {
+          method: 'DELETE',
+          headers: {
+            'User-ID': user.email,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to delete highlight');
+        }
+
+        console.log('✅ Highlight deleted:', annotationId);
+
+        // Remove from local state
+        setHighlights((prev) => prev.filter((h) => h.annotation_id !== annotationId));
+      } catch (err) {
+        console.error('❌ Error deleting highlight:', err);
+        alert('Failed to delete highlight. Please try again.');
+      }
+    },
+    [projectId, user]
+  );
+
+  // Handle changing highlight color
+  const handleHighlightColorChange = useCallback(
+    async (annotationId: string, newColor: string) => {
+      if (!projectId || !user) return;
+
+      try {
+        const response = await fetch(`/api/proxy/projects/${projectId}/annotations/${annotationId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-ID': user.email,
+          },
+          body: JSON.stringify({
+            highlight_color: newColor,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update highlight color');
+        }
+
+        console.log('✅ Highlight color updated:', annotationId, newColor);
+
+        // Update local state
+        setHighlights((prev) =>
+          prev.map((h) => (h.annotation_id === annotationId ? { ...h, highlight_color: newColor } : h))
+        );
+      } catch (err) {
+        console.error('❌ Error updating highlight color:', err);
+        alert('Failed to update highlight color. Please try again.');
+      }
+    },
+    [projectId, user]
+  );
+
+  // Handle adding a note to a highlight
+  const handleNoteAdd = useCallback(
+    async (annotationId: string, note: string) => {
+      if (!projectId || !user) return;
+
+      try {
+        const response = await fetch(`/api/proxy/projects/${projectId}/annotations/${annotationId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-ID': user.email,
+          },
+          body: JSON.stringify({
+            content: note,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to add note');
+        }
+
+        console.log('✅ Note added to highlight:', annotationId);
+
+        // Update local state
+        setHighlights((prev) =>
+          prev.map((h) => (h.annotation_id === annotationId ? { ...h, content: note } : h))
+        );
+      } catch (err) {
+        console.error('❌ Error adding note:', err);
+        alert('Failed to add note. Please try again.');
+      }
+    },
+    [projectId, user]
+  );
+
+  // Handle updating a note
+  const handleNoteUpdate = useCallback(
+    async (annotationId: string, note: string) => {
+      // Same as handleNoteAdd - PATCH endpoint handles both
+      await handleNoteAdd(annotationId, note);
+    },
+    [handleNoteAdd]
+  );
 
   if (loading) {
     return (
@@ -399,6 +520,25 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
             </div>
           )}
 
+          {/* Sidebar Toggle */}
+          {projectId && (
+            <div className="flex items-center gap-2 border-l border-gray-300 pl-4">
+              <button
+                onClick={() => setShowSidebar(!showSidebar)}
+                className={`
+                  p-2 rounded-lg transition-colors
+                  ${showSidebar
+                    ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                    : 'hover:bg-gray-100 text-gray-700'
+                  }
+                `}
+                title={showSidebar ? 'Hide annotations sidebar' : 'Show annotations sidebar'}
+              >
+                <Bars3Icon className="w-5 h-5" />
+              </button>
+            </div>
+          )}
+
           {/* Title */}
           <div className="flex-1 min-w-0 border-l border-gray-300 pl-4">
             <p className="text-sm font-medium text-gray-900 truncate">{title || `PMID: ${pmid}`}</p>
@@ -416,44 +556,66 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
         </button>
       </div>
 
-      {/* PDF Content */}
-      <div className="flex-1 overflow-auto bg-gray-800 flex justify-center items-start p-4">
-        <div className="bg-white shadow-2xl relative">
-          <Document
-            file={pdfUrl}
-            onLoadSuccess={onDocumentLoadSuccess}
-            onLoadError={onDocumentLoadError}
-            loading={
-              <div className="flex items-center justify-center p-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-              </div>
-            }
-          >
-            <div className="relative">
-              <Page
-                pageNumber={pageNumber}
-                scale={scale}
-                renderTextLayer={true}
-                renderAnnotationLayer={true}
-                inputRef={(ref) => {
-                  if (ref) {
-                    ref.setAttribute('data-page-number', pageNumber.toString());
-                  }
-                }}
-              />
-
-              {/* Highlight Layer - renders existing highlights */}
-              {projectId && (
-                <HighlightLayer
-                  highlights={highlights}
+      {/* Main Content Area - Split View */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* PDF Content */}
+        <div
+          className={`flex-1 overflow-auto bg-gray-800 flex justify-center items-start p-4 transition-all duration-300 ${
+            showSidebar && projectId ? 'w-[70%]' : 'w-full'
+          }`}
+        >
+          <div className="bg-white shadow-2xl relative">
+            <Document
+              file={pdfUrl}
+              onLoadSuccess={onDocumentLoadSuccess}
+              onLoadError={onDocumentLoadError}
+              loading={
+                <div className="flex items-center justify-center p-8">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                </div>
+              }
+            >
+              <div className="relative">
+                <Page
                   pageNumber={pageNumber}
                   scale={scale}
-                  onHighlightClick={handleHighlightClick}
+                  renderTextLayer={true}
+                  renderAnnotationLayer={true}
+                  inputRef={(ref) => {
+                    if (ref) {
+                      ref.setAttribute('data-page-number', pageNumber.toString());
+                    }
+                  }}
                 />
-              )}
-            </div>
-          </Document>
+
+                {/* Highlight Layer - renders existing highlights */}
+                {projectId && (
+                  <HighlightLayer
+                    highlights={highlights}
+                    pageNumber={pageNumber}
+                    scale={scale}
+                    onHighlightClick={handleHighlightClick}
+                  />
+                )}
+              </div>
+            </Document>
+          </div>
         </div>
+
+        {/* Annotations Sidebar */}
+        {projectId && showSidebar && (
+          <div className="w-[30%] h-full overflow-hidden">
+            <AnnotationsSidebar
+              highlights={highlights}
+              currentPage={pageNumber}
+              onHighlightClick={handleHighlightClick}
+              onHighlightDelete={handleHighlightDelete}
+              onHighlightColorChange={handleHighlightColorChange}
+              onNoteAdd={handleNoteAdd}
+              onNoteUpdate={handleNoteUpdate}
+            />
+          </div>
+        )}
       </div>
 
       {/* Highlight Tool - color picker for text selection */}
