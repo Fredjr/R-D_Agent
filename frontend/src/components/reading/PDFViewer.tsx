@@ -104,8 +104,11 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
       setPdfSource(data.source);
       setPdfAvailable(data.pdf_available);
       
-      if (data.pdf_available && data.url) {
-        setPdfUrl(data.url);
+      if (data.pdf_available) {
+        // Use our proxy endpoint to avoid CORS issues
+        const proxyUrl = `/api/proxy/articles/${pmid}/pdf-proxy`;
+        console.log('📄 Using PDF proxy:', proxyUrl);
+        setPdfUrl(proxyUrl);
       } else {
         // No direct PDF available - show message with link
         setError(`PDF not directly available. This article may be behind a paywall.`);

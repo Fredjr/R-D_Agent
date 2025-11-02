@@ -13,6 +13,7 @@ import asyncio
 import logging
 from typing import Optional, Dict, Any
 from fastapi import HTTPException, Depends, Query, Header
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 import httpx
 from database import get_db, Article
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 # Configure httpx client with timeout
 HTTP_TIMEOUT = 10.0
+PDF_DOWNLOAD_TIMEOUT = 60.0
 
 
 def register_pdf_endpoints(app):
@@ -131,6 +133,98 @@ def register_pdf_endpoints(app):
         except Exception as e:
             logger.error(f"❌ Error fetching PDF URL for {pmid}: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to fetch PDF URL: {str(e)}")
+
+
+    @app.get("/articles/{pmid}/pdf-proxy")
+    async def proxy_pdf(
+        pmid: str,
+        user_id: str = Header(..., alias="User-ID"),
+        db: Session = Depends(get_db)
+    ):
+        """
+        Proxy PDF content to avoid CORS issues.
+
+        This endpoint:
+        1. Fetches the PDF URL using the same logic as /pdf-url
+        2. Downloads the PDF from the source
+        3. Streams it back to the client with proper headers
+
+        This solves CORS issues with EuropePMC and other sources.
+        """
+        try:
+            logger.info(f"📄 Proxying PDF for PMID: {pmid}")
+
+            # Get article from database
+            article = db.query(Article).filter(Article.pmid == pmid).first()
+            if not article:
+                logger.warning(f"⚠️ Article not found in database: {pmid}")
+                article_doi = None
+            else:
+                article_doi = article.doi
+
+            # Try multiple sources in parallel
+            results = await asyncio.gather(
+                get_pmc_pdf_url(pmid),
+                get_europepmc_pdf_url(pmid),
+                get_unpaywall_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
+                return_exceptions=True
+            )
+
+            pmc_url, europepmc_url, unpaywall_url = results
+
+            # Determine which URL to use
+            pdf_url = None
+            source = None
+
+            if pmc_url and not isinstance(pmc_url, Exception):
+                pdf_url = pmc_url
+                source = "pmc"
+            elif europepmc_url and not isinstance(europepmc_url, Exception):
+                pdf_url = europepmc_url
+                source = "europepmc"
+            elif unpaywall_url and not isinstance(unpaywall_url, Exception):
+                pdf_url = unpaywall_url
+                source = "unpaywall"
+
+            if not pdf_url:
+                logger.warning(f"⚠️ No PDF URL found for {pmid}")
+                raise HTTPException(status_code=404, detail="PDF not available")
+
+            logger.info(f"📥 Downloading PDF from {source}: {pdf_url}")
+
+            # Download PDF with longer timeout
+            async with httpx.AsyncClient(timeout=PDF_DOWNLOAD_TIMEOUT, follow_redirects=True) as client:
+                response = await client.get(pdf_url)
+
+                if response.status_code != 200:
+                    logger.error(f"❌ PDF download failed: {response.status_code}")
+                    raise HTTPException(status_code=response.status_code, detail="Failed to download PDF")
+
+                # Check if content is actually a PDF
+                content_type = response.headers.get('content-type', '')
+                if 'pdf' not in content_type.lower() and 'application/octet-stream' not in content_type.lower():
+                    logger.warning(f"⚠️ Unexpected content type: {content_type}")
+                    # Still try to serve it - might be a PDF with wrong content-type
+
+                logger.info(f"✅ PDF downloaded successfully for {pmid} ({len(response.content)} bytes)")
+
+                # Stream the PDF back to client
+                return StreamingResponse(
+                    iter([response.content]),
+                    media_type="application/pdf",
+                    headers={
+                        "Content-Disposition": f"inline; filename={pmid}.pdf",
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Methods": "GET, OPTIONS",
+                        "Access-Control-Allow-Headers": "*",
+                    }
+                )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"❌ Error proxying PDF for {pmid}: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to proxy PDF: {str(e)}")
 
 
 async def get_pmc_pdf_url(pmid: str) -> Optional[str]:
