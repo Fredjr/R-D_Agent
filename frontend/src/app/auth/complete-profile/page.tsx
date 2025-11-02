@@ -12,6 +12,8 @@ import { Step2ResearchInterests } from '@/components/onboarding/Step2ResearchInt
 import { Step3FirstAction, FirstActionType } from '@/components/onboarding/Step3FirstAction';
 import Step4FirstProject from '@/components/onboarding/Step4FirstProject';
 import Step5SeedPaper from '@/components/onboarding/Step5SeedPaper';
+import Step6ExploreOrganize from '@/components/onboarding/Step6ExploreOrganize';
+import Step7FirstNote from '@/components/onboarding/Step7FirstNote';
 
 const CATEGORY_ROLES = {
   Student: ['Undergraduate', 'Postgraduate', 'PhD Student'],
@@ -25,7 +27,7 @@ export default function CompleteProfile() {
 
   // Multi-step wizard state
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 5;
+  const totalSteps = 7;
 
   // Step 1: Personal Information
   const [formData, setFormData] = useState({
@@ -230,10 +232,42 @@ export default function CompleteProfile() {
         }
       }
 
+      // Move to Step 6 (Explore & Organize)
+      setCurrentStep(6);
+      setIsLoading(false);
+    } catch (error: any) {
+      setError(error.message || 'Failed to save seed paper. Please try again.');
+      setIsLoading(false);
+    }
+  };
+
+  const handleStep6Complete = async (collectionCreated: boolean) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      console.log('📁 Step 6 complete, collection created:', collectionCreated);
+
+      // Move to Step 7 (Add First Note)
+      setCurrentStep(7);
+      setIsLoading(false);
+    } catch (error: any) {
+      setError(error.message || 'Failed to proceed. Please try again.');
+      setIsLoading(false);
+    }
+  };
+
+  const handleStep7Complete = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      console.log('📝 Step 7 complete, finishing onboarding');
+
       // Complete registration with all data
       await handleFinalRegistration(createdProjectId!);
     } catch (error: any) {
-      setError(error.message || 'Failed to save seed paper. Please try again.');
+      setError(error.message || 'Failed to complete onboarding. Please try again.');
       setIsLoading(false);
     }
   };
@@ -286,7 +320,9 @@ export default function CompleteProfile() {
     { number: 2, label: 'Interests', description: 'Research areas' },
     { number: 3, label: 'Get Started', description: 'First action' },
     { number: 4, label: 'First Project', description: 'Create project' },
-    { number: 5, label: 'Seed Paper', description: 'Find first paper' }
+    { number: 5, label: 'Seed Paper', description: 'Find first paper' },
+    { number: 6, label: 'Organize', description: 'Create collection' },
+    { number: 7, label: 'First Note', description: 'Add annotation' }
   ];
 
   return (
@@ -541,6 +577,26 @@ export default function CompleteProfile() {
             researchInterests={researchInterests.topics}
             onBack={handleBack}
             onComplete={handleStep5Complete}
+          />
+        )}
+
+        {/* Step 6: Explore & Organize */}
+        {currentStep === 6 && (
+          <Step6ExploreOrganize
+            seedPaper={seedPaper}
+            projectId={createdProjectId!}
+            onBack={handleBack}
+            onComplete={handleStep6Complete}
+          />
+        )}
+
+        {/* Step 7: First Note */}
+        {currentStep === 7 && (
+          <Step7FirstNote
+            seedPaper={seedPaper}
+            projectId={createdProjectId!}
+            onBack={handleBack}
+            onComplete={handleStep7Complete}
           />
         )}
 
