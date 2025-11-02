@@ -116,12 +116,22 @@ class PubMedCache {
   }
 
   private startCleanupInterval(): void {
+    // Only start cleanup interval in browser environment
+    if (typeof window === 'undefined') {
+      return;
+    }
+
     // Clean up expired entries every 5 minutes
     setInterval(() => this.cleanup(), 5 * 60 * 1000);
   }
 
   private saveToStorage(): void {
     if (!this.options.persistToStorage) return;
+
+    // Check if we're in a browser environment
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return;
+    }
 
     try {
       const cacheData = Array.from(this.cache.entries()).slice(0, 100); // Limit storage size
@@ -134,19 +144,24 @@ class PubMedCache {
   private loadFromStorage(): void {
     if (!this.options.persistToStorage) return;
 
+    // Check if we're in a browser environment
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return;
+    }
+
     try {
       const stored = localStorage.getItem(this.storageKey);
       if (stored) {
         const cacheData = JSON.parse(stored);
         const now = Date.now();
-        
+
         for (const [key, entry] of cacheData) {
           // Only load non-expired entries
           if (now < entry.expiresAt) {
             this.cache.set(key, entry);
           }
         }
-        
+
         console.log(`📦 Loaded ${this.cache.size} cache entries from storage`);
       }
     } catch (error) {

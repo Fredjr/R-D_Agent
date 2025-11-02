@@ -1,15 +1,21 @@
 import React from 'react';
+import dynamic from 'next/dynamic';
 import { fetchDeepDive } from '@/lib/api';
 import ScientificModelCard from '@/components/ScientificModelCard';
 import ExperimentalMethodsTable from '@/components/ExperimentalMethodsTable';
 import ResultsInterpretationCard from '@/components/ResultsInterpretationCard';
 import ContentQualityIndicator from '@/components/ContentQualityIndicator';
 import AnnotationsFeed from '@/components/AnnotationsFeed';
-import PDFViewer from '@/components/reading/PDFViewer';
 import { BookmarkIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { BookmarkIcon as BookmarkSolidIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/solid';
 import { useAuth } from '@/contexts/AuthContext';
 import type { SearchResult } from '@/lib/dummy-data';
+
+// Dynamically import PDFViewer to avoid SSR issues with react-pdf
+const PDFViewer = dynamic(() => import('@/components/reading/PDFViewer'), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center p-8">Loading PDF viewer...</div>
+});
 
 type Props = {
   item: SearchResult;

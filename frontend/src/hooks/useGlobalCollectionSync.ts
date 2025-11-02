@@ -36,7 +36,7 @@ const SYNC_CHANNEL = 'rd_agent_collection_updates';
 
 class CollectionSyncManager {
   private listeners: Set<(state: CollectionSyncState) => void> = new Set();
-  private broadcastChannel: BroadcastChannel;
+  private broadcastChannel: BroadcastChannel | null = null;
   private state: CollectionSyncState = {
     collections: [],
     lastUpdated: 0,
@@ -45,12 +45,20 @@ class CollectionSyncManager {
   };
 
   constructor() {
-    this.broadcastChannel = new BroadcastChannel(SYNC_CHANNEL);
-    this.broadcastChannel.addEventListener('message', this.handleBroadcastMessage.bind(this));
+    // Only initialize BroadcastChannel in browser environment
+    if (typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined') {
+      this.broadcastChannel = new BroadcastChannel(SYNC_CHANNEL);
+      this.broadcastChannel.addEventListener('message', this.handleBroadcastMessage.bind(this));
+    }
     this.loadStateFromStorage();
   }
 
   private loadStateFromStorage() {
+    // Check if we're in a browser environment
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return;
+    }
+
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
@@ -66,6 +74,11 @@ class CollectionSyncManager {
   }
 
   private saveStateToStorage() {
+    // Check if we're in a browser environment
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return;
+    }
+
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
     } catch (error) {
@@ -190,10 +203,14 @@ class CollectionSyncManager {
       ...event,
       timestamp: Date.now()
     };
-    
+
     console.log('📡 Broadcasting collection sync event:', fullEvent);
-    this.broadcastChannel.postMessage(fullEvent);
-    
+
+    // Only broadcast if broadcastChannel is available
+    if (this.broadcastChannel) {
+      this.broadcastChannel.postMessage(fullEvent);
+    }
+
     // Also handle locally
     this.handleBroadcastMessage({ data: fullEvent } as MessageEvent<CollectionUpdateEvent>);
   }
@@ -210,7 +227,9 @@ class CollectionSyncManager {
   }
 
   destroy() {
-    this.broadcastChannel.close();
+    if (this.broadcastChannel) {
+      this.broadcastChannel.close();
+    }
     this.listeners.clear();
   }
 }

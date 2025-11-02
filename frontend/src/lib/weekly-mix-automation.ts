@@ -299,6 +299,11 @@ class WeeklyMixAutomationSystem {
    * Store PubMed recommendations for later use
    */
   private storePubMedRecommendations(userId: string, type: string, recommendations: any[]): void {
+    // Check if we're in a browser environment
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return;
+    }
+
     try {
       const storageKey = `pubmed_recommendations_${userId}`;
       const existing = JSON.parse(localStorage.getItem(storageKey) || '{}');
@@ -543,6 +548,11 @@ class WeeklyMixAutomationSystem {
    * Save state to localStorage
    */
   private saveToStorage(): void {
+    // Check if we're in a browser environment
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return;
+    }
+
     try {
       const state = {
         searchHistory: Array.from(this.searchHistory.entries()),
@@ -560,6 +570,11 @@ class WeeklyMixAutomationSystem {
    * Load state from localStorage
    */
   private loadFromStorage(): void {
+    // Check if we're in a browser environment
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return;
+    }
+
     try {
       const stored = localStorage.getItem('weeklyMixAutomation');
       if (stored) {
