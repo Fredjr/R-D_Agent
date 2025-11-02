@@ -45,6 +45,16 @@ class ActionItem(BaseModel):
     assigned_to: Optional[str] = Field(None, description="Optional user assignment")
 
 
+class PDFCoordinates(BaseModel):
+    """PDF coordinates for highlights"""
+    x: float = Field(..., description="Normalized X position (0-1)")
+    y: float = Field(..., description="Normalized Y position (0-1)")
+    width: float = Field(..., description="Normalized width (0-1)")
+    height: float = Field(..., description="Normalized height (0-1)")
+    pageWidth: int = Field(..., description="Original page width in points")
+    pageHeight: int = Field(..., description="Original page height in points")
+
+
 class CreateAnnotationRequest(BaseModel):
     """Request model for creating a new annotation"""
     content: str = Field(..., min_length=1, description="Annotation content")
@@ -69,10 +79,16 @@ class CreateAnnotationRequest(BaseModel):
     # Research journey (Phase 2)
     exploration_session_id: Optional[str] = Field(None, description="Exploration session ID")
     research_question: Optional[str] = Field(None, description="Research question context")
-    
+
+    # PDF annotation fields (Week 11 Day 1)
+    pdf_page: Optional[int] = Field(None, description="Page number in PDF")
+    pdf_coordinates: Optional[PDFCoordinates] = Field(None, description="PDF highlight coordinates")
+    highlight_color: Optional[str] = Field(None, description="Highlight color (hex code)")
+    highlight_text: Optional[str] = Field(None, description="Selected text from PDF")
+
     # Privacy
     is_private: bool = Field(default=False, description="Private vs shared annotation")
-    
+
     @validator('note_type', pre=True)
     def validate_note_type(cls, v):
         """Validate note_type is a valid value"""
@@ -125,10 +141,16 @@ class UpdateAnnotationRequest(BaseModel):
     # Research journey
     exploration_session_id: Optional[str] = Field(None, description="Updated session ID")
     research_question: Optional[str] = Field(None, description="Updated research question")
-    
+
+    # PDF annotation fields (Week 11 Day 1)
+    pdf_page: Optional[int] = Field(None, description="Updated page number")
+    pdf_coordinates: Optional[PDFCoordinates] = Field(None, description="Updated PDF coordinates")
+    highlight_color: Optional[str] = Field(None, description="Updated highlight color")
+    highlight_text: Optional[str] = Field(None, description="Updated highlight text")
+
     # Privacy
     is_private: Optional[bool] = Field(None, description="Updated privacy setting")
-    
+
     @validator('note_type', pre=True)
     def validate_note_type(cls, v):
         """Validate note_type is a valid value"""
@@ -195,7 +217,13 @@ class AnnotationResponse(BaseModel):
     # Research journey
     exploration_session_id: Optional[str] = None
     research_question: Optional[str] = None
-    
+
+    # PDF annotation fields (Week 11 Day 1)
+    pdf_page: Optional[int] = None
+    pdf_coordinates: Optional[Dict[str, Any]] = None
+    highlight_color: Optional[str] = None
+    highlight_text: Optional[str] = None
+
     # Metadata
     created_at: datetime
     updated_at: datetime

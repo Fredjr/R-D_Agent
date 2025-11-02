@@ -5838,6 +5838,9 @@ async def create_annotation(
     # Convert action_items to dict format for JSON storage
     action_items_data = [item.dict() for item in annotation_data.action_items] if annotation_data.action_items else []
 
+    # Convert pdf_coordinates to dict format for JSON storage
+    pdf_coordinates_data = annotation_data.pdf_coordinates.dict() if annotation_data.pdf_coordinates else None
+
     annotation = Annotation(
         annotation_id=annotation_id,
         project_id=project_id,
@@ -5857,7 +5860,12 @@ async def create_annotation(
         action_items=action_items_data,
         exploration_session_id=annotation_data.exploration_session_id,
         research_question=annotation_data.research_question,
-        is_private=annotation_data.is_private
+        is_private=annotation_data.is_private,
+        # NEW: PDF annotation fields (Week 11 Day 1)
+        pdf_page=annotation_data.pdf_page,
+        pdf_coordinates=pdf_coordinates_data,
+        highlight_color=annotation_data.highlight_color,
+        highlight_text=annotation_data.highlight_text
     )
     
     db.add(annotation)
@@ -5880,6 +5888,12 @@ async def create_annotation(
     else:
         action_items = annotation.action_items if annotation.action_items else []
 
+    # Parse pdf_coordinates if it's a string
+    if isinstance(annotation.pdf_coordinates, str):
+        pdf_coordinates = json.loads(annotation.pdf_coordinates) if annotation.pdf_coordinates else None
+    else:
+        pdf_coordinates = annotation.pdf_coordinates
+
     # Create response object with new fields
     response = AnnotationResponseModel(
         annotation_id=annotation.annotation_id,
@@ -5900,7 +5914,12 @@ async def create_annotation(
         created_at=annotation.created_at,
         updated_at=annotation.updated_at,
         author_id=annotation.author_id,
-        is_private=annotation.is_private
+        is_private=annotation.is_private,
+        # NEW: PDF annotation fields (Week 11 Day 1)
+        pdf_page=annotation.pdf_page,
+        pdf_coordinates=pdf_coordinates,
+        highlight_color=annotation.highlight_color,
+        highlight_text=annotation.highlight_text
     )
 
     # Broadcast new annotation to all connected clients in the project room
@@ -6025,6 +6044,11 @@ async def get_annotations(
                 "action_items": parse_json_field(a.action_items),
                 "exploration_session_id": a.exploration_session_id,
                 "research_question": a.research_question,
+                # NEW: PDF annotation fields (Week 11 Day 1)
+                "pdf_page": a.pdf_page,
+                "pdf_coordinates": parse_json_field(a.pdf_coordinates) if a.pdf_coordinates else None,
+                "highlight_color": a.highlight_color,
+                "highlight_text": a.highlight_text,
                 "is_private": a.is_private
             }
             for a in annotations
@@ -6248,10 +6272,15 @@ async def get_annotation_thread(
             "exploration_session_id": annotation.exploration_session_id,
             "research_question": annotation.research_question,
             "created_at": annotation.created_at.isoformat(),
-            "updated_at": annotation.updated_at.isoformat() if annotation.updated_at else annotation.created_at.isoformat(),
+            "updated_at": annotation.updated_at.isoformat() if annotation.updated_at else annotation.updated_at.created_at.isoformat(),
             "author_id": annotation.author_id,
             "author_username": annotation.author.username if annotation.author else "Unknown",
-            "is_private": annotation.is_private
+            "is_private": annotation.is_private,
+            # NEW: PDF annotation fields (Week 11 Day 1)
+            "pdf_page": annotation.pdf_page,
+            "pdf_coordinates": parse_json_field(annotation.pdf_coordinates) if annotation.pdf_coordinates else None,
+            "highlight_color": annotation.highlight_color,
+            "highlight_text": annotation.highlight_text
         }
 
     # Recursive function to get all children
@@ -6365,7 +6394,12 @@ async def get_all_annotation_threads(
             "updated_at": annotation.updated_at.isoformat() if annotation.updated_at else annotation.created_at.isoformat(),
             "author_id": annotation.author_id,
             "author_username": annotation.author.username if annotation.author else "Unknown",
-            "is_private": annotation.is_private
+            "is_private": annotation.is_private,
+            # NEW: PDF annotation fields (Week 11 Day 1)
+            "pdf_page": annotation.pdf_page,
+            "pdf_coordinates": parse_json_field(annotation.pdf_coordinates) if annotation.pdf_coordinates else None,
+            "highlight_color": annotation.highlight_color,
+            "highlight_text": annotation.highlight_text
         }
 
     # Recursive function to get all children

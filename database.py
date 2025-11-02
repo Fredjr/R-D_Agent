@@ -287,6 +287,12 @@ class Annotation(Base):
     exploration_session_id = Column(String, nullable=True)
     research_question = Column(Text, nullable=True)
 
+    # NEW: PDF annotation fields (Week 11 Day 1)
+    pdf_page = Column(Integer, nullable=True)  # Page number in PDF
+    pdf_coordinates = Column(JSON, nullable=True)  # {x, y, width, height, pageWidth, pageHeight}
+    highlight_color = Column(String(7), nullable=True)  # Hex color code (e.g., #FFEB3B)
+    highlight_text = Column(Text, nullable=True)  # Selected text from PDF
+
     # Relationships
     project = relationship("Project", back_populates="annotations")
     author = relationship("User", back_populates="annotations")
