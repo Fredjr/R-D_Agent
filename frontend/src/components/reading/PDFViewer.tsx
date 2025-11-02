@@ -13,8 +13,16 @@ import type { Highlight, TextSelection, PDFCoordinates } from '@/types/pdf-annot
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
-// Configure PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+// Configure PDF.js worker - use multiple CDN fallbacks for reliability
+// Try unpkg.com first (most reliable for npm packages), then jsdelivr, then cdnjs
+if (typeof window !== 'undefined') {
+  // Only run in browser
+  const workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+  pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
+
+  console.log('📄 PDF.js worker configured:', workerSrc);
+  console.log('📄 PDF.js version:', pdfjs.version);
+}
 
 interface PDFViewerProps {
   pmid: string;
