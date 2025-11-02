@@ -9,10 +9,6 @@ import HighlightLayer from './HighlightLayer';
 import AnnotationsSidebar from './AnnotationsSidebar';
 import type { Highlight, TextSelection, PDFCoordinates } from '@/types/pdf-annotations';
 
-// Import CSS for react-pdf (using correct paths for Next.js)
-import 'react-pdf/dist/Page/AnnotationLayer.css';
-import 'react-pdf/dist/Page/TextLayer.css';
-
 // Configure PDF.js worker - use jsdelivr CDN with correct .mjs file
 if (typeof window !== 'undefined') {
   // Only run in browser
@@ -590,8 +586,8 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
                 <Page
                   pageNumber={pageNumber}
                   scale={scale}
-                  renderTextLayer={true}
-                  renderAnnotationLayer={true}
+                  renderTextLayer={false}
+                  renderAnnotationLayer={false}
                   inputRef={(ref) => {
                     if (ref) {
                       ref.setAttribute('data-page-number', pageNumber.toString());
