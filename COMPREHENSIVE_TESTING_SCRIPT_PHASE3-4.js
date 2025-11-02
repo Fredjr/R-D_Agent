@@ -205,9 +205,17 @@ async function testActivityFeed() {
   
   // Test 3.3: Backend Activity Endpoint
   console.log('%c\n3.3 BACKEND ACTIVITY ENDPOINT', 'color: #8b5cf6; font-weight: bold;');
-  const activityResult = await testBackendEndpoint('/activities?limit=10');
-  logTest('Backend', 'Activity feed endpoint', activityResult.success ? 'pass' : 'fail',
-    activityResult.success ? `Found ${activityResult.data?.activities?.length || 0} activities` : activityResult.error);
+
+  // Get a project ID first
+  const projectsResult = await testBackendEndpoint('/projects');
+  if (projectsResult.success && projectsResult.data?.projects?.length > 0) {
+    const projectId = projectsResult.data.projects[0].project_id;
+    const activityResult = await testBackendEndpoint(`/projects/${projectId}/activities?limit=10`);
+    logTest('Backend', 'Activity feed endpoint', activityResult.success ? 'pass' : 'fail',
+      activityResult.success ? `Found ${activityResult.data?.activities?.length || 0} activities` : activityResult.error);
+  } else {
+    logTest('Backend', 'Activity feed endpoint', 'warn', 'No projects found to test activities');
+  }
   
   // Test 3.4: Activity Cards
   console.log('%c\n3.4 ACTIVITY CARDS', 'color: #8b5cf6; font-weight: bold;');
