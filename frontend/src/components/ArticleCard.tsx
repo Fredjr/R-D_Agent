@@ -546,6 +546,7 @@ export default function ArticleCard({ item, projectId, onAddToCollection }: Prop
         <PDFViewer
           pmid={headerPmid}
           title={headerTitle}
+          projectId={projectId}
           onClose={() => setShowPDFViewer(false)}
         />
       )}

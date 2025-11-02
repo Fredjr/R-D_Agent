@@ -1,8 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
-import { XMarkIcon, ChevronLeftIcon, ChevronRightIcon, MagnifyingGlassMinusIcon, MagnifyingGlassPlusIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, ChevronLeftIcon, ChevronRightIcon, MagnifyingGlassMinusIcon, MagnifyingGlassPlusIcon, PencilIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '@/contexts/AuthContext';
+import HighlightTool from './HighlightTool';
+import HighlightLayer from './HighlightLayer';
+import type { Highlight, TextSelection, PDFCoordinates } from '@/types/pdf-annotations';
 
 // Import CSS for react-pdf (using correct paths for Next.js)
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -14,10 +18,12 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/$
 interface PDFViewerProps {
   pmid: string;
   title?: string;
+  projectId?: string;
   onClose: () => void;
 }
 
-export default function PDFViewer({ pmid, title, onClose }: PDFViewerProps) {
+export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewerProps) {
+  const { user } = useAuth();
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfSource, setPdfSource] = useState<string>('');
   const [numPages, setNumPages] = useState<number>(0);
@@ -27,9 +33,21 @@ export default function PDFViewer({ pmid, title, onClose }: PDFViewerProps) {
   const [scale, setScale] = useState<number>(1.2);
   const [pdfAvailable, setPdfAvailable] = useState<boolean>(false);
 
+  // Highlight functionality state
+  const [highlightMode, setHighlightMode] = useState<boolean>(false);
+  const [highlights, setHighlights] = useState<Highlight[]>([]);
+  const [loadingHighlights, setLoadingHighlights] = useState<boolean>(false);
+
   useEffect(() => {
     fetchPDFUrl();
   }, [pmid]);
+
+  // Load highlights when PDF loads and projectId is available
+  useEffect(() => {
+    if (pdfUrl && projectId && user) {
+      fetchHighlights();
+    }
+  }, [pdfUrl, projectId, user, pmid]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -40,6 +58,10 @@ export default function PDFViewer({ pmid, title, onClose }: PDFViewerProps) {
         goToNextPage();
       } else if (e.key === 'Escape') {
         onClose();
+      } else if (e.key === 'h' && (e.metaKey || e.ctrlKey)) {
+        // Cmd/Ctrl + H to toggle highlight mode
+        e.preventDefault();
+        setHighlightMode((prev) => !prev);
       }
     };
 
@@ -122,6 +144,131 @@ export default function PDFViewer({ pmid, title, onClose }: PDFViewerProps) {
       setPageNumber(page);
     }
   };
+
+  // Fetch highlights for this article
+  const fetchHighlights = async () => {
+    if (!projectId || !user) return;
+
+    try {
+      setLoadingHighlights(true);
+      console.log(`📝 Fetching highlights for PMID: ${pmid}`);
+
+      const response = await fetch(
+        `/api/proxy/projects/${projectId}/annotations?article_pmid=${pmid}`,
+        {
+          headers: {
+            'User-ID': user.email,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch highlights');
+      }
+
+      const data = await response.json();
+
+      // Filter only annotations with PDF data
+      const pdfHighlights = (data.annotations || []).filter(
+        (a: any) => a.pdf_page !== null && a.pdf_coordinates !== null
+      );
+
+      setHighlights(pdfHighlights);
+      console.log(`✅ Loaded ${pdfHighlights.length} highlights`);
+    } catch (err) {
+      console.error('❌ Error fetching highlights:', err);
+    } finally {
+      setLoadingHighlights(false);
+    }
+  };
+
+  // Handle creating a new highlight
+  const handleHighlight = useCallback(
+    async (color: string, selection: TextSelection) => {
+      if (!projectId || !user) {
+        console.error('❌ Cannot create highlight: missing projectId or user');
+        return;
+      }
+
+      try {
+        console.log('📝 Creating highlight:', {
+          page: selection.pageNumber,
+          text: selection.text.substring(0, 50),
+          color,
+        });
+
+        // Get the page canvas to calculate normalized coordinates
+        const pageCanvas = document.querySelector(
+          `.react-pdf__Page[data-page-number="${selection.pageNumber}"] canvas`
+        ) as HTMLCanvasElement;
+
+        if (!pageCanvas) {
+          console.error('❌ Could not find page canvas');
+          return;
+        }
+
+        const canvasWidth = pageCanvas.width;
+        const canvasHeight = pageCanvas.height;
+
+        // Convert client coordinates to canvas coordinates
+        const canvasRect = pageCanvas.getBoundingClientRect();
+        const x = (selection.boundingRect.left - canvasRect.left) / canvasRect.width;
+        const y = (selection.boundingRect.top - canvasRect.top) / canvasRect.height;
+        const width = selection.boundingRect.width / canvasRect.width;
+        const height = selection.boundingRect.height / canvasRect.height;
+
+        const coordinates: PDFCoordinates = {
+          x: Math.max(0, Math.min(1, x)),
+          y: Math.max(0, Math.min(1, y)),
+          width: Math.max(0, Math.min(1, width)),
+          height: Math.max(0, Math.min(1, height)),
+          pageWidth: canvasWidth,
+          pageHeight: canvasHeight,
+        };
+
+        // Create annotation with PDF fields
+        const annotationData = {
+          content: `Highlight: ${selection.text}`,
+          article_pmid: pmid,
+          note_type: 'highlight',
+          priority: 'medium',
+          status: 'active',
+          pdf_page: selection.pageNumber,
+          pdf_coordinates: coordinates,
+          highlight_color: color,
+          highlight_text: selection.text,
+        };
+
+        const response = await fetch(`/api/proxy/projects/${projectId}/annotations`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-ID': user.email,
+          },
+          body: JSON.stringify(annotationData),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to create highlight');
+        }
+
+        const newHighlight = await response.json();
+        console.log('✅ Highlight created:', newHighlight.annotation_id);
+
+        // Add to local state
+        setHighlights((prev) => [...prev, newHighlight]);
+      } catch (err) {
+        console.error('❌ Error creating highlight:', err);
+      }
+    },
+    [projectId, user, pmid]
+  );
+
+  // Handle clicking on a highlight
+  const handleHighlightClick = useCallback((highlight: Highlight) => {
+    console.log('🖱️ Clicked highlight:', highlight.annotation_id);
+    // TODO: Show highlight details or navigate to annotation
+  }, []);
 
   if (loading) {
     return (
@@ -228,6 +375,30 @@ export default function PDFViewer({ pmid, title, onClose }: PDFViewerProps) {
             </button>
           </div>
 
+          {/* Highlight Mode Toggle */}
+          {projectId && (
+            <div className="flex items-center gap-2 border-l border-gray-300 pl-4">
+              <button
+                onClick={() => setHighlightMode(!highlightMode)}
+                className={`
+                  p-2 rounded-lg transition-colors
+                  ${highlightMode
+                    ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                    : 'hover:bg-gray-100 text-gray-700'
+                  }
+                `}
+                title={highlightMode ? 'Disable highlight mode (Cmd/Ctrl+H)' : 'Enable highlight mode (Cmd/Ctrl+H)'}
+              >
+                <PencilIcon className="w-5 h-5" />
+              </button>
+              {highlights.length > 0 && (
+                <span className="text-xs text-gray-600">
+                  {highlights.length} highlight{highlights.length !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Title */}
           <div className="flex-1 min-w-0 border-l border-gray-300 pl-4">
             <p className="text-sm font-medium text-gray-900 truncate">{title || `PMID: ${pmid}`}</p>
@@ -247,7 +418,7 @@ export default function PDFViewer({ pmid, title, onClose }: PDFViewerProps) {
 
       {/* PDF Content */}
       <div className="flex-1 overflow-auto bg-gray-800 flex justify-center items-start p-4">
-        <div className="bg-white shadow-2xl">
+        <div className="bg-white shadow-2xl relative">
           <Document
             file={pdfUrl}
             onLoadSuccess={onDocumentLoadSuccess}
@@ -258,20 +429,45 @@ export default function PDFViewer({ pmid, title, onClose }: PDFViewerProps) {
               </div>
             }
           >
-            <Page
-              pageNumber={pageNumber}
-              scale={scale}
-              renderTextLayer={true}
-              renderAnnotationLayer={true}
-            />
+            <div className="relative">
+              <Page
+                pageNumber={pageNumber}
+                scale={scale}
+                renderTextLayer={true}
+                renderAnnotationLayer={true}
+                inputRef={(ref) => {
+                  if (ref) {
+                    ref.setAttribute('data-page-number', pageNumber.toString());
+                  }
+                }}
+              />
+
+              {/* Highlight Layer - renders existing highlights */}
+              {projectId && (
+                <HighlightLayer
+                  highlights={highlights}
+                  pageNumber={pageNumber}
+                  scale={scale}
+                  onHighlightClick={handleHighlightClick}
+                />
+              )}
+            </div>
           </Document>
         </div>
       </div>
 
+      {/* Highlight Tool - color picker for text selection */}
+      {projectId && (
+        <HighlightTool
+          onHighlight={handleHighlight}
+          isEnabled={highlightMode}
+        />
+      )}
+
       {/* Footer with keyboard shortcuts */}
       <div className="bg-white border-t border-gray-200 px-4 py-2">
         <p className="text-xs text-gray-500 text-center">
-          Keyboard shortcuts: ← → (navigate pages) | Esc (close)
+          Keyboard shortcuts: ← → (navigate pages) | Esc (close) | Cmd/Ctrl+H (toggle highlight mode)
         </p>
       </div>
     </div>
