@@ -11,6 +11,7 @@ import { StepIndicator } from '@/components/onboarding/StepIndicator';
 import { Step2ResearchInterests } from '@/components/onboarding/Step2ResearchInterests';
 import { Step3FirstAction, FirstActionType } from '@/components/onboarding/Step3FirstAction';
 import Step4FirstProject from '@/components/onboarding/Step4FirstProject';
+import Step5SeedPaper from '@/components/onboarding/Step5SeedPaper';
 
 const CATEGORY_ROLES = {
   Student: ['Undergraduate', 'Postgraduate', 'PhD Student'],
@@ -24,7 +25,7 @@ export default function CompleteProfile() {
 
   // Multi-step wizard state
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 4;
+  const totalSteps = 5;
 
   // Step 1: Personal Information
   const [formData, setFormData] = useState({
@@ -55,6 +56,9 @@ export default function CompleteProfile() {
     researchQuestion: ''
   });
   const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
+
+  // Step 5: Seed Paper
+  const [seedPaper, setSeedPaper] = useState<{ pmid: string; title: string } | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -186,10 +190,50 @@ export default function CompleteProfile() {
       const project = await projectResponse.json();
       setCreatedProjectId(project.project_id);
 
-      // Complete registration with all data
-      await handleFinalRegistration(project.project_id);
+      // Move to Step 5 (Seed Paper)
+      setCurrentStep(5);
+      setIsLoading(false);
     } catch (error: any) {
       setError(error.message || 'Failed to create project. Please try again.');
+      setIsLoading(false);
+    }
+  };
+
+  const handleStep5Complete = async (selectedSeedPaper: { pmid: string; title: string } | null) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      setSeedPaper(selectedSeedPaper);
+
+      // If seed paper selected, update project settings
+      if (selectedSeedPaper && createdProjectId) {
+        console.log('📄 Saving seed paper to project:', selectedSeedPaper);
+
+        const updateResponse = await fetch(`/api/proxy/projects/${createdProjectId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-ID': 'default_user',
+          },
+          body: JSON.stringify({
+            settings: {
+              research_question: projectData.researchQuestion,
+              seed_pmid: selectedSeedPaper.pmid,
+              seed_title: selectedSeedPaper.title,
+            },
+          }),
+        });
+
+        if (!updateResponse.ok) {
+          console.error('Failed to update project with seed paper');
+        }
+      }
+
+      // Complete registration with all data
+      await handleFinalRegistration(createdProjectId!);
+    } catch (error: any) {
+      setError(error.message || 'Failed to save seed paper. Please try again.');
       setIsLoading(false);
     }
   };
@@ -215,6 +259,7 @@ export default function CompleteProfile() {
           research_interests: researchInterests,
           first_action: firstAction,
           first_project_id: projectId,
+          seed_paper: seedPaper,
           onboarding_completed: true,
           onboarding_completed_at: new Date().toISOString()
         }
@@ -240,7 +285,8 @@ export default function CompleteProfile() {
     { number: 1, label: 'Profile', description: 'Basic info' },
     { number: 2, label: 'Interests', description: 'Research areas' },
     { number: 3, label: 'Get Started', description: 'First action' },
-    { number: 4, label: 'First Project', description: 'Create project' }
+    { number: 4, label: 'First Project', description: 'Create project' },
+    { number: 5, label: 'Seed Paper', description: 'Find first paper' }
   ];
 
   return (
@@ -485,6 +531,16 @@ export default function CompleteProfile() {
             researchInterests={researchInterests.topics}
             onBack={handleBack}
             onNext={handleStep4Complete}
+          />
+        )}
+
+        {/* Step 5: Seed Paper */}
+        {currentStep === 5 && (
+          <Step5SeedPaper
+            researchQuestion={projectData.researchQuestion}
+            researchInterests={researchInterests.topics}
+            onBack={handleBack}
+            onComplete={handleStep5Complete}
           />
         )}
 
