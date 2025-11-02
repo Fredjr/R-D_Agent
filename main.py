@@ -5291,13 +5291,22 @@ async def get_project(project_id: str, request: Request, db: Session = Depends(g
 
     if not has_access:
         raise HTTPException(status_code=403, detail="Access denied")
-    
-    # Get associated data
+
+    # 🚀 OPTIMIZATION: Get associated data with eager loading to reduce queries
+    # OLD: 4 separate queries (N+1 problem)
+    # NEW: 4 optimized queries with eager loading where applicable
+    from sqlalchemy.orm import joinedload
+
     reports = db.query(Report).filter(Report.project_id == project_id).all()
-    collaborators = db.query(ProjectCollaborator).join(User).filter(
+
+    # Eager load User data for collaborators (reduces N queries to 1)
+    collaborators = db.query(ProjectCollaborator).options(
+        joinedload(ProjectCollaborator.user)
+    ).filter(
         ProjectCollaborator.project_id == project_id,
         ProjectCollaborator.is_active == True
     ).all()
+
     annotations = db.query(Annotation).filter(Annotation.project_id == project_id).all()
     deep_dive_analyses = db.query(DeepDiveAnalysis).filter(DeepDiveAnalysis.project_id == project_id).all()
 
