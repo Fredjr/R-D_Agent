@@ -2,10 +2,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { ArrowLeftIcon, BeakerIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, BeakerIcon, ChatBubbleLeftRightIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { type Collection } from '@/hooks/useGlobalCollectionSync';
 import MultiColumnNetworkView from './MultiColumnNetworkView';
 import { AnnotationList } from './annotations';
+import dynamic from 'next/dynamic';
+
+// Dynamically import PDFViewer to avoid SSR issues
+const PDFViewer = dynamic(() => import('@/components/reading/PDFViewer'), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center p-8">Loading PDF viewer...</div>
+});
 
 interface Article {
   id: number;
@@ -43,6 +50,11 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
   const [loading, setLoading] = useState(true);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [showNetworkExploration, setShowNetworkExploration] = useState(false);
+
+  // PDF Viewer state
+  const [showPDFViewer, setShowPDFViewer] = useState(false);
+  const [selectedPMID, setSelectedPMID] = useState<string | null>(null);
+  const [selectedTitle, setSelectedTitle] = useState<string | null>(null);
 
   useEffect(() => {
     fetchArticles();
@@ -220,9 +232,27 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
                         <p className="text-gray-600 mt-1">{article.notes}</p>
                       </div>
                     )}
+
+                    {/* Action Buttons */}
+                    {article.article_pmid && (
+                      <div className="mt-4 flex gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedPMID(article.article_pmid);
+                            setSelectedTitle(article.article_title);
+                            setShowPDFViewer(true);
+                          }}
+                          className="inline-flex items-center px-3 py-1.5 text-xs bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
+                        >
+                          <DocumentTextIcon className="w-4 h-4 mr-1" />
+                          Read PDF
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
-                
+
                 <div className="ml-4 text-right">
                   <div className="text-xs text-gray-500">
                     Added {new Date(article.added_at).toLocaleDateString()}
@@ -250,6 +280,20 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
             </div>
           ))}
         </div>
+      )}
+
+      {/* PDF Viewer Modal */}
+      {showPDFViewer && selectedPMID && (
+        <PDFViewer
+          pmid={selectedPMID}
+          title={selectedTitle || undefined}
+          projectId={projectId}
+          onClose={() => {
+            setShowPDFViewer(false);
+            setSelectedPMID(null);
+            setSelectedTitle(null);
+          }}
+        />
       )}
     </div>
   );

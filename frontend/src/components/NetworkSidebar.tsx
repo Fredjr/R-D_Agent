@@ -7,6 +7,13 @@ import { useGlobalCollectionSync } from '../hooks/useGlobalCollectionSync';
 import { NetworkNode } from './NetworkView';
 import { useToast, ToastContainer } from './Toast';
 import { AnnotationList } from './annotations';
+import dynamic from 'next/dynamic';
+
+// Dynamically import PDFViewer to avoid SSR issues
+const PDFViewer = dynamic(() => import('@/components/reading/PDFViewer'), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center p-8">Loading PDF viewer...</div>
+});
 
 interface NetworkSidebarProps {
   selectedNode: NetworkNode | null;
@@ -118,6 +125,9 @@ export default function NetworkSidebar({
   const [showSaveToCollectionModal, setShowSaveToCollectionModal] = useState(false);
   const [selectedArticleToSave, setSelectedArticleToSave] = useState<any>(null);
   const [savingToCollection, setSavingToCollection] = useState(false);
+
+  // PDF Viewer state
+  const [showPDFViewer, setShowPDFViewer] = useState(false);
 
   // OA/Full-Text toggle for smart actions
   // Use controlled state if provided, otherwise use internal state
@@ -885,6 +895,22 @@ export default function NetworkSidebar({
             </Button>
           )}
         </div>
+
+        {/* Read PDF Button */}
+        <div className="mt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full text-xs bg-purple-50 hover:bg-purple-100 border-purple-200"
+            onClick={() => {
+              console.log('📄 Read PDF button clicked!', selectedNode);
+              setShowPDFViewer(true);
+            }}
+            title="Read PDF (if available)"
+          >
+            📄 Read PDF
+          </Button>
+        </div>
       </div>
 
       {/* 📋 AUDIT TRAIL: Research Path Tracking - Compact */}
@@ -1423,6 +1449,16 @@ export default function NetworkSidebar({
 
       {/* Toast notifications */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
+
+      {/* PDF Viewer Modal */}
+      {showPDFViewer && selectedNode && (
+        <PDFViewer
+          pmid={selectedNode.id}
+          title={metadata.title || undefined}
+          projectId={projectId}
+          onClose={() => setShowPDFViewer(false)}
+        />
+      )}
     </div>
   );
 }

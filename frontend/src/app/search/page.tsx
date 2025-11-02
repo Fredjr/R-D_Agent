@@ -2,12 +2,19 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { MagnifyingGlassIcon, FunnelIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, FunnelIcon, AdjustmentsHorizontalIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { PageHeader } from '@/components/ui/Navigation';
 import { Button } from '@/components/ui/Button';
 import { MobileResponsiveLayout } from '@/components/ui/MobileResponsiveLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWeeklyMixIntegration } from '@/hooks/useWeeklyMixIntegration';
+import dynamic from 'next/dynamic';
+
+// Dynamically import PDFViewer to avoid SSR issues
+const PDFViewer = dynamic(() => import('@/components/reading/PDFViewer'), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center p-8">Loading PDF viewer...</div>
+});
 
 interface SearchResult {
   id: string;
@@ -49,6 +56,11 @@ function SearchPageContent() {
     mesh_enhanced: boolean;
     optimized_query?: string;
   } | null>(null);
+
+  // PDF Viewer state
+  const [showPDFViewer, setShowPDFViewer] = useState(false);
+  const [selectedPMID, setSelectedPMID] = useState<string | null>(null);
+  const [selectedTitle, setSelectedTitle] = useState<string | null>(null);
 
   // Modal states for article actions
   const [showAddToProjectModal, setShowAddToProjectModal] = useState(false);
@@ -618,6 +630,18 @@ function SearchPageContent() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              setSelectedPMID(result.metadata.pmid || null);
+                              setSelectedTitle(result.title);
+                              setShowPDFViewer(true);
+                            }}
+                            className="inline-flex items-center px-3 py-1 text-xs bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition-colors"
+                          >
+                            <DocumentTextIcon className="w-4 h-4 mr-1" />
+                            Read PDF
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
                               handleAddToProject(result);
                             }}
                             className="px-3 py-1 text-xs bg-[var(--spotify-green)]/20 text-[var(--spotify-green)] rounded hover:bg-[var(--spotify-green)]/30 transition-colors"
@@ -795,6 +819,19 @@ function SearchPageContent() {
               )}
             </div>
           </div>
+        )}
+
+        {/* PDF Viewer Modal */}
+        {showPDFViewer && selectedPMID && (
+          <PDFViewer
+            pmid={selectedPMID}
+            title={selectedTitle || undefined}
+            onClose={() => {
+              setShowPDFViewer(false);
+              setSelectedPMID(null);
+              setSelectedTitle(null);
+            }}
+          />
         )}
       </div>
     </MobileResponsiveLayout>

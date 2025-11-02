@@ -1,12 +1,19 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { MagnifyingGlassIcon, SparklesIcon, XMarkIcon, BookmarkIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, SparklesIcon, XMarkIcon, BookmarkIcon, ArrowTopRightOnSquareIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { BookmarkIcon as BookmarkSolidIcon } from '@heroicons/react/24/solid';
 import MultiColumnNetworkView from '@/components/MultiColumnNetworkView';
 import { useAuth } from '@/contexts/AuthContext';
 import FilterPanel, { type FilterSection } from '@/components/filters/FilterPanel';
 import FilterChips, { type FilterChip } from '@/components/filters/FilterChips';
+import dynamic from 'next/dynamic';
+
+// Dynamically import PDFViewer to avoid SSR issues
+const PDFViewer = dynamic(() => import('@/components/reading/PDFViewer'), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center p-8">Loading PDF viewer...</div>
+});
 
 interface ExploreTabProps {
   project: any;
@@ -41,6 +48,11 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
     citationFilter: 'all',
     hasAbstract: false
   });
+
+  // PDF Viewer state
+  const [showPDFViewer, setShowPDFViewer] = useState(false);
+  const [selectedPMID, setSelectedPMID] = useState<string | null>(null);
+  const [selectedTitle, setSelectedTitle] = useState<string | null>(null);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -405,6 +417,17 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
                     </div>
                     <div className="flex items-center gap-2">
                       <button
+                        onClick={() => {
+                          setSelectedPMID(article.pmid);
+                          setSelectedTitle(article.title);
+                          setShowPDFViewer(true);
+                        }}
+                        className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-md transition-colors"
+                        title="Read PDF"
+                      >
+                        <DocumentTextIcon className="w-5 h-5" />
+                      </button>
+                      <button
                         onClick={() => handleSaveArticle(article)}
                         disabled={savingPmids.has(article.pmid)}
                         className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors disabled:opacity-50"
@@ -501,6 +524,20 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
             </ul>
           </div>
         </>
+      )}
+
+      {/* PDF Viewer Modal */}
+      {showPDFViewer && selectedPMID && (
+        <PDFViewer
+          pmid={selectedPMID}
+          title={selectedTitle || undefined}
+          projectId={project.project_id}
+          onClose={() => {
+            setShowPDFViewer(false);
+            setSelectedPMID(null);
+            setSelectedTitle(null);
+          }}
+        />
       )}
     </div>
   );
