@@ -5,7 +5,8 @@ import ExperimentalMethodsTable from '@/components/ExperimentalMethodsTable';
 import ResultsInterpretationCard from '@/components/ResultsInterpretationCard';
 import ContentQualityIndicator from '@/components/ContentQualityIndicator';
 import AnnotationsFeed from '@/components/AnnotationsFeed';
-import { BookmarkIcon } from '@heroicons/react/24/outline';
+import PDFViewer from '@/components/reading/PDFViewer';
+import { BookmarkIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { BookmarkIcon as BookmarkSolidIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/solid';
 import { useAuth } from '@/contexts/AuthContext';
 import type { SearchResult } from '@/lib/dummy-data';
@@ -41,6 +42,7 @@ export default function ArticleCard({ item, projectId, onAddToCollection }: Prop
   const [isPinned, setIsPinned] = React.useState(false);
   const [pinning, setPinning] = React.useState(false);
   const [showAnnotations, setShowAnnotations] = React.useState(false);
+  const [showPDFViewer, setShowPDFViewer] = React.useState(false);
   // Cache deep dive data by key (pmid||title)
   const deepDiveCacheRef = React.useRef<Map<string, any>>(new Map());
 
@@ -343,6 +345,22 @@ export default function ArticleCard({ item, projectId, onAddToCollection }: Prop
             Annotate
           </button>
 
+          {/* Read PDF Button */}
+          {headerPmid && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log('ArticleCard - Read PDF clicked for PMID:', headerPmid);
+                setShowPDFViewer(true);
+              }}
+              className="inline-flex items-center px-3 py-2 rounded-lg text-sm bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors"
+              title="Read PDF (if available)"
+            >
+              <DocumentTextIcon className="h-4 w-4 mr-1" />
+              Read PDF
+            </button>
+          )}
+
           {/* Add to Collection Button */}
           {onAddToCollection && (
             <button
@@ -515,6 +533,15 @@ export default function ArticleCard({ item, projectId, onAddToCollection }: Prop
             )}
           </div>
         </div>
+      )}
+
+      {/* PDF Viewer Modal */}
+      {showPDFViewer && headerPmid && (
+        <PDFViewer
+          pmid={headerPmid}
+          title={headerTitle}
+          onClose={() => setShowPDFViewer(false)}
+        />
       )}
     </article>
   );

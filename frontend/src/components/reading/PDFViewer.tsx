@@ -1,0 +1,278 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Document, Page, pdfjs } from 'react-pdf';
+import { XMarkIcon, ChevronLeftIcon, ChevronRightIcon, MagnifyingGlassMinusIcon, MagnifyingGlassPlusIcon } from '@heroicons/react/24/outline';
+import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
+import 'react-pdf/dist/esm/Page/TextLayer.css';
+
+// Configure PDF.js worker
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+
+interface PDFViewerProps {
+  pmid: string;
+  title?: string;
+  onClose: () => void;
+}
+
+export default function PDFViewer({ pmid, title, onClose }: PDFViewerProps) {
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfSource, setPdfSource] = useState<string>('');
+  const [numPages, setNumPages] = useState<number>(0);
+  const [pageNumber, setPageNumber] = useState<number>(1);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [scale, setScale] = useState<number>(1.2);
+  const [pdfAvailable, setPdfAvailable] = useState<boolean>(false);
+
+  useEffect(() => {
+    fetchPDFUrl();
+  }, [pmid]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        goToPrevPage();
+      } else if (e.key === 'ArrowRight') {
+        goToNextPage();
+      } else if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [pageNumber, numPages]);
+
+  const fetchPDFUrl = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log(`📄 Fetching PDF URL for PMID: ${pmid}`);
+      
+      const response = await fetch(`/api/proxy/articles/${pmid}/pdf-url`, {
+        headers: {
+          'User-ID': 'default_user',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch PDF URL');
+      }
+
+      const data = await response.json();
+      console.log('📄 PDF URL response:', data);
+      
+      setPdfSource(data.source);
+      setPdfAvailable(data.pdf_available);
+      
+      if (data.pdf_available && data.url) {
+        setPdfUrl(data.url);
+      } else {
+        // No direct PDF available - show message with link
+        setError(`PDF not directly available. This article may be behind a paywall.`);
+        setPdfUrl(null);
+        
+        // Open the article URL in a new tab
+        if (data.url) {
+          window.open(data.url, '_blank');
+        }
+      }
+    } catch (err) {
+      console.error('❌ Error fetching PDF:', err);
+      setError('Failed to load PDF. The article may not be available or may be behind a paywall.');
+      setPdfUrl(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
+    setNumPages(numPages);
+    console.log(`✅ PDF loaded successfully: ${numPages} pages`);
+  };
+
+  const onDocumentLoadError = (error: Error) => {
+    console.error('❌ PDF load error:', error);
+    setError('Failed to load PDF. The file may be corrupted or inaccessible.');
+  };
+
+  const goToPrevPage = () => {
+    setPageNumber((prev) => Math.max(prev - 1, 1));
+  };
+
+  const goToNextPage = () => {
+    setPageNumber((prev) => Math.min(prev + 1, numPages));
+  };
+
+  const zoomIn = () => {
+    setScale((prev) => Math.min(prev + 0.2, 3.0));
+  };
+
+  const zoomOut = () => {
+    setScale((prev) => Math.max(prev - 0.2, 0.5));
+  };
+
+  const goToPage = (page: number) => {
+    if (page >= 1 && page <= numPages) {
+      setPageNumber(page);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+          <div className="flex flex-col items-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading PDF...</h3>
+            <p className="text-sm text-gray-600 text-center">
+              Searching for PDF in PubMed Central, Europe PMC, and Unpaywall...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !pdfUrl) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+          <div className="flex flex-col items-center">
+            <div className="text-red-500 mb-4">
+              <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">PDF Not Available</h3>
+            <p className="text-sm text-gray-600 text-center mb-6">{error}</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => window.open(`https://pubmed.ncbi.nlm.nih.gov/${pmid}/`, '_blank')}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                View on PubMed
+              </button>
+              <button
+                onClick={onClose}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex flex-col">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-4 flex-1 min-w-0">
+          {/* Navigation Controls */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={goToPrevPage}
+              disabled={pageNumber <= 1}
+              className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Previous page (←)"
+            >
+              <ChevronLeftIcon className="w-5 h-5 text-gray-700" />
+            </button>
+            
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={pageNumber}
+                onChange={(e) => goToPage(parseInt(e.target.value))}
+                className="w-16 px-2 py-1 text-center border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                min={1}
+                max={numPages}
+              />
+              <span className="text-sm text-gray-600">/ {numPages}</span>
+            </div>
+            
+            <button
+              onClick={goToNextPage}
+              disabled={pageNumber >= numPages}
+              className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Next page (→)"
+            >
+              <ChevronRightIcon className="w-5 h-5 text-gray-700" />
+            </button>
+          </div>
+
+          {/* Zoom Controls */}
+          <div className="flex items-center gap-2 border-l border-gray-300 pl-4">
+            <button
+              onClick={zoomOut}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              title="Zoom out"
+            >
+              <MagnifyingGlassMinusIcon className="w-5 h-5 text-gray-700" />
+            </button>
+            <span className="text-sm text-gray-600 w-16 text-center">{Math.round(scale * 100)}%</span>
+            <button
+              onClick={zoomIn}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              title="Zoom in"
+            >
+              <MagnifyingGlassPlusIcon className="w-5 h-5 text-gray-700" />
+            </button>
+          </div>
+
+          {/* Title */}
+          <div className="flex-1 min-w-0 border-l border-gray-300 pl-4">
+            <p className="text-sm font-medium text-gray-900 truncate">{title || `PMID: ${pmid}`}</p>
+            <p className="text-xs text-gray-500">Source: {pdfSource.toUpperCase()}</p>
+          </div>
+        </div>
+
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          className="p-2 rounded-lg hover:bg-gray-100 transition-colors ml-4"
+          title="Close (Esc)"
+        >
+          <XMarkIcon className="w-6 h-6 text-gray-700" />
+        </button>
+      </div>
+
+      {/* PDF Content */}
+      <div className="flex-1 overflow-auto bg-gray-800 flex justify-center items-start p-4">
+        <div className="bg-white shadow-2xl">
+          <Document
+            file={pdfUrl}
+            onLoadSuccess={onDocumentLoadSuccess}
+            onLoadError={onDocumentLoadError}
+            loading={
+              <div className="flex items-center justify-center p-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              </div>
+            }
+          >
+            <Page
+              pageNumber={pageNumber}
+              scale={scale}
+              renderTextLayer={true}
+              renderAnnotationLayer={true}
+            />
+          </Document>
+        </div>
+      </div>
+
+      {/* Footer with keyboard shortcuts */}
+      <div className="bg-white border-t border-gray-200 px-4 py-2">
+        <p className="text-xs text-gray-500 text-center">
+          Keyboard shortcuts: ← → (navigate pages) | Esc (close)
+        </p>
+      </div>
+    </div>
+  );
+}
+

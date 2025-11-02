@@ -830,6 +830,14 @@ from citation_endpoints import register_citation_endpoints, add_test_citation_en
 register_citation_endpoints(app)
 
 # =============================================================================
+# PDF VIEWER ENDPOINTS - Phase 4 Week 9-10
+# =============================================================================
+
+# Import and register PDF endpoints
+from pdf_endpoints import register_pdf_endpoints
+register_pdf_endpoints(app)
+
+# =============================================================================
 # AI RECOMMENDATIONS ENDPOINTS - Phase 8 ResearchRabbit Feature Parity
 # =============================================================================
 
