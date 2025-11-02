@@ -28,14 +28,17 @@ GET https://r-dagent-production.up.railway.app/pubmed/search?q=cancer&limit=5 40
 ### **2. Activity Feed Endpoint 404 Error**
 **Error:**
 ```
-GET https://r-dagent-production.up.railway.app/activity?limit=10 404 (Not Found)
+GET https://r-dagent-production.up.railway.app/activities?limit=10 404 (Not Found)
 ```
 
 **Root Cause:**
-- Wrong endpoint path - should be `/activities` (plural), not `/activity`
+- Activities are **project-specific**, not global
+- Correct endpoint is `/projects/{projectId}/activities`, not `/activities`
 
 **Fix Applied:**
-- Changed endpoint from `/activity` to `/activities`
+- Changed endpoint from `/activities` to `/projects/{projectId}/activities`
+- Added project ID lookup before testing activities
+- Added fallback if no projects exist
 
 ---
 
@@ -87,10 +90,13 @@ const searchResponse = await fetch(`${CONFIG.FRONTEND_URL}/api/proxy/pubmed/sear
 #### **Change 2: Activity Feed Endpoint**
 ```javascript
 // BEFORE (WRONG):
-const activityResult = await testBackendEndpoint('/activity?limit=10');
+const activityResult = await testBackendEndpoint('/activities?limit=10');
 
 // AFTER (CORRECT):
-const activityResult = await testBackendEndpoint('/activities?limit=10');
+// Get project ID first
+const projectsResult = await testBackendEndpoint('/projects');
+const projectId = projectsResult.data.projects[0].project_id;
+const activityResult = await testBackendEndpoint(`/projects/${projectId}/activities?limit=10`);
 ```
 
 #### **Change 3: Caching Test**
@@ -207,14 +213,15 @@ After running the automated tests, please manually test:
 
 ## 📊 **SUMMARY OF CHANGES**
 
-### **Commit:** `aff3658`
-**Title:** Fix testing script: Use correct frontend proxy endpoints
+### **Commit:** `aff3658` + `1753219`
+**Title:** Fix testing script: Use correct endpoints
 
 **Changes:**
 - ✅ Fixed PubMed search endpoint (backend → frontend proxy)
-- ✅ Fixed activity feed endpoint path (/activity → /activities)
+- ✅ Fixed activity feed endpoint (global → project-specific)
 - ✅ Fixed caching test to use frontend proxy
 - ✅ Added error handling for all fetch calls
+- ✅ Added project ID lookup for activities
 
 **Files Modified:**
 - `COMPREHENSIVE_TESTING_SCRIPT_PHASE3-4.js`
