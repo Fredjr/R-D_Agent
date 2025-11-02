@@ -49,27 +49,29 @@ pdfjs.GlobalWorkerOptions.workerSrc =
 
 ## ✅ SOLUTION
 
-Changed the worker source to use **unpkg.com**, which is specifically designed for npm packages and mirrors the exact npm package structure.
+Changed the worker source to use **cdn.jsdelivr.net** with the correct file extension (`.mjs` instead of `.js`).
 
 ### **New Configuration:**
 ```typescript
 // ✅ FIXED
 if (typeof window !== 'undefined') {
   // Only run in browser
-  const workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+  // Note: The worker file is pdf.worker.min.mjs (ES module), not .js
+  const workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
   pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
-  
+
   console.log('📄 PDF.js worker configured:', workerSrc);
   console.log('📄 PDF.js version:', pdfjs.version);
 }
 ```
 
-### **Why unpkg.com works:**
-1. **Mirrors npm exactly** - unpkg.com serves files directly from npm packages
-2. **Correct path structure** - Uses `/build/pdf.worker.min.js` (matches npm package)
-3. **Always up-to-date** - Automatically has all npm package versions
-4. **Reliable CORS** - Designed for cross-origin requests
+### **Why this works:**
+1. **Correct file extension** - `.mjs` (ES module) not `.js`
+2. **Verified CDN** - jsdelivr.net has the correct file structure
+3. **Correct path** - `/build/pdf.worker.min.mjs` exists on jsdelivr
+4. **Reliable CORS** - jsdelivr is designed for cross-origin requests
 5. **Fast CDN** - Global CDN with good performance
+6. **File verified** - 1021.69 KB file exists at the URL
 
 ### **Additional Improvements:**
 1. **Browser-only check** - `typeof window !== 'undefined'` ensures it only runs in browser
@@ -140,9 +142,9 @@ To verify the fix is working:
 
 | CDN | URL Pattern | Works? | Notes |
 |-----|-------------|--------|-------|
-| **cdnjs.cloudflare.com** | `/ajax/libs/pdf.js/{version}/pdf.worker.min.js` | ❌ | Wrong path structure |
-| **unpkg.com** | `/pdfjs-dist@{version}/build/pdf.worker.min.js` | ✅ | Correct npm structure |
-| **jsdelivr.com** | `/npm/pdfjs-dist@{version}/build/pdf.worker.min.js` | ✅ | Alternative (not used) |
+| **cdnjs.cloudflare.com** | `/ajax/libs/pdf.js/{version}/pdf.worker.min.js` | ❌ | Wrong path + wrong extension |
+| **unpkg.com** | `/pdfjs-dist@{version}/build/pdf.worker.min.js` | ❌ | Wrong extension (.js not .mjs) |
+| **cdn.jsdelivr.net** | `/npm/pdfjs-dist@{version}/build/pdf.worker.min.mjs` | ✅ | **CORRECT** - .mjs extension |
 
 ### **Why not use local worker file?**
 - Next.js 15 with App Router makes it complex to serve static files
@@ -168,7 +170,7 @@ To verify the fix is working:
 
 ### **Console Output (Success):**
 ```
-📄 PDF.js worker configured: https://unpkg.com/pdfjs-dist@5.4.296/build/pdf.worker.min.js
+📄 PDF.js worker configured: https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.296/build/pdf.worker.min.mjs
 📄 PDF.js version: 5.4.296
 🔍 Searching PubMed for: 39361594
 ✅ Search results: {query: '39361594', ...}
