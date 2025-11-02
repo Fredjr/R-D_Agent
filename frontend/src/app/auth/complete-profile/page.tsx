@@ -10,6 +10,7 @@ import { validateObject, userProfileRules, formatValidationErrors } from '@/lib/
 import { StepIndicator } from '@/components/onboarding/StepIndicator';
 import { Step2ResearchInterests } from '@/components/onboarding/Step2ResearchInterests';
 import { Step3FirstAction, FirstActionType } from '@/components/onboarding/Step3FirstAction';
+import Step4FirstProject from '@/components/onboarding/Step4FirstProject';
 
 const CATEGORY_ROLES = {
   Student: ['Undergraduate', 'Postgraduate', 'PhD Student'],
@@ -23,7 +24,7 @@ export default function CompleteProfile() {
 
   // Multi-step wizard state
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 3;
+  const totalSteps = 4;
 
   // Step 1: Personal Information
   const [formData, setFormData] = useState({
@@ -46,6 +47,14 @@ export default function CompleteProfile() {
 
   // Step 3: First Action
   const [firstAction, setFirstAction] = useState<FirstActionType | null>(null);
+
+  // Step 4: First Project
+  const [projectData, setProjectData] = useState({
+    name: '',
+    description: '',
+    researchQuestion: ''
+  });
+  const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -125,10 +134,67 @@ export default function CompleteProfile() {
     setCurrentStep(3);
   };
 
-  const handleStep3Complete = async () => {
+  const handleStep3Next = () => {
+    // Validate first action selection
+    if (!firstAction) {
+      setError('Please select what you\'d like to do first');
+      return;
+    }
+
+    setError(null);
+    setCurrentStep(4);
+  };
+
+  const handleStep4Complete = async (data: {
+    name: string;
+    description: string;
+    researchQuestion: string;
+  }) => {
     setError(null);
     setIsLoading(true);
+    setProjectData(data);
 
+    try {
+      // Get user data for User-ID header
+      const savedUser = localStorage.getItem('rd_agent_user');
+      if (!savedUser) {
+        throw new Error('User not authenticated');
+      }
+      const userData = JSON.parse(savedUser);
+
+      // Create the project
+      const projectResponse = await fetch('/api/proxy/projects', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': userData.user_id || userData.email,
+        },
+        body: JSON.stringify({
+          name: data.name,
+          description: data.description,
+          settings: {
+            research_question: data.researchQuestion,
+          },
+        }),
+      });
+
+      if (!projectResponse.ok) {
+        const errorData = await projectResponse.json();
+        throw new Error(errorData.error || 'Failed to create project');
+      }
+
+      const project = await projectResponse.json();
+      setCreatedProjectId(project.project_id);
+
+      // Complete registration with all data
+      await handleFinalRegistration(project.project_id);
+    } catch (error: any) {
+      setError(error.message || 'Failed to create project. Please try again.');
+      setIsLoading(false);
+    }
+  };
+
+  const handleFinalRegistration = async (projectId: string) => {
     try {
       // Prepare data for backend
       const validationData = {
@@ -148,27 +214,14 @@ export default function CompleteProfile() {
         preferences: {
           research_interests: researchInterests,
           first_action: firstAction,
+          first_project_id: projectId,
           onboarding_completed: true,
           onboarding_completed_at: new Date().toISOString()
         }
       });
 
-      // Redirect based on first action
-      if (firstAction === 'search') {
-        // Redirect to Research Hub (home page) which has MeSH search
-        router.push('/?onboarding=search');
-      } else if (firstAction === 'import') {
-        // Redirect to Research Hub with import hint
-        router.push('/?onboarding=import');
-      } else if (firstAction === 'trending') {
-        // Redirect to Discover page
-        router.push('/discover?onboarding=trending');
-      } else if (firstAction === 'project') {
-        // Redirect to Dashboard with create project modal trigger
-        router.push('/dashboard?action=create_project');
-      } else {
-        router.push('/dashboard');
-      }
+      // Redirect to the newly created project
+      router.push(`/project/${projectId}?onboarding=complete`);
     } catch (error: any) {
       setError(error.message || 'Registration failed. Please try again.');
     } finally {
@@ -186,7 +239,8 @@ export default function CompleteProfile() {
   const steps = [
     { number: 1, label: 'Profile', description: 'Basic info' },
     { number: 2, label: 'Interests', description: 'Research areas' },
-    { number: 3, label: 'Get Started', description: 'First action' }
+    { number: 3, label: 'Get Started', description: 'First action' },
+    { number: 4, label: 'First Project', description: 'Create project' }
   ];
 
   return (
@@ -420,8 +474,17 @@ export default function CompleteProfile() {
             selectedAction={firstAction}
             onSelectAction={setFirstAction}
             onBack={handleBack}
-            onComplete={handleStep3Complete}
+            onComplete={handleStep3Next}
             hasTopics={researchInterests.topics.length > 0}
+          />
+        )}
+
+        {/* Step 4: First Project */}
+        {currentStep === 4 && (
+          <Step4FirstProject
+            researchInterests={researchInterests.topics}
+            onBack={handleBack}
+            onNext={handleStep4Complete}
           />
         )}
 
