@@ -9,6 +9,7 @@ import {
   extractYear,
   extractDOI
 } from '@/lib/pubmed-utils';
+import { pubmedCache } from '@/utils/pubmedCache';
 
 /**
  * PubMed Citation Network API
@@ -242,20 +243,103 @@ export async function GET(request: NextRequest) {
 
     console.log(`🔍 PubMed API: Fetching ${type} for PMID ${pmid} (limit: ${limit})`);
 
-    // Fetch source article details
-    debugInfo.steps.push({ step: 'fetch_source_article_start', pmid });
+    // Try to get from cache first (30 minute TTL for citations)
+    try {
+      const cached = await pubmedCache.get(
+        '/api/proxy/pubmed/citations',
+        { pmid, limit, type },
+        async () => {
+          // Cache miss - fetch from PubMed API
+          console.log('🔄 Cache miss - fetching citations from PubMed API');
+
+          // Fetch source article details
+          debugInfo.steps.push({ step: 'fetch_source_article_start', pmid });
+          const sourceArticles = await fetchArticleDetails([pmid]);
+          let sourceArticle = sourceArticles[0];
+          debugInfo.steps.push({
+            step: 'fetch_source_article_complete',
+            found: !!sourceArticle,
+            article: sourceArticle ? { pmid: sourceArticle.pmid, title: sourceArticle.title } : null
+          });
+
+          // If source article not found, create a minimal placeholder to avoid 404
+          if (!sourceArticle) {
+            console.log(`⚠️ Article PMID ${pmid} not found in PubMed, creating placeholder`);
+            debugInfo.steps.push({ step: 'source_article_not_found', creating_placeholder: true });
+            sourceArticle = {
+              pmid,
+              title: `Article ${pmid}`,
+              authors: ['Unknown Author'],
+              journal: 'Unknown Journal',
+              year: new Date().getFullYear(),
+              citation_count: 0,
+              abstract: 'Abstract not available'
+            };
+          }
+
+          // Fetch related articles based on type
+          debugInfo.steps.push({ step: 'fetch_related_articles_start', type });
+          let relatedPmids: string[] = [];
+          if (type === 'citations') {
+            relatedPmids = await findCitingArticles(pmid, limit);
+          } else if (type === 'similar') {
+            relatedPmids = await findSimilarArticles(pmid, limit);
+          }
+          debugInfo.steps.push({
+            step: 'fetch_related_articles_complete',
+            count: relatedPmids.length,
+            pmids: relatedPmids.slice(0, 5) // First 5 for debugging
+          });
+
+          console.log(`📊 Found ${relatedPmids.length} ${type} for PMID ${pmid}`);
+
+          // Fetch details for related articles
+          debugInfo.steps.push({ step: 'fetch_article_details_start', pmid_count: relatedPmids.length });
+          const relatedArticles = await fetchArticleDetails(relatedPmids);
+          debugInfo.steps.push({
+            step: 'fetch_article_details_complete',
+            article_count: relatedArticles.length,
+            articles: relatedArticles.slice(0, 2).map(a => ({ pmid: a.pmid, title: a.title }))
+          });
+
+          // Log if no results found - this is legitimate, not an error
+          if (relatedArticles.length === 0) {
+            console.log(`ℹ️ No ${type} found for PMID ${pmid} in PubMed`);
+            debugInfo.steps.push({ step: 'no_results_found', type });
+          }
+
+          return {
+            source_article: sourceArticle,
+            citations: relatedArticles,
+            total_count: relatedArticles.length,
+            limit
+          };
+        }
+      );
+
+      if (cached) {
+        console.log('✅ Cache hit - returning cached citations');
+        const response: any = {
+          ...cached,
+          cached: true
+        };
+
+        // Include debug info if requested
+        if (debug) {
+          response._debug = debugInfo;
+        }
+
+        return NextResponse.json(response);
+      }
+    } catch (cacheError) {
+      console.warn('⚠️ Cache error, falling back to direct API call:', cacheError);
+    }
+
+    // Fallback: Fetch directly if cache failed
     const sourceArticles = await fetchArticleDetails([pmid]);
     let sourceArticle = sourceArticles[0];
-    debugInfo.steps.push({
-      step: 'fetch_source_article_complete',
-      found: !!sourceArticle,
-      article: sourceArticle ? { pmid: sourceArticle.pmid, title: sourceArticle.title } : null
-    });
 
-    // If source article not found, create a minimal placeholder to avoid 404
     if (!sourceArticle) {
-      console.log(`⚠️ Article PMID ${pmid} not found in PubMed, creating placeholder`);
-      debugInfo.steps.push({ step: 'source_article_not_found', creating_placeholder: true });
       sourceArticle = {
         pmid,
         title: `Article ${pmid}`,
@@ -267,45 +351,23 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    // Fetch related articles based on type
-    debugInfo.steps.push({ step: 'fetch_related_articles_start', type });
     let relatedPmids: string[] = [];
     if (type === 'citations') {
       relatedPmids = await findCitingArticles(pmid, limit);
     } else if (type === 'similar') {
       relatedPmids = await findSimilarArticles(pmid, limit);
     }
-    debugInfo.steps.push({
-      step: 'fetch_related_articles_complete',
-      count: relatedPmids.length,
-      pmids: relatedPmids.slice(0, 5) // First 5 for debugging
-    });
 
-    console.log(`📊 Found ${relatedPmids.length} ${type} for PMID ${pmid}`);
-
-    // Fetch details for related articles
-    debugInfo.steps.push({ step: 'fetch_article_details_start', pmid_count: relatedPmids.length });
     const relatedArticles = await fetchArticleDetails(relatedPmids);
-    debugInfo.steps.push({
-      step: 'fetch_article_details_complete',
-      article_count: relatedArticles.length,
-      articles: relatedArticles.slice(0, 2).map(a => ({ pmid: a.pmid, title: a.title }))
-    });
-
-    // Log if no results found - this is legitimate, not an error
-    if (relatedArticles.length === 0) {
-      console.log(`ℹ️ No ${type} found for PMID ${pmid} in PubMed`);
-      debugInfo.steps.push({ step: 'no_results_found', type });
-    }
 
     const response: any = {
       source_article: sourceArticle,
       citations: relatedArticles,
       total_count: relatedArticles.length,
-      limit
+      limit,
+      cached: false
     };
 
-    // Include debug info if requested
     if (debug) {
       response._debug = debugInfo;
     }

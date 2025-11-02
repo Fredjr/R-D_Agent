@@ -9,6 +9,7 @@ import {
   extractYear,
   extractDOI
 } from '@/lib/pubmed-utils';
+import { pubmedCache } from '@/utils/pubmedCache';
 
 // PubMed eUtils URLs
 const PUBMED_SEARCH_URL = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi';
@@ -283,7 +284,39 @@ async function handlePubMedSearch(
       searchQuery = buildOptimizedQuery(query, parsedMeshTerms, parsedSuggestedQueries);
     }
 
-    // Perform PubMed search
+    // Generate cache key
+    const cacheKey = `pubmed-search-${searchQuery}-${limit}`;
+
+    // Try to get from cache first
+    try {
+      const cached = await pubmedCache.get(
+        '/api/proxy/pubmed/search',
+        { query: searchQuery, limit },
+        async () => {
+          // Cache miss - fetch from PubMed API
+          console.log('🔄 Cache miss - fetching from PubMed API');
+          return await searchPubMed(searchQuery, limit);
+        }
+      );
+
+      if (cached) {
+        console.log('✅ Cache hit - returning cached results');
+        return NextResponse.json({
+          query: query,
+          optimized_query: searchQuery,
+          query_type: queryInfo.type,
+          articles: cached,
+          total_found: cached.length,
+          limit: limit,
+          mesh_enhanced: !!(parsedMeshTerms || parsedSuggestedQueries),
+          cached: true
+        });
+      }
+    } catch (cacheError) {
+      console.warn('⚠️ Cache error, falling back to direct API call:', cacheError);
+    }
+
+    // Fallback: Perform PubMed search directly (if cache failed)
     const articles = await searchPubMed(searchQuery, limit);
 
     return NextResponse.json({
@@ -293,7 +326,8 @@ async function handlePubMedSearch(
       articles: articles,
       total_found: articles.length,
       limit: limit,
-      mesh_enhanced: !!(parsedMeshTerms || parsedSuggestedQueries)
+      mesh_enhanced: !!(parsedMeshTerms || parsedSuggestedQueries),
+      cached: false
     });
 
   } catch (error) {
