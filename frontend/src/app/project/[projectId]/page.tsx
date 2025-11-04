@@ -135,6 +135,14 @@ export default function ProjectPage() {
     source_id: string;
   } | null>(null);
 
+  // Collection creation modal state
+  const [showCollectionModal, setShowCollectionModal] = useState(false);
+  const [newCollectionData, setNewCollectionData] = useState({
+    collection_name: '',
+    description: ''
+  });
+  const [creatingCollection, setCreatingCollection] = useState(false);
+
   // Tab navigation state
   const [activeTab, setActiveTab] = useState<'research-question' | 'explore' | 'collections' | 'notes' | 'analysis' | 'progress'>('research-question');
 
@@ -541,6 +549,43 @@ export default function ProjectPage() {
     }
   };
 
+  const handleCreateCollection = async () => {
+    if (!newCollectionData.collection_name.trim()) {
+      alert('Please enter a collection name');
+      return;
+    }
+
+    setCreatingCollection(true);
+    try {
+      const response = await fetch(`/api/proxy/projects/${projectId}/collections`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user?.email || 'default_user',
+        },
+        body: JSON.stringify(newCollectionData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create collection');
+      }
+
+      // Reset form and close modal
+      setNewCollectionData({ collection_name: '', description: '' });
+      setShowCollectionModal(false);
+
+      // Refresh project data
+      await fetchProjectData();
+
+      alert('✅ Collection created successfully!');
+    } catch (error) {
+      console.error('Error creating collection:', error);
+      alert('❌ Failed to create collection. Please try again.');
+    } finally {
+      setCreatingCollection(false);
+    }
+  };
+
   const handleGenerateSummary = async () => {
     setGeneratingSummary(true);
     try {
@@ -565,10 +610,10 @@ export default function ProjectPage() {
       }
 
       setShowSummaryModal(false);
-      
+
       // Refresh project data to show new report
       fetchProjectData();
-      
+
       alert('Summary report generated successfully!');
     } catch (err) {
       console.error('Error generating summary:', err);
@@ -1047,6 +1092,62 @@ export default function ProjectPage() {
             ]}
           />
         </div>
+
+        {/* Create Collection Modal */}
+        {showCollectionModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Create Collection</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Collection Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={newCollectionData.collection_name}
+                    onChange={(e) => setNewCollectionData({ ...newCollectionData, collection_name: e.target.value })}
+                    placeholder="e.g., Cancer Immunotherapy Papers"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={creatingCollection}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description (Optional)
+                  </label>
+                  <textarea
+                    value={newCollectionData.description}
+                    onChange={(e) => setNewCollectionData({ ...newCollectionData, description: e.target.value })}
+                    placeholder="Brief description of this collection..."
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={creatingCollection}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowCollectionModal(false);
+                    setNewCollectionData({ collection_name: '', description: '' });
+                  }}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                  disabled={creatingCollection}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateCollection}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  disabled={creatingCollection}
+                >
+                  {creatingCollection ? 'Creating...' : 'Create Collection'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Add Note Modal */}
         {showNoteModal && (
