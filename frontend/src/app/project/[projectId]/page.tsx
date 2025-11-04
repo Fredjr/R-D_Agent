@@ -25,6 +25,7 @@ import { NotesTab } from '@/components/project/NotesTab';
 import { ExploreTab } from '@/components/project/ExploreTab';
 import { AnalysisTab } from '@/components/project/AnalysisTab';
 import { ProgressTab } from '@/components/project/ProgressTab';
+import { MyCollectionsTab } from '@/components/project/MyCollectionsTab';
 import GlobalSearch from '@/components/search/GlobalSearch';
 import CollaboratorsList from '@/components/collaboration/CollaboratorsList';
 import {
@@ -1547,12 +1548,10 @@ export default function ProjectPage() {
         {/* Collections Tab */}
         {activeTab === 'collections' && (
           <div className="mb-8">
-            <Collections
+            <MyCollectionsTab
               projectId={projectId}
               onRefresh={fetchProjectData}
-              onGenerateReview={handleGenerateReviewFromNetwork}
-              onDeepDive={handleDeepDiveFromNetwork}
-              onExploreCluster={handleExploreClusterFromNetwork}
+              onCreateCollection={() => setShowCollectionModal(true)}
             />
           </div>
         )}
