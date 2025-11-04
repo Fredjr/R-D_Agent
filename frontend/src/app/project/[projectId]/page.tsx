@@ -1512,6 +1512,16 @@ export default function ProjectPage() {
                   throw error;
                 }
               }}
+              onNavigateToTab={(tab) => setActiveTab(tab as any)}
+              onOpenModal={(modal) => {
+                if (modal === 'collection') {
+                  setShowCollectionModal(true);
+                } else if (modal === 'note') {
+                  setShowNoteModal(true);
+                } else if (modal === 'report') {
+                  setShowReportModal(true);
+                }
+              }}
             />
 
             {/* Collaborators List */}
