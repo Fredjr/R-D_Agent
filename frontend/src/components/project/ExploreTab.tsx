@@ -1,7 +1,16 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { MagnifyingGlassIcon, SparklesIcon, XMarkIcon, BookmarkIcon, ArrowTopRightOnSquareIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import {
+  MagnifyingGlassIcon,
+  SparklesIcon,
+  XMarkIcon,
+  BookmarkIcon,
+  ArrowTopRightOnSquareIcon,
+  DocumentTextIcon,
+  Squares2X2Icon,
+  ListBulletIcon
+} from '@heroicons/react/24/outline';
 import { BookmarkIcon as BookmarkSolidIcon } from '@heroicons/react/24/solid';
 import MultiColumnNetworkView from '@/components/MultiColumnNetworkView';
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,6 +40,8 @@ interface PubMedArticle {
   doi?: string;
 }
 
+type ViewMode = 'network' | 'search';
+
 export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
@@ -39,6 +50,9 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState<PubMedArticle | null>(null);
   const [savingPmids, setSavingPmids] = useState<Set<string>>(new Set());
+
+  // View mode toggle
+  const [viewMode, setViewMode] = useState<ViewMode>('network');
 
   // 🔍 Week 6: Filter state
   const [showFilters, setShowFilters] = useState(false);
@@ -60,6 +74,7 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
 
     setIsSearching(true);
     setHasSearched(true);
+    setViewMode('search'); // Switch to search view
     try {
       console.log('🔍 Searching PubMed for:', searchQuery);
 
@@ -284,15 +299,44 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
               <p className="text-sm text-gray-600">Search PubMed and visualize research networks</p>
             </div>
           </div>
-          {hasSearched && (
-            <button
-              onClick={clearSearch}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-white rounded-md transition-colors"
-            >
-              <XMarkIcon className="w-4 h-4" />
-              Clear Search
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-1 bg-white rounded-lg p-1 border border-blue-200">
+              <button
+                onClick={() => setViewMode('network')}
+                className={`flex items-center gap-2 px-3 py-2 rounded-md transition-all ${
+                  viewMode === 'network'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-blue-50'
+                }`}
+                title="Network View"
+              >
+                <Squares2X2Icon className="w-4 h-4" />
+                <span className="text-sm font-medium">Network</span>
+              </button>
+              <button
+                onClick={() => setViewMode('search')}
+                className={`flex items-center gap-2 px-3 py-2 rounded-md transition-all ${
+                  viewMode === 'search'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-blue-50'
+                }`}
+                title="Search View"
+              >
+                <ListBulletIcon className="w-4 h-4" />
+                <span className="text-sm font-medium">Search</span>
+              </button>
+            </div>
+            {hasSearched && viewMode === 'search' && (
+              <button
+                onClick={clearSearch}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-white rounded-md transition-colors border border-blue-200"
+              >
+                <XMarkIcon className="w-4 h-4" />
+                Clear
+              </button>
+            )}
+          </div>
         </div>
 
         {/* PubMed Search Bar */}
@@ -348,7 +392,7 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
       </div>
 
       {/* Search Results or Network View */}
-      {hasSearched ? (
+      {viewMode === 'search' ? (
         <>
           {/* 🔍 Week 6: Filter Panel */}
           {searchResults.length > 0 && !isSearching && (
