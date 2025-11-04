@@ -8,7 +8,10 @@ import {
   FolderIcon,
   ClockIcon,
   ArrowTrendingUpIcon,
-  CalendarIcon
+  CalendarIcon,
+  UserGroupIcon,
+  BookOpenIcon,
+  ChartBarIcon
 } from '@heroicons/react/24/outline';
 import EnhancedActivityFeed from '@/components/activity/EnhancedActivityFeed';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,9 +29,11 @@ export function ProgressTab({ project }: ProgressTabProps) {
     papers: project.total_papers || 0,
     notes: project.annotations?.length || 0,
     collections: project.collections?.length || 0,
-    reports: (project.reports?.length || 0) + (project.deep_dives?.length || 0)
+    reports: (project.reports?.length || 0) + (project.deep_dives?.length || 0),
+    collaborators: project.collaborators?.length || 0,
+    papersRead: project.annotations?.filter((a: any) => a.annotation_type === 'highlight').length || 0
   };
-  
+
   // Calculate growth (placeholder - would need historical data)
   const growth = {
     papers: '+5',
@@ -36,6 +41,11 @@ export function ProgressTab({ project }: ProgressTabProps) {
     collections: '+1',
     reports: '+1'
   };
+
+  // Calculate reading progress
+  const readingProgress = metrics.papers > 0
+    ? Math.round((metrics.papersRead / metrics.papers) * 100)
+    : 0;
   
   // Get recent activities (placeholder - would need activity log)
   const recentActivities = [
@@ -215,10 +225,87 @@ export function ProgressTab({ project }: ProgressTabProps) {
         showFilters={true}
       />
       
+      {/* Reading Progress */}
+      <div className="bg-white rounded-lg p-6 border border-gray-200">
+        <div className="flex items-center gap-3 mb-4">
+          <BookOpenIcon className="w-6 h-6 text-blue-600" />
+          <h3 className="text-lg font-semibold text-gray-900">Reading Progress</h3>
+        </div>
+        <div className="space-y-4">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700">Papers Read</span>
+              <span className="text-sm font-bold text-blue-600">
+                {metrics.papersRead} / {metrics.papers} ({readingProgress}%)
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-3">
+              <div
+                className="bg-blue-600 h-3 rounded-full transition-all duration-500"
+                style={{ width: `${readingProgress}%` }}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <div className="bg-blue-50 rounded-lg p-4">
+              <p className="text-sm font-medium text-gray-700 mb-1">Papers with Notes</p>
+              <p className="text-2xl font-bold text-blue-600">
+                {metrics.papersRead}
+              </p>
+            </div>
+            <div className="bg-purple-50 rounded-lg p-4">
+              <p className="text-sm font-medium text-gray-700 mb-1">Total Notes</p>
+              <p className="text-2xl font-bold text-purple-600">
+                {metrics.notes}
+              </p>
+            </div>
+            <div className="bg-green-50 rounded-lg p-4">
+              <p className="text-sm font-medium text-gray-700 mb-1">Avg Notes/Paper</p>
+              <p className="text-2xl font-bold text-green-600">
+                {metrics.papers > 0 ? (metrics.notes / metrics.papers).toFixed(1) : '0'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Collaboration Stats */}
+      {metrics.collaborators > 0 && (
+        <div className="bg-white rounded-lg p-6 border border-gray-200">
+          <div className="flex items-center gap-3 mb-4">
+            <UserGroupIcon className="w-6 h-6 text-purple-600" />
+            <h3 className="text-lg font-semibold text-gray-900">Collaboration</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-purple-50 rounded-lg p-4">
+              <p className="text-sm font-medium text-gray-700 mb-1">Team Members</p>
+              <p className="text-2xl font-bold text-purple-600">
+                {metrics.collaborators}
+              </p>
+            </div>
+            <div className="bg-blue-50 rounded-lg p-4">
+              <p className="text-sm font-medium text-gray-700 mb-1">Shared Collections</p>
+              <p className="text-2xl font-bold text-blue-600">
+                {metrics.collections}
+              </p>
+            </div>
+            <div className="bg-green-50 rounded-lg p-4">
+              <p className="text-sm font-medium text-gray-700 mb-1">Shared Notes</p>
+              <p className="text-2xl font-bold text-green-600">
+                {metrics.notes}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Insights */}
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 border border-blue-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">📊 Research Insights</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="flex items-center gap-3 mb-4">
+          <ChartBarIcon className="w-6 h-6 text-blue-600" />
+          <h3 className="text-lg font-semibold text-gray-900">Research Insights</h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white rounded-lg p-4">
             <p className="text-sm font-medium text-gray-700 mb-1">Most Active Day</p>
             <p className="text-2xl font-bold text-blue-600">
@@ -226,9 +313,21 @@ export function ProgressTab({ project }: ProgressTabProps) {
             </p>
           </div>
           <div className="bg-white rounded-lg p-4">
-            <p className="text-sm font-medium text-gray-700 mb-1">Average Notes per Paper</p>
+            <p className="text-sm font-medium text-gray-700 mb-1">Avg Notes/Paper</p>
             <p className="text-2xl font-bold text-purple-600">
               {metrics.papers > 0 ? (metrics.notes / metrics.papers).toFixed(1) : '0'}
+            </p>
+          </div>
+          <div className="bg-white rounded-lg p-4">
+            <p className="text-sm font-medium text-gray-700 mb-1">Reading Rate</p>
+            <p className="text-2xl font-bold text-green-600">
+              {readingProgress}%
+            </p>
+          </div>
+          <div className="bg-white rounded-lg p-4">
+            <p className="text-sm font-medium text-gray-700 mb-1">Total Analyses</p>
+            <p className="text-2xl font-bold text-orange-600">
+              {metrics.reports}
             </p>
           </div>
         </div>
