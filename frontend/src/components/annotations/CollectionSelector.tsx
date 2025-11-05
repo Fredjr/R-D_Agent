@@ -64,18 +64,18 @@ export default function CollectionSelector({
             const collectionsWithArticle: Collection[] = [];
             for (const collection of allCollections) {
               const articlesResponse = await fetch(
-                `/api/proxy/collections/${collection.collection_id}/articles`,
+                `/api/proxy/collections/${collection.collection_id}/articles?projectId=${projectId}`,
                 {
                   headers: {
                     'User-ID': user?.email || 'default_user',
                   },
                 }
               );
-              
+
               if (articlesResponse.ok) {
                 const articlesData = await articlesResponse.json();
                 const articles = Array.isArray(articlesData) ? articlesData : (articlesData.articles || []);
-                
+
                 // Check if this collection contains the article
                 if (articles.some((article: any) => article.pmid === articlePmid || article.article_pmid === articlePmid)) {
                   collectionsWithArticle.push(collection);

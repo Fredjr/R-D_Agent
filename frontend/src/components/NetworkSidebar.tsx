@@ -181,7 +181,7 @@ export default function NetworkSidebar({
           const collectionsWithArticle: any[] = [];
           for (const collection of allCollections) {
             const articlesResponse = await fetch(
-              `/api/proxy/collections/${collection.collection_id}/articles`,
+              `/api/proxy/collections/${collection.collection_id}/articles?projectId=${projectId}`,
               {
                 headers: {
                   'User-ID': user?.email || 'default_user',
