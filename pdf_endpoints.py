@@ -145,7 +145,30 @@ def register_pdf_endpoints(app):
                     "pdf_available": True,
                     "title": article_title
                 }
-            
+
+            # Try PubMed's "Full Text Links" section (universal approach for all publishers)
+            logger.info(f"🔍 Checking PubMed full text links for {pmid}...")
+            fulltext_links = await get_pubmed_fulltext_links(pmid)
+
+            if fulltext_links:
+                # Try the first available full text link
+                for link in fulltext_links:
+                    provider = link['provider']
+                    url = link['url']
+
+                    # Try to get PDF URL from publisher link
+                    pdf_url = await try_get_pdf_from_publisher_link(url, provider)
+
+                    if pdf_url:
+                        logger.info(f"✅ Found PDF via PubMed full text link ({provider}): {pmid}")
+                        return {
+                            "pmid": pmid,
+                            "source": f"pubmed_fulltext_{provider.lower().replace(' ', '_')}",
+                            "url": pdf_url,
+                            "pdf_available": True,
+                            "title": article_title
+                        }
+
             # Fallback to DOI resolver
             if article_doi:
                 logger.info(f"ℹ️ Falling back to DOI resolver: {pmid}")
@@ -239,6 +262,21 @@ def register_pdf_endpoints(app):
             elif unpaywall_url and not isinstance(unpaywall_url, Exception):
                 pdf_url = unpaywall_url
                 source = "unpaywall"
+
+            # Try PubMed full text links if no other source found
+            if not pdf_url:
+                logger.info(f"🔍 Checking PubMed full text links for {pmid}...")
+                fulltext_links = await get_pubmed_fulltext_links(pmid)
+
+                if fulltext_links:
+                    for link in fulltext_links:
+                        provider = link['provider']
+                        url = link['url']
+                        pdf_url = await try_get_pdf_from_publisher_link(url, provider)
+                        if pdf_url:
+                            source = f"pubmed_fulltext_{provider.lower().replace(' ', '_')}"
+                            logger.info(f"✅ Found PDF via PubMed full text link ({provider})")
+                            break
 
             if not pdf_url:
                 logger.warning(f"⚠️ No PDF URL found for {pmid}")
@@ -444,6 +482,116 @@ async def fetch_article_metadata_from_pubmed(pmid: str) -> Dict[str, Optional[st
     except Exception as e:
         logger.error(f"❌ Failed to fetch metadata from PubMed for {pmid}: {e}")
         return {"title": None, "doi": None}
+
+
+async def get_pubmed_fulltext_links(pmid: str) -> list[Dict[str, str]]:
+    """
+    Scrape PubMed's "Full Text Links" section to find publisher PDF links.
+
+    This is a universal approach that works for ALL publishers (Elsevier, Wiley,
+    Wolters Kluwer, Annals, etc.) without needing individual handlers.
+
+    Returns:
+        List of dicts with 'provider' and 'url' keys
+        Example: [{'provider': 'Elsevier', 'url': 'https://...'}, ...]
+    """
+    try:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, follow_redirects=True) as client:
+            # Fetch PubMed article page
+            response = await client.get(
+                f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
+                headers={'User-Agent': 'Mozilla/5.0 (compatible; RD-Agent/1.0)'}
+            )
+
+            if response.status_code != 200:
+                logger.debug(f"PubMed page returned {response.status_code} for {pmid}")
+                return []
+
+            html = response.text
+
+            # Extract full text links from the page
+            # PubMed uses a specific structure for full text links
+            links = []
+
+            # Pattern 1: Look for LinkOut section with full text links
+            # Example: <a href="..." class="link-item" ...>Provider Name</a>
+            linkout_pattern = r'<a[^>]*href="([^"]+)"[^>]*class="[^"]*id_link[^"]*"[^>]*>([^<]+)</a>'
+            matches = re.findall(linkout_pattern, html)
+
+            for url, provider in matches:
+                # Clean up the URL (remove tracking parameters)
+                if url.startswith('http'):
+                    links.append({
+                        'provider': provider.strip(),
+                        'url': url
+                    })
+                    logger.debug(f"Found full text link: {provider.strip()} -> {url}")
+
+            # Pattern 2: Look for PMC link specifically
+            pmc_pattern = r'href="(https://www\.ncbi\.nlm\.nih\.gov/pmc/articles/PMC\d+/?)"'
+            pmc_matches = re.findall(pmc_pattern, html)
+            if pmc_matches:
+                for pmc_url in pmc_matches:
+                    if not any(link['url'] == pmc_url for link in links):
+                        links.append({
+                            'provider': 'PubMed Central',
+                            'url': pmc_url
+                        })
+                        logger.debug(f"Found PMC link: {pmc_url}")
+
+            logger.info(f"📚 Found {len(links)} full text links for PMID {pmid}")
+            return links
+
+    except Exception as e:
+        logger.debug(f"Failed to scrape PubMed full text links for {pmid}: {e}")
+        return []
+
+
+async def try_get_pdf_from_publisher_link(url: str, provider: str) -> Optional[str]:
+    """
+    Try to find a PDF URL from a publisher's article page.
+
+    This function attempts common PDF URL patterns for various publishers:
+    - Direct PDF links (ending in .pdf)
+    - /pdf, /epdf, /pdfdirect URL patterns
+    - PDF download buttons/links on the page
+
+    Args:
+        url: Publisher article URL
+        provider: Provider name (e.g., "Elsevier", "Wiley")
+
+    Returns:
+        PDF URL if found, None otherwise
+    """
+    try:
+        # Common PDF URL patterns for different publishers
+        pdf_patterns = [
+            # Direct PDF link
+            lambda u: u if u.endswith('.pdf') else None,
+            # Wiley pattern: /doi/epdf/
+            lambda u: u.replace('/doi/', '/doi/epdf/') if '/doi/' in u and 'wiley.com' in u else None,
+            # Elsevier pattern: /pdf or /pdfft
+            lambda u: u.replace('/article/', '/article/pii/') + '/pdf' if 'sciencedirect.com' in u else None,
+            # Generic /pdf pattern
+            lambda u: u.rstrip('/') + '/pdf',
+            # Generic /pdfdirect pattern
+            lambda u: u.rstrip('/') + '/pdfdirect',
+        ]
+
+        # Try each pattern
+        for pattern_func in pdf_patterns:
+            pdf_url = pattern_func(url)
+            if pdf_url and pdf_url != url:  # Only try if pattern changed the URL
+                logger.debug(f"Trying PDF pattern for {provider}: {pdf_url}")
+                return pdf_url
+
+        # If no pattern matched, return the original URL
+        # (might be a direct PDF link or have a PDF on the page)
+        return url
+
+    except Exception as e:
+        logger.debug(f"Error generating PDF URL from {url}: {e}")
+        return None
 
 
 async def get_cochrane_pdf_url(doi: Optional[str]) -> Optional[str]:
