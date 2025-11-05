@@ -23,9 +23,19 @@ export function AnalysisTab({ project, onGenerateReport, onGenerateDeepDive }: A
   const [searchQuery, setSearchQuery] = useState('');
 
   // Combine reports and deep dives
+  // Backend returns 'deep_dive_analyses' but we also check 'deep_dives' for backward compatibility
+  const deepDives = project.deep_dive_analyses || project.deep_dives || [];
   const allAnalyses = [
     ...(project.reports || []).map((r: any) => ({ ...r, type: 'report', created_at: r.created_at || r.generated_at })),
-    ...(project.deep_dives || []).map((d: any) => ({ ...d, type: 'deep-dive', created_at: d.created_at || d.generated_at }))
+    ...deepDives.map((d: any) => ({
+      ...d,
+      type: 'deep-dive',
+      created_at: d.created_at || d.generated_at,
+      // Map analysis_id to deep_dive_id for consistency
+      deep_dive_id: d.analysis_id || d.deep_dive_id,
+      title: d.article_title || d.title,
+      summary: d.article_title || d.summary || 'Deep dive analysis'
+    }))
   ];
 
   // Filter analyses by type
@@ -227,8 +237,8 @@ export function AnalysisTab({ project, onGenerateReport, onGenerateDeepDive }: A
                 <button
                   onClick={() => {
                     // Navigate to report/deep dive page
-                    const id = analysis.report_id || analysis.deep_dive_id;
-                    const type = analysis.type === 'report' ? 'report' : 'deep-dive';
+                    const id = analysis.report_id || analysis.deep_dive_id || analysis.analysis_id;
+                    const type = analysis.type === 'report' ? 'report' : 'analysis';
                     window.location.href = `/${type}/${id}`;
                   }}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"

@@ -348,7 +348,9 @@ export default function ReportDetailPage() {
                 <div className="bg-white rounded-lg shadow p-6">
                   <h2 className="text-xl font-semibold text-gray-900 mb-4">Executive Summary</h2>
                   <div className="text-gray-700 whitespace-pre-wrap">
-                    {report.content.executive_summary}
+                    {typeof report.content.executive_summary === 'string'
+                      ? report.content.executive_summary
+                      : JSON.stringify(report.content.executive_summary, null, 2)}
                   </div>
                 </div>
               )}
