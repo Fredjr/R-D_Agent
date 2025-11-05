@@ -759,64 +759,95 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         // Let it fall through to the React Flow conversion below
       }
 
-      // ARTICLE NETWORK FALLBACK: If article network is empty or has only 1 node, try PubMed citations
+      // ARTICLE NETWORK FALLBACK: If article network is empty or has only 1 node, try multiple strategies
       if (sourceType === 'article' && (!data.nodes || data.nodes.length <= 1)) {
-        console.log('Article network empty/single node, trying PubMed citations fallback...');
-        // Reduced limit to 8 to avoid timeout
-        const fallbackResponse = await fetch(`/api/proxy/pubmed/network?pmid=${sourceId}&type=citations&limit=8`, {
+        console.log('Article network empty/single node, trying fallback strategies...');
+
+        // Strategy 1: Try citations (papers that cite this one)
+        console.log('📊 Fallback Strategy 1: Trying citations...');
+        const citationsResponse = await fetch(`/api/proxy/pubmed/network?pmid=${sourceId}&type=citations&limit=10${oaParam}`, {
           headers: {
             'User-ID': user?.email || 'default_user',
           },
         });
-        if (fallbackResponse.ok) {
-          const fallbackData = await fallbackResponse.json();
-          console.log('🔄 Article PubMed citations fallback:', {
-            nodesCount: fallbackData.nodes?.length || 0,
-            edgesCount: fallbackData.edges?.length || 0
+        if (citationsResponse.ok) {
+          const citationsData = await citationsResponse.json();
+          console.log('🔄 Citations fallback result:', {
+            nodesCount: citationsData.nodes?.length || 0,
+            edgesCount: citationsData.edges?.length || 0
           });
-          if (fallbackData.nodes && fallbackData.nodes.length > 1) {
-            // Successfully got citation network, use it
-            fallbackData.metadata = {
-              ...fallbackData.metadata,
+          if (citationsData.nodes && citationsData.nodes.length > 1) {
+            citationsData.metadata = {
+              ...citationsData.metadata,
               fallback_mode: true,
-              fallback_message: `Showing citation network from PubMed`
+              fallback_strategy: 'citations',
+              fallback_message: `Showing papers that cite this article`
             };
-            console.log('✅ Using PubMed citations fallback data');
-            data = fallbackData;
-          } else {
-            // Citations fallback also failed, try references
-            console.log('Citations fallback empty, trying references...');
-            // Reduced limit to 8 to avoid timeout
-            const refsResponse = await fetch(`/api/proxy/pubmed/network?pmid=${sourceId}&type=references&limit=8`, {
-              headers: {
-                'User-ID': user?.email || 'default_user',
-              },
+            console.log('✅ Using citations fallback data');
+            data = citationsData;
+          }
+        }
+
+        // Strategy 2: If citations failed, try references (papers this one cites)
+        if (!data.nodes || data.nodes.length <= 1) {
+          console.log('📊 Fallback Strategy 2: Trying references...');
+          const refsResponse = await fetch(`/api/proxy/pubmed/network?pmid=${sourceId}&type=references&limit=10${oaParam}`, {
+            headers: {
+              'User-ID': user?.email || 'default_user',
+            },
+          });
+          if (refsResponse.ok) {
+            const refsData = await refsResponse.json();
+            console.log('🔄 References fallback result:', {
+              nodesCount: refsData.nodes?.length || 0,
+              edgesCount: refsData.edges?.length || 0
             });
-            if (refsResponse.ok) {
-              const refsData = await refsResponse.json();
-              console.log('🔄 Article PubMed references fallback:', {
-                nodesCount: refsData.nodes?.length || 0,
-                edgesCount: refsData.edges?.length || 0
-              });
-              if (refsData.nodes && refsData.nodes.length > 1) {
-                refsData.metadata = {
-                  ...refsData.metadata,
-                  fallback_mode: true,
-                  fallback_message: `Showing reference network from PubMed`
-                };
-                console.log('✅ Using PubMed references fallback data');
-                data = refsData;
-              }
+            if (refsData.nodes && refsData.nodes.length > 1) {
+              refsData.metadata = {
+                ...refsData.metadata,
+                fallback_mode: true,
+                fallback_strategy: 'references',
+                fallback_message: `Showing papers referenced by this article`
+              };
+              console.log('✅ Using references fallback data');
+              data = refsData;
             }
           }
         }
 
-        // Only create synthetic network if all PubMed attempts failed
+        // Strategy 3: If both failed, try similar papers (semantic/topic similarity)
         if (!data.nodes || data.nodes.length <= 1) {
-          console.log('⚠️ All PubMed network attempts failed, article may not have citations/references indexed in PubMed');
+          console.log('📊 Fallback Strategy 3: Trying similar papers (semantic similarity)...');
+          const similarResponse = await fetch(`/api/proxy/pubmed/network?pmid=${sourceId}&type=similar&limit=15${oaParam}`, {
+            headers: {
+              'User-ID': user?.email || 'default_user',
+            },
+          });
+          if (similarResponse.ok) {
+            const similarData = await similarResponse.json();
+            console.log('🔄 Similar papers fallback result:', {
+              nodesCount: similarData.nodes?.length || 0,
+              edgesCount: similarData.edges?.length || 0
+            });
+            if (similarData.nodes && similarData.nodes.length > 1) {
+              similarData.metadata = {
+                ...similarData.metadata,
+                fallback_mode: true,
+                fallback_strategy: 'similar',
+                fallback_message: `Showing papers similar to this article (based on topic, keywords, and content)`
+              };
+              console.log('✅ Using similar papers fallback data');
+              data = similarData;
+            }
+          }
+        }
 
-          // Set error state instead of showing synthetic data
-          setError(`No citation network available for this article. The article may be too new or not have citations/references indexed in PubMed yet.`);
+        // Only show error if ALL strategies failed
+        if (!data.nodes || data.nodes.length <= 1) {
+          console.log('⚠️ All fallback strategies failed (citations, references, similar)');
+
+          // Set error state with more helpful message
+          setError(`Unable to find related papers for this article. This may happen if the article is very new, not indexed in PubMed, or has limited metadata. Try using the "Similar Work" button in the sidebar to explore related research.`);
           setLoading(false);
           return;
         }
@@ -1419,7 +1450,13 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         )}
 
         {/* Network Statistics Panel */}
-        <Panel position="top-left" className={`p-3 rounded-lg shadow-lg border ${(networkData?.metadata as any)?.demo_mode ? 'bg-blue-50 border-blue-200' : 'bg-white'}`}>
+        <Panel position="top-left" className={`p-3 rounded-lg shadow-lg border ${
+          (networkData?.metadata as any)?.demo_mode
+            ? 'bg-blue-50 border-blue-200'
+            : (networkData?.metadata as any)?.fallback_mode
+              ? 'bg-amber-50 border-amber-200'
+              : 'bg-white'
+        }`}>
           <div className="text-sm">
             {(networkData?.metadata as any)?.demo_mode ? (
               <>
@@ -1431,10 +1468,24 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
                   💡 Try clicking nodes to explore the multi-column layout!
                 </div>
               </>
+            ) : (networkData?.metadata as any)?.fallback_mode ? (
+              <>
+                <div className="font-semibold text-amber-900 mb-1">
+                  {(networkData?.metadata as any)?.fallback_strategy === 'citations' && '📊 Citation Network'}
+                  {(networkData?.metadata as any)?.fallback_strategy === 'references' && '📚 Reference Network'}
+                  {(networkData?.metadata as any)?.fallback_strategy === 'similar' && '🔍 Similar Papers'}
+                </div>
+                <div className="text-xs text-amber-700 mb-2">
+                  {(networkData?.metadata as any)?.fallback_message}
+                </div>
+                <div className="text-xs text-amber-600 bg-amber-100 px-2 py-1 rounded">
+                  💡 Use the buttons above to explore other relationships!
+                </div>
+              </>
             ) : (
               <div className="font-semibold text-gray-900 mb-2">Network Overview</div>
             )}
-            <div className="space-y-1 text-xs text-gray-600">
+            <div className="space-y-1 text-xs text-gray-600 mt-2">
               <div>Articles: {networkData.metadata.total_nodes || 0}</div>
               <div>Citations: {networkData.metadata.total_edges || 0}</div>
               <div>Avg Citations: {Math.round(networkData.metadata.avg_citations || 0)}</div>
