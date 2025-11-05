@@ -51,6 +51,15 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
   const [selectedArticle, setSelectedArticle] = useState<PubMedArticle | null>(null);
   const [savingPmids, setSavingPmids] = useState<Set<string>>(new Set());
 
+  // Collection selector modal state
+  const [showCollectionSelector, setShowCollectionSelector] = useState(false);
+  const [articleToSave, setArticleToSave] = useState<PubMedArticle | null>(null);
+  const [collections, setCollections] = useState<any[]>([]);
+  const [loadingCollections, setLoadingCollections] = useState(false);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string>('');
+  const [newCollectionName, setNewCollectionName] = useState('');
+  const [createNewCollection, setCreateNewCollection] = useState(false);
+
   // View mode toggle
   const [viewMode, setViewMode] = useState<ViewMode>('network');
 
@@ -104,30 +113,92 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
     setSelectedArticle(null);
   };
 
+  // Fetch collections when modal opens
+  const fetchCollections = async () => {
+    if (!user?.email) return;
+
+    setLoadingCollections(true);
+    try {
+      const response = await fetch(`/api/proxy/projects/${project.project_id}/collections`, {
+        headers: {
+          'User-ID': user.email
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch collections');
+      }
+
+      const data = await response.json();
+      setCollections(data.collections || []);
+    } catch (error) {
+      console.error('❌ Error fetching collections:', error);
+      setCollections([]);
+    } finally {
+      setLoadingCollections(false);
+    }
+  };
+
+  // Open collection selector modal
   const handleSaveArticle = async (article: PubMedArticle) => {
     if (!user?.email) {
       alert('Please sign in to save articles');
       return;
     }
 
-    setSavingPmids(prev => new Set(prev).add(article.pmid));
+    setArticleToSave(article);
+    setShowCollectionSelector(true);
+    setCreateNewCollection(false);
+    setNewCollectionName('');
+    setSelectedCollectionId('');
+    fetchCollections();
+  };
+
+  // Save article to selected or new collection
+  const handleConfirmSave = async () => {
+    if (!articleToSave || !user?.email) return;
+
+    setSavingPmids(prev => new Set(prev).add(articleToSave.pmid));
+    setShowCollectionSelector(false);
 
     try {
-      const response = await fetch(`/api/proxy/projects/${project.project_id}/collections`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-ID': user.email
-        },
-        body: JSON.stringify({
-          name: `Saved from Search: ${article.title.substring(0, 50)}...`,
-          description: `Article saved from PubMed search`,
-          pmids: [article.pmid]
-        })
-      });
+      if (createNewCollection) {
+        // Create new collection with article
+        if (!newCollectionName.trim()) {
+          alert('Please enter a collection name');
+          return;
+        }
 
-      if (!response.ok) {
-        throw new Error('Failed to save article');
+        const response = await fetch(`/api/proxy/projects/${project.project_id}/collections`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-ID': user.email
+          },
+          body: JSON.stringify({
+            collection_name: newCollectionName.trim(),
+            description: `Created from Explore Papers`,
+            tags: ['explore']
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to create collection');
+        }
+
+        const newCollection = await response.json();
+        const collectionId = newCollection.collection_id;
+
+        // Add article to new collection
+        await addArticleToCollection(collectionId, articleToSave);
+      } else {
+        // Add to existing collection
+        if (!selectedCollectionId) {
+          alert('Please select a collection');
+          return;
+        }
+
+        await addArticleToCollection(selectedCollectionId, articleToSave);
       }
 
       console.log('✅ Article saved to collection');
@@ -138,10 +209,45 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
     } finally {
       setSavingPmids(prev => {
         const next = new Set(prev);
-        next.delete(article.pmid);
+        next.delete(articleToSave.pmid);
         return next;
       });
+      setArticleToSave(null);
     }
+  };
+
+  // Helper function to add article to collection
+  const addArticleToCollection = async (collectionId: string, article: PubMedArticle) => {
+    const response = await fetch(`/api/proxy/collections/${collectionId}/pubmed-articles`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': user.email
+      },
+      body: JSON.stringify({
+        article: {
+          pmid: article.pmid,
+          title: article.title,
+          authors: article.authors || [],
+          journal: article.journal || '',
+          year: article.year || new Date().getFullYear(),
+          abstract: article.abstract || '',
+          citation_count: article.citation_count || 0,
+          discovery_context: 'similar',
+          source_article_pmid: '',
+          source_article_title: '',
+          exploration_session_id: ''
+        },
+        projectId: project.project_id
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to add article to collection');
+    }
+
+    return response.json();
   };
 
   // 🔍 Week 6: Filter and sort search results
@@ -582,6 +688,154 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
             setSelectedTitle(null);
           }}
         />
+      )}
+
+      {/* Collection Selector Modal */}
+      {showCollectionSelector && articleToSave && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">Save Article to Collection</h3>
+                <button
+                  onClick={() => {
+                    setShowCollectionSelector(false);
+                    setArticleToSave(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <XMarkIcon className="w-6 h-6" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-600 mt-2 line-clamp-2">{articleToSave.title}</p>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {/* Toggle between existing and new collection */}
+              <div className="flex gap-4 mb-4">
+                <button
+                  onClick={() => setCreateNewCollection(false)}
+                  className={`flex-1 px-4 py-2 rounded-lg border-2 transition-colors ${
+                    !createNewCollection
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                  }`}
+                >
+                  Add to Existing Collection
+                </button>
+                <button
+                  onClick={() => setCreateNewCollection(true)}
+                  className={`flex-1 px-4 py-2 rounded-lg border-2 transition-colors ${
+                    createNewCollection
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                  }`}
+                >
+                  Create New Collection
+                </button>
+              </div>
+
+              {/* Existing Collections List */}
+              {!createNewCollection && (
+                <div>
+                  {loadingCollections ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    </div>
+                  ) : collections.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-gray-600 mb-4">No collections yet</p>
+                      <button
+                        onClick={() => setCreateNewCollection(true)}
+                        className="text-blue-600 hover:text-blue-700 font-medium"
+                      >
+                        Create your first collection
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Select a collection:
+                      </label>
+                      {collections.map((collection) => (
+                        <button
+                          key={collection.collection_id}
+                          onClick={() => setSelectedCollectionId(collection.collection_id)}
+                          className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-colors ${
+                            selectedCollectionId === collection.collection_id
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-gray-900 truncate">
+                                {collection.collection_name}
+                              </p>
+                              {collection.description && (
+                                <p className="text-sm text-gray-600 truncate">
+                                  {collection.description}
+                                </p>
+                              )}
+                            </div>
+                            <span className="ml-4 text-sm text-gray-500">
+                              {collection.article_count || 0} articles
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* New Collection Form */}
+              {createNewCollection && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Collection Name:
+                  </label>
+                  <input
+                    type="text"
+                    value={newCollectionName}
+                    onChange={(e) => setNewCollectionName(e.target.value)}
+                    placeholder="e.g., Cancer Research Papers"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    autoFocus
+                  />
+                  <p className="text-sm text-gray-500 mt-2">
+                    A new collection will be created with this article
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowCollectionSelector(false);
+                  setArticleToSave(null);
+                }}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmSave}
+                disabled={
+                  (!createNewCollection && !selectedCollectionId) ||
+                  (createNewCollection && !newCollectionName.trim())
+                }
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {createNewCollection ? 'Create & Save' : 'Save to Collection'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
