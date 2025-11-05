@@ -142,6 +142,10 @@ export default function SemanticDiscoveryInterface({
                   placeholder="Enter research concepts, methods, or questions..."
                   className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   onKeyPress={(e) => e.key === 'Enter' && handleSemanticSearch()}
+                  autoComplete="off"
+                  data-1p-ignore
+                  data-lpignore="true"
+                  data-form-type="other"
                 />
                 <button
                   onClick={handleSemanticSearch}

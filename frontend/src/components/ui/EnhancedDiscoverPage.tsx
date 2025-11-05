@@ -301,6 +301,10 @@ export const EnhancedDiscoverPage: React.FC<EnhancedDiscoverPageProps> = ({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search for papers, authors, topics..."
                 className="w-full bg-[#282828] border border-gray-600 rounded-full py-3 pl-12 pr-16 text-white placeholder-gray-400 focus:outline-none focus:border-[var(--spotify-green)] focus:ring-2 focus:ring-[var(--spotify-green)]/20 transition-all"
+                autoComplete="off"
+                data-1p-ignore
+                data-lpignore="true"
+                data-form-type="other"
               />
               <button
                 type="button"

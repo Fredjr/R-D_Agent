@@ -181,6 +181,10 @@ export default function GlobalSearch({
             placeholder="Search papers, collections, notes, reports..."
             className="flex-1 bg-transparent text-[var(--spotify-white)] placeholder-[var(--spotify-subdued)] outline-none"
             data-testid="global-search-input"
+            autoComplete="off"
+            data-1p-ignore
+            data-lpignore="true"
+            data-form-type="other"
           />
           {query && (
             <button

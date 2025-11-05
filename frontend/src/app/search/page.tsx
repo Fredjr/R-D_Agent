@@ -440,6 +440,10 @@ function SearchPageContent() {
               onKeyPress={(e) => e.key === 'Enter' && handleSearch(query)}
               placeholder="Search PubMed articles, PMIDs, DOIs..."
               className="block w-full pl-10 pr-3 py-3 bg-[var(--spotify-dark-gray)] border border-[var(--spotify-border-gray)] rounded-lg text-[var(--spotify-white)] placeholder-[var(--spotify-muted-text)] focus:outline-none focus:ring-2 focus:ring-[var(--spotify-green)] focus:border-transparent text-sm sm:text-base"
+              autoComplete="off"
+              data-1p-ignore
+              data-lpignore="true"
+              data-form-type="other"
             />
           </div>
           
