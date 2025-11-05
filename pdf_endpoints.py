@@ -72,12 +72,13 @@ def register_pdf_endpoints(app):
                 get_europepmc_pdf_url(pmid),  # Europe PMC first (no PoW challenge)
                 get_pmc_pdf_url(pmid),
                 get_cochrane_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
+                get_wiley_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
                 get_nihr_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
                 get_unpaywall_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
                 return_exceptions=True
             )
 
-            europepmc_url, pmc_url, cochrane_url, nihr_url, unpaywall_url = results
+            europepmc_url, pmc_url, cochrane_url, wiley_url, nihr_url, unpaywall_url = results
 
             # Check Europe PMC first (no Proof-of-Work challenge, unlike PMC)
             if europepmc_url and not isinstance(europepmc_url, Exception):
@@ -108,6 +109,17 @@ def register_pdf_endpoints(app):
                     "pmid": pmid,
                     "source": "cochrane",
                     "url": cochrane_url,
+                    "pdf_available": True,
+                    "title": article_title
+                }
+
+            # Check Wiley Online Library
+            if wiley_url and not isinstance(wiley_url, Exception):
+                logger.info(f"✅ Found PDF in Wiley Online Library: {pmid}")
+                return {
+                    "pmid": pmid,
+                    "source": "wiley",
+                    "url": wiley_url,
                     "pdf_available": True,
                     "title": article_title
                 }
@@ -194,29 +206,33 @@ def register_pdf_endpoints(app):
 
             # Try multiple sources in parallel
             results = await asyncio.gather(
+                get_europepmc_pdf_url(pmid),  # Europe PMC first (no PoW challenge)
                 get_pmc_pdf_url(pmid),
-                get_europepmc_pdf_url(pmid),
                 get_cochrane_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
+                get_wiley_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
                 get_nihr_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
                 get_unpaywall_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
                 return_exceptions=True
             )
 
-            pmc_url, europepmc_url, cochrane_url, nihr_url, unpaywall_url = results
+            europepmc_url, pmc_url, cochrane_url, wiley_url, nihr_url, unpaywall_url = results
 
-            # Determine which URL to use
+            # Determine which URL to use (priority order)
             pdf_url = None
             source = None
 
-            if pmc_url and not isinstance(pmc_url, Exception):
-                pdf_url = pmc_url
-                source = "pmc"
-            elif europepmc_url and not isinstance(europepmc_url, Exception):
+            if europepmc_url and not isinstance(europepmc_url, Exception):
                 pdf_url = europepmc_url
                 source = "europepmc"
+            elif pmc_url and not isinstance(pmc_url, Exception):
+                pdf_url = pmc_url
+                source = "pmc"
             elif cochrane_url and not isinstance(cochrane_url, Exception):
                 pdf_url = cochrane_url
                 source = "cochrane"
+            elif wiley_url and not isinstance(wiley_url, Exception):
+                pdf_url = wiley_url
+                source = "wiley"
             elif nihr_url and not isinstance(nihr_url, Exception):
                 pdf_url = nihr_url
                 source = "nihr"
@@ -512,6 +528,56 @@ async def get_nihr_pdf_url(doi: Optional[str]) -> Optional[str]:
 
     except Exception as e:
         logger.debug(f"NIHR lookup failed for DOI {doi}: {e}")
+        return None
+
+
+async def get_wiley_pdf_url(doi: Optional[str]) -> Optional[str]:
+    """
+    Get PDF URL from Wiley Online Library.
+
+    Wiley journals (including ACR journals) have a structured PDF download URL.
+    Example DOI: 10.1002/art.43212
+    PDF URL: https://acrjournals.onlinelibrary.wiley.com/doi/epdf/10.1002/art.43212
+
+    Wiley DOI patterns:
+    - 10.1002/* (general Wiley journals, including Cochrane)
+    - 10.1111/* (Wiley-Blackwell journals)
+
+    Note: Cochrane (10.1002/14651858.*) is handled separately by get_cochrane_pdf_url
+    """
+    if not doi:
+        return None
+
+    try:
+        # Check if this is a Wiley DOI
+        # Exclude Cochrane DOIs (handled separately)
+        if doi.startswith("10.1002/14651858."):
+            return None
+
+        # Check for Wiley DOI patterns
+        is_wiley = doi.startswith("10.1002/") or doi.startswith("10.1111/")
+
+        if not is_wiley:
+            return None
+
+        # Determine the subdomain based on DOI prefix
+        # ACR journals (Arthritis & Rheumatology): 10.1002/art.*
+        # Other Wiley journals may use different subdomains
+        subdomain = "onlinelibrary"  # Default Wiley subdomain
+
+        if doi.startswith("10.1002/art."):
+            subdomain = "acrjournals.onlinelibrary"
+        elif doi.startswith("10.1002/acr."):
+            subdomain = "acrjournals.onlinelibrary"
+
+        # Construct Wiley PDF URL
+        # Format: https://{subdomain}.wiley.com/doi/epdf/{DOI}
+        pdf_url = f"https://{subdomain}.wiley.com/doi/epdf/{doi}"
+        logger.debug(f"Found Wiley PDF: {pdf_url}")
+        return pdf_url
+
+    except Exception as e:
+        logger.debug(f"Wiley lookup failed for DOI {doi}: {e}")
         return None
 
 
