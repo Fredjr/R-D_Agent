@@ -11,6 +11,7 @@ This module provides API endpoints for retrieving PDF URLs from multiple sources
 
 import asyncio
 import logging
+import re
 from typing import Optional, Dict, Any
 from fastapi import HTTPException, Depends, Query, Header
 from fastapi.responses import StreamingResponse
@@ -52,18 +53,20 @@ def register_pdf_endpoints(app):
         """
         try:
             logger.info(f"📄 Fetching PDF URL for PMID: {pmid}")
-            
+
             # Get article from database
             article = db.query(Article).filter(Article.pmid == pmid).first()
             if not article:
-                logger.warning(f"⚠️ Article not found in database: {pmid}")
-                # Don't fail - we can still try to fetch PDF
-                article_title = "Unknown Article"
-                article_doi = None
+                logger.warning(f"⚠️ Article not found in database: {pmid}, fetching metadata from PubMed")
+                # Fetch metadata from PubMed directly
+                pubmed_metadata = await fetch_article_metadata_from_pubmed(pmid)
+                article_title = pubmed_metadata.get("title") or "Unknown Article"
+                article_doi = pubmed_metadata.get("doi")
+                logger.info(f"📋 PubMed metadata: title='{article_title[:50]}...', doi={article_doi}")
             else:
                 article_title = article.title or "Unknown Article"
                 article_doi = article.doi
-            
+
             # Try multiple sources in parallel for speed
             results = await asyncio.gather(
                 get_pmc_pdf_url(pmid),
@@ -157,8 +160,11 @@ def register_pdf_endpoints(app):
             # Get article from database
             article = db.query(Article).filter(Article.pmid == pmid).first()
             if not article:
-                logger.warning(f"⚠️ Article not found in database: {pmid}")
-                article_doi = None
+                logger.warning(f"⚠️ Article not found in database: {pmid}, fetching metadata from PubMed")
+                # Fetch metadata from PubMed directly
+                pubmed_metadata = await fetch_article_metadata_from_pubmed(pmid)
+                article_doi = pubmed_metadata.get("doi")
+                logger.info(f"📋 PubMed DOI: {article_doi}")
             else:
                 article_doi = article.doi
 
@@ -304,46 +310,90 @@ async def get_europepmc_pdf_url(pmid: str) -> Optional[str]:
 async def get_unpaywall_pdf_url(doi: Optional[str]) -> Optional[str]:
     """
     Get PDF URL from Unpaywall API.
-    
+
     Unpaywall aggregates open access content from various sources.
     Requires a valid email address in the query.
     """
     if not doi:
         return None
-    
+
     try:
         async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
             # Unpaywall API (using a generic email - replace with your actual email)
             response = await client.get(
                 f"https://api.unpaywall.org/v2/{doi}?email=research@example.com"
             )
-            
+
             if response.status_code != 200:
                 logger.debug(f"Unpaywall returned {response.status_code} for DOI {doi}")
                 return None
-            
+
             data = response.json()
-            
+
             # Check for best open access location
             if "best_oa_location" in data and data["best_oa_location"]:
                 location = data["best_oa_location"]
-                
+
                 # Prefer PDF URL
                 if "url_for_pdf" in location and location["url_for_pdf"]:
                     pdf_url = location["url_for_pdf"]
                     logger.debug(f"Found Unpaywall PDF: {pdf_url}")
                     return pdf_url
-                
+
                 # Fallback to landing page URL
                 if "url" in location and location["url"]:
                     logger.debug(f"Found Unpaywall landing page: {location['url']}")
                     return location["url"]
-            
+
             return None
-            
+
     except Exception as e:
         logger.debug(f"Unpaywall lookup failed for DOI {doi}: {e}")
         return None
+
+
+async def fetch_article_metadata_from_pubmed(pmid: str) -> Dict[str, Optional[str]]:
+    """
+    Fetch article metadata from PubMed including DOI and title.
+
+    This is used when the article is not in our database yet (e.g., when
+    viewing papers from the network view that haven't been added to collections).
+
+    Returns:
+        Dict with 'title' and 'doi' keys, or None values if not found
+    """
+    try:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+            # Use PubMed eFetch API to get article details
+            response = await client.get(
+                f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id={pmid}&retmode=xml&rettype=abstract",
+                headers={'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'}
+            )
+
+            if response.status_code != 200:
+                logger.warning(f"PubMed eFetch returned {response.status_code} for PMID {pmid}")
+                return {"title": None, "doi": None}
+
+            xml_text = response.text
+
+            # Extract title
+            title_match = re.search(r'<ArticleTitle>(.*?)</ArticleTitle>', xml_text, re.DOTALL)
+            title = title_match.group(1).strip() if title_match else None
+            if title:
+                # Remove HTML tags
+                title = re.sub(r'<[^>]+>', '', title)
+
+            # Extract DOI
+            doi_match = re.search(r'<ArticleId IdType="doi">(.*?)</ArticleId>', xml_text)
+            doi = doi_match.group(1).strip() if doi_match else None
+
+            logger.info(f"📄 Fetched metadata from PubMed for {pmid}: title={bool(title)}, doi={bool(doi)}")
+
+            return {"title": title, "doi": doi}
+
+    except Exception as e:
+        logger.error(f"❌ Failed to fetch metadata from PubMed for {pmid}: {e}")
+        return {"title": None, "doi": None}
 
 
     @app.get("/articles/{pmid}/pdf-availability")
