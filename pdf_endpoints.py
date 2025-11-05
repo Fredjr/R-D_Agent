@@ -269,14 +269,36 @@ def register_pdf_endpoints(app):
                 fulltext_links = await get_pubmed_fulltext_links(pmid)
 
                 if fulltext_links:
+                    # Try each full text link and validate it works
                     for link in fulltext_links:
                         provider = link['provider']
                         url = link['url']
-                        pdf_url = await try_get_pdf_from_publisher_link(url, provider)
-                        if pdf_url:
-                            source = f"pubmed_fulltext_{provider.lower().replace(' ', '_')}"
-                            logger.info(f"✅ Found PDF via PubMed full text link ({provider})")
-                            break
+                        candidate_pdf_url = await try_get_pdf_from_publisher_link(url, provider)
+
+                        if candidate_pdf_url:
+                            # Validate the URL actually returns a PDF (not a 403 or HTML page)
+                            try:
+                                async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, follow_redirects=True) as client:
+                                    # Try HEAD request first to check if accessible
+                                    head_response = await client.head(candidate_pdf_url)
+
+                                    if head_response.status_code == 200:
+                                        content_type = head_response.headers.get('content-type', '').lower()
+                                        # Check if it's a PDF or if we need to try GET
+                                        if 'pdf' in content_type or 'application/octet-stream' in content_type:
+                                            pdf_url = candidate_pdf_url
+                                            source = f"pubmed_fulltext_{provider.lower().replace(' ', '_')}"
+                                            logger.info(f"✅ Found valid PDF via PubMed full text link ({provider})")
+                                            break
+                                        else:
+                                            logger.debug(f"URL returned non-PDF content-type: {content_type}")
+                                    elif head_response.status_code == 403:
+                                        logger.debug(f"URL returned 403 Forbidden (likely paywalled or requires challenge): {candidate_pdf_url}")
+                                    else:
+                                        logger.debug(f"URL returned HTTP {head_response.status_code}: {candidate_pdf_url}")
+                            except Exception as e:
+                                logger.debug(f"Failed to validate PDF URL {candidate_pdf_url}: {e}")
+                                continue
 
             if not pdf_url:
                 logger.warning(f"⚠️ No PDF URL found for {pmid}")
@@ -611,6 +633,35 @@ async def try_get_pdf_from_publisher_link(url: str, provider: str) -> Optional[s
             except Exception as e:
                 logger.debug(f"Failed to follow redirect for {url}: {e}")
                 # Continue with original URL
+
+        # Special handling for DOI URLs from PubMed full text links
+        # PubMed sometimes provides DOI URLs instead of direct publisher URLs
+        if 'doi.org/' in actual_url:
+            # Extract DOI from URL
+            doi_match = re.search(r'doi\.org/(10\.\d+/[^\s]+)', actual_url)
+            if doi_match:
+                doi = doi_match.group(1)
+                logger.debug(f"Extracted DOI from URL: {doi}")
+
+                # JASN (Journal of American Society of Nephrology) - DOI pattern: 10.1681/ASN.*
+                if doi.startswith('10.1681/ASN.'):
+                    # JASN uses this URL pattern: https://jasn.asnjournals.org/content/36/10/2061
+                    # We need to construct it from the DOI
+                    # DOI format: 10.1681/ASN.0000000752
+                    # But we don't have volume/issue/page info from DOI alone
+                    # So we'll try the DOI resolver first, then add /pdf
+                    jasn_pdf_url = f"https://doi.org/{doi}"
+                    logger.debug(f"JASN article detected, will try DOI resolver: {jasn_pdf_url}")
+                    return jasn_pdf_url
+
+                # Kidney International - DOI pattern: 10.1016/j.kint.*
+                elif doi.startswith('10.1016/j.kint.'):
+                    # Kidney International uses Elsevier's ScienceDirect
+                    # Try to construct ScienceDirect URL
+                    article_id = doi.split('/')[-1]
+                    sciencedirect_url = f"https://www.sciencedirect.com/science/article/pii/{article_id}/pdfft"
+                    logger.debug(f"Kidney International article, trying ScienceDirect: {sciencedirect_url}")
+                    return sciencedirect_url
 
         # Common PDF URL patterns for different publishers
         pdf_patterns = [
