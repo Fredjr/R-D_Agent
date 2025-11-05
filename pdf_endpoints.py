@@ -513,31 +513,64 @@ async def get_pubmed_fulltext_links(pmid: str) -> list[Dict[str, str]]:
             # PubMed uses a specific structure for full text links
             links = []
 
-            # Pattern 1: Look for LinkOut section with full text links
-            # Example: <a href="..." class="link-item" ...>Provider Name</a>
-            linkout_pattern = r'<a[^>]*href="([^"]+)"[^>]*class="[^"]*id_link[^"]*"[^>]*>([^<]+)</a>'
-            matches = re.findall(linkout_pattern, html)
+            # Pattern 1: Look for "Full text links" section
+            # The section contains provider buttons/links
+            # Example HTML structure:
+            # <div class="full-text-links-list">
+            #   <a href="..." data-ga-action="Wolters Kluwer">
+            #     <img alt="Wolters Kluwer" ...>
+            #   </a>
+            # </div>
 
-            for url, provider in matches:
-                # Clean up the URL (remove tracking parameters)
-                if url.startswith('http'):
-                    links.append({
-                        'provider': provider.strip(),
-                        'url': url
-                    })
-                    logger.debug(f"Found full text link: {provider.strip()} -> {url}")
+            # Try to find the full text links section
+            fulltext_section_match = re.search(
+                r'<div[^>]*class="[^"]*full-text-links[^"]*"[^>]*>(.*?)</div>',
+                html,
+                re.DOTALL | re.IGNORECASE
+            )
 
-            # Pattern 2: Look for PMC link specifically
+            if fulltext_section_match:
+                fulltext_section = fulltext_section_match.group(1)
+
+                # Extract links from the full text section
+                # Pattern: <a href="URL" ... data-ga-action="Provider" or alt="Provider">
+                link_patterns = [
+                    # Pattern 1: data-ga-action attribute
+                    r'<a[^>]*href="([^"]+)"[^>]*data-ga-action="([^"]+)"[^>]*>',
+                    # Pattern 2: img alt attribute
+                    r'<a[^>]*href="([^"]+)"[^>]*>.*?<img[^>]*alt="([^"]+)"[^>]*>',
+                ]
+
+                for pattern in link_patterns:
+                    matches = re.findall(pattern, fulltext_section, re.DOTALL)
+                    for url, provider in matches:
+                        if url.startswith('http') and not any(link['url'] == url for link in links):
+                            links.append({
+                                'provider': provider.strip(),
+                                'url': url
+                            })
+                            logger.debug(f"Found full text link: {provider.strip()} -> {url}")
+
+            # Pattern 2: Look for PMC link specifically (may be embargoed)
             pmc_pattern = r'href="(https://www\.ncbi\.nlm\.nih\.gov/pmc/articles/PMC\d+/?)"'
             pmc_matches = re.findall(pmc_pattern, html)
             if pmc_matches:
                 for pmc_url in pmc_matches:
                     if not any(link['url'] == pmc_url for link in links):
-                        links.append({
-                            'provider': 'PubMed Central',
-                            'url': pmc_url
-                        })
-                        logger.debug(f"Found PMC link: {pmc_url}")
+                        # Check if PMC article is embargoed
+                        # Look for "available on" text near the PMCID
+                        embargo_pattern = rf'PMC\d+.*?available on.*?(\d{{4}}-\d{{2}}-\d{{2}})'
+                        embargo_match = re.search(embargo_pattern, html, re.DOTALL)
+
+                        if embargo_match:
+                            embargo_date = embargo_match.group(1)
+                            logger.debug(f"PMC article is embargoed until {embargo_date}, skipping")
+                        else:
+                            links.append({
+                                'provider': 'PubMed Central',
+                                'url': pmc_url
+                            })
+                            logger.debug(f"Found PMC link: {pmc_url}")
 
             logger.info(f"📚 Found {len(links)} full text links for PMID {pmid}")
             return links
@@ -564,12 +597,31 @@ async def try_get_pdf_from_publisher_link(url: str, provider: str) -> Optional[s
         PDF URL if found, None otherwise
     """
     try:
+        # For PubMed LinkOut URLs, we need to follow the redirect first
+        # PubMed uses tracking URLs like: https://pubmed.ncbi.nlm.nih.gov/.../?linkout=...
+        actual_url = url
+
+        if 'pubmed.ncbi.nlm.nih.gov' in url and 'linkout' in url.lower():
+            try:
+                # Follow the redirect to get the actual publisher URL
+                async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, follow_redirects=True) as client:
+                    response = await client.head(url)
+                    actual_url = str(response.url)
+                    logger.debug(f"Followed PubMed LinkOut redirect: {url} -> {actual_url}")
+            except Exception as e:
+                logger.debug(f"Failed to follow redirect for {url}: {e}")
+                # Continue with original URL
+
         # Common PDF URL patterns for different publishers
         pdf_patterns = [
             # Direct PDF link
             lambda u: u if u.endswith('.pdf') else None,
             # Wiley pattern: /doi/epdf/
             lambda u: u.replace('/doi/', '/doi/epdf/') if '/doi/' in u and 'wiley.com' in u else None,
+            # Wolters Kluwer (LWW) pattern: Add /pdf to the end
+            lambda u: u.rstrip('/') + '/pdf' if 'lww.com' in u or 'wolterskluwer.com' in u else None,
+            # JASN (Journal of American Society of Nephrology) - Wolters Kluwer
+            lambda u: u.rstrip('/') + '/pdf' if 'jasn.asnjournals.org' in u else None,
             # Elsevier pattern: /pdf or /pdfft
             lambda u: u.replace('/article/', '/article/pii/') + '/pdf' if 'sciencedirect.com' in u else None,
             # Generic /pdf pattern
@@ -580,14 +632,14 @@ async def try_get_pdf_from_publisher_link(url: str, provider: str) -> Optional[s
 
         # Try each pattern
         for pattern_func in pdf_patterns:
-            pdf_url = pattern_func(url)
-            if pdf_url and pdf_url != url:  # Only try if pattern changed the URL
+            pdf_url = pattern_func(actual_url)
+            if pdf_url and pdf_url != actual_url:  # Only try if pattern changed the URL
                 logger.debug(f"Trying PDF pattern for {provider}: {pdf_url}")
                 return pdf_url
 
-        # If no pattern matched, return the original URL
+        # If no pattern matched, return the actual URL
         # (might be a direct PDF link or have a PDF on the page)
-        return url
+        return actual_url
 
     except Exception as e:
         logger.debug(f"Error generating PDF URL from {url}: {e}")
