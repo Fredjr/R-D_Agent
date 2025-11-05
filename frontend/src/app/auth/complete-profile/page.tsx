@@ -4,16 +4,11 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { CheckCircleIcon, UserIcon, BuildingOfficeIcon, AcademicCapIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon, UserIcon, BuildingOfficeIcon, AcademicCapIcon, CheckIcon, SparklesIcon, RocketLaunchIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import { validateObject, userProfileRules, formatValidationErrors } from '@/lib/validation';
 import { StepIndicator } from '@/components/onboarding/StepIndicator';
 import { Step2ResearchInterests } from '@/components/onboarding/Step2ResearchInterests';
-import { Step3FirstAction, FirstActionType } from '@/components/onboarding/Step3FirstAction';
-import Step4FirstProject from '@/components/onboarding/Step4FirstProject';
-import Step5SeedPaper from '@/components/onboarding/Step5SeedPaper';
-import Step6ExploreOrganize from '@/components/onboarding/Step6ExploreOrganize';
-import Step7FirstNote from '@/components/onboarding/Step7FirstNote';
 
 const CATEGORY_ROLES = {
   Student: ['Undergraduate', 'Postgraduate', 'PhD Student'],
@@ -25,9 +20,9 @@ export default function CompleteProfile() {
   const router = useRouter();
   const { completeRegistration } = useAuth();
 
-  // Multi-step wizard state
+  // Multi-step wizard state - SIMPLIFIED TO 3 STEPS
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 7;
+  const totalSteps = 3;
 
   // Step 1: Personal Information
   const [formData, setFormData] = useState({
@@ -41,26 +36,15 @@ export default function CompleteProfile() {
     joinMailingList: false
   });
 
-  // Step 2: Research Interests
+  // Step 2: Research Interests (OPTIONAL)
   const [researchInterests, setResearchInterests] = useState({
     topics: [] as string[],
     keywords: [] as string[],
     careerStage: ''
   });
 
-  // Step 3: First Action
-  const [firstAction, setFirstAction] = useState<FirstActionType | null>(null);
-
-  // Step 4: First Project
-  const [projectData, setProjectData] = useState({
-    name: '',
-    description: '',
-    researchQuestion: ''
-  });
-  const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
-
-  // Step 5: Seed Paper
-  const [seedPaper, setSeedPaper] = useState<{ pmid: string; title: string } | null>(null);
+  // Step 3: Completion state
+  const [wantsTour, setWantsTour] = useState<boolean | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -130,149 +114,27 @@ export default function CompleteProfile() {
   };
 
   const handleStep2Next = () => {
-    // Validate research interests
-    if (researchInterests.topics.length === 0 || !researchInterests.careerStage) {
-      setError('Please select at least one research topic and your career stage');
-      return;
-    }
-
+    // Step 2 is now OPTIONAL - no validation required
     setError(null);
     setCurrentStep(3);
   };
 
-  const handleStep3Next = () => {
-    // Validate first action selection
-    if (!firstAction) {
-      setError('Please select what you\'d like to do first');
-      return;
-    }
-
+  const handleStep2Skip = () => {
+    // Allow skipping research interests
     setError(null);
-    setCurrentStep(4);
+    setResearchInterests({
+      topics: [],
+      keywords: [],
+      careerStage: ''
+    });
+    setCurrentStep(3);
   };
 
-  const handleStep4Complete = async (data: {
-    name: string;
-    description: string;
-    researchQuestion: string;
-  }) => {
-    setError(null);
-    setIsLoading(true);
-    setProjectData(data);
-
-    try {
-      // Get user data for User-ID header
-      const savedUser = localStorage.getItem('rd_agent_user');
-      if (!savedUser) {
-        throw new Error('User not authenticated');
-      }
-      const userData = JSON.parse(savedUser);
-
-      // Create the project
-      const projectResponse = await fetch('/api/proxy/projects', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-ID': userData.user_id || userData.email,
-        },
-        body: JSON.stringify({
-          name: data.name,
-          description: data.description,
-          settings: {
-            research_question: data.researchQuestion,
-          },
-        }),
-      });
-
-      if (!projectResponse.ok) {
-        const errorData = await projectResponse.json();
-        throw new Error(errorData.error || 'Failed to create project');
-      }
-
-      const project = await projectResponse.json();
-      setCreatedProjectId(project.project_id);
-
-      // Move to Step 5 (Seed Paper)
-      setCurrentStep(5);
-      setIsLoading(false);
-    } catch (error: any) {
-      setError(error.message || 'Failed to create project. Please try again.');
-      setIsLoading(false);
-    }
-  };
-
-  const handleStep5Complete = async (selectedSeedPaper: { pmid: string; title: string } | null) => {
+  const handleCompleteOnboarding = async (takeTour: boolean) => {
     setIsLoading(true);
     setError(null);
+    setWantsTour(takeTour);
 
-    try {
-      setSeedPaper(selectedSeedPaper);
-
-      // If seed paper selected, update project settings
-      if (selectedSeedPaper && createdProjectId) {
-        console.log('📄 Saving seed paper to project:', selectedSeedPaper);
-
-        const updateResponse = await fetch(`/api/proxy/projects/${createdProjectId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'User-ID': 'default_user',
-          },
-          body: JSON.stringify({
-            settings: {
-              research_question: projectData.researchQuestion,
-              seed_pmid: selectedSeedPaper.pmid,
-              seed_title: selectedSeedPaper.title,
-            },
-          }),
-        });
-
-        if (!updateResponse.ok) {
-          console.error('Failed to update project with seed paper');
-        }
-      }
-
-      // Move to Step 6 (Explore & Organize)
-      setCurrentStep(6);
-      setIsLoading(false);
-    } catch (error: any) {
-      setError(error.message || 'Failed to save seed paper. Please try again.');
-      setIsLoading(false);
-    }
-  };
-
-  const handleStep6Complete = async (collectionCreated: boolean) => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      console.log('📁 Step 6 complete, collection created:', collectionCreated);
-
-      // Move to Step 7 (Add First Note)
-      setCurrentStep(7);
-      setIsLoading(false);
-    } catch (error: any) {
-      setError(error.message || 'Failed to proceed. Please try again.');
-      setIsLoading(false);
-    }
-  };
-
-  const handleStep7Complete = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      console.log('📝 Step 7 complete, finishing onboarding');
-
-      // Complete registration with all data
-      await handleFinalRegistration(createdProjectId!);
-    } catch (error: any) {
-      setError(error.message || 'Failed to complete onboarding. Please try again.');
-      setIsLoading(false);
-    }
-  };
-
-  const handleFinalRegistration = async (projectId: string) => {
     try {
       // Prepare data for backend
       const validationData = {
@@ -291,19 +153,23 @@ export default function CompleteProfile() {
         join_mailing_list: formData.joinMailingList,
         preferences: {
           research_interests: researchInterests,
-          first_action: firstAction,
-          first_project_id: projectId,
-          seed_paper: seedPaper,
+          wants_product_tour: takeTour,
           onboarding_completed: true,
-          onboarding_completed_at: new Date().toISOString()
+          onboarding_completed_at: new Date().toISOString(),
+          onboarding_version: '2.0' // Track new simplified onboarding
         }
       });
 
-      // Redirect to the newly created project
-      router.push(`/project/${projectId}?onboarding=complete`);
+      // Redirect based on user choice
+      if (takeTour) {
+        // Redirect to dashboard with tour parameter
+        router.push('/dashboard?tour=start');
+      } else {
+        // Redirect directly to dashboard
+        router.push('/dashboard');
+      }
     } catch (error: any) {
       setError(error.message || 'Registration failed. Please try again.');
-    } finally {
       setIsLoading(false);
     }
   };
@@ -314,15 +180,11 @@ export default function CompleteProfile() {
     setCurrentStep(prev => Math.max(1, prev - 1));
   };
 
-  // Step definitions for indicator
+  // Step definitions for indicator - SIMPLIFIED TO 3 STEPS
   const steps = [
     { number: 1, label: 'Profile', description: 'Basic info' },
-    { number: 2, label: 'Interests', description: 'Research areas' },
-    { number: 3, label: 'Get Started', description: 'First action' },
-    { number: 4, label: 'First Project', description: 'Create project' },
-    { number: 5, label: 'Seed Paper', description: 'Find first paper' },
-    { number: 6, label: 'Organize', description: 'Create collection' },
-    { number: 7, label: 'First Note', description: 'Add annotation' }
+    { number: 2, label: 'Interests', description: 'Research areas (optional)' },
+    { number: 3, label: 'Complete', description: 'Get started!' }
   ];
 
   return (
@@ -540,64 +402,120 @@ export default function CompleteProfile() {
         </form>
         )}
 
-        {/* Step 2: Research Interests */}
+        {/* Step 2: Research Interests (OPTIONAL) */}
         {currentStep === 2 && (
-          <Step2ResearchInterests
-            data={researchInterests}
-            onChange={setResearchInterests}
-            onNext={handleStep2Next}
-            onBack={handleBack}
-          />
+          <div className="space-y-6">
+            <Step2ResearchInterests
+              data={researchInterests}
+              onChange={setResearchInterests}
+              onNext={handleStep2Next}
+              onBack={handleBack}
+            />
+
+            {/* Skip Button */}
+            <div className="flex justify-center pt-4">
+              <button
+                type="button"
+                onClick={handleStep2Skip}
+                className="text-gray-600 hover:text-gray-800 text-sm font-medium underline"
+              >
+                Skip this step - I'll add my interests later
+              </button>
+            </div>
+          </div>
         )}
 
-        {/* Step 3: First Action */}
+        {/* Step 3: Completion Screen */}
         {currentStep === 3 && (
-          <Step3FirstAction
-            selectedAction={firstAction}
-            onSelectAction={setFirstAction}
-            onBack={handleBack}
-            onComplete={handleStep3Next}
-            hasTopics={researchInterests.topics.length > 0}
-          />
-        )}
+          <div className="space-y-8 py-8">
+            {/* Success Icon */}
+            <div className="flex justify-center">
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
+                <CheckCircleIcon className="w-12 h-12 text-green-600" />
+              </div>
+            </div>
 
-        {/* Step 4: First Project */}
-        {currentStep === 4 && (
-          <Step4FirstProject
-            researchInterests={researchInterests.topics}
-            onBack={handleBack}
-            onNext={handleStep4Complete}
-          />
-        )}
+            {/* Success Message */}
+            <div className="text-center space-y-3">
+              <h2 className="text-3xl font-bold text-gray-900">
+                🎉 Your Account is Ready!
+              </h2>
+              <p className="text-lg text-gray-600">
+                Welcome to R&D Agent, {formData.firstName}!
+              </p>
+              <p className="text-gray-500 max-w-2xl mx-auto">
+                You're all set to start exploring research papers, organizing your work, and discovering insights.
+              </p>
+            </div>
 
-        {/* Step 5: Seed Paper */}
-        {currentStep === 5 && (
-          <Step5SeedPaper
-            researchQuestion={projectData.researchQuestion}
-            researchInterests={researchInterests.topics}
-            onBack={handleBack}
-            onComplete={handleStep5Complete}
-          />
-        )}
+            {/* Tour Options */}
+            <div className="max-w-3xl mx-auto space-y-4">
+              <h3 className="text-center text-lg font-semibold text-gray-900 mb-6">
+                Would you like a quick tour?
+              </h3>
 
-        {/* Step 6: Explore & Organize */}
-        {currentStep === 6 && (
-          <Step6ExploreOrganize
-            seedPaper={seedPaper}
-            projectId={createdProjectId!}
-            onBack={handleBack}
-            onComplete={handleStep6Complete}
-          />
-        )}
+              {/* Option 1: Take Tour */}
+              <button
+                onClick={() => handleCompleteOnboarding(true)}
+                disabled={isLoading}
+                className="w-full p-6 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                      <SparklesIcon className="w-7 h-7" />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-lg font-semibold">Yes, show me around!</div>
+                      <div className="text-sm text-blue-100">
+                        5-minute interactive tour of key features
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-2xl">→</div>
+                </div>
+              </button>
 
-        {/* Step 7: First Note */}
-        {currentStep === 7 && (
-          <Step7FirstNote
-            seedPaper={seedPaper}
-            projectId={createdProjectId!}
-            onBack={handleBack}
-            onComplete={handleStep7Complete}
-          />
+              {/* Option 2: Skip Tour */}
+              <button
+                onClick={() => handleCompleteOnboarding(false)}
+                disabled={isLoading}
+                className="w-full p-6 bg-white hover:bg-gray-50 border-2 border-gray-300 hover:border-gray-400 text-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                      <RocketLaunchIcon className="w-7 h-7 text-gray-600" />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-lg font-semibold">No thanks, let me explore</div>
+                      <div className="text-sm text-gray-500">
+                        Jump straight to your dashboard
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-2xl">→</div>
+                </div>
+              </button>
+
+              {/* Help Text */}
+              <p className="text-center text-sm text-gray-500 pt-4">
+                Don't worry - you can always access the tour later from Settings
+              </p>
+            </div>
+
+            {/* Back Button */}
+            <div className="flex justify-center pt-6">
+              <button
+                type="button"
+                onClick={handleBack}
+                disabled={isLoading}
+                className="text-gray-600 hover:text-gray-800 text-sm font-medium disabled:opacity-50"
+              >
+                ← Back
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Loading Overlay */}
