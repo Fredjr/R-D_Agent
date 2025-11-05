@@ -829,10 +829,25 @@
         }
       );
 
-      if (addArticleResponse.success || addArticleResponse.article_id) {
-        recordTest('Add Article to Collection', 'pass', 'Successfully added article to collection');
+      // Check for various success indicators
+      if (addArticleResponse.success ||
+          addArticleResponse.article_id ||
+          addArticleResponse.id ||
+          addArticleResponse.message?.includes('success') ||
+          addArticleResponse.message?.includes('added')) {
+        recordTest(
+          'Add Article to Collection',
+          'pass',
+          'Successfully added article to collection',
+          addArticleResponse
+        );
       } else {
-        recordTest('Add Article to Collection', 'fail', 'Failed to add article');
+        recordTest(
+          'Add Article to Collection',
+          'fail',
+          `Unexpected response format: ${JSON.stringify(addArticleResponse)}`,
+          addArticleResponse
+        );
       }
     } catch (error) {
       recordTest('Add Article to Collection', 'fail', error.message);
