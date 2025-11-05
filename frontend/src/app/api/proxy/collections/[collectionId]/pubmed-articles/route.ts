@@ -95,11 +95,11 @@ export async function POST(
     
     // Prepare article data for backend
     const articleData = {
-      pmid: article.pmid,
-      title: article.title,
-      authors: article.authors || [],
-      journal: article.journal || '',
-      year: article.year || new Date().getFullYear(),
+      article_pmid: article.pmid,
+      article_title: article.title,
+      article_authors: article.authors || [],
+      article_journal: article.journal || '',
+      article_year: article.year || new Date().getFullYear(),
       notes: notes || '',
       source_type: 'pubmed_exploration',
       // Store PubMed discovery context as JSON string for backend compatibility

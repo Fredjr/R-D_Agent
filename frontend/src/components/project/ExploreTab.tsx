@@ -130,7 +130,10 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
       }
 
       const data = await response.json();
-      setCollections(data.collections || []);
+      // Backend returns array directly, not wrapped in {collections: [...]}
+      const collectionsArray = Array.isArray(data) ? data : (data.collections || []);
+      console.log('📚 Fetched collections:', collectionsArray);
+      setCollections(collectionsArray);
     } catch (error) {
       console.error('❌ Error fetching collections:', error);
       setCollections([]);
