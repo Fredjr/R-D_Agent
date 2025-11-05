@@ -55,8 +55,9 @@ export function formatNoteType(noteType: NoteType): string {
     todo: 'To-Do',
     comparison: 'Comparison',
     critique: 'Critique',
+    highlight: 'Highlight',
   };
-  
+
   return labels[noteType] || noteType;
 }
 
@@ -99,8 +100,9 @@ export function getNoteTypeColor(noteType: NoteType): string {
     todo: 'green',
     comparison: 'orange',
     critique: 'red',
+    highlight: 'yellow',  // Highlights use yellow like questions
   };
-  
+
   return colors[noteType] || 'gray';
 }
 

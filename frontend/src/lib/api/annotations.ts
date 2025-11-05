@@ -7,14 +7,15 @@
 // Types
 // ============================================================================
 
-export type NoteType = 
+export type NoteType =
   | 'general'
   | 'finding'
   | 'hypothesis'
   | 'question'
   | 'todo'
   | 'comparison'
-  | 'critique';
+  | 'critique'
+  | 'highlight';  // PDF highlight annotations
 
 export type Priority = 
   | 'low'

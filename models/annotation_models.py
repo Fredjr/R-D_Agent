@@ -20,6 +20,7 @@ class NoteType(str, Enum):
     TODO = "todo"
     COMPARISON = "comparison"
     CRITIQUE = "critique"
+    HIGHLIGHT = "highlight"  # PDF highlight annotations
 
 
 class Priority(str, Enum):
