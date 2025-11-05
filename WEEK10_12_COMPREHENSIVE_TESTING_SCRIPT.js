@@ -241,9 +241,9 @@
   let testAnnotationId = null;
   try {
     const annotationData = {
-      content: `Test highlight annotation created at ${new Date().toISOString()}`,
+      content: `Test annotation created at ${new Date().toISOString()}`,
       article_pmid: CONFIG.TEST_PMID,
-      note_type: 'highlight',
+      note_type: 'finding', // Valid note_type: general, finding, hypothesis, question, todo, comparison, critique
       priority: 'medium',
       status: 'active',
       pdf_page: 1,
@@ -285,10 +285,12 @@
   // Test 4: Retrieve PDF Annotations
   log.test('Retrieve PDF Annotations');
   try {
-    const annotations = await apiRequest(`/projects/${projectId}/annotations?article_pmid=${CONFIG.TEST_PMID}`);
-    
+    const response = await apiRequest(`/projects/${projectId}/annotations?article_pmid=${CONFIG.TEST_PMID}`);
+
+    // Handle both array and object responses
+    const annotations = Array.isArray(response) ? response : (response.annotations || []);
     const pdfAnnotations = annotations.filter(a => a.pdf_page !== null && a.pdf_page !== undefined);
-    
+
     if (pdfAnnotations.length > 0) {
       recordTest(
         'Retrieve PDF Annotations',
@@ -780,7 +782,7 @@
   let testCollectionId = null;
   try {
     const collectionData = {
-      name: `Test Collection ${Date.now()}`,
+      collection_name: `Test Collection ${Date.now()}`, // Backend expects 'collection_name' not 'name'
       description: 'Created by comprehensive testing script'
     };
 
@@ -929,11 +931,14 @@
   // Test 30: Get All Annotations for Project
   log.test('Get All Project Annotations');
   try {
-    const annotations = await apiRequest(`/projects/${projectId}/annotations`);
+    const response = await apiRequest(`/projects/${projectId}/annotations`);
+
+    // Handle both array and object responses
+    const annotations = Array.isArray(response) ? response : (response.annotations || []);
 
     if (Array.isArray(annotations)) {
-      const pdfAnnotations = annotations.filter(a => a.pdf_page !== null);
-      const regularNotes = annotations.filter(a => a.pdf_page === null);
+      const pdfAnnotations = annotations.filter(a => a.pdf_page !== null && a.pdf_page !== undefined);
+      const regularNotes = annotations.filter(a => a.pdf_page === null || a.pdf_page === undefined);
 
       recordTest(
         'Get All Project Annotations',
