@@ -69,34 +69,34 @@ def register_pdf_endpoints(app):
 
             # Try multiple sources in parallel for speed
             results = await asyncio.gather(
+                get_europepmc_pdf_url(pmid),  # Europe PMC first (no PoW challenge)
                 get_pmc_pdf_url(pmid),
-                get_europepmc_pdf_url(pmid),
                 get_cochrane_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
                 get_nihr_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
                 get_unpaywall_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
                 return_exceptions=True
             )
 
-            pmc_url, europepmc_url, cochrane_url, nihr_url, unpaywall_url = results
-            
-            # Check PMC first (most reliable)
-            if pmc_url and not isinstance(pmc_url, Exception):
-                logger.info(f"✅ Found PDF in PubMed Central: {pmid}")
-                return {
-                    "pmid": pmid,
-                    "source": "pmc",
-                    "url": pmc_url,
-                    "pdf_available": True,
-                    "title": article_title
-                }
+            europepmc_url, pmc_url, cochrane_url, nihr_url, unpaywall_url = results
 
-            # Check Europe PMC
+            # Check Europe PMC first (no Proof-of-Work challenge, unlike PMC)
             if europepmc_url and not isinstance(europepmc_url, Exception):
                 logger.info(f"✅ Found PDF in Europe PMC: {pmid}")
                 return {
                     "pmid": pmid,
                     "source": "europepmc",
                     "url": europepmc_url,
+                    "pdf_available": True,
+                    "title": article_title
+                }
+
+            # Check PMC (may require Proof-of-Work challenge)
+            if pmc_url and not isinstance(pmc_url, Exception):
+                logger.info(f"✅ Found PDF in PubMed Central: {pmid}")
+                return {
+                    "pmid": pmid,
+                    "source": "pmc",
+                    "url": pmc_url,
                     "pdf_available": True,
                     "title": article_title
                 }
@@ -304,8 +304,9 @@ async def get_pmc_pdf_url(pmid: str) -> Optional[str]:
 async def get_europepmc_pdf_url(pmid: str) -> Optional[str]:
     """
     Get PDF URL from Europe PMC.
-    
+
     Europe PMC is an alternative source for free full-text articles.
+    Unlike PMC, Europe PMC does not require Proof-of-Work challenges.
     """
     try:
         async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
@@ -313,27 +314,28 @@ async def get_europepmc_pdf_url(pmid: str) -> Optional[str]:
             response = await client.get(
                 f"https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID:{pmid}&format=json"
             )
-            
+
             if response.status_code != 200:
                 logger.debug(f"Europe PMC returned {response.status_code} for {pmid}")
                 return None
-            
+
             data = response.json()
-            
+
             if "resultList" in data and "result" in data["resultList"]:
                 results = data["resultList"]["result"]
                 if len(results) > 0:
                     result = results[0]
-                    # Check if full text is available
-                    if result.get("isOpenAccess") == "Y" and "pmcid" in result:
+                    # Check if PDF is available (hasPDF) and article is in Europe PMC (inEPMC)
+                    # Note: Some articles have hasPDF=Y even if isOpenAccess=N (e.g., PMC embargoed articles)
+                    if result.get("hasPDF") == "Y" and result.get("inEPMC") == "Y" and "pmcid" in result:
                         pmcid = result["pmcid"]
                         # Europe PMC PDF URL format
                         pdf_url = f"https://europepmc.org/articles/{pmcid}?pdf=render"
                         logger.debug(f"Found Europe PMC PDF: {pdf_url}")
                         return pdf_url
-            
+
             return None
-            
+
     except Exception as e:
         logger.debug(f"Europe PMC lookup failed for {pmid}: {e}")
         return None
