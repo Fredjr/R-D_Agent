@@ -86,13 +86,21 @@
     return match ? match[1] : null;
   };
 
-  // Get user ID from localStorage or cookies
+  // Get user ID from localStorage
   const getUserId = () => {
     try {
-      const authData = localStorage.getItem('auth');
-      if (authData) {
-        const parsed = JSON.parse(authData);
-        return parsed.user?.email || parsed.user?.id || null;
+      // Check rd_agent_user (primary storage)
+      const rdAgentUser = localStorage.getItem('rd_agent_user');
+      if (rdAgentUser) {
+        const parsed = JSON.parse(rdAgentUser);
+        return parsed.email || parsed.user_id || null;
+      }
+
+      // Fallback: check for user_profile_ keys
+      const keys = Object.keys(localStorage);
+      const userProfileKey = keys.find(k => k.startsWith('user_profile_') && k.includes('@'));
+      if (userProfileKey) {
+        return userProfileKey.replace('user_profile_', '');
       }
     } catch (e) {
       log.warning('Could not parse auth data from localStorage');
