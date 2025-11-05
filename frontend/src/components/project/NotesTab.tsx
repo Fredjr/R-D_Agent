@@ -1,10 +1,11 @@
 'use client';
 
-// CACHE BUSTER: Force new bundle hash - v2.0.2 - 2025-11-01T16:00:00Z
+// CACHE BUSTER: Force new bundle hash - v2.0.3 - 2025-11-05T12:00:00Z
 import React, { useState, useMemo, useEffect } from 'react';
 import { FunnelIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import AnnotationList from '@/components/annotations/AnnotationList';
+import CollectionScopeFilter from '@/components/annotations/CollectionScopeFilter';
 import type { NoteType, Priority, Status } from '@/lib/api/annotations';
 import FilterPanel, { type FilterSection } from '@/components/filters/FilterPanel';
 import FilterChips, { type FilterChip } from '@/components/filters/FilterChips';
@@ -36,6 +37,9 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
   const [dateRange, setDateRange] = useState<[number, number] | null>(null);
   const [hasActionItems, setHasActionItems] = useState(false);
   const [selectedAuthor, setSelectedAuthor] = useState<string>('all');
+
+  // 📚 Collection scope filter
+  const [selectedCollectionScope, setSelectedCollectionScope] = useState<string | 'all' | 'unlinked'>('all');
 
   // Fetch annotations when component mounts or project changes
   useEffect(() => {
@@ -82,6 +86,17 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
   // Filter annotations based on criteria
   const filteredAnnotations = useMemo(() => {
     return allAnnotations.filter((note: any) => {
+      // 📚 Collection scope filter (NEW - highest priority)
+      if (selectedCollectionScope !== 'all') {
+        if (selectedCollectionScope === 'unlinked') {
+          // Show only notes with no collection_id
+          if (note.collection_id) return false;
+        } else {
+          // Show only notes linked to the selected collection
+          if (note.collection_id !== selectedCollectionScope) return false;
+        }
+      }
+
       // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -150,7 +165,7 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
 
       return true;
     });
-  }, [allAnnotations, searchQuery, selectedType, selectedPriority, selectedStatus, viewMode, selectedTags, dateRange, hasActionItems, selectedAuthor]);
+  }, [allAnnotations, searchQuery, selectedType, selectedPriority, selectedStatus, viewMode, selectedTags, dateRange, hasActionItems, selectedAuthor, selectedCollectionScope]);
 
   // Group annotations by hierarchy
   const groupedAnnotations = useMemo(() => {
@@ -201,6 +216,16 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
     return Array.from(authors).sort();
   }, [allAnnotations]);
 
+  // 📚 Calculate note counts per collection
+  const noteCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    allAnnotations.forEach(note => {
+      const key = note.collection_id || 'unlinked';
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    return counts;
+  }, [allAnnotations]);
+
   // Count active filters
   const activeFiltersCount =
     (selectedType !== 'all' ? 1 : 0) +
@@ -210,7 +235,8 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
     (selectedTags.length > 0 ? 1 : 0) +
     (dateRange ? 1 : 0) +
     (hasActionItems ? 1 : 0) +
-    (selectedAuthor !== 'all' ? 1 : 0);
+    (selectedAuthor !== 'all' ? 1 : 0) +
+    (selectedCollectionScope !== 'all' ? 1 : 0);
 
   const clearFilters = () => {
     setSelectedType('all');
@@ -222,6 +248,7 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
     setDateRange(null);
     setHasActionItems(false);
     setSelectedAuthor('all');
+    setSelectedCollectionScope('all');
   };
 
   // Show loading state
@@ -317,6 +344,22 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search notes by content, type, or tags..."
           className="w-full pl-12 pr-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900 placeholder-gray-500"
+        />
+      </div>
+
+      {/* 📚 Collection Scope Filter (NEW) */}
+      <div className="bg-white rounded-lg p-4 border border-gray-200">
+        <div className="mb-3">
+          <h3 className="text-sm font-semibold text-gray-900 mb-1">Filter by Collection</h3>
+          <p className="text-xs text-gray-600">
+            View notes from all collections, a specific collection, or unlinked project notes
+          </p>
+        </div>
+        <CollectionScopeFilter
+          projectId={project.project_id}
+          selectedScope={selectedCollectionScope}
+          onScopeChange={setSelectedCollectionScope}
+          noteCounts={noteCounts}
         />
       </div>
 

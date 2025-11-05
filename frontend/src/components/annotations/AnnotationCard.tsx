@@ -9,6 +9,8 @@ import {
   CheckCircleIcon,
   ClockIcon,
   UserCircleIcon,
+  FolderIcon,
+  GlobeAltIcon,
 } from '@heroicons/react/24/outline';
 import { CheckCircleIcon as CheckCircleIconSolid } from '@heroicons/react/24/solid';
 import type { Annotation } from '../../lib/api/annotations';
@@ -31,6 +33,7 @@ interface AnnotationCardProps {
   showContext?: boolean;
   compact?: boolean;
   className?: string;
+  collectionName?: string; // Optional: Pass collection name to avoid fetching
 }
 
 export default function AnnotationCard({
@@ -42,14 +45,22 @@ export default function AnnotationCard({
   showContext = true,
   compact = false,
   className = '',
+  collectionName,
 }: AnnotationCardProps) {
   const [showActions, setShowActions] = useState(false);
 
   const noteTypeColor = getNoteTypeColor(annotation.note_type);
   const priorityColor = getPriorityColor(annotation.priority);
   const statusColor = getStatusColor(annotation.status);
-  
+
   const incompleteActionItems = countIncompleteActionItems(annotation);
+
+  // Determine note scope
+  const noteScope = annotation.collection_id
+    ? 'collection'
+    : annotation.article_pmid
+      ? 'article'
+      : 'project';
   
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -103,6 +114,19 @@ export default function AnnotationCard({
           `}>
             {formatNoteType(annotation.note_type)}
           </span>
+
+          {/* Collection Scope Badge (NEW) */}
+          {annotation.collection_id ? (
+            <span className="flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+              <FolderIcon className="w-3 h-3" />
+              {collectionName || `Collection: ${annotation.collection_id.slice(0, 8)}...`}
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
+              <GlobeAltIcon className="w-3 h-3" />
+              Project-wide
+            </span>
+          )}
 
           {/* Priority Badge */}
           {annotation.priority !== 'medium' && (
