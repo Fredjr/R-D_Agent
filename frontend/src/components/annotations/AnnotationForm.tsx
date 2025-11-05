@@ -2,19 +2,20 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { 
-  PlusIcon, 
+import {
+  PlusIcon,
   XMarkIcon,
   TagIcon,
   CheckCircleIcon,
 } from '@heroicons/react/24/outline';
-import type { 
-  CreateAnnotationRequest, 
-  NoteType, 
-  Priority, 
+import type {
+  CreateAnnotationRequest,
+  NoteType,
+  Priority,
   Status,
   ActionItem,
 } from '../../lib/api/annotations';
+import CollectionSelector from './CollectionSelector';
 
 interface AnnotationFormProps {
   projectId: string;
@@ -30,6 +31,7 @@ interface AnnotationFormProps {
   placeholder?: string;
   compact?: boolean;
   className?: string;
+  showCollectionSelector?: boolean; // NEW: Option to show collection selector
 }
 
 export default function AnnotationForm({
@@ -37,7 +39,7 @@ export default function AnnotationForm({
   articlePmid,
   reportId,
   analysisId,
-  collectionId,
+  collectionId: initialCollectionId,
   parentAnnotationId,
   onSubmit,
   onCancel,
@@ -46,6 +48,7 @@ export default function AnnotationForm({
   placeholder = 'Add a note...',
   compact = false,
   className = '',
+  showCollectionSelector = false,
 }: AnnotationFormProps) {
   const [content, setContent] = useState('');
   const [noteType, setNoteType] = useState<NoteType>(defaultNoteType);
@@ -59,20 +62,25 @@ export default function AnnotationForm({
   const [submitting, setSubmitting] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(!compact);
 
+  // NEW: Collection selector state
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(
+    initialCollectionId || null
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!content.trim()) return;
-    
+
     setSubmitting(true);
-    
+
     try {
       await onSubmit({
         content: content.trim(),
         article_pmid: articlePmid,
         report_id: reportId,
         analysis_id: analysisId,
-        collection_id: collectionId,
+        collection_id: selectedCollectionId || undefined, // Use selected collection
         parent_annotation_id: parentAnnotationId,
         note_type: noteType,
         priority,
@@ -81,7 +89,7 @@ export default function AnnotationForm({
         action_items: actionItems,
         is_private: isPrivate,
       });
-      
+
       // Reset form
       setContent('');
       setTags([]);
@@ -91,6 +99,7 @@ export default function AnnotationForm({
       setStatus('active');
       setIsPrivate(false);
       setShowAdvanced(!compact);
+      setSelectedCollectionId(initialCollectionId || null); // Reset to initial
     } catch (error) {
       console.error('Failed to submit annotation:', error);
     } finally {
@@ -133,6 +142,18 @@ export default function AnnotationForm({
           disabled={submitting}
         />
       </div>
+
+      {/* Collection Selector (NEW) */}
+      {showCollectionSelector && (
+        <CollectionSelector
+          projectId={projectId}
+          selectedCollectionId={selectedCollectionId}
+          onCollectionChange={setSelectedCollectionId}
+          articlePmid={articlePmid}
+          compact={compact}
+          className="mb-2"
+        />
+      )}
 
       {/* Basic Controls */}
       <div className="flex flex-wrap gap-2">

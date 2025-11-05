@@ -26,11 +26,12 @@ interface AnnotationListProps {
   articlePmid?: string;
   reportId?: string;
   analysisId?: string;
-  collectionId?: string;
+  collectionId?: string | null;
   initialFilters?: AnnotationFilters;
   showForm?: boolean;
   compact?: boolean;
   className?: string;
+  showCollectionSelector?: boolean; // NEW: Pass to AnnotationForm
 }
 
 export default function AnnotationList({
@@ -44,6 +45,7 @@ export default function AnnotationList({
   showForm = true,
   compact = false,
   className = '',
+  showCollectionSelector = false,
 }: AnnotationListProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [showNewForm, setShowNewForm] = useState(false);
@@ -65,7 +67,7 @@ export default function AnnotationList({
     filters: {
       ...initialFilters,
       article_pmid: articlePmid,
-      collection_id: collectionId,
+      collection_id: collectionId === null ? undefined : collectionId,
     },
   });
 
@@ -308,10 +310,11 @@ export default function AnnotationList({
             articlePmid={articlePmid}
             reportId={reportId}
             analysisId={analysisId}
-            collectionId={collectionId}
+            collectionId={collectionId || undefined}
             onSubmit={handleCreate}
             onCancel={() => setShowNewForm(false)}
             compact={compact}
+            showCollectionSelector={showCollectionSelector}
           />
         </div>
       )}
@@ -344,12 +347,13 @@ export default function AnnotationList({
                     articlePmid={annotation.article_pmid}
                     reportId={annotation.report_id}
                     analysisId={annotation.analysis_id}
-                    collectionId={annotation.collection_id}
+                    collectionId={annotation.collection_id || undefined}
                     onSubmit={(data) => handleUpdate(annotation.annotation_id, data)}
                     onCancel={() => setEditingAnnotation(null)}
                     defaultNoteType={annotation.note_type}
                     defaultPriority={annotation.priority}
                     compact={compact}
+                    showCollectionSelector={showCollectionSelector}
                   />
                 </div>
               ) : (
@@ -371,12 +375,13 @@ export default function AnnotationList({
                     articlePmid={annotation.article_pmid}
                     reportId={annotation.report_id}
                     analysisId={annotation.analysis_id}
-                    collectionId={annotation.collection_id}
+                    collectionId={annotation.collection_id || undefined}
                     parentAnnotationId={annotation.annotation_id}
                     onSubmit={handleCreate}
                     onCancel={() => setReplyToId(null)}
                     placeholder="Write a reply..."
                     compact={true}
+                    showCollectionSelector={showCollectionSelector}
                   />
                 </div>
               )}

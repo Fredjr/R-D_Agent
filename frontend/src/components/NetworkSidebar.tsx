@@ -98,6 +98,10 @@ export default function NetworkSidebar({
   const [showCitations, setShowCitations] = useState(false);
   const [selectedCollection, setSelectedCollection] = useState<string>('');
   const [showCreateCollectionModal, setShowCreateCollectionModal] = useState(false);
+
+  // NEW: Collection context for article
+  const [articleCollections, setArticleCollections] = useState<any[]>([]);
+  const [noteCollectionScope, setNoteCollectionScope] = useState<string | 'all'>('all');
   const [newCollectionName, setNewCollectionName] = useState('');
   const [newCollectionDescription, setNewCollectionDescription] = useState('');
   const [creatingCollection, setCreatingCollection] = useState(false);
@@ -152,6 +156,62 @@ export default function NetworkSidebar({
       }
     };
   }, []);
+
+  // NEW: Fetch collections containing the current article
+  useEffect(() => {
+    const fetchArticleCollections = async () => {
+      if (!selectedNode?.id || !projectId) {
+        setArticleCollections([]);
+        return;
+      }
+
+      try {
+        // Fetch all project collections
+        const response = await fetch(`/api/proxy/projects/${projectId}/collections`, {
+          headers: {
+            'User-ID': user?.email || 'default_user',
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const allCollections = Array.isArray(data) ? data : (data.collections || []);
+
+          // Filter collections that contain this article
+          const collectionsWithArticle: any[] = [];
+          for (const collection of allCollections) {
+            const articlesResponse = await fetch(
+              `/api/proxy/collections/${collection.collection_id}/articles`,
+              {
+                headers: {
+                  'User-ID': user?.email || 'default_user',
+                },
+              }
+            );
+
+            if (articlesResponse.ok) {
+              const articlesData = await articlesResponse.json();
+              const articles = Array.isArray(articlesData) ? articlesData : (articlesData.articles || []);
+
+              // Check if this collection contains the article
+              if (articles.some((article: any) =>
+                article.pmid === selectedNode.id || article.article_pmid === selectedNode.id
+              )) {
+                collectionsWithArticle.push(collection);
+              }
+            }
+          }
+
+          setArticleCollections(collectionsWithArticle);
+        }
+      } catch (error) {
+        console.error('Error fetching article collections:', error);
+        setArticleCollections([]);
+      }
+    };
+
+    fetchArticleCollections();
+  }, [selectedNode?.id, projectId, user?.email]);
 
   const fetchPaperDetails = useCallback(async (pmid: string) => {
     setIsLoading(true);
@@ -1296,17 +1356,62 @@ export default function NetworkSidebar({
         </div>
       </div>
 
-      {/* Notes Section - NEW: Contextual Notes */}
+      {/* Notes Section - NEW: Contextual Notes with Collection Context */}
       {selectedNode && projectId && (
         <div className="border-t border-gray-200 flex-shrink-0">
-          <AnnotationList
-            projectId={projectId}
-            userId={user?.user_id}
-            articlePmid={selectedNode.id}
-            showForm={true}
-            compact={true}
-            className="p-3"
-          />
+          <div className="p-3 space-y-3">
+            {/* Collection Context (NEW) */}
+            {articleCollections.length > 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
+                <div className="text-xs font-medium text-blue-900 mb-1">
+                  📚 In Collections:
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {articleCollections.map((collection) => (
+                    <span
+                      key={collection.collection_id}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-white border border-blue-300 rounded-full text-blue-800"
+                    >
+                      {collection.collection_name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Note Scope Filter (NEW) */}
+            {articleCollections.length > 0 && (
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Note Scope:
+                </label>
+                <select
+                  value={noteCollectionScope}
+                  onChange={(e) => setNoteCollectionScope(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">All Notes</option>
+                  {articleCollections.map((collection) => (
+                    <option key={collection.collection_id} value={collection.collection_id}>
+                      {collection.collection_name}
+                    </option>
+                  ))}
+                  <option value="unlinked">Unlinked (Project-wide)</option>
+                </select>
+              </div>
+            )}
+
+            {/* Annotation List */}
+            <AnnotationList
+              projectId={projectId}
+              userId={user?.user_id}
+              articlePmid={selectedNode.id}
+              collectionId={noteCollectionScope === 'all' ? undefined : noteCollectionScope === 'unlinked' ? null : noteCollectionScope}
+              showForm={true}
+              compact={true}
+              showCollectionSelector={articleCollections.length > 0}
+            />
+          </div>
         </div>
       )}
 
