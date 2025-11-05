@@ -243,7 +243,7 @@ export async function GET(request: NextRequest) {
 
     console.log(`🔍 PubMed API: Fetching ${type} for PMID ${pmid} (limit: ${limit})`);
 
-    // Try to get from cache first (30 minute TTL for citations)
+    // Try to get from cache first (15 minute TTL for citations)
     try {
       const cached = await pubmedCache.get(
         '/api/proxy/pubmed/citations',
@@ -262,19 +262,11 @@ export async function GET(request: NextRequest) {
             article: sourceArticle ? { pmid: sourceArticle.pmid, title: sourceArticle.title } : null
           });
 
-          // If source article not found, create a minimal placeholder to avoid 404
+          // If source article not found, DON'T cache - throw error to retry later
           if (!sourceArticle) {
-            console.log(`⚠️ Article PMID ${pmid} not found in PubMed, creating placeholder`);
-            debugInfo.steps.push({ step: 'source_article_not_found', creating_placeholder: true });
-            sourceArticle = {
-              pmid,
-              title: `Article ${pmid}`,
-              authors: ['Unknown Author'],
-              journal: 'Unknown Journal',
-              year: new Date().getFullYear(),
-              citation_count: 0,
-              abstract: 'Abstract not available'
-            };
+            console.log(`⚠️ Article PMID ${pmid} not found in PubMed - will not cache this result`);
+            debugInfo.steps.push({ step: 'source_article_not_found', will_not_cache: true });
+            throw new Error(`Article PMID ${pmid} not found in PubMed`);
           }
 
           // Fetch related articles based on type
@@ -308,6 +300,7 @@ export async function GET(request: NextRequest) {
             debugInfo.steps.push({ step: 'no_results_found', type });
           }
 
+          // Only cache if we have valid source article data
           return {
             source_article: sourceArticle,
             citations: relatedArticles,
@@ -332,7 +325,36 @@ export async function GET(request: NextRequest) {
         return NextResponse.json(response);
       }
     } catch (cacheError) {
-      console.warn('⚠️ Cache error, falling back to direct API call:', cacheError);
+      console.warn('⚠️ Cache/PubMed fetch error - creating placeholder response:', cacheError);
+      debugInfo.steps.push({
+        step: 'cache_error',
+        error: cacheError instanceof Error ? cacheError.message : 'Unknown error'
+      });
+
+      // Create placeholder response (NOT cached) for graceful degradation
+      const placeholderResponse: any = {
+        source_article: {
+          pmid,
+          title: `Article ${pmid}`,
+          authors: ['Unknown Author'],
+          journal: 'Unknown Journal',
+          year: new Date().getFullYear(),
+          citation_count: 0,
+          abstract: 'Abstract not available'
+        },
+        citations: [],
+        total_count: 0,
+        limit,
+        cached: false,
+        _placeholder: true,
+        _error: cacheError instanceof Error ? cacheError.message : 'Failed to fetch from PubMed'
+      };
+
+      if (debug) {
+        placeholderResponse._debug = debugInfo;
+      }
+
+      return NextResponse.json(placeholderResponse);
     }
 
     // Fallback: Fetch directly if cache failed
