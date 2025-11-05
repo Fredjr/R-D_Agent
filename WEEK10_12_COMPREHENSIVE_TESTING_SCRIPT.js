@@ -818,7 +818,12 @@
         {
           method: 'POST',
           body: JSON.stringify({
-            pmid: CONFIG.TEST_PMID,
+            article_pmid: CONFIG.TEST_PMID,
+            article_title: 'Test Article for Collection',
+            article_authors: ['Test Author'],
+            article_journal: 'Test Journal',
+            article_year: 2024,
+            source_type: 'manual',
             notes: 'Added by testing script'
           })
         }
@@ -840,7 +845,10 @@
   if (testCollectionId) {
     log.test('Get Collection Articles');
     try {
-      const articles = await apiRequest(`/projects/${projectId}/collections/${testCollectionId}/articles`);
+      const response = await apiRequest(`/projects/${projectId}/collections/${testCollectionId}/articles`);
+
+      // Handle both array and object responses
+      const articles = Array.isArray(response) ? response : (response.articles || []);
 
       if (Array.isArray(articles)) {
         recordTest(
