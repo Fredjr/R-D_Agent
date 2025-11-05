@@ -297,6 +297,72 @@
 
   await sleep(500);
 
+  // Test 5: Update PDF Annotation
+  if (testAnnotationId) {
+    log.test('Update PDF Annotation');
+    try {
+      const updateData = {
+        content: 'Updated test annotation content',
+        priority: 'high'
+      };
+
+      const updateResponse = await apiRequest(`/projects/${projectId}/annotations/${testAnnotationId}`, {
+        method: 'PUT',
+        body: JSON.stringify(updateData)
+      });
+
+      if (updateResponse.annotation_id === testAnnotationId) {
+        recordTest('Update PDF Annotation', 'pass', 'Successfully updated annotation');
+      } else {
+        recordTest('Update PDF Annotation', 'fail', 'Update response mismatch');
+      }
+    } catch (error) {
+      recordTest('Update PDF Annotation', 'fail', error.message);
+    }
+  }
+
+  await sleep(500);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // WEEK 11 DAY 2-3: HIGHLIGHT TOOL & ANNOTATIONS SIDEBAR
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  log.section('🎨 WEEK 11 DAY 2-3: HIGHLIGHT TOOL & SIDEBAR');
+
+  // Test 6: Highlight Tool Component
+  log.test('Highlight Tool Component');
+  try {
+    const highlightToolExists = document.querySelector('[data-testid="highlight-tool"]') !== null ||
+                                document.querySelector('.highlight-tool') !== null;
+
+    if (highlightToolExists) {
+      recordTest('Highlight Tool Component', 'pass', 'Highlight tool found in DOM');
+    } else {
+      recordTest('Highlight Tool Component', 'warning', 'Highlight tool not visible (PDF viewer may be closed)');
+    }
+  } catch (error) {
+    recordTest('Highlight Tool Component', 'fail', error.message);
+  }
+
+  await sleep(500);
+
+  // Test 7: Annotations Sidebar Component
+  log.test('Annotations Sidebar Component');
+  try {
+    const sidebarExists = document.querySelector('[data-testid="annotations-sidebar"]') !== null ||
+                         document.querySelector('.annotations-sidebar') !== null;
+
+    if (sidebarExists) {
+      recordTest('Annotations Sidebar Component', 'pass', 'Annotations sidebar found in DOM');
+    } else {
+      recordTest('Annotations Sidebar Component', 'warning', 'Annotations sidebar not visible (PDF viewer may be closed)');
+    }
+  } catch (error) {
+    recordTest('Annotations Sidebar Component', 'fail', error.message);
+  }
+
+  await sleep(500);
+
   // ═══════════════════════════════════════════════════════════════════════════
   // WEEK 11 DAY 4-7: ENHANCED ONBOARDING TESTS
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1151,70 +1217,3 @@
   console.log('3. Check browser console for errors');
   console.log('4. Try refreshing the page and running again');
 });
-
-  // Test 5: Update PDF Annotation
-  if (testAnnotationId) {
-    log.test('Update PDF Annotation');
-    try {
-      const updateData = {
-        content: 'Updated test annotation content',
-        priority: 'high'
-      };
-      
-      const updateResponse = await apiRequest(`/projects/${projectId}/annotations/${testAnnotationId}`, {
-        method: 'PUT',
-        body: JSON.stringify(updateData)
-      });
-      
-      if (updateResponse.annotation_id === testAnnotationId) {
-        recordTest('Update PDF Annotation', 'pass', 'Successfully updated annotation');
-      } else {
-        recordTest('Update PDF Annotation', 'fail', 'Update response mismatch');
-      }
-    } catch (error) {
-      recordTest('Update PDF Annotation', 'fail', error.message);
-    }
-  }
-
-  await sleep(500);
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // WEEK 11 DAY 2-3: HIGHLIGHT TOOL & ANNOTATIONS SIDEBAR
-  // ═══════════════════════════════════════════════════════════════════════════
-  
-  log.section('🎨 WEEK 11 DAY 2-3: HIGHLIGHT TOOL & SIDEBAR');
-  
-  // Test 6: Highlight Tool Component
-  log.test('Highlight Tool Component');
-  try {
-    const highlightToolExists = document.querySelector('[data-testid="highlight-tool"]') !== null ||
-                                document.querySelector('.highlight-tool') !== null;
-    
-    if (highlightToolExists) {
-      recordTest('Highlight Tool Component', 'pass', 'Highlight tool found in DOM');
-    } else {
-      recordTest('Highlight Tool Component', 'warning', 'Highlight tool not visible (PDF viewer may be closed)');
-    }
-  } catch (error) {
-    recordTest('Highlight Tool Component', 'fail', error.message);
-  }
-
-  await sleep(500);
-
-  // Test 7: Annotations Sidebar Component
-  log.test('Annotations Sidebar Component');
-  try {
-    const sidebarExists = document.querySelector('[data-testid="annotations-sidebar"]') !== null ||
-                         document.querySelector('.annotations-sidebar') !== null;
-    
-    if (sidebarExists) {
-      recordTest('Annotations Sidebar Component', 'pass', 'Annotations sidebar found in DOM');
-    } else {
-      recordTest('Annotations Sidebar Component', 'warning', 'Annotations sidebar not visible (PDF viewer may be closed)');
-    }
-  } catch (error) {
-    recordTest('Annotations Sidebar Component', 'fail', error.message);
-  }
-
-  await sleep(500);
-
