@@ -7216,6 +7216,17 @@ async def search_project_content(
     # ═══════════════════════════════════════════════════════════
     if 'notes' in search_types:
         try:
+            # 🐛 DEBUG: Log search parameters
+            logger.info(f"🔍 [Search Notes] Project ID: {project_id}")
+            logger.info(f"🔍 [Search Notes] Query pattern: {query_pattern}")
+
+            # Count total annotations for this project
+            total_annotations = db.query(Annotation).filter(
+                Annotation.project_id == project_id
+            ).count()
+            logger.info(f"🔍 [Search Notes] Total annotations in project: {total_annotations}")
+
+            # Search annotations - INCLUDE highlight_text field for PDF annotations
             notes = db.query(Annotation).filter(
                 Annotation.project_id == project_id,
                 or_(
@@ -7223,9 +7234,13 @@ async def search_project_content(
                     # Search in tags JSON array
                     cast(Annotation.tags, String).ilike(query_pattern),
                     Annotation.note_type.ilike(query_pattern),
-                    Annotation.research_question.ilike(query_pattern)
+                    Annotation.research_question.ilike(query_pattern),
+                    # 🔧 FIX: Also search in highlight_text (PDF annotations)
+                    Annotation.highlight_text.ilike(query_pattern)
                 )
             ).limit(limit).all()
+
+            logger.info(f"🔍 [Search Notes] Found {len(notes)} matching notes")
 
             for note in notes:
                 # Determine context
@@ -7332,9 +7347,18 @@ async def search_project_content(
             Collection.project_id == project_id,
             Collection.is_active == True
         ).all()),
+        "total_annotations_in_project": db.query(Annotation).filter(
+            Annotation.project_id == project_id
+        ).count(),
         "query_pattern": query_pattern,
-        "search_types_requested": list(search_types)
+        "search_types_requested": list(search_types),
+        "user_id_resolved": user_id,
+        "project_id": project_id
     }
+
+    # 🐛 DEBUG: Log final results
+    logger.info(f"🔍 [Search Complete] Total found: {total_found}")
+    logger.info(f"🔍 [Search Complete] Notes: {len(results['notes'])}, Papers: {len(results['papers'])}, Collections: {len(results['collections'])}")
 
     return {
         "query": q,
