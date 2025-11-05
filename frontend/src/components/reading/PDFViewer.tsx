@@ -7,6 +7,7 @@ import { XMarkIcon, ChevronLeftIcon, ChevronRightIcon, MagnifyingGlassMinusIcon,
 import { useAuth } from '@/contexts/AuthContext';
 import HighlightTool from './HighlightTool';
 import HighlightLayer from './HighlightLayer';
+import SelectionOverlay from './SelectionOverlay';
 import AnnotationsSidebar from './AnnotationsSidebar';
 import type { Highlight, TextSelection, PDFCoordinates } from '@/types/pdf-annotations';
 
@@ -458,6 +459,15 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
         .react-pdf__Page__textContent span {
           opacity: 0 !important;
         }
+        /* Custom selection color for PDF text - make it subtle so our overlay is visible */
+        .react-pdf__Page__textContent ::selection {
+          background-color: rgba(59, 130, 246, 0.2);
+          color: inherit;
+        }
+        .react-pdf__Page__textContent ::-moz-selection {
+          background-color: rgba(59, 130, 246, 0.2);
+          color: inherit;
+        }
       `}</style>
 
       {/* Header */}
@@ -641,6 +651,13 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
       {projectId && (
         <HighlightTool
           onHighlight={handleHighlight}
+          isEnabled={highlightMode}
+        />
+      )}
+
+      {/* Selection Overlay - real-time blue highlight during text selection */}
+      {projectId && (
+        <SelectionOverlay
           isEnabled={highlightMode}
         />
       )}
