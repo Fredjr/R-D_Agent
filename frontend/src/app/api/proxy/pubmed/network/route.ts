@@ -296,19 +296,21 @@ export async function GET(request: NextRequest) {
 
     // Fetch source article details
     const sourceArticles = await fetchArticleDetails([pmid]);
-    const sourceArticle = sourceArticles[0];
+    let sourceArticle = sourceArticles[0];
 
-    // If source article not found, return error (don't create placeholder)
+    // If source article not found, create placeholder but continue with network fetch
+    // This allows us to still find related papers even if the source article fetch fails
     if (!sourceArticle) {
-      console.log(`⚠️ Article PMID ${pmid} not found in PubMed`);
-      return NextResponse.json(
-        {
-          error: 'Article not found in PubMed',
-          pmid,
-          details: 'The article may not be indexed in PubMed yet, or the PMID may be invalid.'
-        },
-        { status: 404 }
-      );
+      console.log(`⚠️ Article PMID ${pmid} not found in PubMed - creating placeholder and continuing with network fetch`);
+      sourceArticle = {
+        pmid,
+        title: `Article ${pmid}`,
+        authors: ['Unknown Author'],
+        journal: 'Unknown Journal',
+        year: new Date().getFullYear(),
+        citation_count: 0,
+        abstract: 'Abstract not available'
+      };
     }
 
     // Initialize network data
