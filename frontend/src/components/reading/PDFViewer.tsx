@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/Page/TextLayer.css';
 import { XMarkIcon, ChevronLeftIcon, ChevronRightIcon, MagnifyingGlassMinusIcon, MagnifyingGlassPlusIcon, PencilIcon, Bars3Icon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import HighlightTool from './HighlightTool';
@@ -448,6 +449,17 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex flex-col">
+      {/* Custom CSS to make text layer invisible but selectable */}
+      <style jsx global>{`
+        .react-pdf__Page__textContent {
+          opacity: 0 !important;
+          pointer-events: auto !important;
+        }
+        .react-pdf__Page__textContent span {
+          opacity: 0 !important;
+        }
+      `}</style>
+
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -586,7 +598,7 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
                 <Page
                   pageNumber={pageNumber}
                   scale={scale}
-                  renderTextLayer={false}
+                  renderTextLayer={true}
                   renderAnnotationLayer={false}
                   inputRef={(ref) => {
                     if (ref) {
