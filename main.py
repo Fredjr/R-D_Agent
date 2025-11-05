@@ -5548,15 +5548,18 @@ async def get_collaborators(
     try:
         current_user = request.headers.get("User-ID", "default_user")
 
+        # Resolve email to UUID
+        user_id = resolve_user_id(current_user, db)
+
         # Check project access
         has_access = (
             db.query(Project).filter(
                 Project.project_id == project_id,
-                Project.owner_user_id == current_user
+                Project.owner_user_id == user_id
             ).first() is not None or
             db.query(ProjectCollaborator).filter(
                 ProjectCollaborator.project_id == project_id,
-                ProjectCollaborator.user_id == current_user,
+                ProjectCollaborator.user_id == user_id,
                 ProjectCollaborator.is_active == True
             ).first() is not None
         )
@@ -6064,15 +6067,18 @@ async def get_annotations(
     """Get all annotations for a project with optional filters"""
     current_user = request.headers.get("User-ID", "default_user")
 
+    # Resolve email to UUID
+    user_id = resolve_user_id(current_user, db)
+
     # Check project access
     has_access = (
         db.query(Project).filter(
             Project.project_id == project_id,
-            Project.owner_user_id == current_user
+            Project.owner_user_id == user_id
         ).first() is not None or
         db.query(ProjectCollaborator).filter(
             ProjectCollaborator.project_id == project_id,
-            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.user_id == user_id,
             ProjectCollaborator.is_active == True
         ).first() is not None
     )
@@ -8355,22 +8361,25 @@ async def get_activity_logs(
 ):
     """Get activity logs for a project"""
     from database import ActivityLog
-    
+
     current_user = request.headers.get("User-ID", "default_user")
-    
+
+    # Resolve email to UUID
+    user_id = resolve_user_id(current_user, db)
+
     # Check project access
     has_access = (
         db.query(Project).filter(
             Project.project_id == project_id,
-            Project.owner_user_id == current_user
+            Project.owner_user_id == user_id
         ).first() is not None or
         db.query(ProjectCollaborator).filter(
             ProjectCollaborator.project_id == project_id,
-            ProjectCollaborator.user_id == current_user,
+            ProjectCollaborator.user_id == user_id,
             ProjectCollaborator.is_active == True
         ).first() is not None
     )
-    
+
     if not has_access:
         raise HTTPException(status_code=403, detail="Access denied")
     
@@ -12485,16 +12494,19 @@ async def get_project_network(
 ):
     """Get network graph for all articles in a project"""
     try:
+        # Resolve email to UUID
+        resolved_user_id = resolve_user_id(user_id, db)
+
         # Verify project access
         project = db.query(Project).filter(Project.project_id == project_id).first()
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
 
         # Check if user has access to this project
-        if project.owner_user_id != user_id:
+        if project.owner_user_id != resolved_user_id:
             collaborator = db.query(ProjectCollaborator).filter(
                 ProjectCollaborator.project_id == project_id,
-                ProjectCollaborator.user_id == user_id
+                ProjectCollaborator.user_id == resolved_user_id
             ).first()
             if not collaborator:
                 raise HTTPException(status_code=403, detail="Access denied")
@@ -12504,7 +12516,7 @@ async def get_project_network(
 
         # Log activity
         await log_activity(
-            project_id, user_id,
+            project_id, resolved_user_id,
             "network_viewed",
             f"Viewed network graph for project: {project.project_name}",
             {"source_type": "project", "node_count": len(graph_data.get("nodes", []))},
