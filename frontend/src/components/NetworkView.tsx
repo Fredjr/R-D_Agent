@@ -762,10 +762,12 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       // ARTICLE NETWORK FALLBACK: If article network is empty or has only 1 node, try multiple strategies
       if (sourceType === 'article' && (!data.nodes || data.nodes.length <= 1)) {
         console.log('Article network empty/single node, trying fallback strategies...');
+        console.log('🔍 Note: Fallback strategies ignore "Full-Text Only" filter to maximize results');
 
         // Strategy 1: Try citations (papers that cite this one)
-        console.log('📊 Fallback Strategy 1: Trying citations...');
-        const citationsResponse = await fetch(`/api/proxy/pubmed/network?pmid=${sourceId}&type=citations&limit=10${oaParam}`, {
+        // NOTE: We ignore fullTextOnly filter in fallback to maximize chance of finding related papers
+        console.log('📊 Fallback Strategy 1: Trying citations (without OA filter)...');
+        const citationsResponse = await fetch(`/api/proxy/pubmed/network?pmid=${sourceId}&type=citations&limit=15`, {
           headers: {
             'User-ID': user?.email || 'default_user',
           },
@@ -790,8 +792,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
         // Strategy 2: If citations failed, try references (papers this one cites)
         if (!data.nodes || data.nodes.length <= 1) {
-          console.log('📊 Fallback Strategy 2: Trying references...');
-          const refsResponse = await fetch(`/api/proxy/pubmed/network?pmid=${sourceId}&type=references&limit=10${oaParam}`, {
+          console.log('📊 Fallback Strategy 2: Trying references (without OA filter)...');
+          const refsResponse = await fetch(`/api/proxy/pubmed/network?pmid=${sourceId}&type=references&limit=15`, {
             headers: {
               'User-ID': user?.email || 'default_user',
             },
@@ -816,9 +818,10 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         }
 
         // Strategy 3: If both failed, try similar papers (semantic/topic similarity)
+        // This is the most important fallback for new papers!
         if (!data.nodes || data.nodes.length <= 1) {
-          console.log('📊 Fallback Strategy 3: Trying similar papers (semantic similarity)...');
-          const similarResponse = await fetch(`/api/proxy/pubmed/network?pmid=${sourceId}&type=similar&limit=15${oaParam}`, {
+          console.log('📊 Fallback Strategy 3: Trying similar papers (without OA filter)...');
+          const similarResponse = await fetch(`/api/proxy/pubmed/network?pmid=${sourceId}&type=similar&limit=20`, {
             headers: {
               'User-ID': user?.email || 'default_user',
             },
