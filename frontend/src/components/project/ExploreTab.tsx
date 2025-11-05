@@ -218,6 +218,10 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
 
   // Helper function to add article to collection
   const addArticleToCollection = async (collectionId: string, article: PubMedArticle) => {
+    if (!user?.email) {
+      throw new Error('User not authenticated');
+    }
+
     const response = await fetch(`/api/proxy/collections/${collectionId}/pubmed-articles`, {
       method: 'POST',
       headers: {
