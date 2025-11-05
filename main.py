@@ -2972,6 +2972,85 @@ def _filter_candidates_by_molecule(candidates: list[dict], molecule: Optional[st
     # If too few explicit hits, keep all hits and top-up with non-hits
     return hits + non_hits[: max(0, minimum_keep - len(hits))]
 
+async def _calculate_contextual_match_batch(objective: str, items: list[dict], deadline: float) -> list[float]:
+    """
+    Calculate contextual match scores for all articles in parallel.
+    Falls back to token-overlap heuristic if timeout occurs.
+
+    OPTIMIZATION: This function parallelizes LLM calls to calculate contextual match scores
+    for all articles at once, reducing total time from O(n*t) to O(t) where n=number of articles
+    and t=time per LLM call. This prevents timeout issues in Precision mode.
+
+    Args:
+        objective: User's research objective
+        items: List of article dictionaries with 'abstract' field
+        deadline: Unix timestamp deadline for completion
+
+    Returns:
+        List of contextual match scores (0-100) for each article
+    """
+    scores = []
+
+    # Helper function for token-overlap heuristic (fallback)
+    def _token_overlap_score(obj: str, abstract: str) -> float:
+        try:
+            obj_lower = (obj or "").lower()
+            ab_lower = (abstract or "").lower()
+            toks = [t for t in re.split(r"[^a-z0-9\-]+", obj_lower) if len(t) >= 3]
+            if toks:
+                hits = sum(1 for t in toks if t in ab_lower)
+                return max(0.0, min(100.0, (hits / max(1, len(toks))) * 100.0))
+            return 0.0
+        except Exception:
+            return 0.0
+
+    # Check if we have enough time for LLM-based calculation
+    if _time_left(deadline) > 2.0:
+        # Parallel LLM-based calculation (preferred)
+        async def _calculate_single_cm(art: dict) -> float:
+            try:
+                abstract = art.get("abstract", "")
+                cm_tmpl = """
+                You are a relevance scoring expert. Rate how well the article abstract matches the user's objective on a 0-100 scale.
+                Return ONLY the integer.
+                User Objective: {objective}
+                Abstract: {abstract}
+                """
+                cm_prompt = PromptTemplate(template=cm_tmpl, input_variables=["objective", "abstract"])
+                cm_chain = LLMChain(llm=get_llm_analyzer(), prompt=cm_prompt)
+                cm = await run_in_threadpool(cm_chain.invoke, {"objective": objective, "abstract": abstract})
+                txt = str(cm.get("text", cm))
+                score = float(int(''.join(ch for ch in txt if ch.isdigit()) or '0'))
+                return score
+            except Exception:
+                # Fallback to heuristic on error
+                return _token_overlap_score(objective, art.get("abstract", ""))
+
+        try:
+            # Calculate all scores in parallel with timeout
+            cm_tasks = [_calculate_single_cm(art) for art in items]
+            scores = await asyncio.wait_for(
+                asyncio.gather(*cm_tasks, return_exceptions=True),
+                timeout=min(10.0, max(2.0, _time_left(deadline) - 2.0))
+            )
+            # Handle exceptions in results
+            scores = [
+                s if isinstance(s, (int, float)) else _token_overlap_score(objective, items[i].get("abstract", ""))
+                for i, s in enumerate(scores)
+            ]
+        except asyncio.TimeoutError:
+            # Timeout: use heuristic for all
+            scores = [_token_overlap_score(objective, art.get("abstract", "")) for art in items]
+        except Exception:
+            # Error: use heuristic for all
+            scores = [_token_overlap_score(objective, art.get("abstract", "")) for art in items]
+    else:
+        # Not enough time: use heuristic for all
+        scores = [_token_overlap_score(objective, art.get("abstract", "")) for art in items]
+
+    return scores
+
+
 async def _deep_dive_articles(objective: str, items: list[dict], memories: list[dict], deadline: float) -> list[dict]:
     # Extraction, summarization, justification
     extracted_results: list[dict] = []
@@ -2982,6 +3061,9 @@ async def _deep_dive_articles(objective: str, items: list[dict], memories: list[
     except Exception:
         objective_vec = None
         objective_vec_norm = 1.0
+
+    # Pre-calculate all contextual match scores in parallel (OPTIMIZATION)
+    contextual_match_scores = await _calculate_contextual_match_batch(objective, items, deadline)
     extraction_tmpl = """
 You are an information extraction bot. From the abstract below, return ONLY JSON with keys: key_methodologies (array), disease_context (array), primary_conclusion (string).
 Abstract: {abstract}
@@ -3101,21 +3183,20 @@ Abstract: {abstract}
             llm_conf = float(structured.get("confidence_score", 0))
         except Exception:
             llm_conf = 0.0
-        # Contextual match specialist (fast LLM score 0-100)
+        # Contextual match score (pre-calculated in parallel batch)
+        # Use pre-calculated score from batch processing (much faster!)
         contextual_match_score = 0.0
         try:
-            if _time_left(deadline) > 2.0:
-                cm_tmpl = """
-                You are a relevance scoring expert. Rate how well the article abstract matches the user's objective on a 0-100 scale.
-                Return ONLY the integer.
-                User Objective: {objective}
-                Abstract: {abstract}
-                """
-                cm_prompt = PromptTemplate(template=cm_tmpl, input_variables=["objective", "abstract"])
-                cm_chain = LLMChain(llm=get_llm_analyzer(), prompt=cm_prompt)
-                cm = await run_in_threadpool(cm_chain.invoke, {"objective": objective, "abstract": abstract})
-                txt = str(cm.get("text", cm))
-                contextual_match_score = float(int(''.join(ch for ch in txt if ch.isdigit()) or '0'))
+            if idx < len(contextual_match_scores):
+                contextual_match_score = float(contextual_match_scores[idx])
+            else:
+                # Fallback: token overlap heuristic
+                obj_lower = (objective or "").lower()
+                ab_lower = (abstract or "").lower()
+                toks = [t for t in re.split(r"[^a-z0-9\-]+", obj_lower) if len(t) >= 3]
+                if toks:
+                    hits = sum(1 for t in toks if t in ab_lower)
+                    contextual_match_score = max(0.0, min(100.0, (hits / max(1, len(toks))) * 100.0))
         except Exception:
             contextual_match_score = 0.0
         # Compute objective similarity / recency / impact (0-100) so UI never shows "—"
