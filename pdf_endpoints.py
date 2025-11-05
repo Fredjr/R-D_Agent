@@ -71,11 +71,13 @@ def register_pdf_endpoints(app):
             results = await asyncio.gather(
                 get_pmc_pdf_url(pmid),
                 get_europepmc_pdf_url(pmid),
+                get_cochrane_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
+                get_nihr_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
                 get_unpaywall_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
                 return_exceptions=True
             )
-            
-            pmc_url, europepmc_url, unpaywall_url = results
+
+            pmc_url, europepmc_url, cochrane_url, nihr_url, unpaywall_url = results
             
             # Check PMC first (most reliable)
             if pmc_url and not isinstance(pmc_url, Exception):
@@ -87,7 +89,7 @@ def register_pdf_endpoints(app):
                     "pdf_available": True,
                     "title": article_title
                 }
-            
+
             # Check Europe PMC
             if europepmc_url and not isinstance(europepmc_url, Exception):
                 logger.info(f"✅ Found PDF in Europe PMC: {pmid}")
@@ -98,7 +100,29 @@ def register_pdf_endpoints(app):
                     "pdf_available": True,
                     "title": article_title
                 }
-            
+
+            # Check Cochrane Library
+            if cochrane_url and not isinstance(cochrane_url, Exception):
+                logger.info(f"✅ Found PDF in Cochrane Library: {pmid}")
+                return {
+                    "pmid": pmid,
+                    "source": "cochrane",
+                    "url": cochrane_url,
+                    "pdf_available": True,
+                    "title": article_title
+                }
+
+            # Check NIHR Journals Library
+            if nihr_url and not isinstance(nihr_url, Exception):
+                logger.info(f"✅ Found PDF in NIHR Journals Library: {pmid}")
+                return {
+                    "pmid": pmid,
+                    "source": "nihr",
+                    "url": nihr_url,
+                    "pdf_available": True,
+                    "title": article_title
+                }
+
             # Check Unpaywall
             if unpaywall_url and not isinstance(unpaywall_url, Exception):
                 logger.info(f"✅ Found PDF via Unpaywall: {pmid}")
@@ -172,11 +196,13 @@ def register_pdf_endpoints(app):
             results = await asyncio.gather(
                 get_pmc_pdf_url(pmid),
                 get_europepmc_pdf_url(pmid),
+                get_cochrane_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
+                get_nihr_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
                 get_unpaywall_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
                 return_exceptions=True
             )
 
-            pmc_url, europepmc_url, unpaywall_url = results
+            pmc_url, europepmc_url, cochrane_url, nihr_url, unpaywall_url = results
 
             # Determine which URL to use
             pdf_url = None
@@ -188,6 +214,12 @@ def register_pdf_endpoints(app):
             elif europepmc_url and not isinstance(europepmc_url, Exception):
                 pdf_url = europepmc_url
                 source = "europepmc"
+            elif cochrane_url and not isinstance(cochrane_url, Exception):
+                pdf_url = cochrane_url
+                source = "cochrane"
+            elif nihr_url and not isinstance(nihr_url, Exception):
+                pdf_url = nihr_url
+                source = "nihr"
             elif unpaywall_url and not isinstance(unpaywall_url, Exception):
                 pdf_url = unpaywall_url
                 source = "unpaywall"
@@ -394,6 +426,91 @@ async def fetch_article_metadata_from_pubmed(pmid: str) -> Dict[str, Optional[st
     except Exception as e:
         logger.error(f"❌ Failed to fetch metadata from PubMed for {pmid}: {e}")
         return {"title": None, "doi": None}
+
+
+async def get_cochrane_pdf_url(doi: Optional[str]) -> Optional[str]:
+    """
+    Get PDF URL from Cochrane Library.
+
+    Cochrane Library articles have a structured PDF download URL based on DOI.
+    Example DOI: 10.1002/14651858.CD007751.pub2
+    PDF URL: https://www.cochranelibrary.com/cdsr/doi/10.1002/14651858.CD007751.pub2/pdf
+    """
+    if not doi:
+        return None
+
+    try:
+        # Check if this is a Cochrane DOI
+        if not doi.startswith("10.1002/14651858."):
+            return None
+
+        # Construct Cochrane PDF URL
+        # Format: https://www.cochranelibrary.com/cdsr/doi/{DOI}/pdf
+        pdf_url = f"https://www.cochranelibrary.com/cdsr/doi/{doi}/pdf"
+        logger.debug(f"Found Cochrane PDF: {pdf_url}")
+        return pdf_url
+
+    except Exception as e:
+        logger.debug(f"Cochrane lookup failed for DOI {doi}: {e}")
+        return None
+
+
+async def get_nihr_pdf_url(doi: Optional[str]) -> Optional[str]:
+    """
+    Get PDF URL from NIHR Journals Library.
+
+    NIHR articles have a structured PDF download URL.
+    Example: https://www.journalslibrary.nihr.ac.uk/hta/HTA10240
+    PDF URL: https://www.journalslibrary.nihr.ac.uk/hta/HTA10240/pdf
+
+    DOI format: 10.3310/hta10240
+    """
+    if not doi:
+        return None
+
+    try:
+        # Check if this is an NIHR DOI (10.3310/...)
+        if not doi.startswith("10.3310/"):
+            return None
+
+        # Extract the article ID from DOI
+        # DOI: 10.3310/hta10240 -> Article ID: hta10240
+        article_id = doi.replace("10.3310/", "")
+
+        # Determine the journal type from the article ID prefix
+        # hta = Health Technology Assessment
+        # phr = Public Health Research
+        # pgfar = Programme Grants for Applied Research
+        # hsdr = Health Services and Delivery Research
+        journal_type = ""
+        if article_id.startswith("hta"):
+            journal_type = "hta"
+        elif article_id.startswith("phr"):
+            journal_type = "phr"
+        elif article_id.startswith("pgfar"):
+            journal_type = "pgfar"
+        elif article_id.startswith("hsdr"):
+            journal_type = "hsdr"
+        else:
+            # Try to extract journal type from first 3-5 characters
+            for length in [5, 4, 3]:
+                potential_type = article_id[:length]
+                if potential_type.isalpha():
+                    journal_type = potential_type
+                    break
+
+        if not journal_type:
+            logger.debug(f"Could not determine NIHR journal type for DOI {doi}")
+            return None
+
+        # Construct NIHR PDF URL
+        pdf_url = f"https://www.journalslibrary.nihr.ac.uk/{journal_type}/{article_id.upper()}/pdf"
+        logger.debug(f"Found NIHR PDF: {pdf_url}")
+        return pdf_url
+
+    except Exception as e:
+        logger.debug(f"NIHR lookup failed for DOI {doi}: {e}")
+        return None
 
 
     @app.get("/articles/{pmid}/pdf-availability")
