@@ -9109,14 +9109,9 @@ async def get_project_collections(
     """Get all collections for a project"""
     current_user = request.headers.get("User-ID", "default_user")
 
-    # 🔧 FIX: Resolve email to UUID if current_user is an email
-    user_id = current_user
-    if "@" in current_user:
-        user = db.query(User).filter(User.email == current_user).first()
-        if user:
-            user_id = user.user_id
-        else:
-            raise HTTPException(status_code=403, detail="User not found")
+    # 🔧 FIX: Use resolve_user_id() for consistent email-to-UUID resolution
+    user_id = resolve_user_id(current_user, db)
+    print(f"✅ [Get Project Collections] Resolved '{current_user}' to UUID '{user_id}'")
 
     # Check project access (using UUID)
     has_access = (
