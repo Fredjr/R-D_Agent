@@ -272,6 +272,14 @@ export function useGlobalCollectionSync(projectId: string) {
     return unsubscribe;
   }, [projectId]);
 
+  // 🔧 FIX: Automatically fetch collections on mount and when projectId/user changes
+  useEffect(() => {
+    if (projectId && user?.email) {
+      console.log('🔄 Auto-fetching collections on mount for project:', projectId);
+      refreshCollections();
+    }
+  }, [projectId, user?.email, refreshCollections]);
+
   const refreshCollections = useCallback(async () => {
     if (!projectId) return;
 
