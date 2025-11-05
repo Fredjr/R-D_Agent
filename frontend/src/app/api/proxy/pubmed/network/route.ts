@@ -141,97 +141,126 @@ function isOpenAccessArticle(articleXml: string): boolean {
  * @param pmids Array of PMIDs to fetch
  * @param filterOpenAccess If true, only return Open Access articles
  */
-async function fetchArticleDetails(pmids: string[], filterOpenAccess: boolean = false): Promise<PubMedArticle[]> {
+async function fetchArticleDetails(pmids: string[], filterOpenAccess: boolean = false, retries: number = 2): Promise<PubMedArticle[]> {
   if (pmids.length === 0) {
     console.log('⚠️ fetchArticleDetails called with empty pmids array');
     return [];
   }
 
-  try {
-    const pmidList = pmids.join(',');
-    const fetchUrl = `${PUBMED_FETCH_URL}?db=pubmed&id=${pmidList}&retmode=xml&rettype=abstract`;
-    console.log(`🔍 Fetching article details for ${pmids.length} PMIDs (OA filter: ${filterOpenAccess}): ${pmidList.substring(0, 100)}...`);
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const pmidList = pmids.join(',');
+      const fetchUrl = `${PUBMED_FETCH_URL}?db=pubmed&id=${pmidList}&retmode=xml&rettype=abstract`;
+      console.log(`🔍 Fetching article details for ${pmids.length} PMIDs (attempt ${attempt + 1}/${retries + 1}, OA filter: ${filterOpenAccess}): ${pmidList.substring(0, 100)}...`);
 
-    const response = await fetch(fetchUrl, {
-      headers: {
-        'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
+      const response = await fetch(fetchUrl, {
+        headers: {
+          'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
+        },
+        signal: AbortSignal.timeout(15000) // 15 second timeout
+      });
+
+      if (!response.ok) {
+        console.error(`❌ PubMed efetch failed: ${response.status} ${response.statusText}`);
+        if (attempt < retries) {
+          console.log(`⏳ Retrying in ${(attempt + 1) * 1000}ms...`);
+          await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 1000));
+          continue;
+        }
+        throw new Error(`PubMed fetch failed: ${response.status}`);
       }
-    });
 
-    if (!response.ok) {
-      console.error(`❌ PubMed efetch failed: ${response.status} ${response.statusText}`);
-      throw new Error(`PubMed fetch failed: ${response.status}`);
+      const xmlText = await response.text();
+      console.log(`📄 Received XML response: ${xmlText.length} characters`);
+
+      // If filtering for OA, we need to parse and filter
+      if (filterOpenAccess) {
+        const articleMatches = xmlText.match(/<PubmedArticle>[\s\S]*?<\/PubmedArticle>/g) || [];
+        const oaArticleXmls = articleMatches.filter(articleXml => isOpenAccessArticle(articleXml));
+        const oaXmlText = oaArticleXmls.join('\n');
+        console.log(`🔓 Filtered to ${oaArticleXmls.length} Open Access articles out of ${articleMatches.length} total`);
+        const articles = parseArticleXML(oaXmlText);
+        console.log(`✅ Parsed ${articles.length} OA articles from XML`);
+        return articles;
+      } else {
+        const articles = parseArticleXML(xmlText);
+        console.log(`✅ Parsed ${articles.length} articles from XML`);
+        return articles;
+      }
+    } catch (error) {
+      console.error(`❌ Error fetching article details (attempt ${attempt + 1}):`, error);
+      if (attempt < retries) {
+        console.log(`⏳ Retrying in ${(attempt + 1) * 1000}ms...`);
+        await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 1000));
+        continue;
+      }
+      console.error('❌ All retry attempts exhausted, returning empty array');
+      return [];
     }
-
-    const xmlText = await response.text();
-    console.log(`📄 Received XML response: ${xmlText.length} characters`);
-
-    // If filtering for OA, we need to parse and filter
-    if (filterOpenAccess) {
-      const articleMatches = xmlText.match(/<PubmedArticle>[\s\S]*?<\/PubmedArticle>/g) || [];
-      const oaArticleXmls = articleMatches.filter(articleXml => isOpenAccessArticle(articleXml));
-      const oaXmlText = oaArticleXmls.join('\n');
-      console.log(`🔓 Filtered to ${oaArticleXmls.length} Open Access articles out of ${articleMatches.length} total`);
-      const articles = parseArticleXML(oaXmlText);
-      console.log(`✅ Parsed ${articles.length} OA articles from XML`);
-      return articles;
-    } else {
-      const articles = parseArticleXML(xmlText);
-      console.log(`✅ Parsed ${articles.length} articles from XML`);
-      return articles;
-    }
-  } catch (error) {
-    console.error('❌ Error fetching article details:', error);
-    return [];
   }
+  return [];
 }
 
 /**
  * Find related articles using PubMed eLink
  */
-async function findRelatedArticles(pmid: string, linkType: string, limit: number = 10): Promise<string[]> {
-  try {
-    const linkUrl = `${PUBMED_LINK_URL}?dbfrom=pubmed&id=${pmid}&db=pubmed&linkname=${linkType}&retmode=json`;
-    console.log(`🔍 Fetching related articles: ${linkUrl}`);
+async function findRelatedArticles(pmid: string, linkType: string, limit: number = 10, retries: number = 2): Promise<string[]> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const linkUrl = `${PUBMED_LINK_URL}?dbfrom=pubmed&id=${pmid}&db=pubmed&linkname=${linkType}&retmode=json`;
+      console.log(`🔍 Fetching related articles (attempt ${attempt + 1}/${retries + 1}): ${linkUrl}`);
 
-    const response = await fetch(linkUrl, {
-      headers: {
-        'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
+      const response = await fetch(linkUrl, {
+        headers: {
+          'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
+        },
+        signal: AbortSignal.timeout(10000) // 10 second timeout
+      });
+
+      if (!response.ok) {
+        console.error(`❌ PubMed eLink failed for PMID ${pmid}, linkType ${linkType}: ${response.status}`);
+        if (attempt < retries) {
+          console.log(`⏳ Retrying in ${(attempt + 1) * 1000}ms...`);
+          await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 1000));
+          continue;
+        }
+        return [];
       }
-    });
 
-    if (!response.ok) {
-      console.error(`❌ PubMed eLink failed for PMID ${pmid}, linkType ${linkType}: ${response.status}`);
-      return [];
-    }
+      const data = await response.json();
+      console.log(`📊 PubMed eLink response for ${pmid} (${linkType}):`, JSON.stringify(data).substring(0, 500));
 
-    const data = await response.json();
-    console.log(`📊 PubMed eLink response for ${pmid} (${linkType}):`, JSON.stringify(data).substring(0, 500));
+      const linksets = data.linksets || [];
 
-    const linksets = data.linksets || [];
-
-    for (const linkset of linksets) {
-      const linksetdbs = linkset.linksetdbs || [];
-      for (const linksetdb of linksetdbs) {
-        if (linksetdb.linkname === linkType) {
-          const links = linksetdb.links || [];
-          console.log(`✅ Found ${links.length} related articles for ${pmid} (${linkType})`);
-          const filtered = links
-            .filter((id: string) => id.toString() !== pmid) // Exclude self
-            .slice(0, limit)
-            .map((id: string) => id.toString());
-          console.log(`📤 Returning ${filtered.length} articles after filtering and limiting`);
-          return filtered;
+      for (const linkset of linksets) {
+        const linksetdbs = linkset.linksetdbs || [];
+        for (const linksetdb of linksetdbs) {
+          if (linksetdb.linkname === linkType) {
+            const links = linksetdb.links || [];
+            console.log(`✅ Found ${links.length} related articles for ${pmid} (${linkType})`);
+            const filtered = links
+              .filter((id: string) => id.toString() !== pmid) // Exclude self
+              .slice(0, limit)
+              .map((id: string) => id.toString());
+            console.log(`📤 Returning ${filtered.length} articles after filtering and limiting`);
+            return filtered;
+          }
         }
       }
-    }
 
-    console.log(`⚠️ No linksetdb found with linkname ${linkType} for PMID ${pmid}`);
-    return [];
-  } catch (error) {
-    console.error(`❌ Error finding related articles (${linkType}):`, error);
-    return [];
+      console.log(`⚠️ No linksetdb found with linkname ${linkType} for PMID ${pmid}`);
+      return [];
+    } catch (error) {
+      console.error(`❌ Error finding related articles (${linkType}), attempt ${attempt + 1}:`, error);
+      if (attempt < retries) {
+        console.log(`⏳ Retrying in ${(attempt + 1) * 1000}ms...`);
+        await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 1000));
+        continue;
+      }
+      return [];
+    }
   }
+  return [];
 }
 
 /**
@@ -338,12 +367,24 @@ export async function GET(request: NextRequest) {
       similarPmids = await findRelatedArticles(pmid, 'pubmed_pubmed', limit);
     }
 
-    console.log(`📊 Found: ${citingPmids.length} citations, ${referencePmids.length} references, ${similarPmids.length} similar`);
+    console.log(`📊 Found PMIDs: ${citingPmids.length} citations, ${referencePmids.length} references, ${similarPmids.length} similar`);
+
+    // Log the actual PMIDs for debugging
+    if (citingPmids.length > 0) {
+      console.log(`📋 Citation PMIDs: ${citingPmids.slice(0, 5).join(', ')}${citingPmids.length > 5 ? '...' : ''}`);
+    }
+    if (referencePmids.length > 0) {
+      console.log(`📋 Reference PMIDs: ${referencePmids.slice(0, 5).join(', ')}${referencePmids.length > 5 ? '...' : ''}`);
+    }
+    if (similarPmids.length > 0) {
+      console.log(`📋 Similar PMIDs: ${similarPmids.slice(0, 5).join(', ')}${similarPmids.length > 5 ? '...' : ''}`);
+    }
 
     // Fetch and add citing articles
     if (citingPmids.length > 0) {
+      console.log(`🔄 Fetching details for ${citingPmids.length} citing articles...`);
       const citingArticles = await fetchArticleDetails(citingPmids, openAccessOnly);
-      console.log(`✅ Fetched ${citingArticles.length} citing articles`);
+      console.log(`✅ Successfully fetched ${citingArticles.length}/${citingPmids.length} citing articles`);
       for (const article of citingArticles) {
         const node = createNetworkNode(article, 'citing_article');
         nodes.push(node);
@@ -361,8 +402,9 @@ export async function GET(request: NextRequest) {
 
     // Fetch and add reference articles
     if (referencePmids.length > 0) {
+      console.log(`🔄 Fetching details for ${referencePmids.length} reference articles...`);
       const referenceArticles = await fetchArticleDetails(referencePmids, openAccessOnly);
-      console.log(`✅ Fetched ${referenceArticles.length} reference articles`);
+      console.log(`✅ Successfully fetched ${referenceArticles.length}/${referencePmids.length} reference articles`);
       for (const article of referenceArticles) {
         const node = createNetworkNode(article, 'reference_article');
         nodes.push(node);
@@ -380,8 +422,13 @@ export async function GET(request: NextRequest) {
 
     // Fetch and add similar articles
     if (similarPmids.length > 0) {
+      console.log(`🔄 Fetching details for ${similarPmids.length} similar articles...`);
       const similarArticles = await fetchArticleDetails(similarPmids, openAccessOnly);
-      console.log(`✅ Fetched ${similarArticles.length} similar articles`);
+      console.log(`✅ Successfully fetched ${similarArticles.length}/${similarPmids.length} similar articles`);
+      if (similarArticles.length === 0 && similarPmids.length > 0) {
+        console.error(`⚠️ WARNING: Found ${similarPmids.length} similar PMIDs but failed to fetch any article details!`);
+        console.error(`⚠️ This suggests PubMed eFetch API is timing out or rate limiting`);
+      }
       for (const article of similarArticles) {
         const node = createNetworkNode(article, 'similar_article');
         nodes.push(node);
