@@ -49,6 +49,7 @@ export default function ArticleCard({ item, projectId, onAddToCollection }: Prop
   const [pinning, setPinning] = React.useState(false);
   const [showAnnotations, setShowAnnotations] = React.useState(false);
   const [showPDFViewer, setShowPDFViewer] = React.useState(false);
+  const [deepDiveProgress, setDeepDiveProgress] = React.useState(0);
   // Cache deep dive data by key (pmid||title)
   const deepDiveCacheRef = React.useRef<Map<string, any>>(new Map());
 
@@ -64,17 +65,30 @@ export default function ArticleCard({ item, projectId, onAddToCollection }: Prop
     }
     setDeepDiveLoading(true);
     setDeepDiveData(null);
+    setDeepDiveProgress(0);
+
+    // Simulate progress for better UX (actual deep-dive takes 30-60s)
+    const progressInterval = setInterval(() => {
+      setDeepDiveProgress(prev => {
+        if (prev >= 90) return prev; // Cap at 90% until actual completion
+        return prev + Math.random() * 15; // Increment by 0-15%
+      });
+    }, 2000); // Update every 2 seconds
+
     try {
       const url = headerUrl || undefined;
       const objective = (item as any)?._objective || (item as any)?.query || headerTitle;
       const data = await fetchDeepDive({ url, pmid: headerPmid, title: headerTitle, objective });
       const enriched = { ...data, _activeTab: 'Model' };
       deepDiveCacheRef.current.set(key, enriched);
+      setDeepDiveProgress(100); // Complete
       setDeepDiveData(enriched);
     } catch (e: any) {
       setDeepDiveError(e?.message || 'Failed to perform deep dive');
     } finally {
+      clearInterval(progressInterval);
       setDeepDiveLoading(false);
+      setTimeout(() => setDeepDiveProgress(0), 500); // Reset after animation
     }
   }
 
@@ -150,20 +164,48 @@ export default function ArticleCard({ item, projectId, onAddToCollection }: Prop
               </span>
             </div>
           ) : null}
-          {headerUrl ? (
-            <h2 className="text-xl font-semibold text-gray-900">
-              <a
-                href={headerUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:underline"
-              >
-                {headerTitle}
-              </a>
-            </h2>
-          ) : (
-            <h2 className="text-xl font-semibold text-gray-900">{headerTitle}</h2>
-          )}
+          <div className="flex items-start gap-2 flex-wrap">
+            {headerUrl ? (
+              <h2 className="text-xl font-semibold text-gray-900">
+                <a
+                  href={headerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:underline"
+                >
+                  {headerTitle}
+                </a>
+              </h2>
+            ) : (
+              <h2 className="text-xl font-semibold text-gray-900">{headerTitle}</h2>
+            )}
+            {/* Full-text availability badge for deep-dive */}
+            {(() => {
+              const hasFullTextUrl = headerUrl && !headerUrl.includes('pubmed.ncbi.nlm.nih.gov');
+              const hasPmid = !!headerPmid;
+
+              if (hasFullTextUrl) {
+                return (
+                  <span
+                    className="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-100 text-green-700 border border-green-200 rounded-md"
+                    title="Full-text available for enhanced deep-dive analysis"
+                  >
+                    📄 Full-text
+                  </span>
+                );
+              } else if (hasPmid) {
+                return (
+                  <span
+                    className="inline-flex items-center px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-700 border border-yellow-200 rounded-md"
+                    title="Abstract-only (deep-dive will attempt to find full-text)"
+                  >
+                    📝 Abstract
+                  </span>
+                );
+              }
+              return null;
+            })()}
+          </div>
           {specialistTags.length ? (
             <div className="mt-2 flex flex-wrap gap-2">
               {specialistTags.map((t, i) => (
@@ -404,6 +446,16 @@ export default function ArticleCard({ item, projectId, onAddToCollection }: Prop
               setDeepDiveLoading(true);
               setDeepDiveError(null);
               setDeepDiveData(null);
+              setDeepDiveProgress(0);
+
+              // Simulate progress for PDF upload
+              const progressInterval = setInterval(() => {
+                setDeepDiveProgress(prev => {
+                  if (prev >= 90) return prev;
+                  return prev + Math.random() * 15;
+                });
+              }, 2000);
+
               try {
                 const endpoint = '/api/proxy/deep-dive-upload';
                 const form = new FormData();
@@ -412,11 +464,14 @@ export default function ArticleCard({ item, projectId, onAddToCollection }: Prop
                 const res = await fetch(endpoint, { method: 'POST', body: form });
                 if (!res.ok) throw new Error(`Upload failed (${res.status})`);
                 const data = await res.json();
+                setDeepDiveProgress(100);
                 setDeepDiveData({ ...data, _activeTab: 'Model' });
               } catch (err: any) {
                 setDeepDiveError(err?.message || 'Upload deep dive failed');
               } finally {
+                clearInterval(progressInterval);
                 setDeepDiveLoading(false);
+                setTimeout(() => setDeepDiveProgress(0), 500);
               }
             }} />
             <span className="w-full sm:w-auto inline-block rounded border border-indigo-300 px-4 py-2 hover:bg-indigo-50 text-center transition-colors">Upload PDF</span>
@@ -443,7 +498,45 @@ export default function ArticleCard({ item, projectId, onAddToCollection }: Prop
               <button onClick={() => setDeepDiveOpen(false)} className="text-sm text-black hover:opacity-80">Close</button>
             </div>
             {deepDiveLoading && (
-              <div className="p-3 rounded border border-slate-200 bg-slate-50 text-black text-sm">Analyzing article…</div>
+              <div className="p-4 rounded border border-slate-200 bg-slate-50 text-black">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium">Analyzing article…</span>
+                  <span className="text-xs text-slate-500">
+                    {deepDiveProgress < 30 ? '~45-60 seconds' :
+                     deepDiveProgress < 60 ? '~30-45 seconds' :
+                     deepDiveProgress < 90 ? '~15-30 seconds' :
+                     'Almost done...'}
+                  </span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                  <div
+                    className="bg-indigo-600 h-2.5 rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${Math.min(deepDiveProgress, 100)}%` }}
+                  />
+                </div>
+                <div className="mt-3 text-xs text-slate-600 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className={deepDiveProgress > 0 ? 'text-indigo-600' : ''}>
+                      {deepDiveProgress > 0 ? '✓' : '○'} Extracting content
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={deepDiveProgress > 30 ? 'text-indigo-600' : ''}>
+                      {deepDiveProgress > 30 ? '✓' : '○'} Analyzing methodology
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={deepDiveProgress > 60 ? 'text-indigo-600' : ''}>
+                      {deepDiveProgress > 60 ? '✓' : '○'} Generating insights
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={deepDiveProgress > 90 ? 'text-indigo-600' : ''}>
+                      {deepDiveProgress > 90 ? '✓' : '○'} Finalizing report
+                    </span>
+                  </div>
+                </div>
+              </div>
             )}
             {deepDiveError && (
               <div className="p-3 rounded border border-red-300 bg-red-50 text-red-700 text-sm">{deepDiveError}</div>
