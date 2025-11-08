@@ -123,7 +123,7 @@
       }
     },
     getAll: async () => {
-      const res = await fetch(`${apiUrl}/api/proxy/projects/${projectId}/annotations`, {
+      const res = await fetch(`${apiUrl}/api/proxy/projects/${projectId}/annotations?article_pmid=${pmid}`, {
         headers: {
           'User-ID': userId
         }
