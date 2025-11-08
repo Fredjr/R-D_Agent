@@ -795,6 +795,15 @@ async def try_get_pdf_from_publisher_link(url: str, provider: str) -> Optional[s
                     logger.debug(f"Kidney International article, trying ScienceDirect: {sciencedirect_url}")
                     return sciencedirect_url
 
+        # Special handling for BMJ pmidlookup URLs
+        # BMJ provides URLs like: https://www.bmj.com/lookup/pmidlookup?view=long&pmid=38278529
+        # These need to be converted to: https://www.bmj.com/content/{volume}/{article_id}.pdf
+        # However, we can't easily get volume/article_id from this URL, so we skip it
+        # and let the BMJ-specific handler deal with it
+        if 'bmj.com/lookup/pmidlookup' in actual_url:
+            logger.debug(f"Skipping BMJ pmidlookup URL (should be handled by BMJ-specific handler): {actual_url}")
+            return None
+
         # Common PDF URL patterns for different publishers
         pdf_patterns = [
             # Direct PDF link
