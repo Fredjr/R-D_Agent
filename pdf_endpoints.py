@@ -72,6 +72,13 @@ def register_pdf_endpoints(app):
                 get_europepmc_pdf_url(pmid),  # Europe PMC first (no PoW challenge)
                 get_pmc_pdf_url(pmid),
                 get_bmj_pdf_url(article_doi, pmid) if article_doi else asyncio.sleep(0),
+                get_springer_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
+                get_oxford_academic_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
+                get_nejm_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
+                get_wolters_kluwer_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
+                get_wiley_enhanced_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
+                get_acp_journals_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
+                get_taylor_francis_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
                 get_cochrane_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
                 get_wiley_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
                 get_nihr_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
@@ -79,7 +86,9 @@ def register_pdf_endpoints(app):
                 return_exceptions=True
             )
 
-            europepmc_url, pmc_url, bmj_url, cochrane_url, wiley_url, nihr_url, unpaywall_url = results
+            (europepmc_url, pmc_url, bmj_url, springer_url, oxford_url, nejm_url,
+             wolters_url, wiley_enhanced_url, acp_url, taylor_francis_url,
+             cochrane_url, wiley_url, nihr_url, unpaywall_url) = results
 
             # Check Europe PMC first (no Proof-of-Work challenge, unlike PMC)
             if europepmc_url and not isinstance(europepmc_url, Exception):
@@ -110,6 +119,83 @@ def register_pdf_endpoints(app):
                     "pmid": pmid,
                     "source": "bmj",
                     "url": bmj_url,
+                    "pdf_available": True,
+                    "title": article_title
+                }
+
+            # Check Springer
+            if springer_url and not isinstance(springer_url, Exception):
+                logger.info(f"✅ Found PDF in Springer: {pmid}")
+                return {
+                    "pmid": pmid,
+                    "source": "springer",
+                    "url": springer_url,
+                    "pdf_available": True,
+                    "title": article_title
+                }
+
+            # Check Oxford Academic
+            if oxford_url and not isinstance(oxford_url, Exception):
+                logger.info(f"✅ Found PDF in Oxford Academic: {pmid}")
+                return {
+                    "pmid": pmid,
+                    "source": "oxford_academic",
+                    "url": oxford_url,
+                    "pdf_available": True,
+                    "title": article_title
+                }
+
+            # Check NEJM
+            if nejm_url and not isinstance(nejm_url, Exception):
+                logger.info(f"✅ Found PDF in NEJM: {pmid}")
+                return {
+                    "pmid": pmid,
+                    "source": "nejm",
+                    "url": nejm_url,
+                    "pdf_available": True,
+                    "title": article_title
+                }
+
+            # Check Wolters Kluwer
+            if wolters_url and not isinstance(wolters_url, Exception):
+                logger.info(f"✅ Found PDF in Wolters Kluwer: {pmid}")
+                return {
+                    "pmid": pmid,
+                    "source": "wolters_kluwer",
+                    "url": wolters_url,
+                    "pdf_available": True,
+                    "title": article_title
+                }
+
+            # Check Wiley Enhanced
+            if wiley_enhanced_url and not isinstance(wiley_enhanced_url, Exception):
+                logger.info(f"✅ Found PDF in Wiley (Enhanced): {pmid}")
+                return {
+                    "pmid": pmid,
+                    "source": "wiley_enhanced",
+                    "url": wiley_enhanced_url,
+                    "pdf_available": True,
+                    "title": article_title
+                }
+
+            # Check ACP Journals
+            if acp_url and not isinstance(acp_url, Exception):
+                logger.info(f"✅ Found PDF in ACP Journals: {pmid}")
+                return {
+                    "pmid": pmid,
+                    "source": "acp_journals",
+                    "url": acp_url,
+                    "pdf_available": True,
+                    "title": article_title
+                }
+
+            # Check Taylor & Francis
+            if taylor_francis_url and not isinstance(taylor_francis_url, Exception):
+                logger.info(f"✅ Found PDF in Taylor & Francis: {pmid}")
+                return {
+                    "pmid": pmid,
+                    "source": "taylor_francis",
+                    "url": taylor_francis_url,
                     "pdf_available": True,
                     "title": article_title
                 }
@@ -244,6 +330,13 @@ def register_pdf_endpoints(app):
                 get_europepmc_pdf_url(pmid),  # Europe PMC first (no PoW challenge)
                 get_pmc_pdf_url(pmid),
                 get_bmj_pdf_url(article_doi, pmid) if article_doi else asyncio.sleep(0),
+                get_springer_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
+                get_oxford_academic_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
+                get_nejm_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
+                get_wolters_kluwer_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
+                get_wiley_enhanced_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
+                get_acp_journals_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
+                get_taylor_francis_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
                 get_cochrane_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
                 get_wiley_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
                 get_nihr_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
@@ -251,7 +344,9 @@ def register_pdf_endpoints(app):
                 return_exceptions=True
             )
 
-            europepmc_url, pmc_url, bmj_url, cochrane_url, wiley_url, nihr_url, unpaywall_url = results
+            (europepmc_url, pmc_url, bmj_url, springer_url, oxford_url, nejm_url,
+             wolters_url, wiley_enhanced_url, acp_url, taylor_francis_url,
+             cochrane_url, wiley_url, nihr_url, unpaywall_url) = results
 
             # Determine which URL to use (priority order)
             pdf_url = None
@@ -266,6 +361,27 @@ def register_pdf_endpoints(app):
             elif bmj_url and not isinstance(bmj_url, Exception):
                 pdf_url = bmj_url
                 source = "bmj"
+            elif springer_url and not isinstance(springer_url, Exception):
+                pdf_url = springer_url
+                source = "springer"
+            elif oxford_url and not isinstance(oxford_url, Exception):
+                pdf_url = oxford_url
+                source = "oxford_academic"
+            elif nejm_url and not isinstance(nejm_url, Exception):
+                pdf_url = nejm_url
+                source = "nejm"
+            elif wolters_url and not isinstance(wolters_url, Exception):
+                pdf_url = wolters_url
+                source = "wolters_kluwer"
+            elif wiley_enhanced_url and not isinstance(wiley_enhanced_url, Exception):
+                pdf_url = wiley_enhanced_url
+                source = "wiley_enhanced"
+            elif acp_url and not isinstance(acp_url, Exception):
+                pdf_url = acp_url
+                source = "acp_journals"
+            elif taylor_francis_url and not isinstance(taylor_francis_url, Exception):
+                pdf_url = taylor_francis_url
+                source = "taylor_francis"
             elif cochrane_url and not isinstance(cochrane_url, Exception):
                 pdf_url = cochrane_url
                 source = "cochrane"
@@ -768,6 +884,162 @@ async def get_bmj_pdf_url(doi: Optional[str], pmid: Optional[str] = None) -> Opt
 
     except Exception as e:
         logger.debug(f"BMJ lookup failed for DOI {doi}: {e}")
+        return None
+
+
+async def get_springer_pdf_url(doi: Optional[str]) -> Optional[str]:
+    """
+    Get PDF URL from Springer.
+    Springer PDF URL format: https://link.springer.com/content/pdf/{doi}.pdf
+    """
+    if not doi:
+        return None
+
+    try:
+        # Springer DOI prefixes: 10.1007/, 10.1186/, 10.1038/ (Nature)
+        if not any(doi.startswith(prefix) for prefix in ["10.1007/", "10.1186/", "10.1038/"]):
+            return None
+
+        pdf_url = f"https://link.springer.com/content/pdf/{doi}.pdf"
+        logger.debug(f"Found Springer PDF: {pdf_url}")
+        return pdf_url
+    except Exception as e:
+        logger.debug(f"Springer lookup failed for DOI {doi}: {e}")
+        return None
+
+
+async def get_oxford_academic_pdf_url(doi: Optional[str]) -> Optional[str]:
+    """
+    Get PDF URL from Oxford Academic.
+    Oxford Academic PDF URL format: https://academic.oup.com/{journal}/article-pdf/{doi}
+    """
+    if not doi:
+        return None
+
+    try:
+        # Oxford Academic DOI prefix: 10.1093/
+        if not doi.startswith("10.1093/"):
+            return None
+
+        # Extract journal code from DOI (e.g., 10.1093/eurheartj/ehaa736 -> eurheartj)
+        parts = doi.split("/")
+        if len(parts) >= 3:
+            journal = parts[1]
+            article_id = "/".join(parts[2:])
+            pdf_url = f"https://academic.oup.com/{journal}/article-pdf/doi/{doi}/{article_id}.pdf"
+            logger.debug(f"Found Oxford Academic PDF: {pdf_url}")
+            return pdf_url
+
+        return None
+    except Exception as e:
+        logger.debug(f"Oxford Academic lookup failed for DOI {doi}: {e}")
+        return None
+
+
+async def get_nejm_pdf_url(doi: Optional[str]) -> Optional[str]:
+    """
+    Get PDF URL from New England Journal of Medicine (NEJM).
+    NEJM PDF URL format: https://www.nejm.org/doi/pdf/{doi}
+    """
+    if not doi:
+        return None
+
+    try:
+        # NEJM DOI prefix: 10.1056/
+        if not doi.startswith("10.1056/"):
+            return None
+
+        pdf_url = f"https://www.nejm.org/doi/pdf/{doi}"
+        logger.debug(f"Found NEJM PDF: {pdf_url}")
+        return pdf_url
+    except Exception as e:
+        logger.debug(f"NEJM lookup failed for DOI {doi}: {e}")
+        return None
+
+
+async def get_wolters_kluwer_pdf_url(doi: Optional[str]) -> Optional[str]:
+    """
+    Get PDF URL from Wolters Kluwer journals.
+    Wolters Kluwer PDF URL format: https://journals.lww.com/{journal}/fulltext/{year}/{volume}/{issue}/{doi}.pdf
+    """
+    if not doi:
+        return None
+
+    try:
+        # Wolters Kluwer DOI prefixes: 10.1097/, 10.1681/
+        if not any(doi.startswith(prefix) for prefix in ["10.1097/", "10.1681/"]):
+            return None
+
+        # Try direct PDF link pattern
+        pdf_url = f"https://journals.lww.com/pages/default.aspx?uri={doi}&pdf=true"
+        logger.debug(f"Found Wolters Kluwer PDF: {pdf_url}")
+        return pdf_url
+    except Exception as e:
+        logger.debug(f"Wolters Kluwer lookup failed for DOI {doi}: {e}")
+        return None
+
+
+async def get_wiley_enhanced_pdf_url(doi: Optional[str]) -> Optional[str]:
+    """
+    Get PDF URL from Wiley Online Library (enhanced version).
+    Wiley PDF URL format: https://onlinelibrary.wiley.com/doi/pdfdirect/{doi}
+    """
+    if not doi:
+        return None
+
+    try:
+        # Wiley DOI prefixes: 10.1002/, 10.1111/, 10.1046/
+        if not any(doi.startswith(prefix) for prefix in ["10.1002/", "10.1111/", "10.1046/"]):
+            return None
+
+        # Try pdfdirect endpoint (works better than epdf)
+        pdf_url = f"https://onlinelibrary.wiley.com/doi/pdfdirect/{doi}"
+        logger.debug(f"Found Wiley PDF: {pdf_url}")
+        return pdf_url
+    except Exception as e:
+        logger.debug(f"Wiley lookup failed for DOI {doi}: {e}")
+        return None
+
+
+async def get_acp_journals_pdf_url(doi: Optional[str]) -> Optional[str]:
+    """
+    Get PDF URL from ACP Journals (Annals of Internal Medicine).
+    ACP PDF URL format: https://www.acpjournals.org/doi/pdf/{doi}
+    """
+    if not doi:
+        return None
+
+    try:
+        # ACP Journals DOI prefix: 10.7326/
+        if not doi.startswith("10.7326/"):
+            return None
+
+        pdf_url = f"https://www.acpjournals.org/doi/pdf/{doi}"
+        logger.debug(f"Found ACP Journals PDF: {pdf_url}")
+        return pdf_url
+    except Exception as e:
+        logger.debug(f"ACP Journals lookup failed for DOI {doi}: {e}")
+        return None
+
+
+async def get_taylor_francis_pdf_url(doi: Optional[str]) -> Optional[str]:
+    """
+    Get PDF URL from Taylor & Francis.
+    Taylor & Francis PDF URL format: https://www.tandfonline.com/doi/pdf/{doi}
+    """
+    if not doi:
+        return None
+
+    try:
+        # Taylor & Francis DOI prefix: 10.1080/
+        if not doi.startswith("10.1080/"):
+            return None
+
+        pdf_url = f"https://www.tandfonline.com/doi/pdf/{doi}"
+        logger.debug(f"Found Taylor & Francis PDF: {pdf_url}")
+        return pdf_url
+    except Exception as e:
+        logger.debug(f"Taylor & Francis lookup failed for DOI {doi}: {e}")
         return None
 
 
