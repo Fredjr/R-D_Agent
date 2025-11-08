@@ -57,10 +57,8 @@
     projectId = urlMatch ? urlMatch[1] : null;
     logTest('Extract Project ID from URL', !!projectId, projectId);
 
-    // Get API base URL
-    apiBaseUrl = window.location.origin.includes('localhost') 
-      ? 'http://localhost:8000'
-      : 'https://r-dagent-production.up.railway.app';
+    // Use frontend proxy API (works from browser console)
+    apiBaseUrl = window.location.origin; // Use current origin (Vercel frontend)
     logTest('Determine API Base URL', true, apiBaseUrl);
 
     // Try to get user from multiple sources
@@ -142,6 +140,25 @@
   console.log(`   PMID: ${pmid}`);
   console.log(`   API URL: ${apiBaseUrl}\n`);
 
+  // Helper function for API calls
+  const apiCall = async (endpoint, options = {}) => {
+    const url = `${apiBaseUrl}/api/proxy/projects/${projectId}${endpoint}`;
+    const headers = {
+      'Content-Type': 'application/json',
+      'User-ID': userId,
+      ...options.headers
+    };
+
+    const response = await fetch(url, { ...options, headers });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`${response.status} - ${errorText}`);
+    }
+
+    return response;
+  };
+
   // ============================================================================
   // PHASE 1: STICKY NOTES
   // ============================================================================
@@ -152,20 +169,27 @@
 
   // Test 1.1: Create Sticky Note via API
   try {
-    const response = await fetch(`${apiBaseUrl}/api/projects/${projectId}/annotations`, {
+    const response = await fetch(`${apiBaseUrl}/api/proxy/projects/${projectId}/annotations`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId
+      },
       body: JSON.stringify({
-        project_id: projectId,
-        author_id: userId,
-        pmid: pmid,
+        article_pmid: pmid,
         content: 'Test Sticky Note - Phase 1',
         annotation_type: 'sticky_note',
         pdf_page: 1,
         sticky_note_position: { x: 0.5, y: 0.5, width: 200, height: 150 },
-        sticky_note_color: '#FFEB3B'
+        sticky_note_color: '#FFEB3B',
+        note_type: 'general'
       })
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`${response.status} - ${errorText}`);
+    }
 
     const data = await response.json();
     stickyNoteId = data.annotation_id;

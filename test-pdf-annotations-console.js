@@ -64,9 +64,8 @@
     userId = prompt('Enter your user email or ID for testing:');
   }
 
-  const apiUrl = window.location.origin.includes('localhost')
-    ? 'http://localhost:8000'
-    : 'https://r-dagent-production.up.railway.app';
+  // Use frontend proxy API (works from browser console)
+  const apiUrl = window.location.origin; // Use current origin (Vercel frontend)
   const pmid = document.querySelector('[data-pmid]')?.getAttribute('data-pmid') || '12345678';
 
   if (!projectId || !userId) {
@@ -80,34 +79,59 @@
   const createdIds = [];
   const api = {
     create: async (data) => {
-      const res = await fetch(`${apiUrl}/api/projects/${projectId}/annotations`, {
+      const res = await fetch(`${apiUrl}/api/proxy/projects/${projectId}/annotations`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_id: projectId, author_id: userId, pmid, ...data })
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': userId
+        },
+        body: JSON.stringify(data)
       });
-      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`API error: ${res.status} - ${errorText}`);
+      }
       const json = await res.json();
       createdIds.push(json.annotation_id);
       return json;
     },
     update: async (id, data) => {
-      const res = await fetch(`${apiUrl}/api/projects/${projectId}/annotations/${id}`, {
+      const res = await fetch(`${apiUrl}/api/proxy/projects/${projectId}/annotations/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': userId
+        },
         body: JSON.stringify(data)
       });
-      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`API error: ${res.status} - ${errorText}`);
+      }
       return res.json();
     },
     delete: async (id) => {
-      const res = await fetch(`${apiUrl}/api/projects/${projectId}/annotations/${id}`, {
-        method: 'DELETE'
+      const res = await fetch(`${apiUrl}/api/proxy/projects/${projectId}/annotations/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'User-ID': userId
+        }
       });
-      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`API error: ${res.status} - ${errorText}`);
+      }
     },
     getAll: async () => {
-      const res = await fetch(`${apiUrl}/api/projects/${projectId}/annotations`);
-      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      const res = await fetch(`${apiUrl}/api/proxy/projects/${projectId}/annotations`, {
+        headers: {
+          'User-ID': userId
+        }
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`API error: ${res.status} - ${errorText}`);
+      }
       return res.json();
     }
   };
