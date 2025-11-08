@@ -173,7 +173,10 @@ export default function AnnotationsSidebar({
                       <div className="mt-2 p-2 bg-gray-50 rounded text-xs text-gray-700 border border-gray-200">
                         <div className="flex items-start gap-2">
                           <ChatBubbleLeftIcon className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
-                          <p className="flex-1">{highlight.content}</p>
+                          <div
+                            className="flex-1 prose prose-sm max-w-none"
+                            dangerouslySetInnerHTML={{ __html: highlight.content }}
+                          />
                         </div>
                       </div>
                     ) : null}

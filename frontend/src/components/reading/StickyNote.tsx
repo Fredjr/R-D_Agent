@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import type { Highlight, StickyNotePosition } from '@/types/pdf-annotations';
+import RichTextEditor from './RichTextEditor';
 
 interface StickyNoteProps {
   annotation: Highlight;
@@ -30,7 +31,6 @@ export default function StickyNote({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [position, setPosition] = useState(annotation.sticky_note_position);
   const noteRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Only show sticky note on its page
   if (annotation.pdf_page !== pageNumber || !position) {
@@ -164,13 +164,6 @@ export default function StickyNote({
     setIsEditing(false);
   };
 
-  // Auto-focus textarea when editing
-  useEffect(() => {
-    if (isEditing && textareaRef.current) {
-      textareaRef.current.focus();
-    }
-  }, [isEditing]);
-
   return (
     <div
       ref={noteRef}
@@ -206,25 +199,25 @@ export default function StickyNote({
 
       {/* Content */}
       <div
-        className="p-3 overflow-auto"
+        className="overflow-auto"
         style={{ height: 'calc(100% - 40px)' }}
         onClick={(e) => {
           e.stopPropagation();
-          setIsEditing(true);
+          if (!isEditing) {
+            setIsEditing(true);
+          }
         }}
       >
         {isEditing ? (
           <div className="h-full flex flex-col">
-            <textarea
-              ref={textareaRef}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="flex-1 w-full text-sm bg-transparent border-none outline-none resize-none text-gray-900 placeholder-gray-600"
-              placeholder="Type your note here..."
-              onClick={(e) => e.stopPropagation()}
+            <RichTextEditor
+              content={content}
+              onChange={setContent}
               onBlur={handleSave}
+              placeholder="Type your note here..."
+              editable={true}
             />
-            <div className="flex gap-2 mt-2">
+            <div className="flex gap-2 mt-2 px-2 pb-2">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -247,9 +240,10 @@ export default function StickyNote({
             </div>
           </div>
         ) : (
-          <p className="text-sm text-gray-900 whitespace-pre-wrap">
-            {content || 'Click to add note...'}
-          </p>
+          <div
+            className="text-sm text-gray-900 p-3"
+            dangerouslySetInnerHTML={{ __html: content || 'Click to add note...' }}
+          />
         )}
       </div>
 
