@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { validateObject, userProfileRules, formatValidationErrors } from '@/lib/validation';
 import { StepIndicator } from '@/components/onboarding/StepIndicator';
 import { Step2ResearchInterests } from '@/components/onboarding/Step2ResearchInterests';
+import { inferInterestsFromProfile } from '@/lib/interest-inference';
 
 const CATEGORY_ROLES = {
   Student: ['Undergraduate', 'Postgraduate', 'PhD Student'],
@@ -120,13 +121,23 @@ export default function CompleteProfile() {
   };
 
   const handleStep2Skip = () => {
-    // Allow skipping research interests
+    // Instead of empty interests, infer from Step 1 profile data
     setError(null);
+
+    // Infer interests from subject area and role
+    const inferred = inferInterestsFromProfile(
+      formData.subjectArea,
+      formData.role
+    );
+
+    console.log('🧠 Inferred interests from profile:', inferred);
+
     setResearchInterests({
-      topics: [],
-      keywords: [],
-      careerStage: ''
+      topics: inferred.topics,
+      keywords: inferred.keywords,
+      careerStage: inferred.careerStage
     });
+
     setCurrentStep(3);
   };
 
@@ -162,11 +173,11 @@ export default function CompleteProfile() {
 
       // Redirect based on user choice
       if (takeTour) {
-        // Redirect to dashboard with tour parameter
-        router.push('/dashboard?tour=start');
+        // Redirect to dashboard with welcome banner and tour requested flag
+        router.push('/dashboard?welcome=true&tour_requested=true');
       } else {
-        // Redirect directly to dashboard
-        router.push('/dashboard');
+        // Redirect to dashboard with welcome banner
+        router.push('/dashboard?welcome=true');
       }
     } catch (error: any) {
       setError(error.message || 'Registration failed. Please try again.');

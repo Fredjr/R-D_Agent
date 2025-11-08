@@ -23,10 +23,12 @@ import {
   LightBulbIcon,
   SparklesIcon,
   GlobeAltIcon,
-  UserGroupIcon
+  UserGroupIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import { useRealTimeAnalytics } from '@/hooks/useRealTimeAnalytics';
 import { useWeeklyMixIntegration } from '@/hooks/useWeeklyMixIntegration';
+import { hasMinimalInterests } from '@/lib/interest-inference';
 
 interface RecommendationData {
   papers_for_you: any[];
@@ -91,6 +93,9 @@ export default function HomePage() {
     loading: true,
     error: null
   });
+
+  // Interest refinement prompt state
+  const [showInterestPrompt, setShowInterestPrompt] = useState(false);
 
   // Initialize semantic search engine
   const semanticEngine = new SemanticSearchEngine();
@@ -214,6 +219,24 @@ export default function HomePage() {
 
     if (user?.email) {
       fetchSemanticRecommendations();
+    }
+  }, [user]);
+
+  // Check if user has minimal interests (inferred, not selected)
+  useEffect(() => {
+    if (user?.preferences?.research_interests) {
+      const interests = user.preferences.research_interests;
+      const minimal = hasMinimalInterests({
+        topics: interests.topics || [],
+        keywords: interests.keywords || [],
+        careerStage: interests.careerStage || ''
+      });
+
+      // Show prompt if interests are minimal and user hasn't dismissed it
+      const dismissed = localStorage.getItem('interest_prompt_dismissed');
+      if (minimal && !dismissed) {
+        setShowInterestPrompt(true);
+      }
     }
   }, [user]);
 
@@ -368,6 +391,39 @@ export default function HomePage() {
       </div>
 
       <div className="w-full max-w-none py-6 sm:py-8">
+        {/* Interest Refinement Prompt */}
+        {showInterestPrompt && (
+          <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-4 sm:p-6 rounded-lg mb-6 relative animate-fade-in">
+            <button
+              onClick={() => {
+                setShowInterestPrompt(false);
+                localStorage.setItem('interest_prompt_dismissed', 'true');
+              }}
+              className="absolute top-2 right-2 text-white hover:text-gray-200 transition-colors"
+              aria-label="Dismiss interest prompt"
+            >
+              <XMarkIcon className="w-5 h-5" />
+            </button>
+            <div className="flex items-start gap-3 sm:gap-4">
+              <SparklesIcon className="w-8 h-8 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-lg mb-1">💡 Get Better Recommendations</h3>
+                <p className="text-sm text-purple-100 mb-3">
+                  Tell us more about your research interests to see more personalized papers tailored to your work
+                </p>
+                <Button
+                  onClick={() => router.push('/settings?tab=interests')}
+                  variant="default"
+                  size="sm"
+                  className="bg-white text-purple-600 hover:bg-gray-100 font-semibold"
+                >
+                  Add Research Interests
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Quick Actions */}
         <section className="mb-8 sm:mb-12">
           <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6">Quick Actions</h2>

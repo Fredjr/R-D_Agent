@@ -22,6 +22,7 @@ import {
 } from '@/components/ui';
 import { SpotifyTopBar } from '@/components/ui/SpotifyNavigation';
 import { MobileResponsiveLayout } from '@/components/ui/MobileResponsiveLayout';
+import { WelcomeBanner } from '@/components/onboarding/WelcomeBanner';
 
 interface Project {
   project_id: string;
@@ -50,6 +51,8 @@ function DashboardContent() {
   const [creating, setCreating] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [projectDetails, setProjectDetails] = useState<any>(null);
+  const [showWelcomeBanner, setShowWelcomeBanner] = useState(false);
+  const [tourRequested, setTourRequested] = useState(false);
 
   console.log('📊 Dashboard page initialized');
   const [loadingDetails, setLoadingDetails] = useState(false);
@@ -78,6 +81,36 @@ function DashboardContent() {
       return () => clearTimeout(timer);
     }
   }, [searchParams, user, authLoading]);
+
+  // Handle welcome banner
+  useEffect(() => {
+    const welcome = searchParams.get('welcome');
+    const tour = searchParams.get('tour_requested');
+    const dismissed = localStorage.getItem('welcome_banner_dismissed');
+
+    if (welcome === 'true' && !dismissed) {
+      setShowWelcomeBanner(true);
+      setTourRequested(tour === 'true');
+    }
+  }, [searchParams]);
+
+  const handleStartTour = () => {
+    // For now, show an alert with information
+    // TODO: Implement actual interactive tour in Phase 2
+    alert(
+      '🎉 Interactive Tour Coming Soon!\n\n' +
+      'For now, here\'s a quick overview:\n\n' +
+      '📚 Discover Papers - Get AI-powered recommendations\n' +
+      '🔍 Research Hub - Search PubMed with advanced filters\n' +
+      '📁 Create Project - Organize your research\n\n' +
+      'Click the green "+ NEW PROJECT" button below to get started!'
+    );
+    setShowWelcomeBanner(false);
+  };
+
+  const handleDismissBanner = () => {
+    setShowWelcomeBanner(false);
+  };
 
   // Auto-dismiss errors after 10 seconds
   useEffect(() => {
@@ -219,6 +252,16 @@ function DashboardContent() {
   return (
     <MobileResponsiveLayout>
       <div className="w-full max-w-none py-6 sm:py-8">
+        {/* Welcome Banner */}
+        {showWelcomeBanner && user && (
+          <WelcomeBanner
+            userName={user.first_name || user.username || 'there'}
+            tourRequested={tourRequested}
+            onStartTour={handleStartTour}
+            onDismiss={handleDismissBanner}
+          />
+        )}
+
         {/* Mobile-friendly header */}
         <div className="mb-6 sm:mb-8">
           <div className="flex flex-col gap-4 mb-6">

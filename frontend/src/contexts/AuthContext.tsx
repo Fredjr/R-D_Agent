@@ -14,6 +14,18 @@ interface User {
   subject_area?: string;
   created_at: string;
   registration_completed?: boolean;
+  preferences?: {
+    research_interests?: {
+      topics?: string[];
+      keywords?: string[];
+      careerStage?: string;
+    };
+    wants_product_tour?: boolean;
+    onboarding_completed?: boolean;
+    onboarding_completed_at?: string;
+    onboarding_version?: string;
+    [key: string]: any;
+  };
 }
 
 interface AuthContextType {
