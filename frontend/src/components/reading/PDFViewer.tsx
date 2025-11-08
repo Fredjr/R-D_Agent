@@ -308,6 +308,33 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
     }
   }, [pageNumber, showSidebar]);
 
+  // Handle automatic highlight creation from drag-to-highlight
+  const handleDragToHighlight = useCallback(
+    async (selection: {
+      text: string;
+      pageNumber: number;
+      boundingRect: DOMRect;
+      rects: DOMRect[];
+    }) => {
+      console.log('🎨 Drag-to-highlight completed:', selection.text.substring(0, 50));
+
+      // Get the selected color from the toolbar
+      const color = selectedColor || HIGHLIGHT_COLORS[0].hex;
+
+      // Create TextSelection object
+      const textSelection: TextSelection = {
+        text: selection.text,
+        pageNumber: selection.pageNumber,
+        boundingRect: selection.boundingRect,
+        rects: selection.rects,
+      };
+
+      // Call the existing handleHighlight function
+      await handleHighlight(color, textSelection);
+    },
+    [selectedColor, handleHighlight]
+  );
+
   // Handle deleting a highlight
   const handleHighlightDelete = useCallback(
     async (annotationId: string) => {
@@ -855,17 +882,20 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
       )}
 
       {/* Highlight Tool - color picker for text selection */}
-      {projectId && (selectedTool === 'highlight' || selectedTool === 'underline' || selectedTool === 'strikethrough') && (
+      {/* HighlightTool (color picker popup) - Disabled in favor of drag-to-highlight */}
+      {/* {projectId && (selectedTool === 'highlight' || selectedTool === 'underline' || selectedTool === 'strikethrough') && (
         <HighlightTool
           onHighlight={handleHighlight}
           isEnabled={highlightMode}
         />
-      )}
+      )} */}
 
-      {/* Selection Overlay - real-time blue highlight during text selection */}
+      {/* Selection Overlay - real-time highlight with selected color during text selection */}
       {projectId && (selectedTool === 'highlight' || selectedTool === 'underline' || selectedTool === 'strikethrough') && (
         <SelectionOverlay
           isEnabled={highlightMode}
+          selectedColor={selectedColor || HIGHLIGHT_COLORS[0].hex}
+          onSelectionComplete={handleDragToHighlight}
         />
       )}
 
