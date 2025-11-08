@@ -63,14 +63,55 @@
       : 'https://r-dagent-production.up.railway.app';
     logTest('Determine API Base URL', true, apiBaseUrl);
 
-    // Try to get user from localStorage or context
-    const userStr = localStorage.getItem('user');
+    // Try to get user from multiple sources
+    // Method 1: localStorage 'user' key
+    let userStr = localStorage.getItem('user');
     if (userStr) {
-      const user = JSON.parse(userStr);
-      userId = user.user_id || user.id;
-      logTest('Extract User ID from localStorage', !!userId, userId);
-    } else {
-      throw new Error('User not found in localStorage');
+      try {
+        const user = JSON.parse(userStr);
+        userId = user.user_id || user.id || user.email;
+        logTest('Extract User ID from localStorage', !!userId, userId);
+      } catch (e) {
+        console.warn('Failed to parse user from localStorage:', e);
+      }
+    }
+
+    // Method 2: Check for Clerk session data
+    if (!userId) {
+      const clerkKeys = Object.keys(localStorage).filter(k => k.includes('clerk') || k.includes('session'));
+      for (const key of clerkKeys) {
+        try {
+          const data = JSON.parse(localStorage.getItem(key));
+          if (data && (data.email || data.user_id || data.id)) {
+            userId = data.email || data.user_id || data.id;
+            logTest('Extract User ID from Clerk session', !!userId, userId);
+            break;
+          }
+        } catch (e) {
+          // Skip invalid JSON
+        }
+      }
+    }
+
+    // Method 3: Try to get from DOM (user menu, profile, etc.)
+    if (!userId) {
+      const userMenu = document.querySelector('[data-user-email], [data-user-id]');
+      if (userMenu) {
+        userId = userMenu.getAttribute('data-user-email') || userMenu.getAttribute('data-user-id');
+        logTest('Extract User ID from DOM', !!userId, userId);
+      }
+    }
+
+    // Method 4: Prompt user to enter manually
+    if (!userId) {
+      console.warn('⚠️ Could not auto-detect user ID. You can enter it manually:');
+      console.log('Run: userId = "your-email@example.com"');
+      userId = prompt('Enter your user email or ID for testing:');
+      if (userId) {
+        logTest('User ID entered manually', !!userId, userId);
+      } else {
+        throw new Error('User ID required for testing');
+      }
     }
 
     // Try to get PMID from page

@@ -39,9 +39,33 @@
 
   // ========== SETUP ==========
   const projectId = window.location.pathname.match(/\/project\/([^\/]+)/)?.[1];
-  const userId = JSON.parse(localStorage.getItem('user') || '{}').user_id;
-  const apiUrl = window.location.origin.includes('localhost') 
-    ? 'http://localhost:8000' 
+
+  // Try multiple methods to get user ID
+  let userId = null;
+  try {
+    const userObj = JSON.parse(localStorage.getItem('user') || '{}');
+    userId = userObj.user_id || userObj.id || userObj.email;
+  } catch (e) {
+    // Try Clerk session
+    const clerkKeys = Object.keys(localStorage).filter(k => k.includes('clerk') || k.includes('session'));
+    for (const key of clerkKeys) {
+      try {
+        const data = JSON.parse(localStorage.getItem(key));
+        if (data && (data.email || data.user_id || data.id)) {
+          userId = data.email || data.user_id || data.id;
+          break;
+        }
+      } catch (e) {}
+    }
+  }
+
+  // Prompt if still not found
+  if (!userId) {
+    userId = prompt('Enter your user email or ID for testing:');
+  }
+
+  const apiUrl = window.location.origin.includes('localhost')
+    ? 'http://localhost:8000'
     : 'https://r-dagent-production.up.railway.app';
   const pmid = document.querySelector('[data-pmid]')?.getAttribute('data-pmid') || '12345678';
 
