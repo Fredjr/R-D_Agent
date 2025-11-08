@@ -71,6 +71,7 @@ def register_pdf_endpoints(app):
             results = await asyncio.gather(
                 get_europepmc_pdf_url(pmid),  # Europe PMC first (no PoW challenge)
                 get_pmc_pdf_url(pmid),
+                get_bmj_pdf_url(article_doi, pmid) if article_doi else asyncio.sleep(0),
                 get_cochrane_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
                 get_wiley_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
                 get_nihr_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
@@ -78,7 +79,7 @@ def register_pdf_endpoints(app):
                 return_exceptions=True
             )
 
-            europepmc_url, pmc_url, cochrane_url, wiley_url, nihr_url, unpaywall_url = results
+            europepmc_url, pmc_url, bmj_url, cochrane_url, wiley_url, nihr_url, unpaywall_url = results
 
             # Check Europe PMC first (no Proof-of-Work challenge, unlike PMC)
             if europepmc_url and not isinstance(europepmc_url, Exception):
@@ -98,6 +99,17 @@ def register_pdf_endpoints(app):
                     "pmid": pmid,
                     "source": "pmc",
                     "url": pmc_url,
+                    "pdf_available": True,
+                    "title": article_title
+                }
+
+            # Check BMJ
+            if bmj_url and not isinstance(bmj_url, Exception):
+                logger.info(f"✅ Found PDF in BMJ: {pmid}")
+                return {
+                    "pmid": pmid,
+                    "source": "bmj",
+                    "url": bmj_url,
                     "pdf_available": True,
                     "title": article_title
                 }
@@ -231,6 +243,7 @@ def register_pdf_endpoints(app):
             results = await asyncio.gather(
                 get_europepmc_pdf_url(pmid),  # Europe PMC first (no PoW challenge)
                 get_pmc_pdf_url(pmid),
+                get_bmj_pdf_url(article_doi, pmid) if article_doi else asyncio.sleep(0),
                 get_cochrane_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
                 get_wiley_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
                 get_nihr_pdf_url(article_doi) if article_doi else asyncio.sleep(0),
@@ -238,7 +251,7 @@ def register_pdf_endpoints(app):
                 return_exceptions=True
             )
 
-            europepmc_url, pmc_url, cochrane_url, wiley_url, nihr_url, unpaywall_url = results
+            europepmc_url, pmc_url, bmj_url, cochrane_url, wiley_url, nihr_url, unpaywall_url = results
 
             # Determine which URL to use (priority order)
             pdf_url = None
@@ -250,6 +263,9 @@ def register_pdf_endpoints(app):
             elif pmc_url and not isinstance(pmc_url, Exception):
                 pdf_url = pmc_url
                 source = "pmc"
+            elif bmj_url and not isinstance(bmj_url, Exception):
+                pdf_url = bmj_url
+                source = "bmj"
             elif cochrane_url and not isinstance(cochrane_url, Exception):
                 pdf_url = cochrane_url
                 source = "cochrane"
@@ -667,6 +683,8 @@ async def try_get_pdf_from_publisher_link(url: str, provider: str) -> Optional[s
         pdf_patterns = [
             # Direct PDF link
             lambda u: u if u.endswith('.pdf') else None,
+            # BMJ pattern: /content/{volume}/{doi}.pdf
+            lambda u: u.rstrip('/') + '.pdf' if 'bmj.com/content/' in u else None,
             # Wiley pattern: /doi/epdf/
             lambda u: u.replace('/doi/', '/doi/epdf/') if '/doi/' in u and 'wiley.com' in u else None,
             # Wolters Kluwer (LWW) pattern: Add /pdf to the end
@@ -694,6 +712,62 @@ async def try_get_pdf_from_publisher_link(url: str, provider: str) -> Optional[s
 
     except Exception as e:
         logger.debug(f"Error generating PDF URL from {url}: {e}")
+        return None
+
+
+async def get_bmj_pdf_url(doi: Optional[str], pmid: Optional[str] = None) -> Optional[str]:
+    """
+    Get PDF URL from BMJ (British Medical Journal).
+
+    BMJ articles have a structured PDF download URL based on DOI.
+    Example DOI: 10.1136/bmj-2023-075681
+    PDF URL: https://www.bmj.com/content/384/bmj-2023-075681.pdf
+
+    The volume number is extracted from PubMed metadata.
+    The DOI prefix (10.1136/) is stripped from the URL.
+    """
+    if not doi:
+        return None
+
+    try:
+        # Check if this is a BMJ DOI
+        if not doi.startswith("10.1136/bmj"):
+            return None
+
+        # Extract the article ID from DOI (remove 10.1136/ prefix)
+        # DOI: 10.1136/bmj-2023-075681 -> Article ID: bmj-2023-075681
+        article_id = doi.replace("10.1136/", "")
+
+        # Fetch PubMed metadata to get volume number
+        if pmid:
+            try:
+                async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+                    response = await client.get(
+                        f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id={pmid}&retmode=xml&rettype=abstract",
+                        headers={'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'}
+                    )
+
+                    if response.status_code == 200:
+                        xml_text = response.text
+                        # Extract volume from XML
+                        volume_match = re.search(r'<Volume>(\d+)</Volume>', xml_text)
+                        if volume_match:
+                            volume = volume_match.group(1)
+                            # Construct BMJ PDF URL
+                            # Format: https://www.bmj.com/content/{volume}/{article_id}.pdf
+                            pdf_url = f"https://www.bmj.com/content/{volume}/{article_id}.pdf"
+                            logger.debug(f"Found BMJ PDF: {pdf_url}")
+                            return pdf_url
+            except Exception as e:
+                logger.debug(f"Failed to fetch volume from PubMed for BMJ article: {e}")
+
+        # Fallback: Try without volume (some BMJ articles work this way)
+        pdf_url = f"https://www.bmj.com/content/bmj/{article_id}.pdf"
+        logger.debug(f"Trying BMJ PDF without volume: {pdf_url}")
+        return pdf_url
+
+    except Exception as e:
+        logger.debug(f"BMJ lookup failed for DOI {doi}: {e}")
         return None
 
 
