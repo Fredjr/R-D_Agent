@@ -650,7 +650,7 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex flex-col">
+    <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex flex-col" data-pmid={pmid}>
       {/* Custom CSS to make text layer invisible but selectable */}
       <style jsx global>{`
         .react-pdf__Page__textContent {
