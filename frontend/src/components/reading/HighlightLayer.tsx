@@ -55,7 +55,12 @@ export default function HighlightLayer({
   }
 
   // Convert normalized coordinates to pixel coordinates
-  const getPixelCoordinates = (coords: PDFCoordinates) => {
+  const getPixelCoordinates = (coords: PDFCoordinates | null) => {
+    // Return null if coords is null
+    if (!coords) {
+      return null;
+    }
+
     // The PDF page is rendered at a specific scale
     // We need to convert normalized coordinates (0-1) to actual pixel positions
     const pageElement = document.querySelector(
@@ -111,7 +116,7 @@ export default function HighlightLayer({
         switch (annotationType) {
           case 'highlight':
             typeStyle = {
-              backgroundColor: highlight.highlight_color,
+              backgroundColor: highlight.highlight_color || '#FFEB3B',
               opacity: 0.4,
               mixBlendMode: 'multiply',
             };
@@ -135,7 +140,7 @@ export default function HighlightLayer({
 
           default:
             typeStyle = {
-              backgroundColor: highlight.highlight_color,
+              backgroundColor: highlight.highlight_color || '#FFEB3B',
               opacity: 0.4,
               mixBlendMode: 'multiply',
             };

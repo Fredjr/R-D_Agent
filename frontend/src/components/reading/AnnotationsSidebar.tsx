@@ -120,7 +120,7 @@ export default function AnnotationsSidebar({
                   {/* Color indicator */}
                   <div
                     className="absolute left-0 top-0 bottom-0 w-1 rounded-l-lg"
-                    style={{ backgroundColor: highlight.highlight_color }}
+                    style={{ backgroundColor: highlight.highlight_color || '#FFEB3B' }}
                   />
 
                   {/* Highlighted text */}
@@ -128,8 +128,8 @@ export default function AnnotationsSidebar({
                     <div
                       className="text-sm text-gray-900 mb-2 p-2 rounded"
                       style={{
-                        backgroundColor: `${highlight.highlight_color}20`,
-                        borderLeft: `3px solid ${highlight.highlight_color}`,
+                        backgroundColor: `${highlight.highlight_color || '#FFEB3B'}20`,
+                        borderLeft: `3px solid ${highlight.highlight_color || '#FFEB3B'}`,
                       }}
                     >
                       "{highlight.highlight_text}"
@@ -226,7 +226,7 @@ export default function AnnotationsSidebar({
                         >
                           <div
                             className="w-3 h-3 rounded-full border border-gray-300"
-                            style={{ backgroundColor: highlight.highlight_color }}
+                            style={{ backgroundColor: highlight.highlight_color || '#FFEB3B' }}
                           />
                         </button>
 
