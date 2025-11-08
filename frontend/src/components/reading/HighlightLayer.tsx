@@ -89,9 +89,56 @@ export default function HighlightLayer({
     >
       {pageHighlights.map((highlight) => {
         const pixelCoords = getPixelCoordinates(highlight.pdf_coordinates);
-        
+
         if (!pixelCoords) {
           return null;
+        }
+
+        // Determine annotation style based on type
+        const annotationType = highlight.annotation_type || 'highlight';
+
+        // Base styles for all annotation types
+        const baseStyle: React.CSSProperties = {
+          left: `${pixelCoords.x}px`,
+          top: `${pixelCoords.y}px`,
+          width: `${pixelCoords.width}px`,
+          height: `${pixelCoords.height}px`,
+        };
+
+        // Type-specific styles
+        let typeStyle: React.CSSProperties = {};
+
+        switch (annotationType) {
+          case 'highlight':
+            typeStyle = {
+              backgroundColor: highlight.highlight_color,
+              opacity: 0.4,
+              mixBlendMode: 'multiply',
+            };
+            break;
+
+          case 'underline':
+            typeStyle = {
+              borderBottom: `3px solid ${highlight.highlight_color || '#3B82F6'}`,
+              backgroundColor: 'transparent',
+            };
+            break;
+
+          case 'strikethrough':
+            typeStyle = {
+              borderTop: `2px solid ${highlight.highlight_color || '#EF4444'}`,
+              backgroundColor: 'transparent',
+              top: `${pixelCoords.y + pixelCoords.height / 2}px`,
+              height: '0px',
+            };
+            break;
+
+          default:
+            typeStyle = {
+              backgroundColor: highlight.highlight_color,
+              opacity: 0.4,
+              mixBlendMode: 'multiply',
+            };
         }
 
         return (
@@ -99,16 +146,11 @@ export default function HighlightLayer({
             key={highlight.annotation_id}
             className="absolute pointer-events-auto cursor-pointer transition-opacity hover:opacity-80"
             style={{
-              left: `${pixelCoords.x}px`,
-              top: `${pixelCoords.y}px`,
-              width: `${pixelCoords.width}px`,
-              height: `${pixelCoords.height}px`,
-              backgroundColor: highlight.highlight_color,
-              opacity: 0.4,
-              mixBlendMode: 'multiply',
+              ...baseStyle,
+              ...typeStyle,
             }}
             onClick={() => onHighlightClick?.(highlight)}
-            title={highlight.highlight_text}
+            title={`${annotationType}: ${highlight.highlight_text}`}
           />
         );
       })}

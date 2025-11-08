@@ -202,16 +202,24 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
     }
   };
 
-  // Handle creating a new highlight
+  // Handle creating a new annotation (highlight, underline, strikethrough)
   const handleHighlight = useCallback(
     async (color: string, selection: TextSelection) => {
       if (!projectId || !user) {
-        console.error('❌ Cannot create highlight: missing projectId or user');
+        console.error('❌ Cannot create annotation: missing projectId or user');
+        return;
+      }
+
+      // Determine annotation type based on selected tool
+      const annotationType = selectedTool || 'highlight';
+
+      // Skip if tool is sticky_note (handled separately)
+      if (annotationType === 'sticky_note') {
         return;
       }
 
       try {
-        console.log('📝 Creating highlight:', {
+        console.log(`📝 Creating ${annotationType}:`, {
           page: selection.pageNumber,
           text: selection.text.substring(0, 50),
           color,
@@ -248,15 +256,16 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
 
         // Create annotation with PDF fields
         const annotationData = {
-          content: `Highlight: ${selection.text}`,
+          content: `${annotationType}: ${selection.text}`,
           article_pmid: pmid,
-          note_type: 'highlight',
+          note_type: annotationType,
           priority: 'medium',
           status: 'active',
           pdf_page: selection.pageNumber,
           pdf_coordinates: coordinates,
           highlight_color: color,
           highlight_text: selection.text,
+          annotation_type: annotationType,
         };
 
         const response = await fetch(`/api/proxy/projects/${projectId}/annotations`, {
@@ -269,19 +278,19 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
         });
 
         if (!response.ok) {
-          throw new Error('Failed to create highlight');
+          throw new Error(`Failed to create ${annotationType}`);
         }
 
-        const newHighlight = await response.json();
-        console.log('✅ Highlight created:', newHighlight.annotation_id);
+        const newAnnotation = await response.json();
+        console.log(`✅ ${annotationType} created:`, newAnnotation.annotation_id);
 
         // Add to local state
-        setHighlights((prev) => [...prev, newHighlight]);
+        setHighlights((prev) => [...prev, newAnnotation]);
       } catch (err) {
-        console.error('❌ Error creating highlight:', err);
+        console.error('❌ Error creating annotation:', err);
       }
     },
-    [projectId, user, pmid]
+    [projectId, user, pmid, selectedTool]
   );
 
   // Handle clicking on a highlight - navigate to page
@@ -782,10 +791,15 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
                   }}
                 />
 
-                {/* Highlight Layer - renders existing highlights */}
+                {/* Highlight Layer - renders text-based annotations (highlight, underline, strikethrough) */}
                 {projectId && (
                   <HighlightLayer
-                    highlights={highlights.filter((h) => h.annotation_type === 'highlight')}
+                    highlights={highlights.filter((h) =>
+                      h.annotation_type === 'highlight' ||
+                      h.annotation_type === 'underline' ||
+                      h.annotation_type === 'strikethrough' ||
+                      !h.annotation_type // Legacy highlights without type
+                    )}
                     pageNumber={pageNumber}
                     scale={scale}
                     onHighlightClick={handleHighlightClick}
@@ -841,7 +855,7 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
       )}
 
       {/* Highlight Tool - color picker for text selection */}
-      {projectId && selectedTool === 'highlight' && (
+      {projectId && (selectedTool === 'highlight' || selectedTool === 'underline' || selectedTool === 'strikethrough') && (
         <HighlightTool
           onHighlight={handleHighlight}
           isEnabled={highlightMode}
@@ -849,7 +863,7 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
       )}
 
       {/* Selection Overlay - real-time blue highlight during text selection */}
-      {projectId && selectedTool === 'highlight' && (
+      {projectId && (selectedTool === 'highlight' || selectedTool === 'underline' || selectedTool === 'strikethrough') && (
         <SelectionOverlay
           isEnabled={highlightMode}
         />

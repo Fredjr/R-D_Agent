@@ -72,7 +72,8 @@ export default function AnnotationToolbar({
         <div key={tool.id} className="relative">
           <button
             onClick={() => {
-              if (tool.id === 'highlight') {
+              // Show color picker for text-based annotation tools
+              if (tool.id === 'highlight' || tool.id === 'underline' || tool.id === 'strikethrough') {
                 setShowColorPicker(!showColorPicker);
               }
               onToolSelect(selectedTool === tool.id ? null : tool.id);
@@ -90,8 +91,10 @@ export default function AnnotationToolbar({
             <span className={`text-xl ${tool.className || ''}`}>{tool.icon}</span>
           </button>
 
-          {/* Color picker for highlight tool */}
-          {tool.id === 'highlight' && showColorPicker && selectedTool === 'highlight' && (
+          {/* Color picker for text-based annotation tools */}
+          {(tool.id === 'highlight' || tool.id === 'underline' || tool.id === 'strikethrough') &&
+           showColorPicker &&
+           selectedTool === tool.id && (
             <div className="absolute left-full ml-2 top-0 bg-white rounded-lg shadow-xl p-3 flex flex-col gap-2">
               <p className="text-xs font-medium text-gray-700 mb-1">Choose color:</p>
               <div className="flex flex-col gap-2">
@@ -121,8 +124,8 @@ export default function AnnotationToolbar({
         </div>
       ))}
 
-      {/* Selected color indicator for highlight tool */}
-      {selectedTool === 'highlight' && (
+      {/* Selected color indicator for text-based annotation tools */}
+      {(selectedTool === 'highlight' || selectedTool === 'underline' || selectedTool === 'strikethrough') && (
         <div className="mt-2 flex items-center justify-center">
           <div
             className="w-8 h-8 rounded-full border-2 border-white"
