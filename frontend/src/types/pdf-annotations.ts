@@ -45,6 +45,12 @@ export interface Highlight {
   sticky_note_color: string;
   text_formatting: TextFormatting | null;
   drawing_data: any | null;
+
+  // Organization fields
+  tags?: string[];
+  note_type?: string;
+  priority?: string;
+  status?: string;
 }
 
 export interface TextSelection {
