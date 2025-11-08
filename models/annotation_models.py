@@ -87,6 +87,13 @@ class CreateAnnotationRequest(BaseModel):
     highlight_color: Optional[str] = Field(None, description="Highlight color (hex code)")
     highlight_text: Optional[str] = Field(None, description="Selected text from PDF")
 
+    # Advanced PDF annotation fields (Sticky Notes, Underline, Strikethrough, Drawing)
+    annotation_type: Optional[str] = Field(default="highlight", description="Type of annotation: highlight, sticky_note, underline, strikethrough, drawing")
+    sticky_note_position: Optional[Dict[str, Any]] = Field(None, description="Position and size for sticky notes {x, y, width, height}")
+    sticky_note_color: Optional[str] = Field(default="#FFEB3B", description="Sticky note color (hex code)")
+    text_formatting: Optional[Dict[str, bool]] = Field(None, description="Text formatting options {bold, underline, italic, strikethrough}")
+    drawing_data: Optional[Dict[str, Any]] = Field(None, description="SVG path data for freehand drawings")
+
     # Privacy
     is_private: bool = Field(default=False, description="Private vs shared annotation")
 
@@ -224,6 +231,13 @@ class AnnotationResponse(BaseModel):
     pdf_coordinates: Optional[Dict[str, Any]] = None
     highlight_color: Optional[str] = None
     highlight_text: Optional[str] = None
+
+    # Advanced PDF annotation fields (Sticky Notes, Underline, Strikethrough, Drawing)
+    annotation_type: Optional[str] = "highlight"
+    sticky_note_position: Optional[Dict[str, Any]] = None
+    sticky_note_color: Optional[str] = "#FFEB3B"
+    text_formatting: Optional[Dict[str, bool]] = None
+    drawing_data: Optional[Dict[str, Any]] = None
 
     # Metadata
     created_at: datetime

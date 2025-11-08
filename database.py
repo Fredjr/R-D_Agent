@@ -293,6 +293,13 @@ class Annotation(Base):
     highlight_color = Column(String(7), nullable=True)  # Hex color code (e.g., #FFEB3B)
     highlight_text = Column(Text, nullable=True)  # Selected text from PDF
 
+    # NEW: Advanced PDF annotation fields (Sticky Notes, Underline, Strikethrough, Drawing)
+    annotation_type = Column(String, default="highlight")  # highlight, sticky_note, underline, strikethrough, drawing
+    sticky_note_position = Column(JSON, nullable=True)  # {x, y, width, height} for sticky notes
+    sticky_note_color = Column(String(7), default="#FFEB3B")  # Yellow by default
+    text_formatting = Column(JSON, nullable=True)  # {bold: true, underline: false, italic: false, strikethrough: false}
+    drawing_data = Column(JSON, nullable=True)  # SVG path data for freehand drawings
+
     # Relationships
     project = relationship("Project", back_populates="annotations")
     author = relationship("User", back_populates="annotations")

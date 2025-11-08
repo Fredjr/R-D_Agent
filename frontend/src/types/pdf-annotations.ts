@@ -12,15 +12,39 @@ export interface PDFCoordinates {
   pageHeight: number; // Original page height in points
 }
 
+export interface StickyNotePosition {
+  x: number;          // Normalized X position (0-1)
+  y: number;          // Normalized Y position (0-1)
+  width: number;      // Width in pixels
+  height: number;     // Height in pixels
+}
+
+export interface TextFormatting {
+  bold?: boolean;
+  underline?: boolean;
+  italic?: boolean;
+  strikethrough?: boolean;
+}
+
+export type AnnotationType = 'highlight' | 'sticky_note' | 'underline' | 'strikethrough' | 'drawing';
+
 export interface Highlight {
   annotation_id: string;
   pdf_page: number;
-  pdf_coordinates: PDFCoordinates;
-  highlight_color: string;
-  highlight_text: string;
+  pdf_coordinates: PDFCoordinates | null;
+  highlight_color: string | null;
+  highlight_text: string | null;
   content: string;
   created_at: string;
+  updated_at: string;
   author_id: string;
+
+  // Advanced annotation fields
+  annotation_type: AnnotationType;
+  sticky_note_position: StickyNotePosition | null;
+  sticky_note_color: string;
+  text_formatting: TextFormatting | null;
+  drawing_data: any | null;
 }
 
 export interface TextSelection {

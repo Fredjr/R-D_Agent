@@ -5968,6 +5968,90 @@ async def apply_pdf_annotations_migration(
         }
 
 
+# Migration Endpoint (Advanced PDF Annotations - Sticky Notes, Underline, Strikethrough, Drawing)
+@app.post("/api/admin/apply-advanced-pdf-annotations-migration")
+async def apply_advanced_pdf_annotations_migration(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Temporary endpoint to apply advanced PDF annotations migration to production database.
+    This adds support for sticky notes, underline, strikethrough, and drawing annotations.
+    """
+    try:
+        from sqlalchemy import text, inspect
+
+        # Check if columns already exist
+        inspector = inspect(db.bind)
+        existing_columns = [col['name'] for col in inspector.get_columns('annotations')]
+
+        new_columns = ['annotation_type', 'sticky_note_position', 'sticky_note_color', 'text_formatting', 'drawing_data']
+        existing_new_columns = [col for col in new_columns if col in existing_columns]
+
+        if len(existing_new_columns) == 5:
+            return {
+                "status": "already_applied",
+                "message": "All advanced PDF annotation columns already exist in annotations table"
+            }
+
+        changes = []
+
+        # Add annotation_type column
+        if 'annotation_type' not in existing_columns:
+            db.execute(text("""
+                ALTER TABLE annotations
+                ADD COLUMN annotation_type VARCHAR DEFAULT 'highlight'
+            """))
+            changes.append("Added annotation_type column")
+
+        # Add sticky_note_position column
+        if 'sticky_note_position' not in existing_columns:
+            db.execute(text("""
+                ALTER TABLE annotations
+                ADD COLUMN sticky_note_position JSONB
+            """))
+            changes.append("Added sticky_note_position column")
+
+        # Add sticky_note_color column
+        if 'sticky_note_color' not in existing_columns:
+            db.execute(text("""
+                ALTER TABLE annotations
+                ADD COLUMN sticky_note_color VARCHAR(7) DEFAULT '#FFEB3B'
+            """))
+            changes.append("Added sticky_note_color column")
+
+        # Add text_formatting column
+        if 'text_formatting' not in existing_columns:
+            db.execute(text("""
+                ALTER TABLE annotations
+                ADD COLUMN text_formatting JSONB
+            """))
+            changes.append("Added text_formatting column")
+
+        # Add drawing_data column
+        if 'drawing_data' not in existing_columns:
+            db.execute(text("""
+                ALTER TABLE annotations
+                ADD COLUMN drawing_data JSONB
+            """))
+            changes.append("Added drawing_data column")
+
+        db.commit()
+
+        return {
+            "status": "success",
+            "message": "Advanced PDF annotations migration applied successfully",
+            "changes": changes
+        }
+
+    except Exception as e:
+        db.rollback()
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+
 # Annotation Endpoints
 
 @app.post("/projects/{project_id}/annotations", response_model=AnnotationResponseModel)
@@ -6034,7 +6118,13 @@ async def create_annotation(
         pdf_page=annotation_data.pdf_page,
         pdf_coordinates=pdf_coordinates_data,
         highlight_color=annotation_data.highlight_color,
-        highlight_text=annotation_data.highlight_text
+        highlight_text=annotation_data.highlight_text,
+        # NEW: Advanced PDF annotation fields (Sticky Notes, Underline, Strikethrough, Drawing)
+        annotation_type=annotation_data.annotation_type or "highlight",
+        sticky_note_position=annotation_data.sticky_note_position,
+        sticky_note_color=annotation_data.sticky_note_color or "#FFEB3B",
+        text_formatting=annotation_data.text_formatting,
+        drawing_data=annotation_data.drawing_data
     )
     
     db.add(annotation)
