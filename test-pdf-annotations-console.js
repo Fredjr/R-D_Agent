@@ -132,7 +132,9 @@
         const errorText = await res.text();
         throw new Error(`API error: ${res.status} - ${errorText}`);
       }
-      return res.json();
+      const data = await res.json();
+      // Backend returns { annotations: [...] }, extract the array
+      return Array.isArray(data) ? data : (data.annotations || []);
     }
   };
 
