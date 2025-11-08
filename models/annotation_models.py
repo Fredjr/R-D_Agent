@@ -58,7 +58,7 @@ class PDFCoordinates(BaseModel):
 
 class CreateAnnotationRequest(BaseModel):
     """Request model for creating a new annotation"""
-    content: str = Field(..., min_length=1, description="Annotation content")
+    content: str = Field(..., description="Annotation content")
     
     # Context links (at least one should be provided)
     article_pmid: Optional[str] = Field(None, description="Link to article")
