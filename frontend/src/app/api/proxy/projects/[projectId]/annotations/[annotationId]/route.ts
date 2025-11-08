@@ -42,14 +42,14 @@ export async function GET(
   }
 }
 
-export async function PATCH(
+export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string; annotationId: string }> }
 ) {
   try {
     const { projectId, annotationId } = await params;
     const body = await request.json();
-    
+
     // Get user ID header
     const userIdHeader = request.headers.get('User-ID');
     if (!userIdHeader) {
@@ -57,7 +57,51 @@ export async function PATCH(
     }
 
     const response = await fetch(`${BACKEND_URL}/projects/${projectId}/annotations/${annotationId}`, {
-      method: 'PATCH',
+      method: 'PUT',
+      headers: {
+        'User-ID': userIdHeader,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return NextResponse.json(
+        { error: `Backend error: ${response.status} ${response.statusText}`, details: errorText },
+        { status: response.status }
+      );
+    }
+
+    const data = await response.json();
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('Annotation proxy error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
+}
+
+// Also support PATCH for compatibility (forwards as PUT to backend)
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ projectId: string; annotationId: string }> }
+) {
+  try {
+    const { projectId, annotationId } = await params;
+    const body = await request.json();
+
+    // Get user ID header
+    const userIdHeader = request.headers.get('User-ID');
+    if (!userIdHeader) {
+      return NextResponse.json({ error: 'User-ID required' }, { status: 401 });
+    }
+
+    // Backend uses PUT, not PATCH, so forward as PUT
+    const response = await fetch(`${BACKEND_URL}/projects/${projectId}/annotations/${annotationId}`, {
+      method: 'PUT',
       headers: {
         'User-ID': userIdHeader,
         'Content-Type': 'application/json',
