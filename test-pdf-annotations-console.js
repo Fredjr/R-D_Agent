@@ -146,6 +146,7 @@
     const note = await api.create({
       content: 'Test Sticky Note 📝',
       annotation_type: 'sticky_note',
+      article_pmid: pmid,
       pdf_page: 1,
       sticky_note_position: { x: 0.5, y: 0.5, width: 200, height: 150 },
       sticky_note_color: '#FFEB3B'
@@ -192,6 +193,7 @@
     const note = await api.create({
       content: 'Underline test',
       annotation_type: 'underline',
+      article_pmid: pmid,
       pdf_page: 1,
       pdf_coordinates: { x: 0.1, y: 0.2, width: 0.3, height: 0.02, pageWidth: 612, pageHeight: 792 },
       highlight_color: '#2196F3',
@@ -206,6 +208,7 @@
     const note = await api.create({
       content: 'Strikethrough test',
       annotation_type: 'strikethrough',
+      article_pmid: pmid,
       pdf_page: 1,
       pdf_coordinates: { x: 0.1, y: 0.25, width: 0.3, height: 0.02, pageWidth: 612, pageHeight: 792 },
       highlight_color: '#EF4444',
@@ -231,6 +234,7 @@
     const note = await api.create({
       content: html,
       annotation_type: 'sticky_note',
+      article_pmid: pmid,
       pdf_page: 1,
       sticky_note_position: { x: 0.7, y: 0.5, width: 250, height: 200 },
       sticky_note_color: '#FFEB3B'
@@ -275,14 +279,15 @@
       await api.create({
         content: `${color.name} highlight`,
         annotation_type: 'highlight',
+        article_pmid: pmid,
         pdf_page: 1,
-        pdf_coordinates: { 
-          x: 0.1, 
-          y: 0.4 + (colors.indexOf(color) * 0.05), 
-          width: 0.35, 
-          height: 0.025, 
-          pageWidth: 612, 
-          pageHeight: 792 
+        pdf_coordinates: {
+          x: 0.1,
+          y: 0.4 + (colors.indexOf(color) * 0.05),
+          width: 0.35,
+          height: 0.025,
+          pageWidth: 612,
+          pageHeight: 792
         },
         highlight_color: color.hex,
         highlight_text: `${color.name} highlighted text for testing`
