@@ -5,6 +5,7 @@ import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { XMarkIcon, ChevronLeftIcon, ChevronRightIcon, MagnifyingGlassMinusIcon, MagnifyingGlassPlusIcon, PencilIcon, Bars3Icon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAnnotationWebSocket } from '@/hooks/useAnnotationWebSocket';
 import HighlightTool from './HighlightTool';
 import HighlightLayer from './HighlightLayer';
 import SelectionOverlay from './SelectionOverlay';
@@ -54,6 +55,39 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
 
   // Sidebar state
   const [showSidebar, setShowSidebar] = useState<boolean>(true);
+
+  // WebSocket for real-time annotation updates
+  useAnnotationWebSocket({
+    projectId: projectId || '',
+    userId: user?.email,
+    onNewAnnotation: (annotation) => {
+      console.log('📥 New annotation received via WebSocket:', annotation);
+      // Only add if it matches current PMID
+      if (annotation.article_pmid === pmid) {
+        setHighlights((prev) => {
+          // Avoid duplicates
+          if (prev.some((a) => a.annotation_id === annotation.annotation_id)) {
+            return prev;
+          }
+          return [...prev, annotation];
+        });
+      }
+    },
+    onUpdateAnnotation: (annotation) => {
+      console.log('📥 Updated annotation received via WebSocket:', annotation);
+      // Update if it matches current PMID
+      if (annotation.article_pmid === pmid) {
+        setHighlights((prev) =>
+          prev.map((h) => (h.annotation_id === annotation.annotation_id ? annotation : h))
+        );
+      }
+    },
+    onDeleteAnnotation: (annotationId) => {
+      console.log('📥 Deleted annotation received via WebSocket:', annotationId);
+      setHighlights((prev) => prev.filter((h) => h.annotation_id !== annotationId));
+    },
+    enabled: !!projectId && !!user,
+  });
 
   useEffect(() => {
     fetchPDFUrl();

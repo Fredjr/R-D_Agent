@@ -11,7 +11,7 @@ interface UseAnnotationWebSocketOptions {
 }
 
 interface WebSocketMessage {
-  type: 'new_annotation' | 'update_annotation' | 'delete_annotation' | 'connection_established' | 'pong' | 'echo' | 'error' | 'new_activity';
+  type: 'new_annotation' | 'update_annotation' | 'annotation_updated' | 'delete_annotation' | 'connection_established' | 'pong' | 'echo' | 'error' | 'new_activity';
   annotation?: Annotation;
   annotation_id?: string;
   project_id?: string;
@@ -108,6 +108,7 @@ export function useAnnotationWebSocket({
               break;
 
             case 'update_annotation':
+            case 'annotation_updated': // Backend sends this variant
               if (message.annotation && callbacksRef.current.onUpdateAnnotation) {
                 callbacksRef.current.onUpdateAnnotation(message.annotation);
               }

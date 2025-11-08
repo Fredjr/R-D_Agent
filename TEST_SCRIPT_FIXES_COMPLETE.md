@@ -192,7 +192,8 @@ Expected Failures (Backend Limitation):
 | 0ae673e | Use frontend proxy API | ✅ Deployed |
 | 004075b | Add PATCH/DELETE proxy routes + fix response parsing | ✅ Deployed |
 | ab662e9 | Use PUT method for updates (backend uses PUT, not PATCH) | ✅ Deployed |
-| **e8a117e** | **Add article_pmid to all test annotations** | ✅ **Deployed** |
+| e8a117e | Add article_pmid to all test annotations | ✅ Deployed |
+| **7ea5f3f** | **Filter annotations by PMID in getAll() API call** | ✅ **Deployed** |
 
 ---
 
