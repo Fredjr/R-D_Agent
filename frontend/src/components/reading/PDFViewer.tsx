@@ -9,7 +9,10 @@ import HighlightTool from './HighlightTool';
 import HighlightLayer from './HighlightLayer';
 import SelectionOverlay from './SelectionOverlay';
 import AnnotationsSidebar from './AnnotationsSidebar';
-import type { Highlight, TextSelection, PDFCoordinates } from '@/types/pdf-annotations';
+import StickyNote from './StickyNote';
+import AnnotationToolbar from './AnnotationToolbar';
+import type { Highlight, TextSelection, PDFCoordinates, AnnotationType, StickyNotePosition } from '@/types/pdf-annotations';
+import { HIGHLIGHT_COLORS } from '@/types/pdf-annotations';
 
 // Configure PDF.js worker - use jsdelivr CDN with correct .mjs file
 if (typeof window !== 'undefined') {
@@ -44,6 +47,10 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
   const [highlightMode, setHighlightMode] = useState<boolean>(false);
   const [highlights, setHighlights] = useState<Highlight[]>([]);
   const [loadingHighlights, setLoadingHighlights] = useState<boolean>(false);
+
+  // Annotation toolbar state
+  const [selectedTool, setSelectedTool] = useState<AnnotationType | null>(null);
+  const [selectedColor, setSelectedColor] = useState<string>(HIGHLIGHT_COLORS[0].hex);
 
   // Sidebar state
   const [showSidebar, setShowSidebar] = useState<boolean>(true);
@@ -400,6 +407,164 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
     [handleNoteAdd]
   );
 
+  // Handle creating a sticky note
+  const handleCreateStickyNote = useCallback(
+    async (pageNum: number, position: StickyNotePosition) => {
+      if (!projectId || !user) return;
+
+      try {
+        const annotationData = {
+          content: '',
+          article_pmid: pmid,
+          note_type: 'general',
+          pdf_page: pageNum,
+          annotation_type: 'sticky_note',
+          sticky_note_position: position,
+          sticky_note_color: '#FFEB3B',
+        };
+
+        const response = await fetch(`/api/proxy/projects/${projectId}/annotations`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-ID': user.email,
+          },
+          body: JSON.stringify(annotationData),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to create sticky note');
+        }
+
+        const newAnnotation = await response.json();
+        console.log('✅ Sticky note created:', newAnnotation.annotation_id);
+
+        setHighlights((prev) => [...prev, newAnnotation]);
+      } catch (err) {
+        console.error('❌ Error creating sticky note:', err);
+        alert('Failed to create sticky note. Please try again.');
+      }
+    },
+    [projectId, user, pmid]
+  );
+
+  // Handle moving a sticky note
+  const handleStickyNoteMove = useCallback(
+    async (annotationId: string, newPosition: StickyNotePosition) => {
+      if (!projectId || !user) return;
+
+      try {
+        const response = await fetch(`/api/proxy/projects/${projectId}/annotations/${annotationId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-ID': user.email,
+          },
+          body: JSON.stringify({
+            sticky_note_position: newPosition,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to move sticky note');
+        }
+
+        console.log('✅ Sticky note moved:', annotationId);
+
+        // Update local state
+        setHighlights((prev) =>
+          prev.map((h) =>
+            h.annotation_id === annotationId ? { ...h, sticky_note_position: newPosition } : h
+          )
+        );
+      } catch (err) {
+        console.error('❌ Error moving sticky note:', err);
+      }
+    },
+    [projectId, user]
+  );
+
+  // Handle resizing a sticky note
+  const handleStickyNoteResize = useCallback(
+    async (annotationId: string, newSize: { width: number; height: number }) => {
+      if (!projectId || !user) return;
+
+      try {
+        const annotation = highlights.find((h) => h.annotation_id === annotationId);
+        if (!annotation || !annotation.sticky_note_position) return;
+
+        const newPosition = {
+          ...annotation.sticky_note_position,
+          ...newSize,
+        };
+
+        const response = await fetch(`/api/proxy/projects/${projectId}/annotations/${annotationId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-ID': user.email,
+          },
+          body: JSON.stringify({
+            sticky_note_position: newPosition,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to resize sticky note');
+        }
+
+        console.log('✅ Sticky note resized:', annotationId);
+
+        // Update local state
+        setHighlights((prev) =>
+          prev.map((h) =>
+            h.annotation_id === annotationId ? { ...h, sticky_note_position: newPosition } : h
+          )
+        );
+      } catch (err) {
+        console.error('❌ Error resizing sticky note:', err);
+      }
+    },
+    [projectId, user, highlights]
+  );
+
+  // Handle editing sticky note content
+  const handleStickyNoteEdit = useCallback(
+    async (annotationId: string, content: string) => {
+      await handleNoteUpdate(annotationId, content);
+    },
+    [handleNoteUpdate]
+  );
+
+  // Handle clicking on PDF to add sticky note
+  const handlePdfClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (selectedTool !== 'sticky_note') return;
+
+      const target = e.target as HTMLElement;
+      const canvas = target.closest('.react-pdf__Page')?.querySelector('canvas') as HTMLCanvasElement;
+      if (!canvas) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      // Convert to normalized coordinates
+      const normalizedX = x / canvas.width;
+      const normalizedY = y / canvas.height;
+
+      const position: StickyNotePosition = {
+        x: normalizedX,
+        y: normalizedY,
+        width: 200,
+        height: 150,
+      };
+
+      handleCreateStickyNote(pageNumber, position);
+    },
+    [selectedTool, pageNumber, handleCreateStickyNote]
+  );
+
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center">
@@ -604,7 +769,7 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
                 </div>
               }
             >
-              <div className="relative">
+              <div className="relative" onClick={handlePdfClick}>
                 <Page
                   pageNumber={pageNumber}
                   scale={scale}
@@ -620,12 +785,29 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
                 {/* Highlight Layer - renders existing highlights */}
                 {projectId && (
                   <HighlightLayer
-                    highlights={highlights}
+                    highlights={highlights.filter((h) => h.annotation_type === 'highlight')}
                     pageNumber={pageNumber}
                     scale={scale}
                     onHighlightClick={handleHighlightClick}
                   />
                 )}
+
+                {/* Sticky Notes Layer - renders sticky notes */}
+                {projectId &&
+                  highlights
+                    .filter((h) => h.annotation_type === 'sticky_note')
+                    .map((annotation) => (
+                      <StickyNote
+                        key={annotation.annotation_id}
+                        annotation={annotation}
+                        pageNumber={pageNumber}
+                        scale={scale}
+                        onMove={handleStickyNoteMove}
+                        onResize={handleStickyNoteResize}
+                        onEdit={handleStickyNoteEdit}
+                        onDelete={handleHighlightDelete}
+                      />
+                    ))}
               </div>
             </Document>
           </div>
@@ -647,8 +829,19 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
         )}
       </div>
 
+      {/* Annotation Toolbar - vertical toolbar with annotation tools */}
+      {projectId && highlightMode && (
+        <AnnotationToolbar
+          selectedTool={selectedTool}
+          onToolSelect={setSelectedTool}
+          selectedColor={selectedColor}
+          onColorSelect={setSelectedColor}
+          isEnabled={highlightMode}
+        />
+      )}
+
       {/* Highlight Tool - color picker for text selection */}
-      {projectId && (
+      {projectId && selectedTool === 'highlight' && (
         <HighlightTool
           onHighlight={handleHighlight}
           isEnabled={highlightMode}
@@ -656,7 +849,7 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
       )}
 
       {/* Selection Overlay - real-time blue highlight during text selection */}
-      {projectId && (
+      {projectId && selectedTool === 'highlight' && (
         <SelectionOverlay
           isEnabled={highlightMode}
         />
