@@ -1,0 +1,215 @@
+#!/usr/bin/env python3
+"""
+Enrich existing articles in the database with missing DOI and abstract.
+
+This script:
+1. Finds all articles without DOI
+2. Fetches metadata from PubMed
+3. Updates articles with DOI, abstract, and other metadata
+4. Provides progress reporting
+
+Usage:
+    python3 enrich_existing_articles.py
+"""
+
+import asyncio
+import sys
+from datetime import datetime
+from database import get_db, Article
+from pdf_endpoints import fetch_article_metadata_from_pubmed
+
+async def enrich_articles(dry_run=False):
+    """
+    Enrich existing articles with missing DOI and abstract.
+    
+    Args:
+        dry_run: If True, only show what would be updated without making changes
+    """
+    db = next(get_db())
+    
+    print("=" * 80)
+    print("🔍 Article Enrichment Script")
+    print("=" * 80)
+    print()
+    
+    # Find articles without DOI
+    articles_without_doi = db.query(Article).filter(
+        (Article.doi == None) | (Article.doi == "")
+    ).all()
+    
+    print(f"📊 Found {len(articles_without_doi)} articles without DOI")
+    print()
+    
+    if len(articles_without_doi) == 0:
+        print("✅ All articles already have DOI!")
+        return
+    
+    if dry_run:
+        print("🔍 DRY RUN MODE - No changes will be made")
+        print()
+    
+    enriched = 0
+    failed = 0
+    skipped = 0
+    
+    for i, article in enumerate(articles_without_doi, 1):
+        try:
+            print(f"[{i}/{len(articles_without_doi)}] 📥 Processing PMID: {article.pmid}")
+            print(f"   Current title: {article.title[:80]}...")
+            
+            # Fetch metadata from PubMed
+            metadata = await fetch_article_metadata_from_pubmed(article.pmid)
+            
+            # Check if we got a DOI
+            new_doi = metadata.get("doi", "")
+            if not new_doi:
+                print(f"   ⚠️ No DOI found in PubMed for {article.pmid}")
+                skipped += 1
+                print()
+                continue
+            
+            if dry_run:
+                print(f"   Would update:")
+                print(f"      DOI: '' → '{new_doi}'")
+                if metadata.get("abstract"):
+                    print(f"      Abstract: {len(metadata.get('abstract', ''))} characters")
+                enriched += 1
+            else:
+                # Update article
+                article.doi = new_doi
+                article.abstract = metadata.get("abstract", article.abstract)
+                article.title = metadata.get("title", article.title)
+                article.authors = metadata.get("authors", article.authors)
+                article.journal = metadata.get("journal", article.journal)
+                article.publication_year = metadata.get("year", article.publication_year)
+                article.updated_at = datetime.utcnow()
+                
+                db.commit()
+                enriched += 1
+                print(f"   ✅ Updated with DOI: {new_doi}")
+            
+            print()
+            
+            # Rate limit to avoid PubMed throttling (NCBI allows 3 requests/second)
+            await asyncio.sleep(0.4)
+            
+        except Exception as e:
+            print(f"   ❌ Failed: {e}")
+            failed += 1
+            print()
+            continue
+    
+    print("=" * 80)
+    print("📊 Enrichment Summary")
+    print("=" * 80)
+    print(f"   Total articles processed: {len(articles_without_doi)}")
+    print(f"   ✅ Enriched: {enriched}")
+    print(f"   ⚠️ Skipped (no DOI in PubMed): {skipped}")
+    print(f"   ❌ Failed: {failed}")
+    if len(articles_without_doi) > 0:
+        print(f"   📈 Success rate: {enriched / len(articles_without_doi) * 100:.1f}%")
+    print()
+    
+    if dry_run:
+        print("🔍 This was a DRY RUN - no changes were made")
+        print("   Run without --dry-run to apply changes")
+    else:
+        print("✅ Enrichment complete!")
+    print()
+
+async def enrich_specific_pmids(pmids: list[str], dry_run=False):
+    """
+    Enrich specific articles by PMID.
+    
+    Args:
+        pmids: List of PMIDs to enrich
+        dry_run: If True, only show what would be updated
+    """
+    db = next(get_db())
+    
+    print("=" * 80)
+    print(f"🔍 Enriching {len(pmids)} specific articles")
+    print("=" * 80)
+    print()
+    
+    enriched = 0
+    failed = 0
+    not_found = 0
+    
+    for i, pmid in enumerate(pmids, 1):
+        try:
+            print(f"[{i}/{len(pmids)}] 📥 Processing PMID: {pmid}")
+            
+            # Find article in database
+            article = db.query(Article).filter(Article.pmid == pmid).first()
+            
+            if not article:
+                print(f"   ⚠️ Article not found in database")
+                not_found += 1
+                print()
+                continue
+            
+            print(f"   Current DOI: '{article.doi or ''}'")
+            
+            # Fetch metadata from PubMed
+            metadata = await fetch_article_metadata_from_pubmed(pmid)
+            new_doi = metadata.get("doi", "")
+            
+            if not new_doi:
+                print(f"   ⚠️ No DOI found in PubMed")
+                failed += 1
+                print()
+                continue
+            
+            if dry_run:
+                print(f"   Would update DOI: '{article.doi or ''}' → '{new_doi}'")
+                enriched += 1
+            else:
+                # Update article
+                article.doi = new_doi
+                article.abstract = metadata.get("abstract", article.abstract)
+                article.title = metadata.get("title", article.title)
+                article.authors = metadata.get("authors", article.authors)
+                article.journal = metadata.get("journal", article.journal)
+                article.publication_year = metadata.get("year", article.publication_year)
+                article.updated_at = datetime.utcnow()
+                
+                db.commit()
+                enriched += 1
+                print(f"   ✅ Updated with DOI: {new_doi}")
+            
+            print()
+            await asyncio.sleep(0.4)
+            
+        except Exception as e:
+            print(f"   ❌ Failed: {e}")
+            failed += 1
+            print()
+            continue
+    
+    print("=" * 80)
+    print("📊 Summary")
+    print("=" * 80)
+    print(f"   ✅ Enriched: {enriched}")
+    print(f"   ⚠️ Not found in database: {not_found}")
+    print(f"   ❌ Failed: {failed}")
+    print()
+
+def main():
+    """Main entry point"""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Enrich articles with DOI and metadata from PubMed")
+    parser.add_argument("--dry-run", action="store_true", help="Show what would be updated without making changes")
+    parser.add_argument("--pmids", nargs="+", help="Specific PMIDs to enrich (space-separated)")
+    
+    args = parser.parse_args()
+    
+    if args.pmids:
+        asyncio.run(enrich_specific_pmids(args.pmids, dry_run=args.dry_run))
+    else:
+        asyncio.run(enrich_articles(dry_run=args.dry_run))
+
+if __name__ == "__main__":
+    main()
+

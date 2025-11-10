@@ -9503,20 +9503,57 @@ async def add_article_to_collection(
         if article_data.article_pmid:
             existing_article = db.query(Article).filter(Article.pmid == article_data.article_pmid).first()
             if not existing_article:
-                # Create article in main table for ResearchRabbit-style exploration
-                new_article = Article(
-                    pmid=article_data.article_pmid,
-                    title=article_data.article_title,
-                    authors=article_data.article_authors,
-                    journal=article_data.article_journal,
-                    publication_year=article_data.article_year,
-                    abstract="",  # Will be enriched later
-                    doi="",      # Will be enriched later
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow()
-                )
-                db.add(new_article)
-                db.flush()  # Ensure article is created before adding to collection
+                # FIX: Fetch full metadata from PubMed to get DOI and abstract
+                logger.info(f"📥 Fetching metadata from PubMed for PMID: {article_data.article_pmid}")
+                try:
+                    from pdf_endpoints import fetch_article_metadata_from_pubmed
+                    pubmed_metadata = await fetch_article_metadata_from_pubmed(article_data.article_pmid)
+
+                    # Create article with full metadata including DOI (critical for PDF scraping)
+                    new_article = Article(
+                        pmid=article_data.article_pmid,
+                        title=pubmed_metadata.get("title") or article_data.article_title,
+                        authors=pubmed_metadata.get("authors") or article_data.article_authors,
+                        journal=pubmed_metadata.get("journal") or article_data.article_journal,
+                        publication_year=pubmed_metadata.get("year") or article_data.article_year,
+                        abstract=pubmed_metadata.get("abstract", ""),  # Full abstract for AI summaries
+                        doi=pubmed_metadata.get("doi", ""),            # DOI for PDF scraping (BMJ, Springer, etc.)
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow()
+                    )
+                    db.add(new_article)
+                    db.flush()
+                    logger.info(f"✅ Created article with DOI: {new_article.doi}")
+                except Exception as e:
+                    logger.error(f"❌ Failed to fetch PubMed metadata: {e}")
+                    # Fallback to basic article creation
+                    new_article = Article(
+                        pmid=article_data.article_pmid,
+                        title=article_data.article_title,
+                        authors=article_data.article_authors,
+                        journal=article_data.article_journal,
+                        publication_year=article_data.article_year,
+                        abstract="",
+                        doi="",
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow()
+                    )
+                    db.add(new_article)
+                    db.flush()
+            else:
+                # FIX: Update existing article if DOI is missing
+                if not existing_article.doi:
+                    logger.info(f"📥 Updating article {article_data.article_pmid} with missing DOI")
+                    try:
+                        from pdf_endpoints import fetch_article_metadata_from_pubmed
+                        pubmed_metadata = await fetch_article_metadata_from_pubmed(article_data.article_pmid)
+                        existing_article.doi = pubmed_metadata.get("doi", "")
+                        existing_article.abstract = pubmed_metadata.get("abstract", existing_article.abstract)
+                        existing_article.updated_at = datetime.utcnow()
+                        db.flush()
+                        logger.info(f"✅ Updated article with DOI: {existing_article.doi}")
+                    except Exception as e:
+                        logger.error(f"❌ Failed to update article metadata: {e}")
 
         # Add article to collection
         article_collection = ArticleCollection(
