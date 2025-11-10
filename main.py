@@ -6656,7 +6656,9 @@ async def delete_annotation(
 
     # Check if user owns the annotation or is project owner
     project = db.query(Project).filter(Project.project_id == project_id).first()
-    if annotation.author_id != current_user and project.owner_user_id != current_user:
+    # ✅ FIX: Add null check for author_id to prevent 500 error
+    annotation_author = getattr(annotation, 'author_id', None)
+    if annotation_author and annotation_author != current_user and project.owner_user_id != current_user:
         raise HTTPException(status_code=403, detail="Can only delete your own annotations unless you are the project owner")
 
     # Delete annotation (this will cascade delete children if parent_annotation_id is set)

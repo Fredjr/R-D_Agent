@@ -53,7 +53,12 @@ export default function AnnotationsSidebar({
     const tagSet = new Set<string>();
     highlights.forEach(h => {
       if (h.tags && Array.isArray(h.tags)) {
-        h.tags.forEach(tag => tagSet.add(tag));
+        h.tags.forEach(tag => {
+          // ✅ FIX: Filter out null/undefined tags
+          if (tag && typeof tag === 'string') {
+            tagSet.add(tag);
+          }
+        });
       }
     });
     return Array.from(tagSet).sort();
@@ -79,7 +84,8 @@ export default function AnnotationsSidebar({
       filtered = filtered.filter(h =>
         (h.content && h.content.toLowerCase().includes(query)) ||
         (h.highlight_text && h.highlight_text.toLowerCase().includes(query)) ||
-        (h.tags && h.tags.some(tag => tag.toLowerCase().includes(query)))
+        // ✅ FIX: Filter out null/undefined tags before calling toLowerCase()
+        (h.tags && h.tags.some(tag => tag && typeof tag === 'string' && tag.toLowerCase().includes(query)))
       );
     }
 
