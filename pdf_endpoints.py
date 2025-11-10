@@ -67,6 +67,20 @@ def register_pdf_endpoints(app):
                 article_title = article.title or "Unknown Article"
                 article_doi = article.doi
 
+                # FIX: If article exists but DOI is missing, fetch from PubMed
+                if not article_doi:
+                    logger.warning(f"⚠️ Article {pmid} in database but DOI missing, fetching from PubMed")
+                    try:
+                        pubmed_metadata = await fetch_article_metadata_from_pubmed(pmid)
+                        article_doi = pubmed_metadata.get("doi")
+                        if article_doi:
+                            logger.info(f"📋 Found DOI from PubMed: {article_doi}")
+                            # Update article in database with DOI
+                            article.doi = article_doi
+                            db.commit()
+                    except Exception as e:
+                        logger.error(f"❌ Failed to fetch DOI from PubMed: {e}")
+
             # Try multiple sources in parallel for speed
             results = await asyncio.gather(
                 get_europepmc_pdf_url(pmid),  # Europe PMC first (no PoW challenge)
@@ -438,33 +452,74 @@ def register_pdf_endpoints(app):
 
             logger.info(f"📥 Downloading PDF from {source}: {pdf_url}")
 
-            # Download PDF with longer timeout
-            async with httpx.AsyncClient(timeout=PDF_DOWNLOAD_TIMEOUT, follow_redirects=True) as client:
-                response = await client.get(pdf_url)
+            # Download PDF with retry logic and better error handling
+            max_retries = 3
+            timeout = httpx.Timeout(60.0, connect=10.0)  # 60s total, 10s connect
 
-                if response.status_code != 200:
-                    logger.error(f"❌ PDF download failed: {response.status_code}")
-                    raise HTTPException(status_code=response.status_code, detail="Failed to download PDF")
+            for attempt in range(max_retries):
+                try:
+                    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+                        # Add browser-like headers to reduce 403 errors
+                        headers = {
+                            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                            'Accept': 'application/pdf,*/*',
+                            'Accept-Language': 'en-US,en;q=0.9',
+                        }
 
-                # Check if content is actually a PDF
-                content_type = response.headers.get('content-type', '')
-                if 'pdf' not in content_type.lower() and 'application/octet-stream' not in content_type.lower():
-                    logger.warning(f"⚠️ Unexpected content type: {content_type}")
-                    # Still try to serve it - might be a PDF with wrong content-type
+                        response = await client.get(pdf_url, headers=headers)
 
-                logger.info(f"✅ PDF downloaded successfully for {pmid} ({len(response.content)} bytes)")
+                        if response.status_code == 200:
+                            # Check if content is actually a PDF
+                            content_type = response.headers.get('content-type', '')
+                            if 'pdf' not in content_type.lower() and 'application/octet-stream' not in content_type.lower():
+                                logger.warning(f"⚠️ Unexpected content type: {content_type}")
+                                # Still try to serve it - might be a PDF with wrong content-type
 
-                # Stream the PDF back to client
-                return StreamingResponse(
-                    iter([response.content]),
-                    media_type="application/pdf",
-                    headers={
-                        "Content-Disposition": f"inline; filename={pmid}.pdf",
-                        "Access-Control-Allow-Origin": "*",
-                        "Access-Control-Allow-Methods": "GET, OPTIONS",
-                        "Access-Control-Allow-Headers": "*",
-                    }
-                )
+                            logger.info(f"✅ PDF downloaded successfully for {pmid} ({len(response.content)} bytes)")
+
+                            # Stream the PDF back to client
+                            return StreamingResponse(
+                                iter([response.content]),
+                                media_type="application/pdf",
+                                headers={
+                                    "Content-Disposition": f"inline; filename={pmid}.pdf",
+                                    "Access-Control-Allow-Origin": "*",
+                                    "Access-Control-Allow-Methods": "GET, OPTIONS",
+                                    "Access-Control-Allow-Headers": "*",
+                                }
+                            )
+                        elif response.status_code == 403:
+                            logger.warning(f"⚠️ 403 Forbidden from {source} - publisher blocks proxying")
+                            raise HTTPException(
+                                status_code=403,
+                                detail=f"Publisher blocks proxy access. Please open PDF directly."
+                            )
+                        elif response.status_code == 404:
+                            logger.warning(f"⚠️ 404 Not Found from {source}")
+                            raise HTTPException(status_code=404, detail="PDF not found at source")
+                        else:
+                            logger.warning(f"⚠️ Unexpected status {response.status_code} from {source}")
+                            if attempt < max_retries - 1:
+                                logger.info(f"🔄 Retrying... (attempt {attempt + 2}/{max_retries})")
+                                await asyncio.sleep(1)  # Wait 1s before retry
+                                continue
+                            raise HTTPException(
+                                status_code=response.status_code,
+                                detail=f"Failed to fetch PDF: HTTP {response.status_code}"
+                            )
+
+                except httpx.TimeoutException:
+                    logger.warning(f"⏱️ Timeout fetching PDF (attempt {attempt + 1}/{max_retries})")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(2)  # Wait 2s before retry
+                        continue
+                    raise HTTPException(status_code=504, detail="PDF fetch timeout")
+                except httpx.HTTPError as e:
+                    logger.error(f"❌ HTTP error fetching PDF: {e}")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(1)
+                        continue
+                    raise HTTPException(status_code=502, detail=f"Failed to fetch PDF: {str(e)}")
 
         except HTTPException:
             raise

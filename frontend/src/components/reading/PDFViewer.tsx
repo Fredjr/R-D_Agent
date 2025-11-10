@@ -152,17 +152,38 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
       
       setPdfSource(data.source);
       setPdfAvailable(data.pdf_available);
-      
+
       if (data.pdf_available) {
-        // Use our proxy endpoint to avoid CORS issues
-        const proxyUrl = `/api/proxy/articles/${pmid}/pdf-proxy`;
-        console.log('📄 Using PDF proxy:', proxyUrl);
-        setPdfUrl(proxyUrl);
+        // Check if source typically blocks proxying
+        const DIRECT_LINK_SOURCES = [
+          'wolters_kluwer',
+          'wiley_enhanced',
+          'wiley',
+          'pubmed_fulltext_atypon',
+          'pubmed_fulltext_silverchair',
+          'pubmed_fulltext_highwire',
+          'nejm',
+          'springer',
+          'oxford_academic',
+        ];
+
+        if (DIRECT_LINK_SOURCES.includes(data.source)) {
+          // Open in new tab instead of proxying (these publishers block server requests)
+          console.log(`📄 Opening PDF in new tab (source: ${data.source} typically blocks proxying)`);
+          window.open(data.url, '_blank');
+          setError(`PDF opened in new tab. ${data.source} requires direct browser access.`);
+          setPdfUrl(null);
+        } else {
+          // Use our proxy endpoint to avoid CORS issues
+          const proxyUrl = `/api/proxy/articles/${pmid}/pdf-proxy`;
+          console.log('📄 Using PDF proxy:', proxyUrl);
+          setPdfUrl(proxyUrl);
+        }
       } else {
         // No direct PDF available - show message with link
         setError(`PDF not directly available. This article may be behind a paywall.`);
         setPdfUrl(null);
-        
+
         // Open the article URL in a new tab
         if (data.url) {
           window.open(data.url, '_blank');
