@@ -172,45 +172,102 @@
   log('🔧', '--- Test 1: Annotation Toolbar ---\n');
 
   await test('Annotation toolbar exists', async () => {
-    debug('Looking for annotation toolbar...');
+    debug('Looking for annotation toolbar with data-testid...');
 
-    // Try multiple selectors
-    const toolbar = document.querySelector('[class*="AnnotationToolbar"]') ||
-                    document.querySelector('[class*="annotation-toolbar"]') ||
-                    document.querySelector('button[title*="Highlight"]')?.closest('div');
+    // Method 1: Use new data-testid attribute (BEST)
+    let toolbar = document.querySelector('[data-testid="annotation-toolbar"]');
 
     if (!toolbar) {
-      // Debug: Show all buttons with titles
-      const allButtons = Array.from(document.querySelectorAll('button[title]'));
-      debug('All buttons with titles', allButtons.map(b => b.getAttribute('title')));
-      throw new Error('Toolbar not found');
+      debug('⚠️ data-testid not found, trying fallback selectors...');
+
+      // Method 2: Class name selectors
+      toolbar = document.querySelector('[class*="AnnotationToolbar"]') ||
+                document.querySelector('[class*="annotation-toolbar"]');
     }
 
-    debug('Toolbar found', toolbar.className);
+    if (!toolbar) {
+      debug('⚠️ Class selectors failed, trying to find by tool buttons...');
+
+      // Method 3: Find by tool buttons
+      const highlightBtn = document.querySelector('button[title*="Highlight"]');
+      if (highlightBtn) {
+        toolbar = highlightBtn.closest('div');
+      }
+    }
+
+    if (!toolbar) {
+      // Debug: Show what we found
+      const allButtons = Array.from(document.querySelectorAll('button[title]'));
+      debug('❌ All buttons with titles found', allButtons.map(b => b.getAttribute('title')));
+
+      const allTestIds = Array.from(document.querySelectorAll('[data-testid]'));
+      debug('❌ All elements with data-testid', allTestIds.map(el => el.getAttribute('data-testid')));
+
+      throw new Error('Toolbar not found - are you on a PDF page?');
+    }
+
+    debug('✅ Toolbar found!', {
+      testId: toolbar.getAttribute('data-testid'),
+      className: toolbar.className,
+      childCount: toolbar.children.length
+    });
   });
 
   await test('Toolbar has all 4 tools', async () => {
-    const allButtons = Array.from(document.querySelectorAll('button'));
-    debug('Total buttons on page', allButtons.length);
+    debug('Looking for tool buttons with data-testid...');
 
-    const toolButtons = allButtons.filter(btn => {
-      const title = btn.getAttribute('title')?.toLowerCase() || '';
-      const text = btn.textContent || '';
-      return title.includes('highlight') ||
-             title.includes('underline') ||
-             title.includes('strikethrough') ||
-             title.includes('sticky') ||
-             text.includes('🎨') ||
-             text.includes('📝');
-    });
+    // Method 1: Use new data-testid attributes (BEST)
+    const highlightTool = document.querySelector('[data-testid="highlight-tool"]');
+    const underlineTool = document.querySelector('[data-testid="underline-tool"]');
+    const strikethroughTool = document.querySelector('[data-testid="strikethrough-tool"]');
+    const stickyNoteTool = document.querySelector('[data-testid="sticky_note-tool"]');
 
-    debug('Tool buttons found', toolButtons.map(b => ({
-      title: b.getAttribute('title'),
-      text: b.textContent,
-      className: b.className
+    const toolsFound = [
+      { name: 'highlight', element: highlightTool },
+      { name: 'underline', element: underlineTool },
+      { name: 'strikethrough', element: strikethroughTool },
+      { name: 'sticky_note', element: stickyNoteTool }
+    ];
+
+    debug('Tools found by data-testid', toolsFound.map(t => ({
+      name: t.name,
+      found: !!t.element,
+      testId: t.element?.getAttribute('data-testid'),
+      title: t.element?.getAttribute('title')
     })));
 
-    if (toolButtons.length < 4) throw new Error(`Only ${toolButtons.length} tools found`);
+    const foundCount = toolsFound.filter(t => t.element).length;
+
+    if (foundCount < 4) {
+      debug('⚠️ Not all tools found by data-testid, trying fallback...');
+
+      // Fallback: Search by title/text
+      const allButtons = Array.from(document.querySelectorAll('button'));
+      debug('Total buttons on page', allButtons.length);
+
+      const toolButtons = allButtons.filter(btn => {
+        const title = btn.getAttribute('title')?.toLowerCase() || '';
+        const text = btn.textContent || '';
+        return title.includes('highlight') ||
+               title.includes('underline') ||
+               title.includes('strikethrough') ||
+               title.includes('sticky') ||
+               text.includes('🎨') ||
+               text.includes('📝');
+      });
+
+      debug('Tool buttons found by fallback', toolButtons.map(b => ({
+        title: b.getAttribute('title'),
+        text: b.textContent.substring(0, 20),
+        className: b.className
+      })));
+
+      if (toolButtons.length < 4) {
+        throw new Error(`Only ${Math.max(foundCount, toolButtons.length)} tools found (expected 4)`);
+      }
+    }
+
+    log('   ', `✅ All 4 tools found: highlight, underline, strikethrough, sticky_note`);
   });
 
   // ========== TEST 2: COLOR BAR VISIBILITY ==========
@@ -218,23 +275,32 @@
 
   let highlightBtn;
   await test('Find highlight tool', async () => {
-    debug('Searching for highlight tool...');
+    debug('Searching for highlight tool with data-testid...');
 
-    const allButtons = Array.from(document.querySelectorAll('button'));
-    highlightBtn = allButtons.find(btn => {
-      const title = btn.getAttribute('title')?.toLowerCase() || '';
-      const text = btn.textContent || '';
-      return title.includes('highlight') || text.includes('🎨');
-    });
+    // Method 1: Use new data-testid attribute (BEST)
+    highlightBtn = document.querySelector('[data-testid="highlight-tool"]');
 
     if (!highlightBtn) {
-      debug('All button titles', allButtons.map(b => b.getAttribute('title')));
-      throw new Error('Highlight tool not found');
+      debug('⚠️ data-testid not found, trying fallback selectors...');
+
+      // Method 2: Search by title/text
+      const allButtons = Array.from(document.querySelectorAll('button'));
+      highlightBtn = allButtons.find(btn => {
+        const title = btn.getAttribute('title')?.toLowerCase() || '';
+        const text = btn.textContent || '';
+        return title.includes('highlight') || text.includes('🎨');
+      });
+
+      if (!highlightBtn) {
+        debug('❌ All button titles', allButtons.map(b => b.getAttribute('title')));
+        throw new Error('Highlight tool not found');
+      }
     }
 
-    debug('Highlight button found', {
+    debug('✅ Highlight button found', {
+      testId: highlightBtn.getAttribute('data-testid'),
       title: highlightBtn.getAttribute('title'),
-      text: highlightBtn.textContent,
+      text: highlightBtn.textContent.substring(0, 20),
       className: highlightBtn.className
     });
   });
@@ -243,23 +309,52 @@
     if (!highlightBtn) throw new Error('Highlight button not available');
 
     debug('Clicking highlight tool...');
+    const wasSelected = highlightBtn.className.includes('bg-blue-600');
+    debug('Tool was selected before click:', wasSelected);
+
     highlightBtn.click();
     await sleep(1000); // Wait for color bar to render
 
+    const isSelected = highlightBtn.className.includes('bg-blue-600');
+    debug('Tool is selected after click:', isSelected);
     debug('Highlight tool clicked, waiting for color bar...');
   });
 
   await test('Color bar appears when highlight tool selected', async () => {
+    debug('Looking for color bar with data-testid...');
+
+    // Method 1: Use new data-testid attribute (BEST)
+    const colorBar = document.querySelector('[data-testid="color-bar"]');
+
+    if (colorBar) {
+      debug('✅ Color bar found by data-testid!');
+      const colorButtons = colorBar.querySelectorAll('button[data-testid^="color-"]');
+      debug('Color buttons in bar:', colorButtons.length);
+
+      if (colorButtons.length < 5) {
+        throw new Error(`Only ${colorButtons.length} color buttons found (expected 5)`);
+      }
+
+      log('   ', `Found ${colorButtons.length} color buttons in color bar`);
+      return;
+    }
+
+    debug('⚠️ Color bar data-testid not found, trying fallback...');
+
+    // Method 2: Use findColorButtons helper
     const colorButtons = findColorButtons();
 
     if (colorButtons.length === 0) {
       // Debug: Show what we found
       const allButtons = Array.from(document.querySelectorAll('button'));
-      debug('All buttons with background colors', allButtons.map(btn => ({
+      debug('❌ All buttons with background colors', allButtons.map(btn => ({
         text: btn.textContent.substring(0, 20),
         bgColor: window.getComputedStyle(btn).backgroundColor,
         borderRadius: window.getComputedStyle(btn).borderRadius
       })).filter(b => b.bgColor !== 'rgba(0, 0, 0, 0)'));
+
+      const allTestIds = Array.from(document.querySelectorAll('[data-testid]'));
+      debug('❌ All elements with data-testid', allTestIds.map(el => el.getAttribute('data-testid')));
 
       throw new Error(`Only ${colorButtons.length} color buttons found (expected 5)`);
     }
@@ -268,6 +363,41 @@
   });
 
   await test('All 5 colors present', async () => {
+    debug('Checking all 5 colors are present...');
+
+    // Method 1: Use new data-testid attributes (BEST)
+    const yellowBtn = document.querySelector('[data-testid="color-yellow"]');
+    const greenBtn = document.querySelector('[data-testid="color-green"]');
+    const blueBtn = document.querySelector('[data-testid="color-blue"]');
+    const pinkBtn = document.querySelector('[data-testid="color-pink"]');
+    const orangeBtn = document.querySelector('[data-testid="color-orange"]');
+
+    const colorsByTestId = [
+      { name: 'yellow', element: yellowBtn, expectedColor: '#FFEB3B' },
+      { name: 'green', element: greenBtn, expectedColor: '#4CAF50' },
+      { name: 'blue', element: blueBtn, expectedColor: '#2196F3' },
+      { name: 'pink', element: pinkBtn, expectedColor: '#E91E63' },
+      { name: 'orange', element: orangeBtn, expectedColor: '#FF9800' }
+    ];
+
+    debug('Colors found by data-testid', colorsByTestId.map(c => ({
+      name: c.name,
+      found: !!c.element,
+      testId: c.element?.getAttribute('data-testid'),
+      dataColor: c.element?.getAttribute('data-color'),
+      expectedColor: c.expectedColor
+    })));
+
+    const foundByTestId = colorsByTestId.filter(c => c.element).length;
+
+    if (foundByTestId === 5) {
+      log('   ', `✅ All 5 colors found: yellow, green, blue, pink, orange`);
+      return;
+    }
+
+    debug(`⚠️ Only ${foundByTestId} colors found by data-testid, trying fallback...`);
+
+    // Method 2: Use findColorButtons helper
     const colorButtons = findColorButtons();
 
     const foundColors = colorButtons.map(btn => {
@@ -275,7 +405,7 @@
       return style.backgroundColor;
     });
 
-    debug('Found colors', foundColors);
+    debug('Found colors by fallback', foundColors);
 
     if (foundColors.length < 5) throw new Error(`Only ${foundColors.length} colors found`);
     log('   ', `Colors: ${foundColors.join(', ')}`);
@@ -285,19 +415,101 @@
   log('🎯', '\n--- Test 3: Selected Color Visual Feedback ---\n');
 
   await test('Click first color (Yellow)', async () => {
-    const colorButtons = findColorButtons();
-    if (colorButtons.length === 0) throw new Error('No color buttons found');
+    debug('Looking for yellow color button...');
 
-    debug('Clicking first color button...');
-    colorButtons[0].click();
+    // Method 1: Use new data-testid attribute (BEST)
+    let yellowBtn = document.querySelector('[data-testid="color-yellow"]');
+
+    if (!yellowBtn) {
+      debug('⚠️ Yellow button data-testid not found, trying fallback...');
+
+      // Method 2: Use data-color attribute
+      yellowBtn = document.querySelector('[data-color="#FFEB3B"]');
+    }
+
+    if (!yellowBtn) {
+      debug('⚠️ data-color not found, trying findColorButtons...');
+
+      // Method 3: Use findColorButtons helper
+      const colorButtons = findColorButtons();
+      if (colorButtons.length === 0) throw new Error('No color buttons found');
+      yellowBtn = colorButtons[0];
+    }
+
+    if (!yellowBtn) {
+      const allTestIds = Array.from(document.querySelectorAll('[data-testid^="color-"]'));
+      debug('❌ Available color test IDs', allTestIds.map(el => el.getAttribute('data-testid')));
+      throw new Error('Yellow color button not found');
+    }
+
+    debug('✅ Yellow button found', {
+      testId: yellowBtn.getAttribute('data-testid'),
+      dataColor: yellowBtn.getAttribute('data-color'),
+      bgColor: window.getComputedStyle(yellowBtn).backgroundColor
+    });
+
+    debug('Clicking yellow color button...');
+    const beforeClick = {
+      borderColor: window.getComputedStyle(yellowBtn).borderColor,
+      borderWidth: window.getComputedStyle(yellowBtn).borderWidth,
+      boxShadow: window.getComputedStyle(yellowBtn).boxShadow,
+      transform: window.getComputedStyle(yellowBtn).transform,
+      className: yellowBtn.className
+    };
+    debug('Button style before click', beforeClick);
+
+    yellowBtn.click();
     await sleep(500);
 
-    debug('First color clicked', {
-      bgColor: window.getComputedStyle(colorButtons[0]).backgroundColor
-    });
+    const afterClick = {
+      borderColor: window.getComputedStyle(yellowBtn).borderColor,
+      borderWidth: window.getComputedStyle(yellowBtn).borderWidth,
+      boxShadow: window.getComputedStyle(yellowBtn).boxShadow,
+      transform: window.getComputedStyle(yellowBtn).transform,
+      className: yellowBtn.className
+    };
+    debug('Button style after click', afterClick);
   });
 
   await test('Selected color has visual feedback', async () => {
+    debug('Checking for selected color visual feedback...');
+
+    // Method 1: Check yellow button specifically
+    const yellowBtn = document.querySelector('[data-testid="color-yellow"]') ||
+                      document.querySelector('[data-color="#FFEB3B"]');
+
+    if (yellowBtn) {
+      const style = window.getComputedStyle(yellowBtn);
+      const hasWhiteBorder = style.borderColor && style.borderColor.includes('255, 255, 255');
+      const hasThickBorder = style.borderWidth && parseInt(style.borderWidth) > 1;
+      const hasRing = style.boxShadow && style.boxShadow !== 'none';
+      const hasScale = style.transform && style.transform.includes('scale');
+      const hasSelectedClass = yellowBtn.className.includes('scale-110') ||
+                               yellowBtn.className.includes('ring-2') ||
+                               yellowBtn.className.includes('border-white');
+
+      debug('Yellow button visual feedback', {
+        hasWhiteBorder,
+        hasThickBorder,
+        hasRing,
+        hasScale,
+        hasSelectedClass,
+        borderColor: style.borderColor,
+        borderWidth: style.borderWidth,
+        boxShadow: style.boxShadow,
+        transform: style.transform,
+        className: yellowBtn.className
+      });
+
+      if (hasWhiteBorder || hasThickBorder || hasRing || hasScale || hasSelectedClass) {
+        log('   ', '✅ Selected color has visual feedback');
+        return;
+      }
+    }
+
+    debug('⚠️ Specific button check failed, trying all color buttons...');
+
+    // Method 2: Check all color buttons
     const colorButtons = findColorButtons();
 
     // Check if any button has white border or ring (selected state)
@@ -315,29 +527,96 @@
     });
 
     if (!selectedBtn) {
-      debug('Color button styles', colorButtons.map(btn => ({
+      debug('❌ Color button styles', colorButtons.map(btn => ({
         bgColor: window.getComputedStyle(btn).backgroundColor,
         borderColor: window.getComputedStyle(btn).borderColor,
         borderWidth: window.getComputedStyle(btn).borderWidth,
         boxShadow: window.getComputedStyle(btn).boxShadow,
-        transform: window.getComputedStyle(btn).transform
+        transform: window.getComputedStyle(btn).transform,
+        className: btn.className
       })));
       throw new Error('No selected color visual feedback found');
     }
 
-    log('   ', 'Selected color has visual feedback ✓');
+    log('   ', '✅ Selected color has visual feedback');
   });
 
   await test('Click different color (Blue)', async () => {
-    const colorButtons = findColorButtons();
-    if (colorButtons.length < 3) throw new Error('Not enough color buttons');
+    debug('Looking for blue color button...');
 
-    debug('Clicking third color button (Blue)...');
-    colorButtons[2].click(); // Blue
+    // Method 1: Use new data-testid attribute (BEST)
+    let blueBtn = document.querySelector('[data-testid="color-blue"]');
+
+    if (!blueBtn) {
+      debug('⚠️ Blue button data-testid not found, trying data-color...');
+
+      // Method 2: Use data-color attribute
+      blueBtn = document.querySelector('[data-color="#2196F3"]');
+    }
+
+    if (!blueBtn) {
+      debug('⚠️ data-color not found, trying findColorButtons...');
+
+      // Method 3: Use findColorButtons helper
+      const colorButtons = findColorButtons();
+      if (colorButtons.length < 3) throw new Error('Not enough color buttons');
+      blueBtn = colorButtons[2]; // Blue is 3rd button
+    }
+
+    if (!blueBtn) {
+      throw new Error('Blue color button not found');
+    }
+
+    debug('✅ Blue button found', {
+      testId: blueBtn.getAttribute('data-testid'),
+      dataColor: blueBtn.getAttribute('data-color'),
+      bgColor: window.getComputedStyle(blueBtn).backgroundColor
+    });
+
+    debug('Clicking blue color button...');
+    blueBtn.click();
     await sleep(500);
+
+    debug('Blue button clicked', {
+      borderColor: window.getComputedStyle(blueBtn).borderColor,
+      boxShadow: window.getComputedStyle(blueBtn).boxShadow,
+      transform: window.getComputedStyle(blueBtn).transform
+    });
   });
 
   await test('Selected color changes in real-time', async () => {
+    debug('Checking if blue button is now selected...');
+
+    // Method 1: Check blue button specifically
+    const blueBtn = document.querySelector('[data-testid="color-blue"]') ||
+                    document.querySelector('[data-color="#2196F3"]');
+
+    if (blueBtn) {
+      const style = window.getComputedStyle(blueBtn);
+      const hasWhiteBorder = style.borderColor && style.borderColor.includes('255, 255, 255');
+      const hasThickBorder = style.borderWidth && parseInt(style.borderWidth) > 1;
+      const hasRing = style.boxShadow && style.boxShadow !== 'none';
+      const hasScale = style.transform && style.transform.includes('scale');
+
+      debug('Blue button selection state', {
+        hasWhiteBorder,
+        hasThickBorder,
+        hasRing,
+        hasScale,
+        borderColor: style.borderColor,
+        boxShadow: style.boxShadow,
+        transform: style.transform
+      });
+
+      if (hasWhiteBorder || hasThickBorder || hasRing || hasScale) {
+        log('   ', '✅ Color selection updates in real-time');
+        return;
+      }
+    }
+
+    debug('⚠️ Specific button check failed, trying all color buttons...');
+
+    // Method 2: Check all color buttons
     const colorButtons = findColorButtons();
 
     const selectedBtn = colorButtons.find(btn => {
@@ -353,8 +632,12 @@
              (transform && transform.includes('scale'));
     });
 
-    if (!selectedBtn) throw new Error('Selected color not updated');
-    log('   ', 'Color selection updates in real-time ✓');
+    if (!selectedBtn) {
+      debug('❌ No selected button found');
+      throw new Error('Selected color not updated');
+    }
+
+    log('   ', '✅ Color selection updates in real-time');
   });
 
   // ========== TEST 4: STICKY NOTE FEATURES ==========
@@ -362,20 +645,33 @@
 
   let stickyBtn;
   await test('Find sticky note tool', async () => {
-    debug('Searching for sticky note tool...');
+    debug('Searching for sticky note tool with data-testid...');
 
-    const allButtons = Array.from(document.querySelectorAll('button'));
-    stickyBtn = allButtons.find(btn => {
-      const title = btn.getAttribute('title')?.toLowerCase() || '';
-      const text = btn.textContent || '';
-      return title.includes('sticky') || text.includes('📝');
-    });
+    // Method 1: Use new data-testid attribute (BEST)
+    stickyBtn = document.querySelector('[data-testid="sticky_note-tool"]');
 
-    if (!stickyBtn) throw new Error('Sticky note tool not found');
+    if (!stickyBtn) {
+      debug('⚠️ data-testid not found, trying fallback selectors...');
 
-    debug('Sticky note button found', {
+      // Method 2: Search by title/text
+      const allButtons = Array.from(document.querySelectorAll('button'));
+      stickyBtn = allButtons.find(btn => {
+        const title = btn.getAttribute('title')?.toLowerCase() || '';
+        const text = btn.textContent || '';
+        return title.includes('sticky') || text.includes('📝');
+      });
+    }
+
+    if (!stickyBtn) {
+      const allTestIds = Array.from(document.querySelectorAll('[data-testid*="tool"]'));
+      debug('❌ Available tool test IDs', allTestIds.map(el => el.getAttribute('data-testid')));
+      throw new Error('Sticky note tool not found');
+    }
+
+    debug('✅ Sticky note button found', {
+      testId: stickyBtn.getAttribute('data-testid'),
       title: stickyBtn.getAttribute('title'),
-      text: stickyBtn.textContent
+      text: stickyBtn.textContent.substring(0, 20)
     });
   });
 
@@ -383,8 +679,14 @@
     if (!stickyBtn) throw new Error('Sticky note button not available');
 
     debug('Clicking sticky note tool...');
+    const wasSelected = stickyBtn.className.includes('bg-blue-600');
+    debug('Tool was selected before click:', wasSelected);
+
     stickyBtn.click();
     await sleep(500);
+
+    const isSelected = stickyBtn.className.includes('bg-blue-600');
+    debug('Tool is selected after click:', isSelected);
   });
 
   await test('Create sticky note via API', async () => {
@@ -425,23 +727,53 @@
 
   await test('Sticky note appears on PDF', async () => {
     debug('Looking for sticky note in DOM...', { annotation_id: window.__testStickyId });
+    debug('Current page PMID:', pmid);
+    debug('Sticky note PMID:', pmid); // Should match
 
     // Try multiple selectors
     let stickyNote = document.querySelector(`[data-annotation-id="${window.__testStickyId}"]`);
 
     if (!stickyNote) {
+      debug('⚠️ Sticky note not found by data-annotation-id, checking all annotations...');
+
       // Try finding any sticky notes
       const allStickyNotes = document.querySelectorAll('[data-annotation-id]');
-      debug('All annotations in DOM', Array.from(allStickyNotes).map(el => ({
+      debug('All annotations with data-annotation-id in DOM', allStickyNotes.length);
+      debug('Annotation details', Array.from(allStickyNotes).map(el => ({
         id: el.getAttribute('data-annotation-id'),
         className: el.className,
         text: el.textContent.substring(0, 50)
       })));
 
-      throw new Error('Sticky note not found in DOM');
+      // Try finding by class name
+      const stickyByClass = document.querySelector('[class*="StickyNote"]') ||
+                            document.querySelector('[class*="sticky-note"]');
+      if (stickyByClass) {
+        debug('Found sticky note by class name', {
+          className: stickyByClass.className,
+          id: stickyByClass.getAttribute('data-annotation-id')
+        });
+      } else {
+        debug('❌ No sticky notes found by class name either');
+      }
+
+      // Check if PDFViewer has the annotation in state
+      debug('Checking React state (if accessible)...');
+      const pdfViewer = document.querySelector('[data-pmid]');
+      if (pdfViewer) {
+        debug('PDF viewer found', {
+          pmid: pdfViewer.getAttribute('data-pmid'),
+          childCount: pdfViewer.children.length
+        });
+      } else {
+        debug('❌ PDF viewer not found - are you on a PDF page?');
+      }
+
+      throw new Error('Sticky note not found in DOM - check PMID match in console logs above');
     }
 
-    debug('Sticky note found in DOM', {
+    debug('✅ Sticky note found in DOM!', {
+      id: stickyNote.getAttribute('data-annotation-id'),
       className: stickyNote.className,
       position: {
         top: stickyNote.style.top,
@@ -449,7 +781,7 @@
       }
     });
 
-    log('   ', 'Sticky note rendered on PDF ✓');
+    log('   ', '✅ Sticky note rendered on PDF');
   });
 
   await test('Sticky note has placeholder text', async () => {
@@ -530,7 +862,7 @@
     if (!res.ok) {
       const errorText = await res.text();
       debug('API error response', errorText);
-      throw new Error(`API error: ${res.status}`);
+      throw new Error(`API error: ${res.status} - ${errorText}`);
     }
 
     const data = await res.json();
@@ -566,22 +898,35 @@
 
   let underlineBtn;
   await test('Find underline tool', async () => {
-    debug('Searching for underline tool...');
+    debug('Searching for underline tool with data-testid...');
 
-    const allButtons = Array.from(document.querySelectorAll('button'));
-    underlineBtn = allButtons.find(btn => {
-      const title = btn.getAttribute('title')?.toLowerCase() || '';
-      const text = btn.textContent || '';
-      const className = btn.className || '';
-      return title.includes('underline') ||
-             text.includes('U') && className.includes('underline');
-    });
+    // Method 1: Use new data-testid attribute (BEST)
+    underlineBtn = document.querySelector('[data-testid="underline-tool"]');
 
-    if (!underlineBtn) throw new Error('Underline tool not found');
+    if (!underlineBtn) {
+      debug('⚠️ data-testid not found, trying fallback selectors...');
 
-    debug('Underline button found', {
+      // Method 2: Search by title/text
+      const allButtons = Array.from(document.querySelectorAll('button'));
+      underlineBtn = allButtons.find(btn => {
+        const title = btn.getAttribute('title')?.toLowerCase() || '';
+        const text = btn.textContent || '';
+        const className = btn.className || '';
+        return title.includes('underline') ||
+               (text.includes('U') && className.includes('underline'));
+      });
+    }
+
+    if (!underlineBtn) {
+      const allTestIds = Array.from(document.querySelectorAll('[data-testid*="tool"]'));
+      debug('❌ Available tool test IDs', allTestIds.map(el => el.getAttribute('data-testid')));
+      throw new Error('Underline tool not found');
+    }
+
+    debug('✅ Underline button found', {
+      testId: underlineBtn.getAttribute('data-testid'),
       title: underlineBtn.getAttribute('title'),
-      text: underlineBtn.textContent
+      text: underlineBtn.textContent.substring(0, 20)
     });
   });
 
@@ -589,8 +934,14 @@
     if (!underlineBtn) throw new Error('Underline button not available');
 
     debug('Clicking underline tool...');
+    const wasSelected = underlineBtn.className.includes('bg-blue-600');
+    debug('Tool was selected before click:', wasSelected);
+
     underlineBtn.click();
     await sleep(500);
+
+    const isSelected = underlineBtn.className.includes('bg-blue-600');
+    debug('Tool is selected after click:', isSelected);
   });
 
   await test('Create underline annotation via API', async () => {
@@ -626,7 +977,8 @@
 
     if (!res.ok) {
       const errorText = await res.text();
-      throw new Error(`API error: ${res.status}`);
+      debug('API error response', errorText);
+      throw new Error(`API error: ${res.status} - ${errorText}`);
     }
 
     const data = await res.json();
@@ -646,23 +998,36 @@
 
   let strikethroughBtn;
   await test('Find strikethrough tool', async () => {
-    debug('Searching for strikethrough tool...');
+    debug('Searching for strikethrough tool with data-testid...');
 
-    const allButtons = Array.from(document.querySelectorAll('button'));
-    strikethroughBtn = allButtons.find(btn => {
-      const title = btn.getAttribute('title')?.toLowerCase() || '';
-      const text = btn.textContent || '';
-      const className = btn.className || '';
-      return title.includes('strikethrough') ||
-             title.includes('strike') ||
-             text.includes('S') && className.includes('line-through');
-    });
+    // Method 1: Use new data-testid attribute (BEST)
+    strikethroughBtn = document.querySelector('[data-testid="strikethrough-tool"]');
 
-    if (!strikethroughBtn) throw new Error('Strikethrough tool not found');
+    if (!strikethroughBtn) {
+      debug('⚠️ data-testid not found, trying fallback selectors...');
 
-    debug('Strikethrough button found', {
+      // Method 2: Search by title/text
+      const allButtons = Array.from(document.querySelectorAll('button'));
+      strikethroughBtn = allButtons.find(btn => {
+        const title = btn.getAttribute('title')?.toLowerCase() || '';
+        const text = btn.textContent || '';
+        const className = btn.className || '';
+        return title.includes('strikethrough') ||
+               title.includes('strike') ||
+               (text.includes('S') && className.includes('line-through'));
+      });
+    }
+
+    if (!strikethroughBtn) {
+      const allTestIds = Array.from(document.querySelectorAll('[data-testid*="tool"]'));
+      debug('❌ Available tool test IDs', allTestIds.map(el => el.getAttribute('data-testid')));
+      throw new Error('Strikethrough tool not found');
+    }
+
+    debug('✅ Strikethrough button found', {
+      testId: strikethroughBtn.getAttribute('data-testid'),
       title: strikethroughBtn.getAttribute('title'),
-      text: strikethroughBtn.textContent
+      text: strikethroughBtn.textContent.substring(0, 20)
     });
   });
 
@@ -670,8 +1035,14 @@
     if (!strikethroughBtn) throw new Error('Strikethrough button not available');
 
     debug('Clicking strikethrough tool...');
+    const wasSelected = strikethroughBtn.className.includes('bg-blue-600');
+    debug('Tool was selected before click:', wasSelected);
+
     strikethroughBtn.click();
     await sleep(500);
+
+    const isSelected = strikethroughBtn.className.includes('bg-blue-600');
+    debug('Tool is selected after click:', isSelected);
   });
 
   await test('Create strikethrough annotation via API', async () => {
@@ -707,7 +1078,8 @@
 
     if (!res.ok) {
       const errorText = await res.text();
-      throw new Error(`API error: ${res.status}`);
+      debug('API error response', errorText);
+      throw new Error(`API error: ${res.status} - ${errorText}`);
     }
 
     const data = await res.json();
@@ -744,7 +1116,7 @@
     // Check if text selection is not disabled
     const body = document.body;
     const style = window.getComputedStyle(body);
-    const userSelect = style.userSelect || style.webkitUserSelect;
+    const userSelect = style.userSelect;
 
     debug('User select style', userSelect);
 
