@@ -484,7 +484,7 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
 
       try {
         const annotationData = {
-          content: '',
+          content: 'Type to add note...',
           article_pmid: pmid,
           note_type: 'general',
           pdf_page: pageNum,
@@ -509,6 +509,8 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
         const newAnnotation = await response.json();
         console.log('✅ Sticky note created:', newAnnotation.annotation_id);
 
+        // Note: WebSocket will add it to state automatically, but we add it here for immediate feedback
+        // The WebSocket handler will prevent duplicates
         setHighlights((prev) => [...prev, newAnnotation]);
       } catch (err) {
         console.error('❌ Error creating sticky note:', err);
