@@ -67,6 +67,32 @@ export interface UpdateAnnotationRequest {
   is_private?: boolean;
 }
 
+// PDF-specific types
+export interface PDFCoordinates {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  pageWidth: number;
+  pageHeight: number;
+}
+
+export interface StickyNotePosition {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface TextFormatting {
+  bold?: boolean;
+  underline?: boolean;
+  italic?: boolean;
+  strikethrough?: boolean;
+}
+
+export type AnnotationType = 'highlight' | 'sticky_note' | 'underline' | 'strikethrough' | 'drawing';
+
 export interface Annotation {
   annotation_id: string;
   project_id: string;
@@ -89,6 +115,17 @@ export interface Annotation {
   author_id: string;
   author_username?: string;
   is_private: boolean;
+
+  // PDF annotation fields
+  pdf_page?: number;
+  pdf_coordinates?: PDFCoordinates | null;
+  highlight_color?: string | null;
+  highlight_text?: string | null;
+  annotation_type?: AnnotationType;
+  sticky_note_position?: StickyNotePosition | null;
+  sticky_note_color?: string;
+  text_formatting?: TextFormatting | null;
+  drawing_data?: any | null;
 }
 
 export interface AnnotationThread {

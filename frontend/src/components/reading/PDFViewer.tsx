@@ -69,7 +69,8 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
           if (prev.some((a) => a.annotation_id === annotation.annotation_id)) {
             return prev;
           }
-          return [...prev, annotation];
+          // Cast Annotation to Highlight (they're now compatible)
+          return [...prev, annotation as Highlight];
         });
       }
     },
@@ -78,7 +79,7 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
       // Update if it matches current PMID
       if (annotation.article_pmid === pmid) {
         setHighlights((prev) =>
-          prev.map((h) => (h.annotation_id === annotation.annotation_id ? annotation : h))
+          prev.map((h) => (h.annotation_id === annotation.annotation_id ? annotation as Highlight : h))
         );
       }
     },
