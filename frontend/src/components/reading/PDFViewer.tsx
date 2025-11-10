@@ -62,16 +62,25 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
     userId: user?.email,
     onNewAnnotation: (annotation) => {
       console.log('📥 New annotation received via WebSocket:', annotation);
+      console.log('   Current PDF PMID:', pmid);
+      console.log('   Annotation PMID:', annotation.article_pmid);
+      console.log('   PMID Match:', annotation.article_pmid === pmid);
+
       // Only add if it matches current PMID
       if (annotation.article_pmid === pmid) {
+        console.log('   ✅ Adding annotation to highlights');
         setHighlights((prev) => {
           // Avoid duplicates
           if (prev.some((a) => a.annotation_id === annotation.annotation_id)) {
+            console.log('   ⚠️ Annotation already exists, skipping');
             return prev;
           }
           // Cast Annotation to Highlight (they're now compatible)
+          console.log('   ✅ Annotation added to state');
           return [...prev, annotation as Highlight];
         });
+      } else {
+        console.log('   ❌ PMID mismatch - annotation not added to this PDF');
       }
     },
     onUpdateAnnotation: (annotation) => {
@@ -908,13 +917,14 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
       </div>
 
       {/* Annotation Toolbar - vertical toolbar with annotation tools */}
-      {projectId && highlightMode && (
+      {/* Always show toolbar when projectId exists - user can select tools anytime */}
+      {projectId && (
         <AnnotationToolbar
           selectedTool={selectedTool}
           onToolSelect={setSelectedTool}
           selectedColor={selectedColor}
           onColorSelect={setSelectedColor}
-          isEnabled={highlightMode}
+          isEnabled={true}
         />
       )}
 

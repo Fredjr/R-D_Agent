@@ -55,12 +55,16 @@ export default function AnnotationToolbar({
   const isColorTool = selectedTool === 'highlight' || selectedTool === 'underline' || selectedTool === 'strikethrough';
 
   return (
-    <div className="fixed left-4 top-1/2 -translate-y-1/2 z-50 bg-gray-800 rounded-lg shadow-2xl p-2 flex flex-col gap-2">
+    <div
+      className="fixed left-4 top-1/2 -translate-y-1/2 z-50 bg-gray-800 rounded-lg shadow-2xl p-2 flex flex-col gap-2"
+      data-testid="annotation-toolbar"
+    >
       {/* Close button */}
       <button
         onClick={() => onToolSelect(null)}
         className="p-2 text-white hover:bg-gray-700 rounded transition-colors"
         title="Close toolbar"
+        data-testid="close-toolbar"
       >
         <XMarkIcon className="w-5 h-5" />
       </button>
@@ -83,6 +87,7 @@ export default function AnnotationToolbar({
             }
           `}
           title={tool.description}
+          data-testid={`${tool.id}-tool`}
         >
           <span className={`text-xl ${tool.className || ''}`}>{tool.icon}</span>
         </button>
@@ -92,7 +97,7 @@ export default function AnnotationToolbar({
       {isColorTool && (
         <>
           <div className="h-px bg-gray-600 my-1" />
-          <div className="flex flex-col gap-1 px-1">
+          <div className="flex flex-col gap-1 px-1" data-testid="color-bar">
             <p className="text-[10px] text-gray-300 text-center mb-1">Color:</p>
             {HIGHLIGHT_COLORS.map((color) => (
               <button
@@ -109,6 +114,8 @@ export default function AnnotationToolbar({
                 `}
                 style={{ backgroundColor: color.hex }}
                 title={color.name}
+                data-testid={`color-${color.name.toLowerCase()}`}
+                data-color={color.hex}
               />
             ))}
           </div>
