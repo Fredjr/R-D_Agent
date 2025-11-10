@@ -10,22 +10,52 @@ This script:
 
 Usage:
     python3 enrich_existing_articles.py
+    python3 enrich_existing_articles.py --production  # Use production database
 """
 
 import asyncio
 import sys
+import os
 from datetime import datetime
-from database import get_db, Article
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from database import get_db, Article, Base
 from pdf_endpoints import fetch_article_metadata_from_pubmed
 
-async def enrich_articles(dry_run=False):
+def get_production_db():
+    """Get production database session from Railway"""
+    # Get DATABASE_URL from Railway
+    result = os.popen('railway variables --json').read()
+    import json
+    variables = json.loads(result)
+    database_url = variables.get('DATABASE_URL')
+
+    if not database_url:
+        raise ValueError("DATABASE_URL not found in Railway variables")
+
+    # Railway uses postgres:// but SQLAlchemy needs postgresql://
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+    print(f"🔗 Connecting to production database...")
+    engine = create_engine(database_url)
+    SessionLocal = sessionmaker(bind=engine)
+    return SessionLocal()
+
+async def enrich_articles(dry_run=False, use_production=False):
     """
     Enrich existing articles with missing DOI and abstract.
-    
+
     Args:
         dry_run: If True, only show what would be updated without making changes
+        use_production: If True, use production database from Railway
     """
-    db = next(get_db())
+    if use_production:
+        db = get_production_db()
+        print("🚀 Using PRODUCTION database from Railway")
+    else:
+        db = next(get_db())
+        print("🏠 Using LOCAL database")
     
     print("=" * 80)
     print("🔍 Article Enrichment Script")
@@ -117,15 +147,21 @@ async def enrich_articles(dry_run=False):
         print("✅ Enrichment complete!")
     print()
 
-async def enrich_specific_pmids(pmids: list[str], dry_run=False):
+async def enrich_specific_pmids(pmids: list[str], dry_run=False, use_production=False):
     """
     Enrich specific articles by PMID.
-    
+
     Args:
         pmids: List of PMIDs to enrich
         dry_run: If True, only show what would be updated
+        use_production: If True, use production database from Railway
     """
-    db = next(get_db())
+    if use_production:
+        db = get_production_db()
+        print("🚀 Using PRODUCTION database from Railway")
+    else:
+        db = next(get_db())
+        print("🏠 Using LOCAL database")
     
     print("=" * 80)
     print(f"🔍 Enriching {len(pmids)} specific articles")
@@ -198,17 +234,28 @@ async def enrich_specific_pmids(pmids: list[str], dry_run=False):
 def main():
     """Main entry point"""
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Enrich articles with DOI and metadata from PubMed")
     parser.add_argument("--dry-run", action="store_true", help="Show what would be updated without making changes")
     parser.add_argument("--pmids", nargs="+", help="Specific PMIDs to enrich (space-separated)")
-    
+    parser.add_argument("--production", action="store_true", help="Use production database from Railway")
+
     args = parser.parse_args()
-    
+
+    if args.production:
+        print("=" * 80)
+        print("⚠️  WARNING: Using PRODUCTION database")
+        print("=" * 80)
+        if not args.dry_run:
+            response = input("Are you sure you want to modify production data? (yes/no): ")
+            if response.lower() != "yes":
+                print("❌ Aborted")
+                return
+
     if args.pmids:
-        asyncio.run(enrich_specific_pmids(args.pmids, dry_run=args.dry_run))
+        asyncio.run(enrich_specific_pmids(args.pmids, dry_run=args.dry_run, use_production=args.production))
     else:
-        asyncio.run(enrich_articles(dry_run=args.dry_run))
+        asyncio.run(enrich_articles(dry_run=args.dry_run, use_production=args.production))
 
 if __name__ == "__main__":
     main()

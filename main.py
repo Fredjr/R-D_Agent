@@ -4575,6 +4575,152 @@ async def health_check():
         "features": ["increased_recommendation_limits", "author_fixes", "citation_opportunities"]
     }
 
+@app.post("/admin/enrich-articles")
+async def enrich_articles_endpoint(
+    request: Request,
+    dry_run: bool = False,
+    db: Session = Depends(get_db)
+):
+    """
+    Admin endpoint to enrich articles with missing DOI and metadata.
+
+    This endpoint:
+    1. Finds all articles without DOI
+    2. Fetches metadata from PubMed
+    3. Updates articles with DOI, abstract, and other metadata
+
+    Query params:
+        dry_run: If true, only show what would be updated without making changes
+
+    Returns:
+        Summary of enrichment results
+    """
+    from pdf_endpoints import fetch_article_metadata_from_pubmed
+
+    logger.info("📥 Admin: Starting article enrichment")
+
+    # Find articles without DOI
+    articles_without_doi = db.query(Article).filter(
+        (Article.doi == None) | (Article.doi == "")
+    ).all()
+
+    logger.info(f"📊 Found {len(articles_without_doi)} articles without DOI")
+
+    if len(articles_without_doi) == 0:
+        return {
+            "success": True,
+            "message": "All articles already have DOI",
+            "total": 0,
+            "enriched": 0,
+            "skipped": 0,
+            "failed": 0
+        }
+
+    enriched = 0
+    failed = 0
+    skipped = 0
+    results = []
+
+    for article in articles_without_doi:
+        try:
+            logger.info(f"📥 Processing PMID: {article.pmid}")
+
+            # Fetch metadata from PubMed
+            metadata = await fetch_article_metadata_from_pubmed(article.pmid)
+
+            # Check if we got a DOI
+            new_doi = metadata.get("doi", "")
+            if not new_doi:
+                logger.warning(f"⚠️ No DOI found in PubMed for {article.pmid}")
+                skipped += 1
+                results.append({
+                    "pmid": article.pmid,
+                    "status": "skipped",
+                    "reason": "No DOI in PubMed"
+                })
+                continue
+
+            if dry_run:
+                logger.info(f"🔍 DRY RUN: Would update {article.pmid} with DOI: {new_doi}")
+                enriched += 1
+                results.append({
+                    "pmid": article.pmid,
+                    "status": "would_update",
+                    "doi": new_doi
+                })
+            else:
+                # Update article
+                article.doi = new_doi
+                article.abstract = metadata.get("abstract", article.abstract)
+                article.title = metadata.get("title", article.title)
+                article.authors = metadata.get("authors", article.authors)
+                article.journal = metadata.get("journal", article.journal)
+                article.publication_year = metadata.get("year", article.publication_year)
+                article.updated_at = datetime.utcnow()
+
+                db.commit()
+                enriched += 1
+                logger.info(f"✅ Updated {article.pmid} with DOI: {new_doi}")
+                results.append({
+                    "pmid": article.pmid,
+                    "status": "updated",
+                    "doi": new_doi
+                })
+
+            # Rate limit to avoid PubMed throttling (3 requests/second)
+            await asyncio.sleep(0.4)
+
+        except Exception as e:
+            logger.error(f"❌ Failed to enrich {article.pmid}: {e}")
+            failed += 1
+            results.append({
+                "pmid": article.pmid,
+                "status": "failed",
+                "error": str(e)
+            })
+            continue
+
+    success_rate = (enriched / len(articles_without_doi) * 100) if len(articles_without_doi) > 0 else 0
+
+    logger.info(f"📊 Enrichment complete: {enriched} enriched, {skipped} skipped, {failed} failed")
+
+    return {
+        "success": True,
+        "dry_run": dry_run,
+        "total": len(articles_without_doi),
+        "enriched": enriched,
+        "skipped": skipped,
+        "failed": failed,
+        "success_rate": f"{success_rate:.1f}%",
+        "results": results[:10]  # Only return first 10 for brevity
+    }
+
+@app.get("/admin/articles-stats")
+async def articles_stats_endpoint(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Admin endpoint to get article statistics.
+
+    Returns:
+        Statistics about articles in the database
+    """
+    total = db.query(Article).count()
+    without_doi = db.query(Article).filter(
+        (Article.doi == None) | (Article.doi == "")
+    ).count()
+    with_doi = db.query(Article).filter(
+        (Article.doi != None) & (Article.doi != "")
+    ).count()
+
+    return {
+        "total_articles": total,
+        "articles_with_doi": with_doi,
+        "articles_without_doi": without_doi,
+        "doi_coverage": f"{(with_doi / total * 100) if total > 0 else 0:.1f}%"
+    }
+
 @app.get("/debug/llm-status")
 async def debug_llm_status():
     """Debug endpoint to check LLM initialization status"""
