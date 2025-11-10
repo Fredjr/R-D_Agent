@@ -6474,6 +6474,61 @@ async def update_annotation(
 
     return response
 
+@app.delete("/projects/{project_id}/annotations/{annotation_id}")
+async def delete_annotation(
+    project_id: str,
+    annotation_id: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Delete an annotation"""
+    current_user = request.headers.get("User-ID", "default_user")
+
+    # Check project access
+    has_access = (
+        db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == current_user
+        ).first() is not None or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == current_user
+        ).first() is not None
+    )
+
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied to this project")
+
+    # Get annotation
+    annotation = db.query(Annotation).filter(
+        Annotation.annotation_id == annotation_id,
+        Annotation.project_id == project_id
+    ).first()
+
+    if not annotation:
+        raise HTTPException(status_code=404, detail="Annotation not found")
+
+    # Check if user owns the annotation or is project owner
+    project = db.query(Project).filter(Project.project_id == project_id).first()
+    if annotation.author_id != current_user and project.owner_user_id != current_user:
+        raise HTTPException(status_code=403, detail="Can only delete your own annotations unless you are the project owner")
+
+    # Delete annotation (this will cascade delete children if parent_annotation_id is set)
+    db.delete(annotation)
+    db.commit()
+
+    logger.info(f"✅ Deleted annotation {annotation_id} from project {project_id} by user {current_user}")
+
+    # Broadcast deletion via WebSocket
+    await broadcast_annotation_event(
+        project_id=project_id,
+        event_type="annotation_deleted",
+        data={"annotation_id": annotation_id},
+        db=db
+    )
+
+    return {"success": True, "annotation_id": annotation_id, "message": "Annotation deleted successfully"}
+
 @app.get("/projects/{project_id}/annotations/{annotation_id}/thread")
 async def get_annotation_thread(
     project_id: str,
