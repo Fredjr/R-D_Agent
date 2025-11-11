@@ -6560,6 +6560,28 @@ async def update_annotation(
     if annotation_data.is_private is not None:
         annotation.is_private = annotation_data.is_private
 
+    # ✅ FIX: Update PDF annotation fields
+    if annotation_data.pdf_page is not None:
+        annotation.pdf_page = annotation_data.pdf_page
+
+    if annotation_data.pdf_coordinates is not None:
+        annotation.pdf_coordinates = annotation_data.pdf_coordinates
+
+    if annotation_data.highlight_color is not None:
+        annotation.highlight_color = annotation_data.highlight_color
+
+    if annotation_data.highlight_text is not None:
+        annotation.highlight_text = annotation_data.highlight_text
+
+    if annotation_data.annotation_type is not None:
+        annotation.annotation_type = annotation_data.annotation_type
+
+    if annotation_data.sticky_note_position is not None:
+        annotation.sticky_note_position = annotation_data.sticky_note_position
+
+    if annotation_data.sticky_note_color is not None:
+        annotation.sticky_note_color = annotation_data.sticky_note_color
+
     # Update timestamp
     annotation.updated_at = datetime.now()
 
@@ -6582,6 +6604,22 @@ async def update_annotation(
     else:
         action_items = annotation.action_items if annotation.action_items else []
 
+    # ✅ FIX: Parse PDF coordinates if it's a string (SQLite compatibility)
+    pdf_coordinates = None
+    if annotation.pdf_coordinates:
+        if isinstance(annotation.pdf_coordinates, str):
+            pdf_coordinates = json.loads(annotation.pdf_coordinates)
+        else:
+            pdf_coordinates = annotation.pdf_coordinates
+
+    # ✅ FIX: Parse sticky note position if it's a string (SQLite compatibility)
+    sticky_note_position = None
+    if annotation.sticky_note_position:
+        if isinstance(annotation.sticky_note_position, str):
+            sticky_note_position = json.loads(annotation.sticky_note_position)
+        else:
+            sticky_note_position = annotation.sticky_note_position
+
     # Create response object
     response = AnnotationResponseModel(
         annotation_id=annotation.annotation_id,
@@ -6602,21 +6640,46 @@ async def update_annotation(
         created_at=annotation.created_at,
         updated_at=annotation.updated_at,
         author_id=annotation.author_id,
-        is_private=annotation.is_private
+        is_private=annotation.is_private,
+        # ✅ FIX: Include PDF annotation fields in response
+        pdf_page=annotation.pdf_page,
+        pdf_coordinates=pdf_coordinates,
+        highlight_color=annotation.highlight_color,
+        highlight_text=annotation.highlight_text,
+        annotation_type=annotation.annotation_type,
+        sticky_note_position=sticky_note_position,
+        sticky_note_color=annotation.sticky_note_color
     )
 
     # Broadcast update to all connected clients in the project room
+    # ✅ FIX: Include ALL annotation fields in WebSocket broadcast (including PDF fields)
     broadcast_message = {
         "type": "annotation_updated",
         "annotation": {
             "annotation_id": annotation.annotation_id,
+            "project_id": annotation.project_id,
             "content": annotation.content,
+            "article_pmid": annotation.article_pmid,
+            "report_id": annotation.report_id,
+            "analysis_id": annotation.analysis_id,
             "author_id": annotation.author_id,
             "updated_at": annotation.updated_at.isoformat(),
+            "created_at": annotation.created_at.isoformat(),
             "note_type": annotation.note_type,
             "priority": annotation.priority,
             "status": annotation.status,
-            "tags": tags
+            "tags": tags,
+            "related_pmids": related_pmids,
+            "action_items": action_items,
+            "is_private": annotation.is_private,
+            # ✅ FIX: Include PDF annotation fields
+            "pdf_page": annotation.pdf_page,
+            "pdf_coordinates": pdf_coordinates,
+            "highlight_color": annotation.highlight_color,
+            "highlight_text": annotation.highlight_text,
+            "annotation_type": annotation.annotation_type,
+            "sticky_note_position": sticky_note_position,
+            "sticky_note_color": annotation.sticky_note_color
         }
     }
 
