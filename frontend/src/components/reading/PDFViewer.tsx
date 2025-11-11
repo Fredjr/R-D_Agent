@@ -467,6 +467,8 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
       if (!projectId || !user) return;
 
       try {
+        console.log('🗑️ Deleting annotation:', annotationId);
+
         const response = await fetch(`/api/proxy/projects/${projectId}/annotations/${annotationId}`, {
           method: 'DELETE',
           headers: {
@@ -475,16 +477,30 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
         });
 
         if (!response.ok) {
-          throw new Error('Failed to delete highlight');
+          const errorData = await response.json();
+          console.error('❌ Failed to delete annotation:', {
+            status: response.status,
+            error: errorData,
+            annotationId,
+          });
+
+          // ✅ FIX: If annotation not found (404), still remove it from local state
+          if (response.status === 404) {
+            console.log('🗑️ Annotation not found in backend - removing from local state anyway');
+            setHighlights((prev) => prev.filter((h) => h.annotation_id !== annotationId));
+            return; // Don't show error to user
+          }
+
+          throw new Error(`Failed to delete annotation: ${errorData.error || response.statusText}`);
         }
 
-        console.log('✅ Highlight deleted:', annotationId);
+        console.log('✅ Annotation deleted successfully:', annotationId);
 
         // Remove from local state
         setHighlights((prev) => prev.filter((h) => h.annotation_id !== annotationId));
       } catch (err) {
-        console.error('❌ Error deleting highlight:', err);
-        alert('Failed to delete highlight. Please try again.');
+        console.error('❌ Error deleting annotation:', err);
+        alert('Failed to delete annotation. Please try again.');
       }
     },
     [projectId, user]
@@ -531,6 +547,8 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
       if (!projectId || !user) return;
 
       try {
+        console.log('📝 Adding/updating note:', { annotationId, note: note.substring(0, 50) });
+
         const response = await fetch(`/api/proxy/projects/${projectId}/annotations/${annotationId}`, {
           method: 'PATCH',
           headers: {
@@ -543,14 +561,29 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
         });
 
         if (!response.ok) {
-          throw new Error('Failed to add note');
+          const errorData = await response.json();
+          console.error('❌ Failed to add/update note:', {
+            status: response.status,
+            error: errorData,
+            annotationId,
+          });
+
+          // ✅ FIX: If annotation not found (404), remove it from local state
+          if (response.status === 404) {
+            console.log('🗑️ Annotation not found in backend - removing from local state');
+            setHighlights((prev) => prev.filter((h) => h.annotation_id !== annotationId));
+          }
+
+          throw new Error(`Failed to add note: ${errorData.error || response.statusText}`);
         }
 
-        console.log('✅ Note added to highlight:', annotationId);
+        const updatedAnnotation = await response.json();
+        console.log('✅ Note added/updated successfully:', annotationId);
 
-        // Update local state
+        // ✅ FIX: Update local state with the full response from backend
+        // This ensures we have the correct data structure
         setHighlights((prev) =>
-          prev.map((h) => (h.annotation_id === annotationId ? { ...h, content: note } : h))
+          prev.map((h) => (h.annotation_id === annotationId ? updatedAnnotation as Highlight : h))
         );
       } catch (err) {
         console.error('❌ Error adding note:', err);
@@ -585,6 +618,8 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
           sticky_note_color: '#FFEB3B',
         };
 
+        console.log('📝 Creating sticky note:', annotationData);
+
         const response = await fetch(`/api/proxy/projects/${projectId}/annotations`, {
           method: 'POST',
           headers: {
@@ -595,15 +630,21 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
         });
 
         if (!response.ok) {
-          throw new Error('Failed to create sticky note');
+          const errorData = await response.json();
+          console.error('❌ Failed to create sticky note:', errorData);
+          throw new Error(`Failed to create sticky note: ${errorData.error || response.statusText}`);
         }
 
         const newAnnotation = await response.json();
-        console.log('✅ Sticky note created:', newAnnotation.annotation_id);
+        console.log('✅ Sticky note created successfully:', {
+          annotation_id: newAnnotation.annotation_id,
+          pmid: newAnnotation.article_pmid,
+          page: newAnnotation.pdf_page,
+        });
 
-        // Note: WebSocket will add it to state automatically, but we add it here for immediate feedback
-        // The WebSocket handler will prevent duplicates
-        setHighlights((prev) => [...prev, newAnnotation]);
+        // ✅ FIX: Don't add to local state here - let WebSocket handle it
+        // This prevents duplicates when WebSocket broadcast arrives
+        // setHighlights((prev) => [...prev, newAnnotation]);
       } catch (err) {
         console.error('❌ Error creating sticky note:', err);
         alert('Failed to create sticky note. Please try again.');
@@ -618,6 +659,8 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
       if (!projectId || !user) return;
 
       try {
+        console.log('📍 Moving sticky note:', { annotationId, newPosition });
+
         const response = await fetch(`/api/proxy/projects/${projectId}/annotations/${annotationId}`, {
           method: 'PATCH',
           headers: {
@@ -630,10 +673,23 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
         });
 
         if (!response.ok) {
-          throw new Error('Failed to move sticky note');
+          const errorData = await response.json();
+          console.error('❌ Failed to move sticky note:', {
+            status: response.status,
+            error: errorData,
+            annotationId,
+          });
+
+          // ✅ FIX: If annotation not found (404), remove it from local state
+          if (response.status === 404) {
+            console.log('🗑️ Annotation not found in backend - removing from local state');
+            setHighlights((prev) => prev.filter((h) => h.annotation_id !== annotationId));
+          }
+
+          throw new Error(`Failed to move sticky note: ${errorData.error || response.statusText}`);
         }
 
-        console.log('✅ Sticky note moved:', annotationId);
+        console.log('✅ Sticky note moved successfully:', annotationId);
 
         // Update local state
         setHighlights((prev) =>
@@ -695,6 +751,7 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
   // Handle editing sticky note content
   const handleStickyNoteEdit = useCallback(
     async (annotationId: string, content: string) => {
+      console.log('✏️ Editing sticky note:', { annotationId, content: content.substring(0, 50) });
       await handleNoteUpdate(annotationId, content);
     },
     [handleNoteUpdate]
