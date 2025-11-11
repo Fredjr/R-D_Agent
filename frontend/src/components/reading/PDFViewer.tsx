@@ -253,13 +253,21 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
 
       const data = await response.json();
 
-      // Filter only annotations with PDF data
-      const pdfHighlights = (data.annotations || []).filter(
-        (a: any) => a.pdf_page !== null && a.pdf_coordinates !== null
+      // ✅ FIX: Include both text-based annotations (with pdf_coordinates) AND sticky notes (with sticky_note_position)
+      const pdfAnnotations = (data.annotations || []).filter(
+        (a: any) => {
+          // Text-based annotations (highlight, underline, strikethrough) need pdf_coordinates
+          const hasTextAnnotationData = a.pdf_page !== null && a.pdf_coordinates !== null;
+
+          // Sticky notes need pdf_page and sticky_note_position
+          const hasStickyNoteData = a.annotation_type === 'sticky_note' && a.pdf_page !== null && a.sticky_note_position !== null;
+
+          return hasTextAnnotationData || hasStickyNoteData;
+        }
       );
 
-      setHighlights(pdfHighlights);
-      console.log(`✅ Loaded ${pdfHighlights.length} highlights`);
+      setHighlights(pdfAnnotations);
+      console.log(`✅ Loaded ${pdfAnnotations.length} annotations (${pdfAnnotations.filter(a => a.annotation_type === 'sticky_note').length} sticky notes, ${pdfAnnotations.filter(a => a.annotation_type !== 'sticky_note').length} text annotations)`);
     } catch (err) {
       console.error('❌ Error fetching highlights:', err);
     } finally {
