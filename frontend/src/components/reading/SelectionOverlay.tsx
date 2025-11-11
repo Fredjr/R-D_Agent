@@ -83,20 +83,26 @@ export default function SelectionOverlay({
     const handleMouseDown = (e: MouseEvent) => {
       // Check if mousedown is within PDF text layer
       const target = e.target as Element;
+      // ✅ FIX: Check if we're inside a PDF page (not just text layer)
+      // This allows selection to start even if clicking on canvas/whitespace
+      const pageElement = target.closest?.('.react-pdf__Page');
       const textLayerElement = target.closest?.('.react-pdf__Page__textContent');
 
       console.log('🖱️ SelectionOverlay mousedown:', {
         target: target.className,
+        pageFound: !!pageElement,
         textLayerFound: !!textLayerElement,
         isEnabled
       });
 
-      if (textLayerElement) {
+      // ✅ FIX: Start selection if inside PDF page (not just text layer)
+      // The text layer check will happen during mousemove/mouseup
+      if (pageElement) {
         isSelecting = true;
         hasDragged = false;
         mouseDownPos = { x: e.clientX, y: e.clientY };
         setSelectionRects([]); // Clear previous selection
-        console.log('✅ Selection started');
+        console.log('✅ Selection started (inside PDF page)');
       }
     };
 
