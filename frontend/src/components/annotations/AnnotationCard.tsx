@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import {
   ChatBubbleLeftIcon,
@@ -11,6 +11,9 @@ import {
   UserCircleIcon,
   FolderIcon,
   GlobeAltIcon,
+  DocumentTextIcon,
+  ArrowTopRightOnSquareIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { CheckCircleIcon as CheckCircleIconSolid } from '@heroicons/react/24/solid';
 import type { Annotation } from '../../lib/api/annotations';
@@ -30,10 +33,12 @@ interface AnnotationCardProps {
   onEdit?: (annotation: Annotation) => void;
   onDelete?: (annotationId: string) => void;
   onViewThread?: (annotationId: string) => void;
+  onJumpToSource?: (annotation: Annotation) => void; // NEW: Jump to PDF location
   showContext?: boolean;
   compact?: boolean;
   className?: string;
   collectionName?: string; // Optional: Pass collection name to avoid fetching
+  projectId?: string; // NEW: For fetching article title
 }
 
 export default function AnnotationCard({
@@ -42,12 +47,16 @@ export default function AnnotationCard({
   onEdit,
   onDelete,
   onViewThread,
+  onJumpToSource, // NEW
   showContext = true,
   compact = false,
   className = '',
   collectionName,
+  projectId, // NEW
 }: AnnotationCardProps) {
   const [showActions, setShowActions] = useState(false);
+  const [articleTitle, setArticleTitle] = useState<string | null>(null);
+  const [loadingTitle, setLoadingTitle] = useState(false);
 
   const noteTypeColor = getNoteTypeColor(annotation.note_type);
   const priorityColor = getPriorityColor(annotation.priority);
@@ -61,6 +70,33 @@ export default function AnnotationCard({
     : annotation.article_pmid
       ? 'article'
       : 'project';
+
+  // NEW: Fetch article title if annotation has article_pmid
+  useEffect(() => {
+    const fetchArticleTitle = async () => {
+      if (!annotation.article_pmid || !projectId) return;
+
+      setLoadingTitle(true);
+      try {
+        const response = await fetch(`/api/proxy/pubmed/details/${annotation.article_pmid}`, {
+          headers: {
+            'User-ID': 'default_user',
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setArticleTitle(data.title || null);
+        }
+      } catch (error) {
+        console.error('Error fetching article title:', error);
+      } finally {
+        setLoadingTitle(false);
+      }
+    };
+
+    fetchArticleTitle();
+  }, [annotation.article_pmid, projectId]);
   
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -69,13 +105,46 @@ export default function AnnotationCard({
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
-    
+
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
-    
+
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  // NEW: Get annotation type badge
+  const getAnnotationTypeBadge = () => {
+    if (!annotation.annotation_type) return null;
+
+    const typeConfig = {
+      highlight: { label: 'Highlight', icon: SparklesIcon, color: 'bg-yellow-100 text-yellow-800' },
+      sticky_note: { label: 'Sticky Note', icon: DocumentTextIcon, color: 'bg-blue-100 text-blue-800' },
+      underline: { label: 'Underline', icon: SparklesIcon, color: 'bg-purple-100 text-purple-800' },
+      strikethrough: { label: 'Strikethrough', icon: SparklesIcon, color: 'bg-red-100 text-red-800' },
+      drawing: { label: 'Drawing', icon: SparklesIcon, color: 'bg-green-100 text-green-800' },
+    };
+
+    const config = typeConfig[annotation.annotation_type as keyof typeof typeConfig];
+    if (!config) return null;
+
+    const Icon = config.icon;
+
+    return (
+      <span className={`flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${config.color}`}>
+        <Icon className="w-3 h-3" />
+        {config.label}
+      </span>
+    );
+  };
+
+  // NEW: Truncate highlighted text for preview
+  const getHighlightPreview = () => {
+    if (!annotation.highlight_text) return null;
+    const maxLength = 100;
+    const text = annotation.highlight_text;
+    return text.length > maxLength ? `"${text.substring(0, maxLength)}..."` : `"${text}"`;
   };
 
   const borderColorClass = {
@@ -115,7 +184,10 @@ export default function AnnotationCard({
             {formatNoteType(annotation.note_type)}
           </span>
 
-          {/* Collection Scope Badge (NEW) */}
+          {/* NEW: Annotation Type Badge (Highlight, Sticky Note, etc.) */}
+          {getAnnotationTypeBadge()}
+
+          {/* Collection Scope Badge */}
           {annotation.collection_id ? (
             <span className="flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
               <FolderIcon className="w-3 h-3" />
@@ -186,10 +258,47 @@ export default function AnnotationCard({
         )}
       </div>
 
+      {/* NEW: Highlighted Text Preview (for PDF annotations) */}
+      {annotation.highlight_text && (
+        <div className="mb-3 p-2 bg-yellow-50 border-l-2 border-yellow-400 rounded">
+          <div className="text-xs text-yellow-800 font-medium mb-1">Highlighted Text:</div>
+          <div className="text-sm text-gray-700 italic">
+            {getHighlightPreview()}
+          </div>
+        </div>
+      )}
+
       {/* Content */}
       <div className={`text-gray-800 ${compact ? 'text-sm' : ''} mb-3`}>
         {annotation.content}
       </div>
+
+      {/* NEW: PDF Context (Paper Title + Page Number) */}
+      {(articleTitle || annotation.pdf_page) && (
+        <div className="mb-3 flex items-center gap-2 text-xs text-gray-600 bg-gray-50 p-2 rounded">
+          <DocumentTextIcon className="w-4 h-4 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            {articleTitle && (
+              <div className="font-medium truncate">{articleTitle}</div>
+            )}
+            {annotation.pdf_page && (
+              <div className="text-gray-500">
+                Page {annotation.pdf_page}
+              </div>
+            )}
+          </div>
+          {onJumpToSource && annotation.article_pmid && annotation.pdf_page && (
+            <button
+              onClick={() => onJumpToSource(annotation)}
+              className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 rounded transition-colors flex-shrink-0"
+              title="Jump to source in PDF"
+            >
+              <ArrowTopRightOnSquareIcon className="w-3 h-3" />
+              Jump to Source
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Tags */}
       {annotation.tags.length > 0 && (

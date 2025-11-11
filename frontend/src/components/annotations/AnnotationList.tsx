@@ -362,7 +362,14 @@ export default function AnnotationList({
                   onReply={handleReply}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
+                  onJumpToSource={(ann) => {
+                    // Open PDF viewer at specific page
+                    if (ann.article_pmid && ann.pdf_page) {
+                      window.open(`/project/${projectId}/pdf/${ann.article_pmid}?page=${ann.pdf_page}`, '_blank');
+                    }
+                  }}
                   compact={compact}
+                  projectId={projectId}
                 />
               )}
 
