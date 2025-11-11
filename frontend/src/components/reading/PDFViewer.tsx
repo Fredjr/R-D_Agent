@@ -275,6 +275,24 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
     }
   };
 
+  // ✅ FIX: Helper function to check if two text selections overlap
+  const doSelectionsOverlap = (
+    selection1: { pageNumber: number; text: string },
+    selection2: { pdf_page: number; highlight_text: string | null }
+  ): boolean => {
+    // Must be on same page
+    if (selection1.pageNumber !== selection2.pdf_page) return false;
+
+    // Must have overlapping text
+    if (!selection2.highlight_text) return false;
+
+    const text1 = selection1.text.trim().toLowerCase();
+    const text2 = selection2.highlight_text.trim().toLowerCase();
+
+    // Check if texts overlap (either contains the other, or are identical)
+    return text1.includes(text2) || text2.includes(text1) || text1 === text2;
+  };
+
   // Handle creating a new annotation (highlight, underline, strikethrough)
   const handleHighlight = useCallback(
     async (color: string, selection: TextSelection) => {
@@ -297,6 +315,39 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
           text: selection.text.substring(0, 50),
           color,
         });
+
+        // ✅ FIX: Check for overlapping annotations and delete them first
+        // This prevents multiple annotation types on the same text
+        const overlappingAnnotations = highlights.filter((h) =>
+          doSelectionsOverlap(selection, h) &&
+          (h.annotation_type === 'highlight' ||
+           h.annotation_type === 'underline' ||
+           h.annotation_type === 'strikethrough')
+        );
+
+        if (overlappingAnnotations.length > 0) {
+          console.log(`🗑️ Found ${overlappingAnnotations.length} overlapping annotations - deleting them first`);
+
+          // Delete all overlapping annotations
+          for (const annotation of overlappingAnnotations) {
+            try {
+              await fetch(`/api/proxy/projects/${projectId}/annotations/${annotation.annotation_id}`, {
+                method: 'DELETE',
+                headers: {
+                  'User-ID': user.email,
+                },
+              });
+              console.log(`✅ Deleted overlapping annotation: ${annotation.annotation_id}`);
+            } catch (err) {
+              console.error(`❌ Failed to delete annotation ${annotation.annotation_id}:`, err);
+            }
+          }
+
+          // Remove from local state
+          setHighlights((prev) =>
+            prev.filter((h) => !overlappingAnnotations.some((oa) => oa.annotation_id === h.annotation_id))
+          );
+        }
 
         // Get the page canvas to calculate normalized coordinates
         const pageCanvas = document.querySelector(
@@ -365,7 +416,7 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
         console.error('❌ Error creating annotation:', err);
       }
     },
-    [projectId, user, pmid, selectedTool]
+    [projectId, user, pmid, selectedTool, highlights]
   );
 
   // Handle clicking on a highlight - navigate to page
