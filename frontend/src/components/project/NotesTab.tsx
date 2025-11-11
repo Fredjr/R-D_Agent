@@ -2,9 +2,10 @@
 
 // CACHE BUSTER: Force new bundle hash - v2.0.3 - 2025-11-05T12:00:00Z
 import React, { useState, useMemo, useEffect } from 'react';
-import { FunnelIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { FunnelIcon, MagnifyingGlassIcon, Squares2X2Icon, ListBulletIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import AnnotationList from '@/components/annotations/AnnotationList';
+import AnnotationGroupView from '@/components/annotations/AnnotationGroupView';
 import CollectionScopeFilter from '@/components/annotations/CollectionScopeFilter';
 import type { NoteType, Priority, Status } from '@/lib/api/annotations';
 import FilterPanel, { type FilterSection } from '@/components/filters/FilterPanel';
@@ -19,6 +20,7 @@ type NoteTypeFilter = 'all' | NoteType;
 type PriorityFilter = 'all' | Priority;
 type StatusFilter = 'all' | Status;
 type ViewMode = 'all' | 'project' | 'collection' | 'paper';
+type GroupByMode = 'none' | 'paper' | 'date' | 'type';
 
 export function NotesTab({ project, onRefresh }: NotesTabProps) {
   const { user } = useAuth();
@@ -40,6 +42,10 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
 
   // 📚 Collection scope filter
   const [selectedCollectionScope, setSelectedCollectionScope] = useState<string | 'all' | 'unlinked'>('all');
+
+  // 🆕 PHASE 2: Grouping and view mode
+  const [groupBy, setGroupBy] = useState<GroupByMode>('none');
+  const [useGroupView, setUseGroupView] = useState(false);
 
   // Fetch annotations when component mounts or project changes
   useEffect(() => {
@@ -498,36 +504,106 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
         />
       )}
 
-      {/* Results Summary */}
+      {/* Results Summary + View Controls */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-600">
           Showing <span className="font-semibold text-gray-900">{filteredAnnotations.length}</span> of{' '}
           <span className="font-semibold text-gray-900">{allAnnotations.length}</span> notes
         </p>
-        {filteredAnnotations.length === 0 && allAnnotations.length > 0 && (
-          <button
-            onClick={clearFilters}
-            className="text-sm text-purple-600 hover:text-purple-700 font-medium"
-          >
-            Reset filters
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {/* Group By Selector */}
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">Group by:</label>
+            <select
+              value={groupBy}
+              onChange={(e) => {
+                const newGroupBy = e.target.value as GroupByMode;
+                setGroupBy(newGroupBy);
+                setUseGroupView(newGroupBy !== 'none');
+              }}
+              className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="none">None</option>
+              <option value="paper">Paper</option>
+              <option value="date">Date</option>
+              <option value="type">Annotation Type</option>
+            </select>
+          </div>
+
+          {/* View Toggle */}
+          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setUseGroupView(false)}
+              className={`p-1.5 rounded transition-colors ${
+                !useGroupView ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
+              }`}
+              title="List View"
+            >
+              <ListBulletIcon className="w-4 h-4 text-gray-600" />
+            </button>
+            <button
+              onClick={() => setUseGroupView(true)}
+              className={`p-1.5 rounded transition-colors ${
+                useGroupView ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
+              }`}
+              title="Group View"
+            >
+              <Squares2X2Icon className="w-4 h-4 text-gray-600" />
+            </button>
+          </div>
+
+          {filteredAnnotations.length === 0 && allAnnotations.length > 0 && (
+            <button
+              onClick={clearFilters}
+              className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+            >
+              Reset filters
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Notes List */}
       {filteredAnnotations.length > 0 ? (
         <div className="bg-white rounded-lg border border-gray-200">
-          <AnnotationList
-            projectId={project.project_id}
-            userId={user?.email} // CRITICAL FIX: Must pass user email for authentication
-            initialFilters={{
-              note_type: selectedType !== 'all' ? selectedType : undefined,
-              priority: selectedPriority !== 'all' ? selectedPriority : undefined,
-              status: selectedStatus !== 'all' ? selectedStatus : undefined,
-            }}
-            showForm={false}
-            compact={false}
-          />
+          {useGroupView ? (
+            <div className="p-4">
+              <AnnotationGroupView
+                annotations={filteredAnnotations}
+                projectId={project.project_id}
+                groupBy={groupBy}
+                onJumpToSource={(annotation) => {
+                  if (annotation.article_pmid && annotation.pdf_page) {
+                    window.open(`/project/${project.project_id}/pdf/${annotation.article_pmid}?page=${annotation.pdf_page}`, '_blank');
+                  }
+                }}
+                onEdit={(annotation) => {
+                  // Handle edit
+                  console.log('Edit annotation:', annotation);
+                }}
+                onDelete={(annotationId) => {
+                  // Handle delete
+                  console.log('Delete annotation:', annotationId);
+                }}
+                onReply={(annotationId) => {
+                  // Handle reply
+                  console.log('Reply to annotation:', annotationId);
+                }}
+              />
+            </div>
+          ) : (
+            <AnnotationList
+              projectId={project.project_id}
+              userId={user?.email} // CRITICAL FIX: Must pass user email for authentication
+              initialFilters={{
+                note_type: selectedType !== 'all' ? selectedType : undefined,
+                priority: selectedPriority !== 'all' ? selectedPriority : undefined,
+                status: selectedStatus !== 'all' ? selectedStatus : undefined,
+              }}
+              showForm={false}
+              compact={false}
+            />
+          )}
         </div>
       ) : (
         <div className="bg-white rounded-lg p-12 border border-gray-200 text-center">
