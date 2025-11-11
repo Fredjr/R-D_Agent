@@ -267,7 +267,7 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
       );
 
       setHighlights(pdfAnnotations);
-      console.log(`✅ Loaded ${pdfAnnotations.length} annotations (${pdfAnnotations.filter(a => a.annotation_type === 'sticky_note').length} sticky notes, ${pdfAnnotations.filter(a => a.annotation_type !== 'sticky_note').length} text annotations)`);
+      console.log(`✅ Loaded ${pdfAnnotations.length} annotations (${pdfAnnotations.filter((a: any) => a.annotation_type === 'sticky_note').length} sticky notes, ${pdfAnnotations.filter((a: any) => a.annotation_type !== 'sticky_note').length} text annotations)`);
     } catch (err) {
       console.error('❌ Error fetching highlights:', err);
     } finally {
@@ -328,17 +328,19 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
         };
 
         // Create annotation with PDF fields
+        // ✅ FIX: note_type should always be 'highlight' for text-based annotations
+        // annotation_type differentiates between highlight/underline/strikethrough
         const annotationData = {
           content: `${annotationType}: ${selection.text}`,
           article_pmid: pmid,
-          note_type: annotationType,
+          note_type: 'highlight', // Always 'highlight' for text-based annotations
           priority: 'medium',
           status: 'active',
           pdf_page: selection.pageNumber,
           pdf_coordinates: coordinates,
           highlight_color: color,
           highlight_text: selection.text,
-          annotation_type: annotationType,
+          annotation_type: annotationType, // This differentiates highlight/underline/strikethrough
         };
 
         const response = await fetch(`/api/proxy/projects/${projectId}/annotations`, {
@@ -647,6 +649,20 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
     [handleNoteUpdate]
   );
 
+  // Handle tool selection - automatically enable highlight mode for text-based tools
+  const handleToolSelect = useCallback((tool: AnnotationType | null) => {
+    setSelectedTool(tool);
+
+    // ✅ FIX: Automatically enable highlight mode when selecting text-based annotation tools
+    if (tool === 'highlight' || tool === 'underline' || tool === 'strikethrough') {
+      setHighlightMode(true);
+    } else if (tool === null) {
+      // Disable highlight mode when deselecting tool
+      setHighlightMode(false);
+    }
+    // Note: sticky_note doesn't need highlight mode
+  }, []);
+
   // Handle clicking on PDF to add sticky note
   const handlePdfClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -950,7 +966,7 @@ export default function PDFViewer({ pmid, title, projectId, onClose }: PDFViewer
       {projectId && (
         <AnnotationToolbar
           selectedTool={selectedTool}
-          onToolSelect={setSelectedTool}
+          onToolSelect={handleToolSelect}
           selectedColor={selectedColor}
           onColorSelect={setSelectedColor}
           isEnabled={true}
