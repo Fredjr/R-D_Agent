@@ -39,6 +39,8 @@ export default function SelectionOverlay({
     }
 
     let isSelecting = false;
+    let mouseDownPos = { x: 0, y: 0 };
+    let hasDragged = false;
 
     const updateSelectionHighlight = () => {
       const selection = window.getSelection();
@@ -82,15 +84,33 @@ export default function SelectionOverlay({
       // Check if mousedown is within PDF text layer
       const target = e.target as Element;
       const textLayerElement = target.closest?.('.react-pdf__Page__textContent');
-      
+
+      console.log('🖱️ SelectionOverlay mousedown:', {
+        target: target.className,
+        textLayerFound: !!textLayerElement,
+        isEnabled
+      });
+
       if (textLayerElement) {
         isSelecting = true;
+        hasDragged = false;
+        mouseDownPos = { x: e.clientX, y: e.clientY };
         setSelectionRects([]); // Clear previous selection
+        console.log('✅ Selection started');
       }
     };
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!isSelecting) return;
+
+      // Check if user has dragged at least 5 pixels (to distinguish from click/double-click)
+      const dx = Math.abs(e.clientX - mouseDownPos.x);
+      const dy = Math.abs(e.clientY - mouseDownPos.y);
+      if (dx > 5 || dy > 5) {
+        hasDragged = true;
+      }
+
+      console.log('🖱️ SelectionOverlay mousemove - isSelecting:', isSelecting, 'hasDragged:', hasDragged);
 
       // Use requestAnimationFrame for smooth updates
       if (animationFrameRef.current) {
@@ -108,6 +128,13 @@ export default function SelectionOverlay({
       // Update selection highlight one final time
       updateSelectionHighlight();
 
+      // ✅ FIX: Only create annotation if user actually dragged (not just click/double-click)
+      if (!hasDragged) {
+        console.log('⚠️ No drag detected - ignoring selection (likely click/double-click)');
+        setSelectionRects([]);
+        return;
+      }
+
       // If onSelectionComplete callback is provided, trigger it
       if (onSelectionComplete) {
         const selection = window.getSelection();
@@ -115,7 +142,8 @@ export default function SelectionOverlay({
         if (selection && !selection.isCollapsed && selection.rangeCount > 0) {
           const selectedText = selection.toString().trim();
 
-          if (selectedText.length > 0) {
+          // ✅ FIX: Require minimum 3 characters to avoid accidental selections
+          if (selectedText.length >= 3) {
             const range = selection.getRangeAt(0);
             const container = range.commonAncestorContainer;
             const textLayerElement = (container as Element).closest?.('.react-pdf__Page__textContent');
@@ -131,6 +159,8 @@ export default function SelectionOverlay({
               const boundingRect = range.getBoundingClientRect();
 
               if (rects.length > 0) {
+                console.log('✅ Creating annotation for dragged selection:', selectedText.substring(0, 50));
+
                 // Trigger callback with selection data
                 onSelectionComplete({
                   text: selectedText,
@@ -146,6 +176,9 @@ export default function SelectionOverlay({
                 }, 100);
               }
             }
+          } else {
+            console.log('⚠️ Selection too short - ignoring:', selectedText);
+            setSelectionRects([]);
           }
         }
       }

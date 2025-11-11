@@ -25,7 +25,7 @@ export default function HighlightLayer({
       const pageElement = document.querySelector(
         `.react-pdf__Page[data-page-number="${pageNumber}"]`
       );
-      
+
       if (pageElement) {
         const rect = pageElement.getBoundingClientRect();
         setPageRect(rect);
@@ -37,7 +37,7 @@ export default function HighlightLayer({
 
     // Update on window resize
     window.addEventListener('resize', updatePageRect);
-    
+
     // Update after a short delay to ensure PDF is rendered
     const timer = setTimeout(updatePageRect, 100);
 
@@ -47,8 +47,9 @@ export default function HighlightLayer({
     };
   }, [pageNumber, scale]);
 
+  // ✅ FIX: Add defensive check for undefined highlights
   // Filter highlights for current page
-  const pageHighlights = highlights.filter((h) => h.pdf_page === pageNumber);
+  const pageHighlights = (highlights || []).filter((h) => h && h.pdf_page === pageNumber);
 
   if (!pageRect || pageHighlights.length === 0) {
     return null;
