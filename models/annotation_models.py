@@ -156,6 +156,13 @@ class UpdateAnnotationRequest(BaseModel):
     highlight_color: Optional[str] = Field(None, description="Updated highlight color")
     highlight_text: Optional[str] = Field(None, description="Updated highlight text")
 
+    # Advanced PDF annotation fields (Sticky Notes, Underline, Strikethrough, Drawing)
+    annotation_type: Optional[str] = Field(None, description="Updated annotation type: highlight, sticky_note, underline, strikethrough, drawing")
+    sticky_note_position: Optional[Dict[str, Any]] = Field(None, description="Updated sticky note position and size {x, y, width, height}")
+    sticky_note_color: Optional[str] = Field(None, description="Updated sticky note color (hex code)")
+    text_formatting: Optional[Dict[str, bool]] = Field(None, description="Updated text formatting options {bold, underline, italic, strikethrough}")
+    drawing_data: Optional[Dict[str, Any]] = Field(None, description="Updated SVG path data for freehand drawings")
+
     # Privacy
     is_private: Optional[bool] = Field(None, description="Updated privacy setting")
 
