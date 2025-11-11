@@ -2,10 +2,19 @@
 
 // CACHE BUSTER: Force new bundle hash - v2.0.3 - 2025-11-05T12:00:00Z
 import React, { useState, useMemo, useEffect } from 'react';
-import { FunnelIcon, MagnifyingGlassIcon, Squares2X2Icon, ListBulletIcon } from '@heroicons/react/24/outline';
+import {
+  FunnelIcon,
+  MagnifyingGlassIcon,
+  Squares2X2Icon,
+  ListBulletIcon,
+  ClockIcon,
+  DocumentTextIcon,
+} from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import AnnotationList from '@/components/annotations/AnnotationList';
 import AnnotationGroupView from '@/components/annotations/AnnotationGroupView';
+import AnnotationTimelineView from '@/components/annotations/AnnotationTimelineView';
+import AnnotationPaperView from '@/components/annotations/AnnotationPaperView';
 import CollectionScopeFilter from '@/components/annotations/CollectionScopeFilter';
 import type { NoteType, Priority, Status } from '@/lib/api/annotations';
 import FilterPanel, { type FilterSection } from '@/components/filters/FilterPanel';
@@ -21,6 +30,7 @@ type PriorityFilter = 'all' | Priority;
 type StatusFilter = 'all' | Status;
 type ViewMode = 'all' | 'project' | 'collection' | 'paper';
 type GroupByMode = 'none' | 'paper' | 'date' | 'type';
+type DisplayMode = 'list' | 'group' | 'timeline' | 'paper';
 
 export function NotesTab({ project, onRefresh }: NotesTabProps) {
   const { user } = useAuth();
@@ -46,6 +56,9 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
   // 🆕 PHASE 2: Grouping and view mode
   const [groupBy, setGroupBy] = useState<GroupByMode>('none');
   const [useGroupView, setUseGroupView] = useState(false);
+
+  // 🆕 PHASE 3: Display mode (list, group, timeline, paper)
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('list');
 
   // Fetch annotations when component mounts or project changes
   useEffect(() => {
@@ -505,52 +518,75 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
       )}
 
       {/* Results Summary + View Controls */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <p className="text-sm text-gray-600">
           Showing <span className="font-semibold text-gray-900">{filteredAnnotations.length}</span> of{' '}
           <span className="font-semibold text-gray-900">{allAnnotations.length}</span> notes
         </p>
-        <div className="flex items-center gap-3">
-          {/* Group By Selector */}
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Display Mode Selector - PHASE 3 */}
           <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">Group by:</label>
-            <select
-              value={groupBy}
-              onChange={(e) => {
-                const newGroupBy = e.target.value as GroupByMode;
-                setGroupBy(newGroupBy);
-                setUseGroupView(newGroupBy !== 'none');
-              }}
-              className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="none">None</option>
-              <option value="paper">Paper</option>
-              <option value="date">Date</option>
-              <option value="type">Annotation Type</option>
-            </select>
+            <label className="text-sm text-gray-600">View:</label>
+            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setDisplayMode('list')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                  displayMode === 'list' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-600 hover:bg-gray-200'
+                }`}
+                title="List View"
+              >
+                <ListBulletIcon className="w-4 h-4" />
+                List
+              </button>
+              <button
+                onClick={() => setDisplayMode('group')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                  displayMode === 'group' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-600 hover:bg-gray-200'
+                }`}
+                title="Group View"
+              >
+                <Squares2X2Icon className="w-4 h-4" />
+                Group
+              </button>
+              <button
+                onClick={() => setDisplayMode('timeline')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                  displayMode === 'timeline' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-600 hover:bg-gray-200'
+                }`}
+                title="Timeline View"
+              >
+                <ClockIcon className="w-4 h-4" />
+                Timeline
+              </button>
+              <button
+                onClick={() => setDisplayMode('paper')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                  displayMode === 'paper' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-600 hover:bg-gray-200'
+                }`}
+                title="Paper View"
+              >
+                <DocumentTextIcon className="w-4 h-4" />
+                Paper
+              </button>
+            </div>
           </div>
 
-          {/* View Toggle */}
-          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-            <button
-              onClick={() => setUseGroupView(false)}
-              className={`p-1.5 rounded transition-colors ${
-                !useGroupView ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
-              }`}
-              title="List View"
-            >
-              <ListBulletIcon className="w-4 h-4 text-gray-600" />
-            </button>
-            <button
-              onClick={() => setUseGroupView(true)}
-              className={`p-1.5 rounded transition-colors ${
-                useGroupView ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
-              }`}
-              title="Group View"
-            >
-              <Squares2X2Icon className="w-4 h-4 text-gray-600" />
-            </button>
-          </div>
+          {/* Group By Selector - Only show for Group view */}
+          {displayMode === 'group' && (
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-600">Group by:</label>
+              <select
+                value={groupBy}
+                onChange={(e) => setGroupBy(e.target.value as GroupByMode)}
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="none">None</option>
+                <option value="paper">Paper</option>
+                <option value="date">Date</option>
+                <option value="type">Annotation Type</option>
+              </select>
+            </div>
+          )}
 
           {filteredAnnotations.length === 0 && allAnnotations.length > 0 && (
             <button
@@ -563,10 +599,24 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
         </div>
       </div>
 
-      {/* Notes List */}
+      {/* Notes List - PHASE 3: Multiple Display Modes */}
       {filteredAnnotations.length > 0 ? (
         <div className="bg-white rounded-lg border border-gray-200">
-          {useGroupView ? (
+          {displayMode === 'list' && (
+            <AnnotationList
+              projectId={project.project_id}
+              userId={user?.email}
+              initialFilters={{
+                note_type: selectedType !== 'all' ? selectedType : undefined,
+                priority: selectedPriority !== 'all' ? selectedPriority : undefined,
+                status: selectedStatus !== 'all' ? selectedStatus : undefined,
+              }}
+              showForm={false}
+              compact={false}
+            />
+          )}
+
+          {displayMode === 'group' && (
             <div className="p-4">
               <AnnotationGroupView
                 annotations={filteredAnnotations}
@@ -578,31 +628,62 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
                   }
                 }}
                 onEdit={(annotation) => {
-                  // Handle edit
                   console.log('Edit annotation:', annotation);
                 }}
                 onDelete={(annotationId) => {
-                  // Handle delete
                   console.log('Delete annotation:', annotationId);
                 }}
                 onReply={(annotationId) => {
-                  // Handle reply
                   console.log('Reply to annotation:', annotationId);
                 }}
               />
             </div>
-          ) : (
-            <AnnotationList
-              projectId={project.project_id}
-              userId={user?.email} // CRITICAL FIX: Must pass user email for authentication
-              initialFilters={{
-                note_type: selectedType !== 'all' ? selectedType : undefined,
-                priority: selectedPriority !== 'all' ? selectedPriority : undefined,
-                status: selectedStatus !== 'all' ? selectedStatus : undefined,
-              }}
-              showForm={false}
-              compact={false}
-            />
+          )}
+
+          {displayMode === 'timeline' && (
+            <div className="p-6">
+              <AnnotationTimelineView
+                annotations={filteredAnnotations}
+                projectId={project.project_id}
+                onJumpToSource={(annotation) => {
+                  if (annotation.article_pmid && annotation.pdf_page) {
+                    window.open(`/project/${project.project_id}/pdf/${annotation.article_pmid}?page=${annotation.pdf_page}`, '_blank');
+                  }
+                }}
+                onEdit={(annotation) => {
+                  console.log('Edit annotation:', annotation);
+                }}
+                onDelete={(annotationId) => {
+                  console.log('Delete annotation:', annotationId);
+                }}
+                onReply={(annotationId) => {
+                  console.log('Reply to annotation:', annotationId);
+                }}
+              />
+            </div>
+          )}
+
+          {displayMode === 'paper' && (
+            <div className="p-4">
+              <AnnotationPaperView
+                annotations={filteredAnnotations}
+                projectId={project.project_id}
+                onJumpToSource={(annotation) => {
+                  if (annotation.article_pmid && annotation.pdf_page) {
+                    window.open(`/project/${project.project_id}/pdf/${annotation.article_pmid}?page=${annotation.pdf_page}`, '_blank');
+                  }
+                }}
+                onEdit={(annotation) => {
+                  console.log('Edit annotation:', annotation);
+                }}
+                onDelete={(annotationId) => {
+                  console.log('Delete annotation:', annotationId);
+                }}
+                onReply={(annotationId) => {
+                  console.log('Reply to annotation:', annotationId);
+                }}
+              />
+            </div>
           )}
         </div>
       ) : (
