@@ -6328,6 +6328,7 @@ async def create_annotation(
     )
 
     # Broadcast new annotation to all connected clients in the project room
+    # ✅ FIX: Include ALL annotation fields, especially PDF annotation fields
     broadcast_message = {
         "type": "new_annotation",
         "annotation": {
@@ -6335,13 +6336,32 @@ async def create_annotation(
             "content": annotation.content,
             "author_id": annotation.author_id,
             "created_at": annotation.created_at.isoformat(),
+            "updated_at": annotation.updated_at.isoformat(),
             "article_pmid": annotation.article_pmid,
             "report_id": annotation.report_id,
             "analysis_id": annotation.analysis_id,
+            "collection_id": annotation.collection_id,
             "note_type": annotation.note_type,
             "priority": annotation.priority,
             "status": annotation.status,
-            "tags": tags
+            "parent_annotation_id": annotation.parent_annotation_id,
+            "related_pmids": related_pmids,
+            "tags": tags,
+            "action_items": action_items,
+            "exploration_session_id": annotation.exploration_session_id,
+            "research_question": annotation.research_question,
+            "is_private": annotation.is_private,
+            # ✅ CRITICAL: Include PDF annotation fields
+            "pdf_page": annotation.pdf_page,
+            "pdf_coordinates": pdf_coordinates,
+            "highlight_color": annotation.highlight_color,
+            "highlight_text": annotation.highlight_text,
+            # ✅ CRITICAL: Include advanced PDF annotation fields
+            "annotation_type": annotation.annotation_type,
+            "sticky_note_position": annotation.sticky_note_position,
+            "sticky_note_color": annotation.sticky_note_color,
+            "text_formatting": annotation.text_formatting,
+            "drawing_data": annotation.drawing_data
         }
     }
     
