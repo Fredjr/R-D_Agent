@@ -1,11 +1,25 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { MagnifyingGlassIcon, FunnelIcon, AdjustmentsHorizontalIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import { useSearchParams, useRouter } from 'next/navigation';
+import {
+  MagnifyingGlassIcon,
+  FunnelIcon,
+  AdjustmentsHorizontalIcon,
+  DocumentTextIcon,
+  GlobeAltIcon,
+  FolderPlusIcon,
+  BookmarkIcon
+} from '@heroicons/react/24/outline';
 import { PageHeader } from '@/components/ui/Navigation';
 import { Button } from '@/components/ui/Button';
 import { MobileResponsiveLayout } from '@/components/ui/MobileResponsiveLayout';
+import { UnifiedHeroSection, HeroAction } from '@/components/ui/UnifiedHeroSection';
+import { UnifiedSearchBar, SearchQuickActions, SearchQuickActionPresets } from '@/components/ui/UnifiedSearchBar';
+import { QuickActionsFAB } from '@/components/ui/QuickActionsFAB';
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
+import { ContextualHelp } from '@/components/ui/ContextualHelp';
+import { SuggestedNextSteps } from '@/components/ui/SuggestedNextSteps';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWeeklyMixIntegration } from '@/hooks/useWeeklyMixIntegration';
 import dynamic from 'next/dynamic';
@@ -37,6 +51,7 @@ interface SearchResult {
 
 function SearchPageContent() {
   const { user } = useAuth();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [query, setQuery] = useState(searchParams?.get('q') || '');
 
@@ -416,37 +431,70 @@ function SearchPageContent() {
     }
   };
 
+  // Hero actions for search page
+  const heroActions: HeroAction[] = [
+    {
+      id: 'add-to-project',
+      title: 'Add to Project',
+      description: 'Save papers to your research projects',
+      icon: FolderPlusIcon,
+      gradient: 'from-blue-500 to-cyan-600',
+      onClick: () => {
+        if (results.length > 0) {
+          const firstArticle = results.find(r => r.type === 'article');
+          if (firstArticle) {
+            setSelectedArticleForAction(firstArticle);
+            setShowAddToProjectModal(true);
+          }
+        }
+      },
+      disabled: results.length === 0
+    },
+    {
+      id: 'create-collection',
+      title: 'Create Collection',
+      description: 'Organize papers into collections',
+      icon: BookmarkIcon,
+      gradient: 'from-green-500 to-emerald-600',
+      onClick: () => router.push('/collections?action=create')
+    },
+    {
+      id: 'explore-network',
+      title: 'Explore Network',
+      description: 'Visualize paper connections',
+      icon: GlobeAltIcon,
+      gradient: 'from-purple-500 to-indigo-600',
+      onClick: () => router.push('/explore/network')
+    }
+  ];
+
   return (
     <MobileResponsiveLayout>
       <div className="w-full max-w-none py-6 sm:py-8">
-        {/* Mobile-friendly header */}
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-[var(--spotify-white)] mb-2">Search</h1>
-          <p className="text-[var(--spotify-light-text)] text-sm sm:text-base">
-            Search millions of biomedical research articles from PubMed
-          </p>
+        {/* Breadcrumbs */}
+        <div className="mb-4">
+          <Breadcrumbs />
         </div>
 
-        {/* Search Input */}
-        <div className="mb-6 sm:mb-8">
-          <div className="relative w-full">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <MagnifyingGlassIcon className="h-5 w-5 text-[var(--spotify-muted-text)]" />
-            </div>
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch(query)}
-              placeholder="Search PubMed articles, PMIDs, DOIs..."
-              className="block w-full pl-10 pr-3 py-3 bg-[var(--spotify-dark-gray)] border border-[var(--spotify-border-gray)] rounded-lg text-[var(--spotify-white)] placeholder-[var(--spotify-muted-text)] focus:outline-none focus:ring-2 focus:ring-[var(--spotify-green)] focus:border-transparent text-sm sm:text-base"
-              autoComplete="off"
-              data-1p-ignore
-              data-lpignore="true"
-              data-form-type="other"
-            />
-          </div>
-          
+        {/* Unified Hero Section */}
+        <UnifiedHeroSection
+          emoji="🔍"
+          title="Search Research Papers"
+          description="Find papers with intelligent MeSH autocomplete and semantic search"
+          actions={heroActions}
+          proTip="Use MeSH terms for more precise medical literature searches"
+        />
+
+        {/* Unified Search Bar */}
+        <div className="mb-6 sm:mb-8 px-4 sm:px-6">
+          <UnifiedSearchBar
+            context="papers"
+            onSearch={handleSearch}
+            placeholder="Search by title, DOI, PMID, or keywords..."
+            size="lg"
+            showMeSH={true}
+          />
+
           {/* Search Actions */}
           <div className="flex items-center justify-between mt-4">
             <button
@@ -456,17 +504,36 @@ function SearchPageContent() {
               <FunnelIcon className="h-4 w-4 mr-2" />
               Filters
             </button>
-            
-            <Button
-              onClick={() => handleSearch(query)}
-              variant="spotifyPrimary"
-              size="spotifySm"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Searching...' : 'Search'}
-            </Button>
+
+            {isLoading && (
+              <span className="text-sm text-[var(--spotify-light-text)]">
+                Searching...
+              </span>
+            )}
           </div>
         </div>
+
+        {/* Quick Actions */}
+        {!isLoading && results.length === 0 && !query && (
+          <div className="mb-8 px-4 sm:px-6 space-y-6">
+            <div>
+              <h3 className="text-lg font-semibold text-[var(--spotify-white)] mb-4">
+                Quick Start
+              </h3>
+              <SearchQuickActions actions={SearchQuickActionPresets.papers(router)} />
+            </div>
+
+            {/* Suggested Next Steps */}
+            <SuggestedNextSteps context="empty-state" />
+          </div>
+        )}
+
+        {/* Suggested Next Steps after search */}
+        {!isLoading && results.length > 0 && (
+          <div className="mb-8 px-4 sm:px-6">
+            <SuggestedNextSteps context="after-search" />
+          </div>
+        )}
 
         {/* Filters Panel */}
         {showFilters && (
@@ -630,7 +697,17 @@ function SearchPageContent() {
 
                       {/* Action buttons for articles */}
                       {result.type === 'article' && result.metadata.pmid && (
-                        <div className="flex gap-2 mt-4">
+                        <div className="flex flex-wrap gap-2 mt-4">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/explore/network?pmid=${result.metadata.pmid}`);
+                            }}
+                            className="inline-flex items-center px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-purple-400 border border-purple-500/30 rounded hover:from-purple-500/30 hover:to-blue-500/30 transition-all"
+                          >
+                            <GlobeAltIcon className="w-4 h-4 mr-1" />
+                            Explore Network
+                          </button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -638,7 +715,7 @@ function SearchPageContent() {
                               setSelectedTitle(result.title);
                               setShowPDFViewer(true);
                             }}
-                            className="inline-flex items-center px-3 py-1 text-xs bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition-colors"
+                            className="inline-flex items-center px-3 py-1.5 text-xs bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition-colors"
                           >
                             <DocumentTextIcon className="w-4 h-4 mr-1" />
                             Read PDF
@@ -648,7 +725,7 @@ function SearchPageContent() {
                               e.stopPropagation();
                               handleAddToProject(result);
                             }}
-                            className="px-3 py-1 text-xs bg-[var(--spotify-green)]/20 text-[var(--spotify-green)] rounded hover:bg-[var(--spotify-green)]/30 transition-colors"
+                            className="px-3 py-1.5 text-xs bg-[var(--spotify-green)]/20 text-[var(--spotify-green)] rounded hover:bg-[var(--spotify-green)]/30 transition-colors"
                           >
                             Add to Project
                           </button>
@@ -657,7 +734,7 @@ function SearchPageContent() {
                               e.stopPropagation();
                               handleDeepDive(result);
                             }}
-                            className="px-3 py-1 text-xs bg-[var(--spotify-blue)]/20 text-[var(--spotify-blue)] rounded hover:bg-[var(--spotify-blue)]/30 transition-colors"
+                            className="px-3 py-1.5 text-xs bg-[var(--spotify-blue)]/20 text-[var(--spotify-blue)] rounded hover:bg-[var(--spotify-blue)]/30 transition-colors"
                           >
                             Deep Dive
                           </button>
@@ -838,6 +915,12 @@ function SearchPageContent() {
           />
         )}
       </div>
+
+      {/* Quick Actions FAB */}
+      <QuickActionsFAB />
+
+      {/* Contextual Help */}
+      <ContextualHelp />
     </MobileResponsiveLayout>
   );
 }

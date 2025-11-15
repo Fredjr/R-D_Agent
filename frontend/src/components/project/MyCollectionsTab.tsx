@@ -19,6 +19,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useGlobalCollectionSync, type Collection } from '@/hooks/useGlobalCollectionSync';
 import CollectionArticles from '@/components/CollectionArticles';
 import MultiColumnNetworkView from '@/components/MultiColumnNetworkView';
+import {
+  SpotifyTabSection,
+  SpotifyTabCard,
+  SpotifyTabCardHeader,
+  SpotifyTabCardContent,
+  SpotifyTabButton,
+  SpotifyTabSearchBar,
+  SpotifyTabEmptyState,
+  SpotifyTabLoading
+} from './shared';
 
 interface MyCollectionsTabProps {
   projectId: string;
@@ -222,115 +232,115 @@ export function MyCollectionsTab({ projectId, onRefresh, onCreateCollection }: M
 
   // Loading state
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading collections...</p>
-        </div>
-      </div>
-    );
+    return <SpotifyTabLoading message="Loading collections..." />;
   }
 
   // Error state
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-red-900 mb-2">Error loading collections</h3>
-        <p className="text-red-700">{error}</p>
-        <button
-          onClick={() => refreshCollections()}
-          className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-        >
-          Try Again
-        </button>
-      </div>
+      <SpotifyTabCard variant="default">
+        <div className="p-6">
+          <h3 className="text-lg font-semibold text-red-400 mb-2">Error loading collections</h3>
+          <p className="text-red-300 mb-4">{error}</p>
+          <SpotifyTabButton
+            variant="danger"
+            onClick={() => refreshCollections()}
+          >
+            Try Again
+          </SpotifyTabButton>
+        </div>
+      </SpotifyTabCard>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <SpotifyTabSection>
       {/* Header with Actions */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">My Collections</h2>
-          <p className="text-gray-600">
-            {collections.length} collection{collections.length !== 1 ? 's' : ''}
-            {filteredCollections.length !== collections.length && ` • ${filteredCollections.length} shown`}
-          </p>
-        </div>
+      <SpotifyTabCard variant="gradient" gradient="from-green-500/10 to-emerald-500/10">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="text-2xl font-bold text-[var(--spotify-white)]">My Collections</h2>
+            <p className="text-[var(--spotify-light-text)]">
+              {collections.length} collection{collections.length !== 1 ? 's' : ''}
+              {filteredCollections.length !== collections.length && ` • ${filteredCollections.length} shown`}
+            </p>
+          </div>
 
-        <div className="flex items-center gap-2">
-          {bulkMode && (
-            <>
-              <button
-                onClick={() => {
-                  setBulkMode(false);
-                  setSelectedCollections(new Set());
-                }}
-                className="px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleBulkDelete}
-                disabled={selectedCollections.size === 0}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-              >
-                <TrashIcon className="w-4 h-4" />
-                Delete ({selectedCollections.size})
-              </button>
-            </>
-          )}
+          <div className="flex items-center gap-2">
+            {bulkMode && (
+              <>
+                <SpotifyTabButton
+                  variant="ghost"
+                  onClick={() => {
+                    setBulkMode(false);
+                    setSelectedCollections(new Set());
+                  }}
+                >
+                  Cancel
+                </SpotifyTabButton>
+                <SpotifyTabButton
+                  variant="danger"
+                  onClick={handleBulkDelete}
+                  disabled={selectedCollections.size === 0}
+                >
+                  <TrashIcon className="w-4 h-4" />
+                  Delete ({selectedCollections.size})
+                </SpotifyTabButton>
+              </>
+            )}
 
-          {!bulkMode && (
-            <>
-              <button
-                onClick={() => setBulkMode(true)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Select
-              </button>
-              <button
-                onClick={onCreateCollection}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-              >
-                <PlusIcon className="w-4 h-4" />
-                New Collection
-              </button>
-            </>
-          )}
+            {!bulkMode && (
+              <>
+                <SpotifyTabButton
+                  variant="secondary"
+                  onClick={() => setBulkMode(true)}
+                >
+                  Select
+                </SpotifyTabButton>
+                <SpotifyTabButton
+                  variant="primary"
+                  onClick={onCreateCollection}
+                >
+                  <PlusIcon className="w-4 h-4" />
+                  New Collection
+                </SpotifyTabButton>
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      </SpotifyTabCard>
 
       {/* Search and Filters */}
       <div className="flex items-center gap-4 flex-wrap">
         {/* Search */}
         <div className="flex-1 min-w-[300px]">
-          <div className="relative">
-            <MagnifyingGlassIcon className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search collections..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
+          <SpotifyTabSearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search collections..."
+          />
         </div>
 
         {/* View Mode Toggle */}
-        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+        <div className="flex items-center gap-1 bg-[var(--spotify-dark-gray)] rounded-lg p-1">
           <button
             onClick={() => setViewMode('grid')}
-            className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white shadow' : 'text-gray-600'}`}
+            className={`p-2 rounded transition-colors ${
+              viewMode === 'grid'
+                ? 'bg-[var(--spotify-medium-gray)] text-[var(--spotify-white)]'
+                : 'text-[var(--spotify-light-text)] hover:text-[var(--spotify-white)]'
+            }`}
             title="Grid view"
           >
             <Squares2X2Icon className="w-5 h-5" />
           </button>
           <button
             onClick={() => setViewMode('list')}
-            className={`p-2 rounded ${viewMode === 'list' ? 'bg-white shadow' : 'text-gray-600'}`}
+            className={`p-2 rounded transition-colors ${
+              viewMode === 'list'
+                ? 'bg-[var(--spotify-medium-gray)] text-[var(--spotify-white)]'
+                : 'text-[var(--spotify-light-text)] hover:text-[var(--spotify-white)]'
+            }`}
             title="List view"
           >
             <ListBulletIcon className="w-5 h-5" />
@@ -338,86 +348,80 @@ export function MyCollectionsTab({ projectId, onRefresh, onCreateCollection }: M
         </div>
 
         {/* Filters Toggle */}
-        <button
+        <SpotifyTabButton
+          variant={showFilters ? 'primary' : 'secondary'}
           onClick={() => setShowFilters(!showFilters)}
-          className={`px-4 py-2 border rounded-lg transition-colors flex items-center gap-2 ${
-            showFilters ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50'
-          }`}
         >
           <FunnelIcon className="w-4 h-4" />
           Filters
-        </button>
+        </SpotifyTabButton>
       </div>
 
       {/* Filter Panel */}
       {showFilters && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Sort By */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortBy)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="recent">Most Recent</option>
-                <option value="name">Name (A-Z)</option>
-                <option value="size">Size (Largest First)</option>
-              </select>
-            </div>
+        <SpotifyTabCard>
+          <SpotifyTabCardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Sort By */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--spotify-white)] mb-2">Sort By</label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortBy)}
+                  className="w-full px-3 py-2 bg-[var(--spotify-dark-gray)] border border-[var(--spotify-border-gray)] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-[var(--spotify-white)]"
+                >
+                  <option value="recent">Most Recent</option>
+                  <option value="name">Name (A-Z)</option>
+                  <option value="size">Size (Largest First)</option>
+                </select>
+              </div>
 
-            {/* Size Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Size</label>
-              <select
-                value={sizeFilter}
-                onChange={(e) => setSizeFilter(e.target.value as SizeFilter)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Sizes</option>
-                <option value="small">Small (&lt; 5 papers)</option>
-                <option value="medium">Medium (5-19 papers)</option>
-                <option value="large">Large (20+ papers)</option>
-              </select>
+              {/* Size Filter */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--spotify-white)] mb-2">Size</label>
+                <select
+                  value={sizeFilter}
+                  onChange={(e) => setSizeFilter(e.target.value as SizeFilter)}
+                  className="w-full px-3 py-2 bg-[var(--spotify-dark-gray)] border border-[var(--spotify-border-gray)] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-[var(--spotify-white)]"
+                >
+                  <option value="all">All Sizes</option>
+                  <option value="small">Small (&lt; 5 papers)</option>
+                  <option value="medium">Medium (5-19 papers)</option>
+                  <option value="large">Large (20+ papers)</option>
+                </select>
+              </div>
             </div>
-          </div>
-        </div>
+          </SpotifyTabCardContent>
+        </SpotifyTabCard>
       )}
 
       {/* Collections Display */}
       {filteredCollections.length === 0 && collections.length === 0 ? (
         // Empty state
-        <div className="text-center py-16">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <FolderIcon className="w-8 h-8 text-gray-400" />
-          </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No collections yet</h3>
-          <p className="text-gray-600 mb-6">Create your first collection to start organizing papers</p>
-          <button
-            onClick={onCreateCollection}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center gap-2"
-          >
-            <PlusIcon className="w-5 h-5" />
-            Create Collection
-          </button>
-        </div>
+        <SpotifyTabEmptyState
+          icon={<FolderIcon />}
+          title="No collections yet"
+          description="Create your first collection to start organizing papers"
+          action={onCreateCollection ? {
+            label: 'Create Collection',
+            onClick: onCreateCollection,
+            icon: <PlusIcon className="w-5 h-5" />
+          } : undefined}
+        />
       ) : filteredCollections.length === 0 ? (
         // No results
-        <div className="text-center py-16">
-          <MagnifyingGlassIcon className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No collections found</h3>
-          <p className="text-gray-600 mb-4">Try adjusting your search or filters</p>
-          <button
-            onClick={() => {
+        <SpotifyTabEmptyState
+          icon={<MagnifyingGlassIcon />}
+          title="No collections found"
+          description="Try adjusting your search or filters"
+          action={{
+            label: 'Clear filters',
+            onClick: () => {
               setSearchQuery('');
               setSizeFilter('all');
-            }}
-            className="text-blue-600 hover:text-blue-700 font-medium"
-          >
-            Clear filters
-          </button>
-        </div>
+            }
+          }}
+        />
       ) : viewMode === 'grid' ? (
         // Grid View
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -430,8 +434,8 @@ export function MyCollectionsTab({ projectId, onRefresh, onCreateCollection }: M
               <div
                 key={collection.collection_id}
                 onClick={() => handleCollectionClick(collection)}
-                className={`bg-white rounded-lg border-2 shadow-sm hover:shadow-md transition-all cursor-pointer ${
-                  isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                className={`bg-[var(--spotify-dark-gray)] rounded-lg border-2 shadow-sm hover:shadow-md transition-all cursor-pointer ${
+                  isSelected ? 'border-blue-500 bg-blue-500/10' : 'border-[var(--spotify-border-gray)] hover:border-[var(--spotify-light-text)]'
                 }`}
               >
                 {/* Collection Card Header */}
@@ -454,21 +458,21 @@ export function MyCollectionsTab({ projectId, onRefresh, onCreateCollection }: M
                     )}
                   </div>
 
-                  <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2">
+                  <h3 className="text-lg font-bold text-[var(--spotify-white)] mb-2 line-clamp-2">
                     {collection.collection_name}
                   </h3>
 
                   {collection.description && (
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                    <p className="text-sm text-[var(--spotify-light-text)] mb-4 line-clamp-2">
                       {collection.description}
                     </p>
                   )}
 
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">
+                    <span className="text-[var(--spotify-light-text)]">
                       {collection.article_count || 0} paper{collection.article_count !== 1 ? 's' : ''}
                     </span>
-                    <span className="text-gray-500">
+                    <span className="text-[var(--spotify-light-text)] opacity-70">
                       {new Date(collection.created_at).toLocaleDateString()}
                     </span>
                   </div>
@@ -476,7 +480,7 @@ export function MyCollectionsTab({ projectId, onRefresh, onCreateCollection }: M
 
                 {/* Collection Card Actions */}
                 {!bulkMode && (
-                  <div className="border-t border-gray-200 px-6 py-3 flex items-center justify-between bg-gray-50">
+                  <div className="border-t border-[var(--spotify-border-gray)] px-6 py-3 flex items-center justify-between bg-[var(--spotify-black)]">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -637,7 +641,7 @@ export function MyCollectionsTab({ projectId, onRefresh, onCreateCollection }: M
           </div>
         </div>
       )}
-    </div>
+    </SpotifyTabSection>
   );
 }
 

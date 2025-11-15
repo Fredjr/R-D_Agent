@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { validateObject, userProfileRules, formatValidationErrors } from '@/lib/validation';
 import { StepIndicator } from '@/components/onboarding/StepIndicator';
 import { Step2ResearchInterests } from '@/components/onboarding/Step2ResearchInterests';
+import { Step3FirstAction, FirstActionType } from '@/components/onboarding/Step3FirstAction';
 import { inferInterestsFromProfile } from '@/lib/interest-inference';
 
 const CATEGORY_ROLES = {
@@ -44,7 +45,8 @@ export default function CompleteProfile() {
     careerStage: ''
   });
 
-  // Step 3: Completion state
+  // Step 3: First Action selection
+  const [selectedFirstAction, setSelectedFirstAction] = useState<FirstActionType | null>(null);
   const [wantsTour, setWantsTour] = useState<boolean | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -141,10 +143,9 @@ export default function CompleteProfile() {
     setCurrentStep(3);
   };
 
-  const handleCompleteOnboarding = async (takeTour: boolean) => {
+  const handleCompleteOnboarding = async () => {
     setIsLoading(true);
     setError(null);
-    setWantsTour(takeTour);
 
     try {
       // Prepare data for backend
@@ -164,20 +165,32 @@ export default function CompleteProfile() {
         join_mailing_list: formData.joinMailingList,
         preferences: {
           research_interests: researchInterests,
-          wants_product_tour: takeTour,
+          first_action: selectedFirstAction,
           onboarding_completed: true,
           onboarding_completed_at: new Date().toISOString(),
-          onboarding_version: '2.0' // Track new simplified onboarding
+          onboarding_version: '3.0' // Track new onboarding with first action
         }
       });
 
-      // Redirect based on user choice
-      if (takeTour) {
-        // Redirect to dashboard with welcome banner and tour requested flag
-        router.push('/dashboard?welcome=true&tour_requested=true');
-      } else {
-        // Redirect to dashboard with welcome banner
-        router.push('/dashboard?welcome=true');
+      // Redirect based on first action selection
+      switch (selectedFirstAction) {
+        case 'network':
+          router.push('/explore/network?onboarding=true');
+          break;
+        case 'search':
+          router.push('/search');
+          break;
+        case 'project':
+          router.push('/project/new');
+          break;
+        case 'trending':
+          router.push('/discover');
+          break;
+        case 'skip':
+          router.push('/home');
+          break;
+        default:
+          router.push('/home');
       }
     } catch (error: any) {
       setError(error.message || 'Registration failed. Please try again.');
@@ -381,20 +394,6 @@ export default function CompleteProfile() {
             </label>
           </div>
 
-          {/* Mailing List Checkbox */}
-          <div className="flex items-start gap-3">
-            <input
-              id="joinMailingList"
-              type="checkbox"
-              checked={formData.joinMailingList}
-              onChange={(e) => handleInputChange('joinMailingList', e.target.checked)}
-              className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <label htmlFor="joinMailingList" className="text-sm text-gray-700">
-              Join our mailing list for updates about new features and research insights
-            </label>
-          </div>
-
           {/* Navigation Buttons */}
           <div className="flex justify-end pt-6 border-t border-gray-200">
             <button
@@ -436,97 +435,15 @@ export default function CompleteProfile() {
           </div>
         )}
 
-        {/* Step 3: Completion Screen */}
+        {/* Step 3: First Action */}
         {currentStep === 3 && (
-          <div className="space-y-8 py-8">
-            {/* Success Icon */}
-            <div className="flex justify-center">
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
-                <CheckCircleIcon className="w-12 h-12 text-green-600" />
-              </div>
-            </div>
-
-            {/* Success Message */}
-            <div className="text-center space-y-3">
-              <h2 className="text-3xl font-bold text-gray-900">
-                🎉 Your Account is Ready!
-              </h2>
-              <p className="text-lg text-gray-600">
-                Welcome to R&D Agent, {formData.firstName}!
-              </p>
-              <p className="text-gray-500 max-w-2xl mx-auto">
-                You're all set to start exploring research papers, organizing your work, and discovering insights.
-              </p>
-            </div>
-
-            {/* Tour Options */}
-            <div className="max-w-3xl mx-auto space-y-4">
-              <h3 className="text-center text-lg font-semibold text-gray-900 mb-6">
-                Would you like a quick tour?
-              </h3>
-
-              {/* Option 1: Take Tour */}
-              <button
-                onClick={() => handleCompleteOnboarding(true)}
-                disabled={isLoading}
-                className="w-full p-6 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
-                      <SparklesIcon className="w-7 h-7" />
-                    </div>
-                    <div className="text-left">
-                      <div className="text-lg font-semibold">Yes, show me around!</div>
-                      <div className="text-sm text-blue-100">
-                        5-minute interactive tour of key features
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-2xl">→</div>
-                </div>
-              </button>
-
-              {/* Option 2: Skip Tour */}
-              <button
-                onClick={() => handleCompleteOnboarding(false)}
-                disabled={isLoading}
-                className="w-full p-6 bg-white hover:bg-gray-50 border-2 border-gray-300 hover:border-gray-400 text-gray-700 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <RocketLaunchIcon className="w-7 h-7 text-gray-600" />
-                    </div>
-                    <div className="text-left">
-                      <div className="text-lg font-semibold">No thanks, let me explore</div>
-                      <div className="text-sm text-gray-500">
-                        Jump straight to your dashboard
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-2xl">→</div>
-                </div>
-              </button>
-
-              {/* Help Text */}
-              <p className="text-center text-sm text-gray-500 pt-4">
-                Don't worry - you can always access the tour later from Settings
-              </p>
-            </div>
-
-            {/* Back Button */}
-            <div className="flex justify-center pt-6">
-              <button
-                type="button"
-                onClick={handleBack}
-                disabled={isLoading}
-                className="text-gray-600 hover:text-gray-800 text-sm font-medium disabled:opacity-50"
-              >
-                ← Back
-              </button>
-            </div>
-          </div>
+          <Step3FirstAction
+            selectedAction={selectedFirstAction}
+            onSelectAction={setSelectedFirstAction}
+            onBack={handleBack}
+            onComplete={handleCompleteOnboarding}
+            hasTopics={researchInterests.topics.length > 0}
+          />
         )}
 
         {/* Loading Overlay */}

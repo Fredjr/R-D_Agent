@@ -2,7 +2,17 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { PlusIcon, FolderIcon, UsersIcon, CalendarIcon, BeakerIcon, UserIcon, MusicalNoteIcon } from '@heroicons/react/24/outline';
+import {
+  PlusIcon,
+  FolderIcon,
+  UsersIcon,
+  CalendarIcon,
+  BeakerIcon,
+  UserIcon,
+  MusicalNoteIcon,
+  MagnifyingGlassIcon,
+  BookmarkIcon
+} from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -20,6 +30,11 @@ import {
   DeletableProjectCard,
   PageHeader
 } from '@/components/ui';
+import { UnifiedHeroSection, HeroAction } from '@/components/ui/UnifiedHeroSection';
+import { QuickActionsFAB } from '@/components/ui/QuickActionsFAB';
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
+import { ContextualHelp } from '@/components/ui/ContextualHelp';
+import { SuggestedNextSteps } from '@/components/ui/SuggestedNextSteps';
 import { SpotifyTopBar } from '@/components/ui/SpotifyNavigation';
 import { MobileResponsiveLayout } from '@/components/ui/MobileResponsiveLayout';
 import { WelcomeBanner } from '@/components/onboarding/WelcomeBanner';
@@ -49,13 +64,10 @@ function DashboardContent() {
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectDescription, setNewProjectDescription] = useState('');
   const [creating, setCreating] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-  const [projectDetails, setProjectDetails] = useState<any>(null);
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(false);
   const [tourRequested, setTourRequested] = useState(false);
 
   console.log('📊 Dashboard page initialized');
-  const [loadingDetails, setLoadingDetails] = useState(false);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -121,29 +133,6 @@ function DashboardContent() {
       return () => clearTimeout(timer);
     }
   }, [error]);
-
-  const fetchProjectDetails = async (projectId: string) => {
-    setLoadingDetails(true);
-    try {
-      const user_id = user?.email || 'default_user';
-      const response = await fetch(`/api/proxy/projects/${projectId}`, {
-        headers: {
-          'User-ID': user_id,
-          'Content-Type': 'application/json',
-        },
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch project details');
-      }
-      const details = await response.json();
-      setProjectDetails(details);
-    } catch (error) {
-      console.error('Error fetching project details:', error);
-      setError('Failed to load project details');
-    } finally {
-      setLoadingDetails(false);
-    }
-  };
 
   const fetchProjects = async () => {
     try {
@@ -262,41 +251,45 @@ function DashboardContent() {
           />
         )}
 
-        {/* Mobile-friendly header */}
-        <div className="mb-6 sm:mb-8">
-          <div className="flex flex-col gap-4 mb-6">
-            <div className="min-w-0 flex-1">
-              <h1 className="text-2xl sm:text-3xl font-bold text-[var(--spotify-white)] mb-2">Research Projects</h1>
-              <p className="text-[var(--spotify-light-text)] text-sm sm:text-base">
-                Manage your research projects and collaborate with your team
-              </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Link href="/discover" className="w-full sm:w-auto">
-                <Button variant="outline" className="inline-flex items-center justify-center w-full">
-                  <MusicalNoteIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                  Discover Papers
-                </Button>
-              </Link>
-              <Link href="/" className="w-full sm:w-auto">
-                <Button variant="outline" className="inline-flex items-center justify-center w-full">
-                  <BeakerIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                  Research Hub
-                </Button>
-              </Link>
-              <Button
-                onClick={() => setShowCreateModal(true)}
-                variant="spotifyPrimary"
-                size="spotifyDefault"
-                className="inline-flex items-center justify-center w-full sm:w-auto"
-              >
-                <PlusIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                New Project
-              </Button>
-            </div>
-          </div>
+        {/* Breadcrumbs */}
+        <div className="mb-4">
+          <Breadcrumbs />
         </div>
+
+        {/* Unified Hero Section */}
+        <UnifiedHeroSection
+          emoji="📊"
+          title="Your Projects"
+          description="Manage your research projects and track progress"
+          actions={[
+            {
+              id: 'new-project',
+              title: 'New Project',
+              description: 'Start a new research project',
+              icon: PlusIcon,
+              gradient: 'from-blue-500 to-cyan-600',
+              onClick: () => setShowCreateModal(true),
+              badge: 'Quick Action'
+            },
+            {
+              id: 'search-papers',
+              title: 'Search Papers',
+              description: 'Find relevant research',
+              icon: MagnifyingGlassIcon,
+              gradient: 'from-purple-500 to-indigo-600',
+              onClick: () => router.push('/search')
+            },
+            {
+              id: 'view-collections',
+              title: 'View Collections',
+              description: 'Browse your paper collections',
+              icon: BookmarkIcon,
+              gradient: 'from-green-500 to-emerald-600',
+              onClick: () => router.push('/collections')
+            }
+          ]}
+          proTip="Projects help you organize papers, notes, and analyses for specific research goals"
+        />
 
         {/* Error Display */}
         {error && (
@@ -351,190 +344,13 @@ function DashboardContent() {
                 lastUpdated={formatDate(project.updated_at)}
                 reportCount={0} // TODO: Add report count from API
                 projectId={project.project_id}
-                onClick={() => {
-                  setSelectedProject(project);
-                  fetchProjectDetails(project.project_id);
-                }}
+                onClick={() => router.push(`/project/${project.project_id}`)}
                 onDelete={() => {
                   // Refresh the projects list after deletion
                   fetchProjects();
-                  setSelectedProject(null);
                 }}
               />
             ))}
-          </div>
-        )}
-
-        {/* Project Detail Modal */}
-        {selectedProject && (
-          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
-            <div className="bg-[var(--spotify-dark-gray)] rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-[var(--spotify-border-gray)]">
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-6">
-                  <div className="flex-1">
-                    <h2 className="text-2xl font-bold text-[var(--spotify-white)] mb-2">{selectedProject.project_name}</h2>
-                    <p className="text-[var(--spotify-light-text)] mb-4">{selectedProject.description || 'No description provided'}</p>
-                    
-                    <div className="flex items-center gap-6 text-sm text-gray-500">
-                      <div className="flex items-center">
-                        <CalendarIcon className="h-4 w-4 mr-1" />
-                        Created {formatDate(selectedProject.created_at)}
-                      </div>
-                      <div className="flex items-center">
-                        <UserIcon className="h-4 w-4 mr-1" />
-                        Project ID: {selectedProject.project_id}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <button
-                    onClick={() => {
-                      setSelectedProject(null);
-                      setProjectDetails(null);
-                    }}
-                    className="ml-4 text-gray-400 hover:text-gray-600"
-                  >
-                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-
-                {/* Main Content */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  {/* Left Column - Main Content */}
-                  <div className="lg:col-span-2 space-y-6">
-                    {/* Reports & Dossiers */}
-                    <div className="bg-[var(--spotify-medium-gray)] rounded-lg p-6 border border-[var(--spotify-border-gray)]">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-[var(--spotify-white)] flex items-center">
-                          <BeakerIcon className="h-5 w-5 mr-2" />
-                          Reports & Dossiers
-                        </h3>
-                        <button
-                          onClick={() => window.location.href = `/project/${selectedProject.project_id}`}
-                          className="px-3 py-1 text-sm bg-[var(--spotify-green)] text-[var(--spotify-black)] rounded hover:bg-[var(--spotify-green-hover)] font-medium transition-colors"
-                        >
-                          New Report
-                        </button>
-                      </div>
-                      {loadingDetails ? (
-                        <div className="text-center py-8">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--spotify-green)] mx-auto"></div>
-                          <p className="text-[var(--spotify-light-text)] mt-2">Loading reports...</p>
-                        </div>
-                      ) : projectDetails?.reports?.length > 0 ? (
-                        <div className="space-y-3">
-                          {projectDetails.reports.map((report: any, index: number) => (
-                            <div key={index} className="bg-white p-4 rounded border">
-                              <h4 className="font-medium text-gray-900">{report.title || `Report ${index + 1}`}</h4>
-                              <p className="text-sm text-gray-600 mt-1">{report.summary || 'No summary available'}</p>
-                              <p className="text-xs text-gray-500 mt-2">Created: {report.created_at ? formatDate(report.created_at) : 'Unknown'}</p>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center py-8 text-gray-500">
-                          <BeakerIcon className="h-12 w-12 mx-auto mb-2 text-gray-400" />
-                          <p>No reports created yet</p>
-                          <p className="text-sm">Create your first research report to get started</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Annotations */}
-                    <div className="bg-gray-50 rounded-lg p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                          <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                          </svg>
-                          Annotations
-                        </h3>
-                        <button 
-                          onClick={() => window.location.href = `/project/${selectedProject.project_id}`}
-                          className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
-                        >
-                          Add Note
-                        </button>
-                      </div>
-                      {loadingDetails ? (
-                        <div className="text-center py-8">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
-                          <p className="text-gray-500 mt-2">Loading annotations...</p>
-                        </div>
-                      ) : projectDetails?.annotations?.length > 0 ? (
-                        <div className="space-y-3">
-                          {projectDetails.annotations.map((annotation: any, index: number) => (
-                            <div key={index} className="bg-white p-4 rounded border">
-                              <p className="text-sm text-gray-900">{annotation.content || annotation.text}</p>
-                              <p className="text-xs text-gray-500 mt-2">Added: {annotation.created_at ? formatDate(annotation.created_at) : 'Unknown'}</p>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center py-8 text-gray-500">
-                          <svg className="h-12 w-12 mx-auto mb-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                          </svg>
-                          <p>No annotations yet</p>
-                          <p className="text-sm">Add research notes and annotations</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Right Column - Sidebar */}
-                  <div className="space-y-6">
-                    {/* Project Info */}
-                    <div className="bg-[var(--spotify-medium-gray)] rounded-lg p-6 border border-[var(--spotify-border-gray)]">
-                      <h4 className="text-lg font-semibold text-[var(--spotify-white)] mb-4">Project Details</h4>
-                      <div className="space-y-3 text-sm">
-                        <div>
-                          <span className="font-medium text-[var(--spotify-light-text)]">Status:</span>
-                          <span className="ml-2 px-2 py-1 bg-[var(--spotify-green)] text-[var(--spotify-black)] rounded-full text-xs font-medium">
-                            Active
-                          </span>
-                        </div>
-                        <div>
-                          <span className="font-medium text-[var(--spotify-light-text)]">Created:</span>
-                          <span className="ml-2 text-[var(--spotify-white)]">{formatDate(selectedProject.created_at)}</span>
-                        </div>
-                        <div>
-                          <span className="font-medium text-[var(--spotify-light-text)]">Last Updated:</span>
-                          <span className="ml-2 text-[var(--spotify-white)]">{formatDate(selectedProject.updated_at)}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Quick Actions */}
-                    <div className="bg-[var(--spotify-medium-gray)] rounded-lg p-6 border border-[var(--spotify-border-gray)]">
-                      <h4 className="text-lg font-semibold text-[var(--spotify-white)] mb-4">Quick Actions</h4>
-                      <div className="space-y-2">
-                        <Link
-                          href={`/project/${selectedProject.project_id}`}
-                          className="block w-full text-left px-3 py-2 text-sm bg-[var(--spotify-blue)]/10 text-[var(--spotify-blue)] rounded hover:bg-[var(--spotify-blue)]/20 transition-colors"
-                        >
-                          Open Project Workspace
-                        </Link>
-                        <button
-                          onClick={() => window.location.href = `/project/${selectedProject.project_id}`}
-                          className="w-full text-left px-3 py-2 text-sm bg-[var(--spotify-green)]/10 text-[var(--spotify-green)] rounded hover:bg-[var(--spotify-green)]/20 transition-colors"
-                        >
-                          Generate Summary Report
-                        </button>
-                        <button
-                          onClick={() => window.location.href = `/project/${selectedProject.project_id}`}
-                          className="w-full text-left px-3 py-2 text-sm bg-[var(--spotify-purple)]/10 text-[var(--spotify-purple)] rounded hover:bg-[var(--spotify-purple)]/20 transition-colors"
-                        >
-                          Invite Collaborators
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         )}
 
@@ -600,7 +416,20 @@ function DashboardContent() {
             </div>
           </div>
         )}
+
+        {/* Suggested Next Steps for empty state */}
+        {projects.length === 0 && !loading && (
+          <div className="px-4 sm:px-6 mt-8">
+            <SuggestedNextSteps context="after-create-project" />
+          </div>
+        )}
       </div>
+
+      {/* Quick Actions FAB */}
+      <QuickActionsFAB onCreateProject={() => setShowCreateModal(true)} />
+
+      {/* Contextual Help */}
+      <ContextualHelp />
     </MobileResponsiveLayout>
   );
 }

@@ -116,17 +116,7 @@ export const SpotifyTopBar: React.FC<SpotifyTopBarProps> = ({
             <RectangleStackIcon className="w-4 h-4 inline mr-1" />
             Dashboard
           </button>
-          <button
-            onClick={() => router.push('/discover')}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-              pathname === '/discover'
-                ? 'bg-white text-black'
-                : 'bg-[var(--spotify-dark-gray)] text-white hover:bg-[var(--spotify-medium-gray)]'
-            }`}
-          >
-            <MusicalNoteIcon className="w-4 h-4 inline mr-1" />
-            Discover
-          </button>
+          {/* Removed Discover button - merged into Home page */}
           <button
             onClick={() => router.push('/collections')}
             className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${

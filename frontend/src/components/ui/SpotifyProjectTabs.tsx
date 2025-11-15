@@ -37,18 +37,18 @@ export function SpotifyProjectTabs({
               data-active={activeTab === tab.id}
               onClick={() => onTabChange(tab.id)}
               className={cn(
-                "flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+                "flex-shrink-0 px-6 py-4 text-base font-medium border-b-4 transition-colors whitespace-nowrap min-h-[56px]",
                 activeTab === tab.id
                   ? "text-[var(--spotify-white)] border-[var(--spotify-green)]"
                   : "text-[var(--spotify-light-text)] border-transparent hover:text-[var(--spotify-white)]"
               )}
             >
-              <div className="flex items-center space-x-2">
-                {tab.icon && <span className="text-base">{tab.icon}</span>}
-                <span>{tab.label}</span>
+              <div className="flex items-center space-x-3">
+                {tab.icon && <span className="text-2xl">{tab.icon}</span>}
+                <span className="text-base">{tab.label}</span>
                 {tab.count !== undefined && (
                   <span className={cn(
-                    "px-2 py-0.5 rounded-full text-xs",
+                    "px-2.5 py-1 rounded-full text-xs font-medium",
                     activeTab === tab.id
                       ? "bg-[var(--spotify-green)] text-black"
                       : "bg-[var(--spotify-dark-gray)] text-[var(--spotify-light-text)]"
@@ -73,17 +73,17 @@ export function SpotifyProjectTabs({
               data-active={activeTab === tab.id}
               onClick={() => onTabChange(tab.id)}
               className={cn(
-                "flex items-center space-x-3 px-1 py-4 text-sm font-medium border-b-2 transition-colors",
+                "flex items-center space-x-4 px-2 py-5 text-base font-medium border-b-4 transition-colors min-h-[60px] lg:text-lg xl:text-xl",
                 activeTab === tab.id
                   ? "text-[var(--spotify-white)] border-[var(--spotify-green)]"
                   : "text-[var(--spotify-light-text)] border-transparent hover:text-[var(--spotify-white)]"
               )}
             >
-              {tab.icon && <span className="text-lg">{tab.icon}</span>}
-              <span>{tab.label}</span>
+              {tab.icon && <span className="text-3xl lg:text-4xl">{tab.icon}</span>}
+              <span className="lg:text-lg xl:text-xl">{tab.label}</span>
               {tab.count !== undefined && (
                 <span className={cn(
-                  "px-2 py-1 rounded-full text-xs font-medium",
+                  "px-2.5 py-1 rounded-full text-xs font-medium lg:text-sm",
                   activeTab === tab.id
                     ? "bg-[var(--spotify-green)] text-black"
                     : "bg-[var(--spotify-dark-gray)] text-[var(--spotify-light-text)]"

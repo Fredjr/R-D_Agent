@@ -6,6 +6,7 @@ import { ArrowLeftIcon, BeakerIcon, ChatBubbleLeftRightIcon, DocumentTextIcon } 
 import { type Collection } from '@/hooks/useGlobalCollectionSync';
 import MultiColumnNetworkView from './MultiColumnNetworkView';
 import { AnnotationList } from './annotations';
+import SmartAnnotationList from './annotations/SmartAnnotationList';
 import dynamic from 'next/dynamic';
 
 // Dynamically import PDFViewer to avoid SSR issues
@@ -48,6 +49,7 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
   const { user } = useAuth();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
+  const [annotations, setAnnotations] = useState<any[]>([]);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [showNetworkExploration, setShowNetworkExploration] = useState(false);
 
@@ -58,6 +60,7 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
 
   useEffect(() => {
     fetchArticles();
+    fetchAnnotations();
   }, [collection.collection_id]);
 
   const fetchArticles = async () => {
@@ -77,6 +80,29 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
       console.error('Error fetching articles:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAnnotations = async () => {
+    try {
+      // ✅ NEW: Use collection_id filter in API query instead of client-side filtering
+      const response = await fetch(
+        `/api/proxy/projects/${projectId}/annotations?collection_id=${collection.collection_id}`,
+        {
+          headers: {
+            'User-ID': user?.email || 'default_user',
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const collectionAnnotations = data.annotations || data || [];
+        console.log(`📊 Fetched ${collectionAnnotations.length} annotations for collection ${collection.collection_id}`);
+        setAnnotations(collectionAnnotations);
+      }
+    } catch (error) {
+      console.error('Error fetching annotations:', error);
     }
   };
 
@@ -150,20 +176,42 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
         <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
           <div className="flex items-center gap-2">
             <ChatBubbleLeftRightIcon className="w-5 h-5 text-blue-600" />
-            <h3 className="font-semibold text-gray-900">Collection Notes</h3>
+            <h3 className="font-semibold text-gray-900">Collection Notes ({annotations.length})</h3>
           </div>
           <p className="text-xs text-gray-600 mt-1">
-            Add notes about this collection's theme, research questions, or key findings
+            Smart view of your notes - aggregated and organized by context
           </p>
         </div>
         <div className="p-4">
-          <AnnotationList
-            projectId={projectId}
-            userId={user?.email}
-            collectionId={collection.collection_id}
-            showForm={true}
-            compact={false}
-          />
+          {annotations.length > 0 ? (
+            <SmartAnnotationList
+              annotations={annotations}
+              projectId={projectId}
+              onEdit={(annotation) => {
+                console.log('Edit annotation:', annotation);
+              }}
+              onDelete={(annotationId) => {
+                console.log('Delete annotation:', annotationId);
+                fetchAnnotations(); // Refresh after delete
+              }}
+              onReply={(annotationId) => {
+                console.log('Reply to annotation:', annotationId);
+              }}
+              onJumpToSource={(annotation) => {
+                if (annotation.article_pmid && annotation.pdf_page) {
+                  setSelectedPMID(annotation.article_pmid);
+                  setSelectedTitle(annotation.paper_title || 'Paper');
+                  setShowPDFViewer(true);
+                }
+              }}
+              compact={false}
+            />
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <p className="text-sm">No notes in this collection yet</p>
+              <p className="text-xs mt-1">Add notes while reading papers to see them here</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -288,10 +336,12 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
           pmid={selectedPMID}
           title={selectedTitle || undefined}
           projectId={projectId}
+          collectionId={collection.collection_id} // ✅ NEW: Pass collection context to PDFViewer
           onClose={() => {
             setShowPDFViewer(false);
             setSelectedPMID(null);
             setSelectedTitle(null);
+            fetchAnnotations(); // ✅ Refresh annotations after closing PDF viewer
           }}
         />
       )}

@@ -25,6 +25,7 @@ import ArticleSummaryModal from './ArticleSummaryModal';
 import { useLazyNetworkLoading } from '@/hooks/useLazyNetworkLoading';
 import { pubmedCache } from '@/utils/pubmedCache';
 import { NetworkLoadingProgress, LoadingOverlay, useLoadingState } from './LoadingStates';
+import NavigationBreadcrumbs from './NavigationBreadcrumbs';
 import { useResponsive, MobileSidebar } from './MobileOptimizations';
 import { useNetworkShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { SourceBadge, NodeSourceOverlay } from './DataSourceIndicators';
@@ -858,13 +859,14 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
       setNetworkData(data);
 
-      // Update navigation trail for non-default modes
-      if (navigationMode !== 'default') {
+      // Update navigation trail for non-default modes OR when forceNetworkType is used
+      if (navigationMode !== 'default' || forceNetworkType) {
+        const effectiveMode = forceNetworkType || navigationMode;
         const step: NavigationStep = {
-          mode: navigationMode,
+          mode: effectiveMode,
           sourceId,
           sourceType,
-          title: data.metadata?.most_cited?.title || `${navigationMode} view`,
+          title: data.metadata?.most_cited?.title || `${effectiveMode} view`,
           timestamp: new Date()
         };
 
@@ -960,7 +962,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
     } finally {
       setLoading(false);
     }
-  }, [sourceType, sourceId, navigationMode, user]);
+  }, [sourceType, sourceId, navigationMode, user, forceNetworkType, fullTextOnly, projectId]);
 
   // Fetch collections for sidebar
   const fetchCollections = useCallback(async () => {
@@ -1286,8 +1288,25 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   });
 
   return (
-    <div className={`network-view-container relative ${className || 'h-96'} bg-white rounded-lg border overflow-hidden`}>
-      <ReactFlow
+    <div className={`network-view-container relative ${className || 'h-96'} flex flex-col bg-white rounded-lg border overflow-hidden`}>
+      {/* Navigation Breadcrumb Trail */}
+      {navigationTrail.length > 0 && (
+        <NavigationBreadcrumbs
+          trail={navigationTrail}
+          onStepClick={(step, index) => {
+            // Remove steps after the clicked step
+            setNavigationTrail(prev => prev.slice(0, index + 1));
+            // Navigate to the clicked step
+            if (onNavigationChange) {
+              onNavigationChange(step.mode, step.sourceId);
+            }
+          }}
+          maxVisible={5}
+        />
+      )}
+
+      <div className="flex-1 relative">
+        <ReactFlow
         key={`network-${nodes.length}-${edges.length}`}
         nodes={nodes}
         edges={edges}
@@ -1349,42 +1368,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           className="opacity-30"
         />
 
-        {/* Enhanced Navigation Breadcrumb Trail with Smooth Scrolling */}
-        {navigationTrail.length > 0 && (
-          <Panel position="bottom-left" className="bg-white/95 backdrop-blur-sm p-3 rounded-xl shadow-xl border border-gray-200 max-w-lg">
-            <div className="text-xs">
-              <div className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 4m0 13V4m-6 3l6-3" />
-                </svg>
-                Navigation Trail
-              </div>
-              <div
-                className="flex gap-1 overflow-x-auto scrollbar-hide pb-1"
-                style={{
-                  scrollBehavior: 'smooth',
-                  WebkitOverflowScrolling: 'touch'
-                }}
-              >
-                {navigationTrail.map((step, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleBreadcrumbClick(step)}
-                    className="px-3 py-1.5 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-blue-800 rounded-full text-xs transition-all duration-200 hover:scale-105 whitespace-nowrap flex items-center gap-1 shadow-sm"
-                    title={`${step.mode} view - ${step.title}`}
-                  >
-                    {step.mode}
-                    {index < navigationTrail.length - 1 && (
-                      <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </Panel>
-        )}
+
 
         {/* Enhanced Navigation Mode Controls - Google Maps Style */}
         {sourceType === 'article' && (
@@ -1569,6 +1553,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           </Panel>
         )}
       </ReactFlow>
+      </div>
 
       {/* Enhanced NetworkSidebar - Only show if not disabled */}
       {(() => {

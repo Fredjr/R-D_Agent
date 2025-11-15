@@ -2,12 +2,29 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { BeakerIcon, PlusIcon, FolderIcon, EyeIcon, ShareIcon, TrashIcon, XMarkIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+import {
+  BeakerIcon,
+  PlusIcon,
+  FolderIcon,
+  EyeIcon,
+  ShareIcon,
+  TrashIcon,
+  XMarkIcon,
+  ArrowLeftIcon,
+  GlobeAltIcon,
+  MagnifyingGlassIcon,
+  BookmarkIcon
+} from '@heroicons/react/24/outline';
 import { PageHeader } from '@/components/ui/Navigation';
 import { Button } from '@/components/ui/Button';
 import { SpotifyCollectionCard } from '@/components/ui/SpotifyCard';
 import { SpotifyTopBar, SpotifyTabs } from '@/components/ui/SpotifyNavigation';
 import { MobileResponsiveLayout } from '@/components/ui/MobileResponsiveLayout';
+import { UnifiedHeroSection, HeroAction } from '@/components/ui/UnifiedHeroSection';
+import { QuickActionsFAB } from '@/components/ui/QuickActionsFAB';
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
+import { ContextualHelp } from '@/components/ui/ContextualHelp';
+import { SuggestedNextSteps } from '@/components/ui/SuggestedNextSteps';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import EnhancedCollectionNavigation from '@/components/EnhancedCollectionNavigation';
@@ -42,6 +59,15 @@ export default function CollectionsPage() {
   const [showArticleSelector, setShowArticleSelector] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState<any | null>(null);
   const [showNetworkView, setShowNetworkView] = useState(false);
+
+  // State for creating new collection
+  const [newCollection, setNewCollection] = useState({
+    collection_name: '',
+    description: '',
+    color: '#3B82F6',
+    icon: 'folder'
+  });
+  const [creatingCollection, setCreatingCollection] = useState(false);
 
   console.log('📚 Collections page loaded');
 
@@ -163,53 +189,128 @@ export default function CollectionsPage() {
     });
   };
 
+  // Handle creating a new collection
+  const handleCreateCollection = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!newCollection.collection_name.trim()) {
+      alert('Please enter a collection name');
+      return;
+    }
+
+    // Get the first project ID (or create a default project)
+    const projectId = 'default_project'; // TODO: Get from user's projects
+
+    setCreatingCollection(true);
+    try {
+      const response = await fetch(`/api/proxy/projects/${projectId}/collections`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user?.email || 'default_user',
+        },
+        body: JSON.stringify(newCollection),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create collection');
+      }
+
+      // Reset form and close modal
+      setNewCollection({
+        collection_name: '',
+        description: '',
+        color: '#3B82F6',
+        icon: 'folder'
+      });
+      setShowCreateModal(false);
+
+      // Refresh collections
+      fetchCollections();
+
+      alert('✅ Collection created successfully!');
+    } catch (error) {
+      console.error('Error creating collection:', error);
+      alert('❌ Failed to create collection. Please try again.');
+    } finally {
+      setCreatingCollection(false);
+    }
+  };
+
+  const colors = [
+    '#3B82F6', '#EF4444', '#10B981', '#F59E0B',
+    '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'
+  ];
+
+  // Hero actions for collections page
+  const heroActions: HeroAction[] = [
+    {
+      id: 'new-collection',
+      title: 'New Collection',
+      description: 'Create a new paper collection',
+      icon: PlusIcon,
+      gradient: 'from-green-500 to-emerald-600',
+      onClick: () => setShowCreateModal(true),
+      badge: 'Quick Action'
+    },
+    {
+      id: 'explore-network',
+      title: 'Explore Network',
+      description: 'Discover connected papers',
+      icon: GlobeAltIcon,
+      gradient: 'from-purple-500 to-indigo-600',
+      onClick: () => router.push('/explore/network')
+    },
+    {
+      id: 'search-papers',
+      title: 'Search Papers',
+      description: 'Find papers to add',
+      icon: MagnifyingGlassIcon,
+      gradient: 'from-blue-500 to-cyan-600',
+      onClick: () => router.push('/search')
+    }
+  ];
+
   return (
     <MobileResponsiveLayout>
       <div className="w-full max-w-none py-6 sm:py-8">
-        {/* Mobile-friendly header */}
-        <div className="mb-6 sm:mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-            <div className="min-w-0 flex-1">
-              <h1 className="text-2xl sm:text-3xl font-bold text-[var(--spotify-white)] mb-2">Collections</h1>
-              <p className="text-[var(--spotify-light-text)] text-sm sm:text-base">
-                Organize and manage your research article collections
-              </p>
-            </div>
+        {/* Breadcrumbs */}
+        <div className="mb-4">
+          <Breadcrumbs />
+        </div>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <div className="flex bg-[var(--spotify-dark-gray)] rounded-lg p-1">
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`flex-1 sm:flex-none px-3 py-2 text-sm rounded transition-colors ${
-                    viewMode === 'grid'
-                      ? 'bg-[var(--spotify-green)] text-[var(--spotify-black)]'
-                      : 'text-[var(--spotify-light-text)] hover:text-[var(--spotify-white)]'
-                  }`}
-                >
-                  Grid
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`flex-1 sm:flex-none px-3 py-2 text-sm rounded transition-colors ${
-                    viewMode === 'list'
-                      ? 'bg-[var(--spotify-green)] text-[var(--spotify-black)]'
-                      : 'text-[var(--spotify-light-text)] hover:text-[var(--spotify-white)]'
-                  }`}
-                >
-                  List
-                </button>
-              </div>
+        {/* Unified Hero Section */}
+        <UnifiedHeroSection
+          emoji="📚"
+          title="Your Collections"
+          description="Organize and manage your curated paper collections"
+          actions={heroActions}
+          proTip="Collections help you organize papers by topic, project, or research question"
+        />
 
-              <Button
-                onClick={() => setShowCreateModal(true)}
-                variant="spotifyPrimary"
-                size="spotifyDefault"
-                className="inline-flex items-center justify-center w-full sm:w-auto"
-              >
-                <PlusIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                New Collection
-              </Button>
-            </div>
+        {/* View Mode Toggle */}
+        <div className="mb-6 px-4 sm:px-6 flex justify-end">
+          <div className="flex bg-[var(--spotify-dark-gray)] rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`px-4 py-2 text-sm rounded transition-colors ${
+                viewMode === 'grid'
+                  ? 'bg-[var(--spotify-green)] text-[var(--spotify-black)]'
+                  : 'text-[var(--spotify-light-text)] hover:text-[var(--spotify-white)]'
+              }`}
+            >
+              Grid
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`px-4 py-2 text-sm rounded transition-colors ${
+                viewMode === 'list'
+                  ? 'bg-[var(--spotify-green)] text-[var(--spotify-black)]'
+                  : 'text-[var(--spotify-light-text)] hover:text-[var(--spotify-white)]'
+              }`}
+            >
+              List
+            </button>
           </div>
         </div>
 
@@ -348,7 +449,93 @@ export default function CollectionsPage() {
             }}
           />
         )}
+
+        {/* Suggested Next Steps for empty state */}
+        {collections.length === 0 && !isLoading && (
+          <div className="px-4 sm:px-6 mt-8">
+            <SuggestedNextSteps context="after-create-collection" />
+          </div>
+        )}
+
+        {/* Create Collection Modal */}
+        {showCreateModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Create New Collection</h3>
+              <form onSubmit={handleCreateCollection} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                  <input
+                    type="text"
+                    value={newCollection.collection_name}
+                    onChange={(e) => setNewCollection(prev => ({ ...prev, collection_name: e.target.value }))}
+                    placeholder="Enter collection name..."
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <textarea
+                    value={newCollection.description}
+                    onChange={(e) => setNewCollection(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Enter description (optional)..."
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                    rows={3}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Color</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {colors.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setNewCollection(prev => ({ ...prev, color }))}
+                        className={`w-8 h-8 rounded-full border-2 transition-all ${
+                          newCollection.color === color ? 'border-gray-900 scale-110' : 'border-gray-300'
+                        }`}
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreateModal(false);
+                      setNewCollection({
+                        collection_name: '',
+                        description: '',
+                        color: '#3B82F6',
+                        icon: 'folder'
+                      });
+                    }}
+                    className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                    disabled={creatingCollection}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!newCollection.collection_name.trim() || creatingCollection}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {creatingCollection ? 'Creating...' : 'Create Collection'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Quick Actions FAB */}
+      <QuickActionsFAB onCreateCollection={() => setShowCreateModal(true)} />
+
+      {/* Contextual Help */}
+      <ContextualHelp />
     </MobileResponsiveLayout>
   );
 }

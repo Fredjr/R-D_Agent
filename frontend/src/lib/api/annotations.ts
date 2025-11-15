@@ -270,13 +270,14 @@ export async function getAnnotations(
   userId?: string
 ): Promise<GetAnnotationsResponse> {
   const params = new URLSearchParams();
-  
+
   if (filters?.note_type) params.append('note_type', filters.note_type);
   if (filters?.priority) params.append('priority', filters.priority);
   if (filters?.status) params.append('status', filters.status);
   if (filters?.article_pmid) params.append('article_pmid', filters.article_pmid);
+  if (filters?.collection_id) params.append('collection_id', filters.collection_id); // ✅ NEW: Support collection_id filter
   if (filters?.author_id) params.append('author_id', filters.author_id);
-  
+
   const queryString = params.toString();
   const url = `${getBaseUrl()}/projects/${projectId}/annotations${queryString ? `?${queryString}` : ''}`;
   

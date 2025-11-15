@@ -5509,41 +5509,27 @@ async def get_project(project_id: str, request: Request, db: Session = Depends(g
     # 🔧 FIX: Resolve email to UUID using helper function
     user_id = resolve_user_id(current_user, db)
 
-    # Check if user has access to this project
-    project = db.query(Project).filter(Project.project_id == project_id).first()
+    # 🚀 WEEK 1 OPTIMIZATION: Use optimized query with eager loading and caching
+    from utils.optimized_queries import get_project_with_details
+
+    project = get_project_with_details(project_id, db)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
     # Check permissions (using UUID)
     has_access = (
         project.owner_user_id == user_id or
-        db.query(ProjectCollaborator).filter(
-            ProjectCollaborator.project_id == project_id,
-            ProjectCollaborator.user_id == user_id,
-            ProjectCollaborator.is_active == True
-        ).first() is not None
+        any(c.user_id == user_id and c.is_active for c in project.collaborators)
     )
 
     if not has_access:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    # 🚀 OPTIMIZATION: Get associated data with eager loading to reduce queries
-    # OLD: 4 separate queries (N+1 problem)
-    # NEW: 4 optimized queries with eager loading where applicable
-    from sqlalchemy.orm import joinedload
-
-    reports = db.query(Report).filter(Report.project_id == project_id).all()
-
-    # Eager load User data for collaborators (reduces N queries to 1)
-    collaborators = db.query(ProjectCollaborator).options(
-        joinedload(ProjectCollaborator.user)
-    ).filter(
-        ProjectCollaborator.project_id == project_id,
-        ProjectCollaborator.is_active == True
-    ).all()
-
-    annotations = db.query(Annotation).filter(Annotation.project_id == project_id).all()
-    deep_dive_analyses = db.query(DeepDiveAnalysis).filter(DeepDiveAnalysis.project_id == project_id).all()
+    # All data is already loaded via eager loading - no additional queries needed!
+    reports = project.reports
+    collaborators = project.collaborators
+    annotations = project.annotations
+    deep_dive_analyses = project.deep_dive_analyses
 
     # Calculate active days (days with any activity)
     try:
@@ -5598,6 +5584,77 @@ async def get_project(project_id: str, request: Request, db: Session = Depends(g
         annotations_count=len(annotations),
         active_days=active_days_count
     )
+
+@app.patch("/projects/{project_id}")
+async def update_project(
+    project_id: str,
+    project_update: dict,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Update project details (description, settings, etc.)"""
+    current_user = request.headers.get("User-ID", "default_user")
+
+    # Resolve email to UUID
+    user_id = resolve_user_id(current_user, db)
+
+    # Check if user has access to this project
+    project = db.query(Project).filter(Project.project_id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Check permissions (owner or collaborator)
+    has_access = (
+        project.owner_user_id == user_id or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == user_id,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    try:
+        # Update allowed fields
+        if "description" in project_update:
+            project.description = project_update["description"]
+
+        if "project_name" in project_update:
+            project.project_name = project_update["project_name"]
+
+        if "settings" in project_update:
+            # Merge settings (don't overwrite entire settings object)
+            if project.settings is None:
+                project.settings = {}
+
+            for key, value in project_update["settings"].items():
+                project.settings[key] = value
+
+            # Mark settings as modified for SQLAlchemy to detect change
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(project, "settings")
+
+        project.updated_at = datetime.now()
+        db.commit()
+        db.refresh(project)
+
+        # Invalidate cache after update
+        from utils.optimized_queries import invalidate_project_cache
+        invalidate_project_cache(project_id)
+
+        return {
+            "project_id": project.project_id,
+            "project_name": project.project_name,
+            "description": project.description,
+            "settings": project.settings,
+            "updated_at": project.updated_at.isoformat()
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update project: {str(e)}")
 
 # Collaboration Endpoints
 
@@ -9506,21 +9563,10 @@ async def get_project_collections(
         raise HTTPException(status_code=403, detail="Access denied")
 
     try:
-        from sqlalchemy import func
+        # 🚀 WEEK 1 OPTIMIZATION: Use optimized query with caching
+        from utils.optimized_queries import get_project_collections_optimized
 
-        # Get collections with article counts
-        collections_with_counts = db.query(
-            Collection,
-            func.count(ArticleCollection.id).label('article_count')
-        ).outerjoin(
-            ArticleCollection, Collection.collection_id == ArticleCollection.collection_id
-        ).filter(
-            Collection.project_id == project_id,
-            Collection.is_active == True
-        ).group_by(Collection.collection_id).order_by(
-            Collection.sort_order.asc(),
-            Collection.created_at.desc()
-        ).all()
+        collections = get_project_collections_optimized(project_id, db)
 
         return [
             {
@@ -9533,9 +9579,9 @@ async def get_project_collections(
                 "color": collection.color,
                 "icon": collection.icon,
                 "sort_order": collection.sort_order,
-                "article_count": article_count or 0
+                "article_count": getattr(collection, 'article_count', 0)
             }
-            for collection, article_count in collections_with_counts
+            for collection in collections
         ]
 
     except Exception as e:

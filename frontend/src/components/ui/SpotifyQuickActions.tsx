@@ -30,15 +30,18 @@ interface SpotifyQuickActionsProps {
 export function SpotifyQuickActions({ actions, className }: SpotifyQuickActionsProps) {
   return (
     <div className={cn("w-full", className)}>
-      {/* Section Header */}
-      <div className="mb-4 px-4 sm:px-6">
-        <h2 className="text-lg sm:text-xl font-bold text-[var(--spotify-white)]">Quick Actions</h2>
-        <p className="text-[var(--spotify-light-text)] text-sm">
-          Get started with your project
+      {/* Section Header - Enhanced */}
+      <div className="mb-6 px-4 sm:px-6">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-2xl">⚡</span>
+          <h2 className="text-xl sm:text-2xl font-bold text-[var(--spotify-white)]">Quick Actions</h2>
+        </div>
+        <p className="text-[var(--spotify-light-text)] text-sm sm:text-base">
+          Common tasks to accelerate your research workflow
         </p>
       </div>
 
-      {/* Mobile Actions - 2 Column Grid */}
+      {/* Mobile Actions - 2 Column Grid - Enhanced */}
       <div className="block sm:hidden px-4">
         <div className="grid grid-cols-2 gap-3">
           {actions.map((action) => {
@@ -49,23 +52,24 @@ export function SpotifyQuickActions({ actions, className }: SpotifyQuickActionsP
                 onClick={action.onClick}
                 disabled={action.disabled || action.loading}
                 className={cn(
-                  "p-4 rounded-lg text-left transition-all duration-200 disabled:opacity-50",
+                  "group p-5 rounded-xl text-left transition-all duration-200 disabled:opacity-50",
                   "bg-[var(--spotify-dark-gray)] hover:bg-[var(--spotify-medium-gray)]",
-                  "border border-[var(--spotify-border-gray)] hover:border-[var(--spotify-light-gray)]"
+                  "border-2 border-[var(--spotify-border-gray)] hover:border-[var(--spotify-green)]",
+                  "hover:scale-105"
                 )}
               >
-                <div className="flex flex-col items-center text-center space-y-2">
-                  <div 
-                    className="w-10 h-10 rounded-full flex items-center justify-center"
+                <div className="flex flex-col items-center text-center space-y-3">
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform"
                     style={{ backgroundColor: `${action.color}20` }}
                   >
-                    <Icon 
-                      className="w-5 h-5" 
+                    <Icon
+                      className="w-6 h-6"
                       style={{ color: action.color }}
                     />
                   </div>
                   <div>
-                    <p className="text-[var(--spotify-white)] font-medium text-sm">
+                    <p className="text-[var(--spotify-white)] font-semibold text-sm">
                       {action.loading ? 'Loading...' : action.label}
                     </p>
                     {action.description && (
@@ -81,9 +85,9 @@ export function SpotifyQuickActions({ actions, className }: SpotifyQuickActionsP
         </div>
       </div>
 
-      {/* Desktop Actions - Horizontal Cards */}
+      {/* Desktop Actions - Horizontal Cards - Enhanced */}
       <div className="hidden sm:block px-4 sm:px-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {actions.map((action) => {
             const Icon = action.icon;
             return (
@@ -92,27 +96,28 @@ export function SpotifyQuickActions({ actions, className }: SpotifyQuickActionsP
                 onClick={action.onClick}
                 disabled={action.disabled || action.loading}
                 className={cn(
-                  "p-4 rounded-lg text-left transition-all duration-200 disabled:opacity-50 group",
+                  "group p-6 rounded-xl text-left transition-all duration-200 disabled:opacity-50",
                   "bg-[var(--spotify-dark-gray)] hover:bg-[var(--spotify-medium-gray)]",
-                  "border border-[var(--spotify-border-gray)] hover:border-[var(--spotify-light-gray)]"
+                  "border-2 border-[var(--spotify-border-gray)] hover:border-[var(--spotify-green)]",
+                  "hover:scale-105 hover:shadow-xl"
                 )}
               >
-                <div className="flex items-start space-x-3">
-                  <div 
-                    className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform"
+                <div className="flex items-start space-x-4">
+                  <div
+                    className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform"
                     style={{ backgroundColor: `${action.color}20` }}
                   >
-                    <Icon 
-                      className="w-6 h-6" 
+                    <Icon
+                      className="w-7 h-7"
                       style={{ color: action.color }}
                     />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[var(--spotify-white)] font-medium text-sm mb-1">
+                    <h3 className="text-[var(--spotify-white)] font-bold text-base sm:text-lg mb-1">
                       {action.loading ? 'Loading...' : action.label}
-                    </p>
+                    </h3>
                     {action.description && (
-                      <p className="text-[var(--spotify-light-text)] text-xs line-clamp-2">
+                      <p className="text-[var(--spotify-light-text)] text-sm sm:text-base line-clamp-2">
                         {action.description}
                       </p>
                     )}
@@ -140,14 +145,6 @@ export const createQuickActions = (handlers: {
   creatingNote?: boolean;
 } = {}): QuickAction[] => [
   {
-    id: 'new-report',
-    label: 'New Report',
-    description: 'Create a detailed research report',
-    icon: DocumentTextIcon,
-    color: '#3b82f6',
-    onClick: handlers.onNewReport
-  },
-  {
     id: 'add-note',
     label: 'Add Note',
     description: 'Quick note or observation',
@@ -157,37 +154,20 @@ export const createQuickActions = (handlers: {
     loading: loading.creatingNote
   },
   {
+    id: 'new-report',
+    label: 'New Report',
+    description: 'Create a detailed research report',
+    icon: DocumentTextIcon,
+    color: '#3b82f6',
+    onClick: handlers.onNewReport
+  },
+  {
     id: 'deep-dive',
-    label: '🧠 AI Deep Dive Analysis',
+    label: 'AI Deep Dive',
     description: 'Semantic analysis with cross-domain insights',
     icon: BeakerIcon,
     color: '#8b5cf6',
     onClick: handlers.onDeepDive
-  },
-  {
-    id: 'summary',
-    label: 'Generate Summary',
-    description: 'Create project summary report',
-    icon: ChartBarIcon,
-    color: '#6366f1',
-    onClick: handlers.onSummary
-  },
-  {
-    id: 'comprehensive',
-    label: '🌐 Comprehensive Analysis',
-    description: 'Full semantic project analysis with AI insights',
-    icon: ChartBarIcon,
-    color: '#8b5cf6',
-    onClick: handlers.onComprehensiveAnalysis,
-    loading: loading.generatingComprehensiveSummary
-  },
-  {
-    id: 'invite',
-    label: 'Invite Collaborators',
-    description: 'Add team members to project',
-    icon: UserPlusIcon,
-    color: '#f59e0b',
-    onClick: handlers.onInviteCollaborators
   }
 ];
 

@@ -9,7 +9,9 @@ import {
   FolderIcon,
   ChartBarIcon,
   MusicalNoteIcon,
-  Cog6ToothIcon
+  Cog6ToothIcon,
+  GlobeAltIcon,
+  UserIcon
 } from '@heroicons/react/24/outline';
 import {
   HomeIcon as HomeIconSolid,
@@ -17,7 +19,9 @@ import {
   FolderIcon as FolderIconSolid,
   ChartBarIcon as ChartBarIconSolid,
   MusicalNoteIcon as MusicalNoteIconSolid,
-  Cog6ToothIcon as Cog6ToothIconSolid
+  Cog6ToothIcon as Cog6ToothIconSolid,
+  GlobeAltIcon as GlobeAltIconSolid,
+  UserIcon as UserIconSolid
 } from '@heroicons/react/24/solid';
 import { cn } from '@/lib/utils';
 
@@ -45,11 +49,11 @@ const navigationItems: NavigationItem[] = [
     label: 'Search'
   },
   {
-    name: 'Discover',
-    href: '/discover',
-    icon: MusicalNoteIcon,
-    activeIcon: MusicalNoteIconSolid,
-    label: 'Discover'
+    name: 'Network',
+    href: '/explore/network',
+    icon: GlobeAltIcon,
+    activeIcon: GlobeAltIconSolid,
+    label: 'Network'
   },
   {
     name: 'Collections',
@@ -59,11 +63,11 @@ const navigationItems: NavigationItem[] = [
     label: 'Collections'
   },
   {
-    name: 'Dashboard',
+    name: 'Profile',
     href: '/dashboard',
-    icon: ChartBarIcon,
-    activeIcon: ChartBarIconSolid,
-    label: 'Dashboard'
+    icon: UserIcon,
+    activeIcon: UserIconSolid,
+    label: 'Profile'
   }
 ];
 

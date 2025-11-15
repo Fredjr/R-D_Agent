@@ -26,6 +26,10 @@ import { ExploreTab } from '@/components/project/ExploreTab';
 import { AnalysisTab } from '@/components/project/AnalysisTab';
 import { ProgressTab } from '@/components/project/ProgressTab';
 import { MyCollectionsTab } from '@/components/project/MyCollectionsTab';
+import { ProjectHeroActions } from '@/components/project/ProjectHeroActions';
+import { NetworkQuickStart } from '@/components/project/NetworkQuickStart';
+import { ContextualActions, ProjectState, ActionType } from '@/components/project/ContextualActions';
+import DiscoverSection from '@/components/project/DiscoverSection';
 import GlobalSearch from '@/components/search/GlobalSearch';
 import CollaboratorsList from '@/components/collaboration/CollaboratorsList';
 import {
@@ -48,6 +52,12 @@ interface Project {
   owner_user_id: string;
   created_at: string;
   updated_at: string;
+  settings?: {
+    research_question?: string;
+    seed_paper_pmid?: string;
+    seed_paper_title?: string;
+    [key: string]: any;
+  };
   reports: Array<{
     report_id: string;
     title: string;
@@ -78,6 +88,11 @@ interface Project {
     created_at: string;
     created_by: string;
   }>;
+  // Statistics fields from backend
+  reports_count?: number;
+  deep_dive_analyses_count?: number;
+  annotations_count?: number;
+  active_days?: number;
 }
 
 export default function ProjectPage() {
@@ -124,6 +139,7 @@ export default function ProjectPage() {
 
   // Collection management state
   const [collections, setCollections] = useState<any[]>([]);
+  const [totalPapers, setTotalPapers] = useState(0);
   const [showAddToCollectionModal, setShowAddToCollectionModal] = useState(false);
   const [selectedArticleForCollection, setSelectedArticleForCollection] = useState<{
     pmid?: string;
@@ -322,12 +338,49 @@ export default function ProjectPage() {
         const collectionsArray = Array.isArray(data) ? data : (data.collections || []);
         setCollections(collectionsArray);
         console.log('Collections set to state:', collectionsArray);
+
+        // Calculate total papers from all collections
+        await fetchTotalPapers(collectionsArray);
       } else {
         const errorText = await response.text();
         console.error('Collections fetch failed:', response.status, errorText);
       }
     } catch (error) {
       console.error('Error fetching collections:', error);
+    }
+  };
+
+  const fetchTotalPapers = async (collectionsArray: any[]) => {
+    try {
+      let total = 0;
+      const uniquePmids = new Set<string>();
+
+      for (const collection of collectionsArray) {
+        const response = await fetch(
+          `/api/proxy/collections/${collection.collection_id}/articles?projectId=${projectId}&limit=1000`,
+          { headers: { 'User-ID': user?.email || 'default_user' } }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          const articles = data.articles || [];
+
+          // Count unique PMIDs to avoid double-counting papers in multiple collections
+          // Backend returns article_pmid, not pmid
+          articles.forEach((article: any) => {
+            const pmid = article.article_pmid || article.pmid;
+            if (pmid) {
+              uniquePmids.add(pmid);
+            }
+          });
+        }
+      }
+
+      setTotalPapers(uniquePmids.size);
+      console.log(`📊 Total unique papers across all collections: ${uniquePmids.size}`);
+    } catch (error) {
+      console.error('Error calculating total papers:', error);
+      setTotalPapers(0);
     }
   };
 
@@ -1009,6 +1062,103 @@ export default function ProjectPage() {
     );
   }
 
+  // ============================================================================
+  // PROJECT STATE DETECTION FOR CONTEXTUAL ACTIONS
+  // ============================================================================
+  const getProjectState = (): ProjectState => {
+    const hasResearchQuestion =
+      !!project?.settings?.research_question &&
+      project.settings.research_question.trim().length > 0;
+
+    const hasPapers = totalPapers > 0;
+
+    let stage: ProjectState['stage'] = 'no-question';
+    if (hasResearchQuestion && !hasPapers) {
+      stage = 'has-question';
+    } else if (hasResearchQuestion && hasPapers) {
+      stage = 'has-papers';
+    }
+
+    return {
+      stage,
+      hasResearchQuestion,
+      hasPapers,
+      hasCollections: collections.length > 0,
+      paperCount: totalPapers,
+      collectionCount: collections.length,
+      notesCount: project.annotations_count || project.annotations?.length || 0,
+      reportsCount: (project.reports_count || project.reports?.length || 0) +
+                    (project.deep_dive_analyses_count || project.deep_dive_analyses?.length || 0),
+    };
+  };
+
+  // ============================================================================
+  // ACTION HANDLER FOR CONTEXTUAL ACTIONS
+  // ============================================================================
+  const handleContextualAction = (action: ActionType) => {
+    console.log('🎯 Contextual action triggered:', action);
+
+    switch (action) {
+      case 'define-question':
+        setActiveTab('research-question');
+        // Scroll to research question section after tab change
+        setTimeout(() => {
+          const element = document.getElementById('research-question-section');
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 100);
+        break;
+
+      case 'view-collections':
+        setActiveTab('collections');
+        break;
+
+      case 'browse-trending':
+        setActiveTab('explore');
+        // TODO: Trigger trending view in ExploreTab
+        break;
+
+      case 'recent-papers':
+        setActiveTab('explore');
+        // TODO: Trigger recent papers view in ExploreTab
+        break;
+
+      case 'ai-suggestions':
+        setActiveTab('explore');
+        // TODO: Trigger AI suggestions in ExploreTab
+        break;
+
+      case 'custom-search':
+        setActiveTab('explore');
+        // TODO: Focus on search bar in ExploreTab
+        break;
+
+      case 'new-collection':
+        setShowCollectionModal(true);
+        break;
+
+      case 'generate-report':
+        setShowReportModal(true);
+        break;
+
+      case 'deep-dive':
+        setShowDeepDiveModal(true);
+        break;
+
+      case 'generate-summary':
+        setShowSummaryModal(true);
+        break;
+
+      case 'add-note':
+        setShowNoteModal(true);
+        break;
+
+      default:
+        console.warn(`Unhandled contextual action: ${action}`);
+    }
+  };
+
   return (
     <MobileResponsiveLayout>
       <div className="w-full max-w-none">
@@ -1024,23 +1174,23 @@ export default function ProjectPage() {
           onInvite={() => setShowInviteModal(true)}
         />
 
-        {/* Quick Actions */}
-        <div className="py-6">
-          <SpotifyQuickActions
-            actions={createQuickActions(
-              {
-                onNewReport: () => setShowReportModal(true),
-                onAddNote: () => setShowNoteModal(true),
-                onDeepDive: () => setShowDeepDiveModal(true),
-                onSummary: () => setShowSummaryModal(true),
-                onComprehensiveAnalysis: handleGenerateComprehensiveSummary,
-                onInviteCollaborators: () => setShowInviteModal(true)
-              },
-              {
-                generatingComprehensiveSummary,
-                creatingNote
-              }
-            )}
+        {/* Discover Section - Fixed section with colored boxes, search, and quick actions */}
+        <div className="py-6 px-4">
+          <DiscoverSection
+            projectId={projectId as string}
+            collectionsCount={collections.length}
+            onAddNote={() => setShowNoteModal(true)}
+            onNewReport={() => setShowReportModal(true)}
+            onDeepDive={() => setShowDeepDiveModal(true)}
+          />
+        </div>
+
+        {/* Contextual Actions - Smart button system based on project stage */}
+        <div className="py-6 px-4">
+          <ContextualActions
+            projectState={getProjectState()}
+            activeTab={activeTab}
+            onAction={handleContextualAction}
           />
         </div>
 
@@ -1066,21 +1216,21 @@ export default function ProjectPage() {
                 id: 'collections',
                 label: 'My Collections',
                 icon: '📚',
-                count: (project as any).collections?.length || 0,
+                count: collections.length,
                 description: 'Organized paper collections'
               },
               {
                 id: 'notes',
                 label: 'Notes & Ideas',
                 icon: '📝',
-                count: (project as any).annotations?.length || 0,
+                count: project.annotations_count || project.annotations?.length || 0,
                 description: 'All your research notes'
               },
               {
                 id: 'analysis',
                 label: 'Analysis',
                 icon: '📊',
-                count: ((project as any).reports?.length || 0) + ((project as any).deep_dives?.length || 0),
+                count: (project.reports_count || project.reports?.length || 0) + (project.deep_dive_analyses_count || project.deep_dive_analyses?.length || 0),
                 description: 'Reports and deep dive analyses'
               },
               {
@@ -1592,6 +1742,8 @@ export default function ProjectPage() {
           <div className="mb-8 space-y-6">
             <ResearchQuestionTab
               project={project}
+              totalPapers={totalPapers}
+              collectionsCount={collections.length}
               onUpdateProject={async (updates) => {
                 try {
                   const response = await fetch(`/api/proxy/projects/${projectId}`, {
@@ -1681,7 +1833,11 @@ export default function ProjectPage() {
         {/* Progress Tab */}
         {activeTab === 'progress' && (
           <div className="mb-8">
-            <ProgressTab project={project} />
+            <ProgressTab
+              project={project}
+              totalPapers={totalPapers}
+              collectionsCount={collections.length}
+            />
           </div>
         )}
       </div>

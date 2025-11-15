@@ -17,6 +17,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import FilterPanel, { type FilterSection } from '@/components/filters/FilterPanel';
 import FilterChips, { type FilterChip } from '@/components/filters/FilterChips';
 import dynamic from 'next/dynamic';
+import {
+  SpotifyTabSection,
+  SpotifyTabCard,
+  SpotifyTabCardContent,
+  SpotifyTabButton,
+  SpotifyTabSearchBar,
+  SpotifyTabEmptyState,
+  SpotifyTabLoading
+} from './shared';
 
 // Dynamically import PDFViewer to avoid SSR issues
 const PDFViewer = dynamic(() => import('@/components/reading/PDFViewer'), {
@@ -399,28 +408,28 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
   };
 
   return (
-    <div className="space-y-6">
+    <SpotifyTabSection>
       {/* Header with Search */}
-      <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg p-6 border border-blue-200">
+      <SpotifyTabCard variant="gradient" gradient="from-purple-500/10 to-blue-500/10">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
+            <div className="w-12 h-12 bg-purple-500/20 rounded-full flex items-center justify-center">
               <span className="text-2xl">🔍</span>
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Explore Papers</h2>
-              <p className="text-sm text-gray-600">Search PubMed and visualize research networks</p>
+              <h2 className="text-xl font-bold text-[var(--spotify-white)]">Explore Papers</h2>
+              <p className="text-sm text-[var(--spotify-light-text)]">Search PubMed and visualize research networks</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {/* View Mode Toggle */}
-            <div className="flex items-center gap-1 bg-white rounded-lg p-1 border border-blue-200">
+            <div className="flex items-center gap-1 bg-[var(--spotify-dark-gray)] rounded-lg p-1">
               <button
                 onClick={() => setViewMode('network')}
                 className={`flex items-center gap-2 px-3 py-2 rounded-md transition-all ${
                   viewMode === 'network'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-blue-50'
+                    ? 'bg-purple-600 text-white shadow-sm'
+                    : 'text-[var(--spotify-light-text)] hover:text-[var(--spotify-white)] hover:bg-[var(--spotify-medium-gray)]'
                 }`}
                 title="Network View"
               >
@@ -431,8 +440,8 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
                 onClick={() => setViewMode('search')}
                 className={`flex items-center gap-2 px-3 py-2 rounded-md transition-all ${
                   viewMode === 'search'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-blue-50'
+                    ? 'bg-purple-600 text-white shadow-sm'
+                    : 'text-[var(--spotify-light-text)] hover:text-[var(--spotify-white)] hover:bg-[var(--spotify-medium-gray)]'
                 }`}
                 title="Search View"
               >
@@ -441,13 +450,13 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
               </button>
             </div>
             {hasSearched && viewMode === 'search' && (
-              <button
+              <SpotifyTabButton
+                variant="ghost"
                 onClick={clearSearch}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-white rounded-md transition-colors border border-blue-200"
               >
                 <XMarkIcon className="w-4 h-4" />
                 Clear
-              </button>
+              </SpotifyTabButton>
             )}
           </div>
         </div>
@@ -455,13 +464,13 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
         {/* PubMed Search Bar */}
         <form onSubmit={handleSearch} className="mt-4">
           <div className="relative">
-            <MagnifyingGlassIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <MagnifyingGlassIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[var(--spotify-light-text)]" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search PubMed for papers (e.g., 'CRISPR gene editing', 'PMID:40310133', 'machine learning cancer')"
-              className="w-full pl-12 pr-32 py-3 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
+              className="w-full pl-12 pr-32 py-3 bg-[var(--spotify-dark-gray)] border-2 border-purple-500/30 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-[var(--spotify-white)] placeholder-[var(--spotify-light-text)]"
               disabled={isSearching}
               autoComplete="off"
               data-1p-ignore
@@ -471,7 +480,7 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
             <button
               type="submit"
               disabled={isSearching || !searchQuery.trim()}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium"
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors font-medium"
             >
               {isSearching ? 'Searching...' : 'Search'}
             </button>
@@ -480,33 +489,33 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
 
         {/* Quick Tips */}
         <div className="mt-4 flex flex-wrap gap-2">
-          <span className="text-xs text-gray-600">Quick tips:</span>
+          <span className="text-xs text-[var(--spotify-light-text)]">Quick tips:</span>
           <button
             onClick={() => setSearchQuery('machine learning')}
-            className="text-xs px-2 py-1 bg-white border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700"
+            className="text-xs px-2 py-1 bg-[var(--spotify-dark-gray)] border border-[var(--spotify-border-gray)] rounded-md hover:bg-[var(--spotify-medium-gray)] text-[var(--spotify-white)]"
           >
             machine learning
           </button>
           <button
             onClick={() => setSearchQuery('CRISPR')}
-            className="text-xs px-2 py-1 bg-white border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700"
+            className="text-xs px-2 py-1 bg-[var(--spotify-dark-gray)] border border-[var(--spotify-border-gray)] rounded-md hover:bg-[var(--spotify-medium-gray)] text-[var(--spotify-white)]"
           >
             CRISPR
           </button>
           <button
             onClick={() => setSearchQuery('PMID:40310133')}
-            className="text-xs px-2 py-1 bg-white border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700"
+            className="text-xs px-2 py-1 bg-[var(--spotify-dark-gray)] border border-[var(--spotify-border-gray)] rounded-md hover:bg-[var(--spotify-medium-gray)] text-[var(--spotify-white)]"
           >
             PMID:40310133
           </button>
           <button
             onClick={() => setSearchQuery('neural networks')}
-            className="text-xs px-2 py-1 bg-white border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700"
+            className="text-xs px-2 py-1 bg-[var(--spotify-dark-gray)] border border-[var(--spotify-border-gray)] rounded-md hover:bg-[var(--spotify-medium-gray)] text-[var(--spotify-white)]"
           >
             neural networks
           </button>
         </div>
-      </div>
+      </SpotifyTabCard>
 
       {/* Search Results or Network View */}
       {viewMode === 'search' ? (
@@ -848,7 +857,7 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
           </div>
         </div>
       )}
-    </div>
+    </SpotifyTabSection>
   );
 }
 

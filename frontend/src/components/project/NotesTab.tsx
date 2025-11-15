@@ -12,6 +12,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import AnnotationList from '@/components/annotations/AnnotationList';
+import SmartAnnotationList from '@/components/annotations/SmartAnnotationList';
 import AnnotationGroupView from '@/components/annotations/AnnotationGroupView';
 import AnnotationTimelineView from '@/components/annotations/AnnotationTimelineView';
 import AnnotationPaperView from '@/components/annotations/AnnotationPaperView';
@@ -19,6 +20,17 @@ import CollectionScopeFilter from '@/components/annotations/CollectionScopeFilte
 import type { NoteType, Priority, Status } from '@/lib/api/annotations';
 import FilterPanel, { type FilterSection } from '@/components/filters/FilterPanel';
 import FilterChips, { type FilterChip } from '@/components/filters/FilterChips';
+import {
+  SpotifyTabSection,
+  SpotifyTabCard,
+  SpotifyTabCardHeader,
+  SpotifyTabCardContent,
+  SpotifyTabButton,
+  SpotifyTabSearchBar,
+  SpotifyTabEmptyState,
+  SpotifyTabLoading,
+  SpotifyTabGrid
+} from './shared';
 
 interface NotesTabProps {
   project: any;
@@ -272,115 +284,109 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
 
   // Show loading state
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg p-6 border border-purple-200">
-          <div className="flex items-center justify-center py-12">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Loading notes...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <SpotifyTabLoading message="Loading notes..." />;
   }
 
   // Show error state
   if (error) {
     return (
-      <div className="space-y-6">
-        <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-lg p-6 border border-red-200">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center">
-              <span className="text-2xl">⚠️</span>
+      <SpotifyTabSection>
+        <SpotifyTabCard variant="default">
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center">
+                <span className="text-2xl">⚠️</span>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-[var(--spotify-white)]">Error Loading Notes</h2>
+                <p className="text-sm text-red-400">{error}</p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">Error Loading Notes</h2>
-              <p className="text-sm text-red-600">{error}</p>
-            </div>
+            <SpotifyTabButton
+              variant="danger"
+              onClick={() => window.location.reload()}
+            >
+              Reload Page
+            </SpotifyTabButton>
           </div>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-          >
-            Reload Page
-          </button>
-        </div>
-      </div>
+        </SpotifyTabCard>
+      </SpotifyTabSection>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <SpotifyTabSection>
       {/* Header with Stats */}
-      <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg p-6 border border-purple-200">
+      <SpotifyTabCard variant="gradient" gradient="from-purple-500/10 to-pink-500/10">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center">
+            <div className="w-12 h-12 bg-purple-500/20 rounded-full flex items-center justify-center">
               <span className="text-2xl">📝</span>
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Notes & Ideas</h2>
-              <p className="text-sm text-gray-600">All your research notes in one place</p>
+              <h2 className="text-xl font-bold text-[var(--spotify-white)]">Notes & Ideas</h2>
+              <p className="text-sm text-[var(--spotify-light-text)]">All your research notes in one place</p>
             </div>
           </div>
           <div className="text-right">
-            <div className="text-3xl font-bold text-purple-600">{allAnnotations.length}</div>
-            <div className="text-sm text-gray-600">Total Notes</div>
+            <div className="text-3xl font-bold text-purple-400">{allAnnotations.length}</div>
+            <div className="text-sm text-[var(--spotify-light-text)]">Total Notes</div>
           </div>
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white rounded-lg p-3 border border-gray-200">
-            <div className="text-sm text-gray-600 mb-1">Project Level</div>
-            <div className="text-2xl font-bold text-gray-900">
-              {groupedAnnotations.project.length}
-            </div>
-          </div>
-          <div className="bg-white rounded-lg p-3 border border-gray-200">
-            <div className="text-sm text-gray-600 mb-1">Collection Level</div>
-            <div className="text-2xl font-bold text-gray-900">
-              {Object.keys(groupedAnnotations.collections).length}
-            </div>
-          </div>
-          <div className="bg-white rounded-lg p-3 border border-gray-200">
-            <div className="text-sm text-gray-600 mb-1">Paper Level</div>
-            <div className="text-2xl font-bold text-gray-900">
-              {Object.keys(groupedAnnotations.papers).length}
-            </div>
-          </div>
-        </div>
-      </div>
+        <SpotifyTabGrid columns={3}>
+          <SpotifyTabCard hoverable>
+            <SpotifyTabCardContent>
+              <div className="text-sm text-[var(--spotify-light-text)] mb-1">Project Level</div>
+              <div className="text-2xl font-bold text-[var(--spotify-white)]">
+                {groupedAnnotations.project.length}
+              </div>
+            </SpotifyTabCardContent>
+          </SpotifyTabCard>
+          <SpotifyTabCard hoverable>
+            <SpotifyTabCardContent>
+              <div className="text-sm text-[var(--spotify-light-text)] mb-1">Collection Level</div>
+              <div className="text-2xl font-bold text-[var(--spotify-white)]">
+                {Object.keys(groupedAnnotations.collections).length}
+              </div>
+            </SpotifyTabCardContent>
+          </SpotifyTabCard>
+          <SpotifyTabCard hoverable>
+            <SpotifyTabCardContent>
+              <div className="text-sm text-[var(--spotify-light-text)] mb-1">Paper Level</div>
+              <div className="text-2xl font-bold text-[var(--spotify-white)]">
+                {Object.keys(groupedAnnotations.papers).length}
+              </div>
+            </SpotifyTabCardContent>
+          </SpotifyTabCard>
+        </SpotifyTabGrid>
+      </SpotifyTabCard>
 
       {/* Search Bar */}
-      <div className="relative">
-        <MagnifyingGlassIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search notes by content, type, or tags..."
-          className="w-full pl-12 pr-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900 placeholder-gray-500"
-        />
-      </div>
+      <SpotifyTabSearchBar
+        value={searchQuery}
+        onChange={setSearchQuery}
+        placeholder="Search notes by content, type, or tags..."
+      />
 
       {/* 📚 Collection Scope Filter (NEW) */}
-      <div className="bg-white rounded-lg p-4 border border-gray-200">
-        <div className="mb-3">
-          <h3 className="text-sm font-semibold text-gray-900 mb-1">Filter by Collection</h3>
-          <p className="text-xs text-gray-600">
-            View notes from all collections, a specific collection, or unlinked project notes
-          </p>
-        </div>
-        <CollectionScopeFilter
-          projectId={project.project_id}
-          selectedScope={selectedCollectionScope}
-          onScopeChange={setSelectedCollectionScope}
-          noteCounts={noteCounts}
-        />
-      </div>
+      <SpotifyTabCard>
+        <SpotifyTabCardContent>
+          <div className="mb-3">
+            <h3 className="text-sm font-semibold text-[var(--spotify-white)] mb-1">Filter by Collection</h3>
+            <p className="text-xs text-[var(--spotify-light-text)]">
+              View notes from all collections, a specific collection, or unlinked project notes
+            </p>
+          </div>
+          <CollectionScopeFilter
+            projectId={project.project_id}
+            selectedScope={selectedCollectionScope}
+            onScopeChange={setSelectedCollectionScope}
+            noteCounts={noteCounts}
+          />
+        </SpotifyTabCardContent>
+      </SpotifyTabCard>
 
       {/* 🔍 Week 6: Enhanced Filter Panel */}
       <FilterPanel
@@ -603,15 +609,23 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
       {filteredAnnotations.length > 0 ? (
         <div className="bg-white rounded-lg border border-gray-200">
           {displayMode === 'list' && (
-            <AnnotationList
+            <SmartAnnotationList
+              annotations={filteredAnnotations}
               projectId={project.project_id}
-              userId={user?.email}
-              initialFilters={{
-                note_type: selectedType !== 'all' ? selectedType : undefined,
-                priority: selectedPriority !== 'all' ? selectedPriority : undefined,
-                status: selectedStatus !== 'all' ? selectedStatus : undefined,
+              onEdit={(annotation) => {
+                console.log('Edit annotation:', annotation);
               }}
-              showForm={false}
+              onDelete={(annotationId) => {
+                console.log('Delete annotation:', annotationId);
+              }}
+              onReply={(annotationId) => {
+                console.log('Reply to annotation:', annotationId);
+              }}
+              onJumpToSource={(annotation) => {
+                if (annotation.article_pmid && annotation.pdf_page) {
+                  window.open(`/project/${project.project_id}/pdf/${annotation.article_pmid}?page=${annotation.pdf_page}`, '_blank');
+                }
+              }}
               compact={false}
             />
           )}
@@ -720,7 +734,7 @@ export function NotesTab({ project, onRefresh }: NotesTabProps) {
           )}
         </div>
       )}
-    </div>
+    </SpotifyTabSection>
   );
 }
 

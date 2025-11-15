@@ -224,9 +224,9 @@ export const SpotifyCollectionCard: React.FC<{
   onNetworkView
 }) => {
   return (
-    <div className="spotify-card-enhanced bg-white" onClick={onClick}>
+    <div className="spotify-card-enhanced bg-[var(--spotify-dark-gray)] hover:bg-[var(--spotify-medium-gray)]" onClick={onClick}>
       <div className="flex items-center mb-4">
-        <div 
+        <div
           className="w-12 h-12 rounded-lg flex items-center justify-center mr-4"
           style={{ backgroundColor: color }}
         >
@@ -235,23 +235,23 @@ export const SpotifyCollectionCard: React.FC<{
           </svg>
         </div>
         <div className="flex-1">
-          <h3 className="text-[#1a1a1a] font-semibold text-base mb-1">
+          <h3 className="text-white font-semibold text-base mb-1">
             {title}
           </h3>
-          <p className="text-[#4a4a4a] text-sm">
+          <p className="text-[var(--spotify-light-text)] text-sm">
             {articleCount} articles
           </p>
         </div>
       </div>
-      
+
       {description && (
-        <p className="text-[#4a4a4a] text-sm mb-4 line-clamp-2">
+        <p className="text-[var(--spotify-light-text)] text-sm mb-4 line-clamp-2">
           {description}
         </p>
       )}
-      
+
       {lastUpdated && (
-        <p className="text-[#6a6a6a] text-xs mb-4">
+        <p className="text-[var(--spotify-light-text)] text-xs mb-4">
           Updated {lastUpdated}
         </p>
       )}

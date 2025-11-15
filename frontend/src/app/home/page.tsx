@@ -6,12 +6,13 @@ import { useRouter } from 'next/navigation';
 import { SemanticSearchEngine } from '@/lib/semantic-search';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ErrorAlert } from '@/components/ui/Alert';
-import { SpotifyRecommendations } from '@/components/ui/SpotifyRecommendations';
-import { SpotifyTopBar } from '@/components/ui/SpotifyNavigation';
-import { EnhancedHomePage } from '@/components/ui/EnhancedHomePage';
 import { Button } from '@/components/ui/Button';
 import { MobileResponsiveLayout } from '@/components/ui/MobileResponsiveLayout';
 import MeSHAutocompleteSearch from '@/components/MeSHAutocompleteSearch';
+import { UnifiedHeroSection, HeroAction } from '@/components/ui/UnifiedHeroSection';
+import { UnifiedSearchBar } from '@/components/ui/UnifiedSearchBar';
+import { QuickActionsFAB } from '@/components/ui/QuickActionsFAB';
+import { ContextualHelp } from '@/components/ui/ContextualHelp';
 import {
   PlusIcon,
   FolderIcon,
@@ -24,7 +25,9 @@ import {
   SparklesIcon,
   GlobeAltIcon,
   UserGroupIcon,
-  XMarkIcon
+  XMarkIcon,
+  MagnifyingGlassIcon,
+  BookmarkIcon
 } from '@heroicons/react/24/outline';
 import { useRealTimeAnalytics } from '@/hooks/useRealTimeAnalytics';
 import { useWeeklyMixIntegration } from '@/hooks/useWeeklyMixIntegration';
@@ -364,30 +367,46 @@ export default function HomePage() {
     );
   }
 
+  // Hero actions for home page
+  const heroActions: HeroAction[] = [
+    {
+      id: 'explore-network',
+      title: 'Explore Network',
+      description: 'Visualize paper connections and discover related research',
+      icon: GlobeAltIcon,
+      gradient: 'from-purple-500 to-indigo-600',
+      onClick: () => router.push('/explore/network'),
+      badge: 'Popular'
+    },
+    {
+      id: 'search-papers',
+      title: 'Search Papers',
+      description: 'Find research with intelligent MeSH autocomplete',
+      icon: MagnifyingGlassIcon,
+      gradient: 'from-blue-500 to-cyan-600',
+      onClick: () => router.push('/search')
+    },
+    {
+      id: 'my-collections',
+      title: 'My Collections',
+      description: 'Organize and manage your saved papers',
+      icon: BookmarkIcon,
+      gradient: 'from-green-500 to-emerald-600',
+      onClick: () => router.push('/collections')
+    }
+  ];
+
   return (
     <MobileResponsiveLayout>
-      {/* Header */}
-      <div className="bg-gradient-to-b from-[var(--spotify-dark-gray)] to-[var(--spotify-black)] -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        <div className="w-full max-w-none">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="min-w-0 flex-1">
-              <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2 truncate">
-                Good {getTimeOfDay()}, {user.first_name || user.username}
-              </h1>
-              <p className="text-[var(--spotify-light-text)] text-base sm:text-lg">
-                Discover new research tailored to your interests
-              </p>
-            </div>
-            <Button
-              onClick={() => router.push('/discover')}
-              variant="outline"
-              size="sm"
-              className="border-[var(--spotify-green)] text-[var(--spotify-green)] hover:bg-[var(--spotify-green)] hover:text-black flex-shrink-0 w-full sm:w-auto"
-            >
-              Discover →
-            </Button>
-          </div>
-        </div>
+      {/* Unified Hero Section */}
+      <div className="-mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <UnifiedHeroSection
+          emoji="👋"
+          title={`Good ${getTimeOfDay()}, ${user.first_name || user.username}`}
+          description="Discover new research tailored to your interests with AI-powered recommendations"
+          actions={heroActions}
+          proTip="Use the Network Explorer to visualize connections between papers and discover hidden research opportunities"
+        />
       </div>
 
       <div className="w-full max-w-none py-6 sm:py-8">
@@ -423,26 +442,6 @@ export default function HomePage() {
             </div>
           </div>
         )}
-
-        {/* Quick Actions */}
-        <section className="mb-8 sm:mb-12">
-          <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6">Quick Actions</h2>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            {quickActions.map((action, index) => (
-              <button
-                key={index}
-                onClick={() => router.push(action.href)}
-                className="group p-4 sm:p-6 bg-[var(--spotify-dark-gray)] rounded-lg hover:bg-[var(--spotify-gray)] transition-all duration-200 text-left w-full"
-              >
-                <div className={`w-10 h-10 sm:w-12 sm:h-12 ${action.color} rounded-lg flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform`}>
-                  <action.icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                </div>
-                <h3 className="text-white font-semibold mb-1 sm:mb-2 text-sm sm:text-base truncate">{action.title}</h3>
-                <p className="text-[var(--spotify-light-text)] text-xs sm:text-sm line-clamp-2">{action.description}</p>
-              </button>
-            ))}
-          </div>
-        </section>
 
         {/* Research Hub Section */}
         <section className="mb-12 sm:mb-16">
@@ -505,14 +504,7 @@ export default function HomePage() {
                 Semantic analysis of your research interests
               </p>
             </div>
-            <Button
-              onClick={() => router.push('/discover')}
-              variant="outline"
-              size="sm"
-              className="text-[var(--spotify-light-text)] hover:text-white self-start sm:self-auto"
-            >
-              Explore More →
-            </Button>
+            {/* Removed "Explore More" button - all discovery features are now on this page */}
           </div>
           {semanticRecommendations.loading ? (
             <div className="flex items-center justify-center py-12">
@@ -537,15 +529,7 @@ export default function HomePage() {
                       {semanticRecommendations.crossDomain.length} papers
                     </span>
                   </div>
-                  <button
-                    onClick={() => {
-                      trackEvent('cross_domain_explore', { source: 'home_recommendations' });
-                      router.push('/discover?mode=cross_domain_discoveries&category=cross_domain_discoveries');
-                    }}
-                    className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
-                  >
-                    Explore All →
-                  </button>
+                  {/* Removed "Explore All" button - all papers are shown on this page */}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {semanticRecommendations.crossDomain.slice(0, 3).map((paper, index) => (
@@ -579,15 +563,7 @@ export default function HomePage() {
                       {semanticRecommendations.trending.length} papers
                     </span>
                   </div>
-                  <button
-                    onClick={() => {
-                      trackEvent('trending_explore', { source: 'home_recommendations' });
-                      router.push('/discover?mode=trending&category=trending');
-                    }}
-                    className="text-xs text-orange-400 hover:text-orange-300 transition-colors"
-                  >
-                    Explore All →
-                  </button>
+                  {/* Removed "Explore All" button - all papers are shown on this page */}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {semanticRecommendations.trending.slice(0, 3).map((paper, index) => (
@@ -621,15 +597,7 @@ export default function HomePage() {
                       {semanticRecommendations.personalized.length} papers
                     </span>
                   </div>
-                  <button
-                    onClick={() => {
-                      trackEvent('personalized_explore', { source: 'home_recommendations' });
-                      router.push('/discover?mode=for_you&category=for_you');
-                    }}
-                    className="text-xs text-green-400 hover:text-green-300 transition-colors"
-                  >
-                    Explore All →
-                  </button>
+                  {/* Removed "Explore All" button - all papers are shown on this page */}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {semanticRecommendations.personalized.slice(0, 3).map((paper, index) => (
@@ -664,15 +632,7 @@ export default function HomePage() {
                         {semanticRecommendations.citationOpportunities.length} papers
                       </span>
                     </div>
-                    <button
-                      onClick={() => {
-                        trackEvent('citation_opportunities_explore', { source: 'home_recommendations' });
-                        router.push('/discover?mode=citation_opportunities&category=citation_opportunities');
-                      }}
-                      className="text-xs text-yellow-400 hover:text-yellow-300 transition-colors"
-                    >
-                      Explore All →
-                    </button>
+                    {/* Removed "Explore All" button - all papers are shown on this page */}
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {semanticRecommendations.citationOpportunities.slice(0, 3).map((paper, index) => (
@@ -721,6 +681,12 @@ export default function HomePage() {
           </div>
         </section>
       </div>
+
+      {/* Quick Actions FAB */}
+      <QuickActionsFAB />
+
+      {/* Contextual Help */}
+      <ContextualHelp />
     </MobileResponsiveLayout>
   );
 }

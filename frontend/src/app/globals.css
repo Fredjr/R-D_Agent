@@ -24,6 +24,33 @@ html {
   width: 100%;
   max-width: 100vw;
   overflow-x: hidden;
+  /* Dynamic font scaling based on viewport */
+  font-size: 14px; /* Mobile base */
+}
+
+/* Responsive font scaling for larger screens */
+@media (min-width: 768px) {
+  html {
+    font-size: 15px; /* Tablet */
+  }
+}
+
+@media (min-width: 1024px) {
+  html {
+    font-size: 16px; /* Desktop */
+  }
+}
+
+@media (min-width: 1440px) {
+  html {
+    font-size: 17px; /* Large desktop (MacBook Pro 16") */
+  }
+}
+
+@media (min-width: 1920px) {
+  html {
+    font-size: 18px; /* 4K displays */
+  }
 }
 
 * {
@@ -194,6 +221,13 @@ select:focus-visible {
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Custom breakpoints for better responsive design */
+  --breakpoint-sm: 640px;   /* Mobile landscape */
+  --breakpoint-md: 768px;   /* Tablet */
+  --breakpoint-lg: 1024px;  /* Desktop */
+  --breakpoint-xl: 1440px;  /* Large desktop (MacBook Pro 16") */
+  --breakpoint-2xl: 1920px; /* 4K displays */
 }
 
 @media (prefers-color-scheme: dark) {

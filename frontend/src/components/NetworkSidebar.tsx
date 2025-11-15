@@ -750,7 +750,7 @@ export default function NetworkSidebar({
   const { metadata } = selectedNode;
 
   return (
-    <div className="w-full h-full bg-white border-l border-gray-200 flex flex-col overflow-y-auto">
+    <div className="w-full h-full bg-white border-l border-gray-200 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b border-gray-200 flex justify-between items-start flex-shrink-0">
         <div className="flex-1">
@@ -1034,8 +1034,10 @@ export default function NetworkSidebar({
         </div>
       )}
 
-      {/* ResearchRabbit-style Exploration Sections */}
-      <div className="flex-shrink-0">
+      {/* Scrollable Content Area - Contains all exploration sections and collection management */}
+      <div className="flex-1 overflow-y-auto">
+        {/* ResearchRabbit-style Exploration Sections */}
+        <div className="flex-shrink-0">
         {/* Explore Papers Section */}
         <div className="border-b border-gray-200">
           <div className="p-3 bg-gray-50">
@@ -1551,6 +1553,8 @@ export default function NetworkSidebar({
           </div>
         </div>
       )}
+      </div>
+      {/* End of Scrollable Content Area */}
 
       {/* Toast notifications */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
@@ -1562,6 +1566,12 @@ export default function NetworkSidebar({
           title={metadata.title || undefined}
           projectId={projectId}
           onClose={() => setShowPDFViewer(false)}
+          onViewInNetwork={() => {
+            // Close PDF and ensure network is visible
+            setShowPDFViewer(false);
+            // The network is already showing the paper, just close the PDF
+            console.log('🕸️ View in Network clicked - PDF closed, network visible');
+          }}
         />
       )}
     </div>

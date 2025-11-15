@@ -6,10 +6,11 @@ import {
   DocumentPlusIcon,
   FireIcon,
   FolderPlusIcon,
-  SparklesIcon
+  SparklesIcon,
+  GlobeAltIcon
 } from '@heroicons/react/24/outline';
 
-export type FirstActionType = 'search' | 'import' | 'trending' | 'project' | 'skip';
+export type FirstActionType = 'network' | 'search' | 'import' | 'trending' | 'project' | 'skip';
 
 interface FirstActionOption {
   id: FirstActionType;
@@ -37,34 +38,35 @@ export function Step3FirstAction({
 }: Step3FirstActionProps) {
   const actions: FirstActionOption[] = [
     {
+      id: 'network',
+      title: 'Explore Paper Network',
+      description: 'See how research papers connect through citations and discover adjacent research',
+      icon: <GlobeAltIcon className="w-8 h-8" />,
+      color: 'purple',
+      recommended: true
+    },
+    {
       id: 'search',
       title: 'Search for Papers',
-      description: 'Use our Research Hub to search PubMed with MeSH terms',
+      description: 'Find research with intelligent MeSH autocomplete and semantic search',
       icon: <MagnifyingGlassIcon className="w-8 h-8" />,
       color: 'blue',
       recommended: hasTopics
     },
     {
-      id: 'import',
-      title: 'Import Papers',
-      description: 'Import papers you\'re already working with using PMIDs or DOIs',
-      icon: <DocumentPlusIcon className="w-8 h-8" />,
+      id: 'project',
+      title: 'Create Project',
+      description: 'Set up a research workspace to organize papers, notes, and analyses',
+      icon: <FolderPlusIcon className="w-8 h-8" />,
       color: 'green'
     },
     {
       id: 'trending',
       title: 'Discover Papers',
-      description: 'Explore personalized recommendations based on your interests',
+      description: 'Get AI-powered recommendations based on your research interests',
       icon: <FireIcon className="w-8 h-8" />,
       color: 'orange',
       recommended: hasTopics
-    },
-    {
-      id: 'project',
-      title: 'Create a Project',
-      description: 'Start organizing your research with a project workspace',
-      icon: <FolderPlusIcon className="w-8 h-8" />,
-      color: 'purple'
     }
   ];
 

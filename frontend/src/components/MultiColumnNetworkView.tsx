@@ -62,19 +62,58 @@ export default function MultiColumnNetworkView({
   const [collections, setCollections] = useState<any[]>([]);
   const mainNetworkViewRef = useRef<any>(null);
 
-  // Fetch collections for the project
+  // Fetch collections for the project OR all collections across all projects if no projectId
   const fetchCollections = useCallback(async () => {
-    if (!projectId) return;
+    if (!user?.email) return;
 
     try {
-      console.log('🔍 Fetching collections for project:', projectId);
-      const response = await fetch(`/api/proxy/projects/${projectId}/collections`, {
-        headers: {
-          'User-ID': user?.email || 'default_user',
-        },
-      });
+      let response;
 
-      if (response.ok) {
+      if (projectId) {
+        // Fetch collections for specific project
+        console.log('🔍 Fetching collections for project:', projectId);
+        response = await fetch(`/api/proxy/projects/${projectId}/collections`, {
+          headers: {
+            'User-ID': user.email,
+          },
+        });
+      } else {
+        // Fetch all collections across all projects for the user
+        console.log('🔍 Fetching all collections across all projects for user:', user.email);
+        // First get all projects
+        const projectsResponse = await fetch(`/api/proxy/projects`, {
+          headers: {
+            'User-ID': user.email,
+          },
+        });
+
+        if (projectsResponse.ok) {
+          const projects = await projectsResponse.json();
+          console.log('✅ Found projects:', projects.length);
+
+          // Fetch collections from all projects
+          const allCollectionsPromises = projects.map((project: any) =>
+            fetch(`/api/proxy/projects/${project.project_id}/collections`, {
+              headers: {
+                'User-ID': user.email,
+              },
+            }).then(res => res.ok ? res.json() : [])
+          );
+
+          const allCollectionsArrays = await Promise.all(allCollectionsPromises);
+          const allCollections = allCollectionsArrays.flat();
+
+          console.log('✅ All collections fetched:', allCollections.length);
+          setCollections(allCollections);
+          return;
+        } else {
+          console.warn('⚠️ Failed to fetch projects:', projectsResponse.status);
+          setCollections([]);
+          return;
+        }
+      }
+
+      if (response && response.ok) {
         const collectionsData = await response.json();
         console.log('✅ Collections fetched:', collectionsData);
         // Backend returns collections directly as array, not wrapped in collections property
@@ -82,7 +121,7 @@ export default function MultiColumnNetworkView({
         setCollections(collectionsArray);
         console.log('✅ Collections set to state:', collectionsArray.length, 'collections');
       } else {
-        console.warn('⚠️ Failed to fetch collections:', response.status);
+        console.warn('⚠️ Failed to fetch collections:', response?.status);
         setCollections([]);
       }
     } catch (error) {
