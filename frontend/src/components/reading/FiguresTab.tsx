@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { PhotoIcon, XMarkIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
+import { extractFiguresFromPDF, type ExtractedFigure } from '@/utils/pdfFigureExtractor';
 
 interface Figure {
   id: string;
@@ -16,10 +17,11 @@ interface Figure {
 interface FiguresTabProps {
   pmid: string;
   pdfUrl?: string;
+  pdfDocument?: any; // PDF.js document object
   onFigureClick?: (pageNumber: number) => void;
 }
 
-export default function FiguresTab({ pmid, pdfUrl, onFigureClick }: FiguresTabProps) {
+export default function FiguresTab({ pmid, pdfUrl, pdfDocument, onFigureClick }: FiguresTabProps) {
   const [figures, setFigures] = useState<Figure[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedFigure, setSelectedFigure] = useState<Figure | null>(null);
@@ -27,13 +29,25 @@ export default function FiguresTab({ pmid, pdfUrl, onFigureClick }: FiguresTabPr
 
   useEffect(() => {
     fetchFigures();
-  }, [pmid]);
+  }, [pmid, pdfUrl, pdfDocument]);
 
   const fetchFigures = async () => {
     setLoading(true);
     try {
-      // TODO: Implement actual figure extraction from PDF
-      // For now, using mock data
+      // Try to extract real figures from PDF
+      if (pdfUrl) {
+        console.log('🔍 Extracting figures from PDF...');
+        const extractedFigures = await extractFiguresFromPDF(pdfUrl, pdfDocument);
+
+        if (extractedFigures.length > 0) {
+          setFigures(extractedFigures);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Fallback to mock data if extraction fails or no PDF URL
+      console.log('⚠️ Using mock figure data');
       const mockFigures: Figure[] = [
         {
           id: '1',

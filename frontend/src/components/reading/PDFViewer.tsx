@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAnnotationWebSocket } from '@/hooks/useAnnotationWebSocket';
 import HighlightTool from './HighlightTool';
 import HighlightLayer from './HighlightLayer';
+import SearchHighlightLayer from './SearchHighlightLayer';
 import SelectionOverlay from './SelectionOverlay';
 import AnnotationsSidebar from './AnnotationsSidebar';
 import PDFSidebarTabs from './PDFSidebarTabs';
@@ -50,6 +51,7 @@ export default function PDFViewer({ pmid, title, projectId, collectionId, onClos
   const [pdfSource, setPdfSource] = useState<string>('');
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);
+  const [pdfDocument, setPdfDocument] = useState<any>(null); // Store PDF document for text extraction
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [scale, setScale] = useState<number>(1.2);
@@ -241,9 +243,10 @@ export default function PDFViewer({ pmid, title, projectId, collectionId, onClos
     }
   };
 
-  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
-    setNumPages(numPages);
-    console.log(`✅ PDF loaded successfully: ${numPages} pages`);
+  const onDocumentLoadSuccess = async (pdf: any) => {
+    setNumPages(pdf.numPages);
+    setPdfDocument(pdf); // Store document for text extraction
+    console.log(`✅ PDF loaded successfully: ${pdf.numPages} pages`);
   };
 
   const onDocumentLoadError = (error: Error) => {
@@ -305,7 +308,7 @@ export default function PDFViewer({ pmid, title, projectId, collectionId, onClos
     }
   };
 
-  const handleSearchQueryChange = (query: string) => {
+  const handleSearchQueryChange = async (query: string) => {
     setSearchQuery(query);
 
     if (!query.trim()) {
@@ -314,16 +317,61 @@ export default function PDFViewer({ pmid, title, projectId, collectionId, onClos
       return;
     }
 
-    // TODO: Implement actual PDF text search using PDF.js
-    // For now, simulate search results
-    const mockResults = Array.from({ length: 10 }, (_, i) => ({
-      pageNumber: Math.floor(Math.random() * numPages) + 1,
-      text: `This is a sample text containing ${query} in the PDF document. Lorem ipsum dolor sit amet, consectetur adipiscing elit.`,
-      index: i,
-    }));
+    if (!pdfDocument) {
+      console.warn('PDF document not loaded yet');
+      return;
+    }
 
-    setSearchResults(mockResults);
-    setCurrentSearchResultIndex(0);
+    try {
+      const results: any[] = [];
+      const searchTerm = query.toLowerCase();
+
+      // Search through all pages
+      for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+        const page = await pdfDocument.getPage(pageNum);
+        const textContent = await page.getTextContent();
+
+        // Combine all text items into a single string
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(' ');
+
+        // Find all matches in this page
+        const lowerPageText = pageText.toLowerCase();
+        let startIndex = 0;
+
+        while (true) {
+          const matchIndex = lowerPageText.indexOf(searchTerm, startIndex);
+          if (matchIndex === -1) break;
+
+          // Extract context around the match (50 chars before and after)
+          const contextStart = Math.max(0, matchIndex - 50);
+          const contextEnd = Math.min(pageText.length, matchIndex + searchTerm.length + 50);
+          const context = pageText.substring(contextStart, contextEnd);
+
+          results.push({
+            pageNumber: pageNum,
+            text: (contextStart > 0 ? '...' : '') + context + (contextEnd < pageText.length ? '...' : ''),
+            index: results.length,
+            matchIndex, // Store for highlighting
+          });
+
+          startIndex = matchIndex + 1;
+        }
+      }
+
+      console.log(`🔍 Found ${results.length} matches for "${query}"`);
+      setSearchResults(results);
+      setCurrentSearchResultIndex(0);
+
+      // Navigate to first result if found
+      if (results.length > 0) {
+        setPageNumber(results[0].pageNumber);
+      }
+    } catch (error) {
+      console.error('Error searching PDF:', error);
+      setSearchResults([]);
+    }
   };
 
   const handleSearchResultClick = (pageNumber: number, index: number) => {
@@ -1209,6 +1257,18 @@ export default function PDFViewer({ pmid, title, projectId, collectionId, onClos
                   />
                 )}
 
+                {/* Search Highlight Layer - renders search keyword highlights */}
+                {showSearch && searchQuery && pdfDocument && (
+                  <SearchHighlightLayer
+                    pdfDocument={pdfDocument}
+                    searchQuery={searchQuery}
+                    searchResults={searchResults}
+                    currentResultIndex={currentSearchResultIndex}
+                    pageNumber={pageNumber}
+                    scale={scale}
+                  />
+                )}
+
                 {/* Sticky Notes Layer - renders sticky notes */}
                 {projectId &&
                   highlights
@@ -1285,6 +1345,7 @@ export default function PDFViewer({ pmid, title, projectId, collectionId, onClos
                 collectionId={collectionId}
                 userId={user?.user_id}
                 pdfUrl={pdfUrl || undefined}
+                pdfDocument={pdfDocument}
                 onViewPDF={(newPmid) => {
                   // Open new PDF in same viewer
                   window.location.href = `/project/${projectId}/pdf/${newPmid}${collectionId ? `?collectionId=${collectionId}` : ''}`;

@@ -35,6 +35,7 @@ interface PDFSidebarTabsProps {
   collectionId?: string;
   userId?: string;
   pdfUrl?: string;
+  pdfDocument?: any; // PDF.js document object
 
   // Callbacks
   onClose?: () => void;
@@ -56,6 +57,7 @@ export default function PDFSidebarTabs({
   collectionId,
   userId,
   pdfUrl,
+  pdfDocument,
   onClose,
   onViewPDF,
   onAddToCollection,
@@ -133,6 +135,7 @@ export default function PDFSidebarTabs({
           <FiguresTab
             pmid={pmid}
             pdfUrl={pdfUrl}
+            pdfDocument={pdfDocument}
             onFigureClick={(pageNumber) => {
               if (onPageNavigate) {
                 onPageNavigate(pageNumber);
