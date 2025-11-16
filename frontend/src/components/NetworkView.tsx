@@ -1841,7 +1841,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           zoomable
           pannable
           className="!bg-white/90 !backdrop-blur-sm !border !border-gray-200 !rounded-lg !shadow-lg"
-          position="top-right"
+          position="bottom-right"
+          style={{ bottom: 80 }}
         />
         <Background
           variant={BackgroundVariant.Dots}
