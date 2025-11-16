@@ -173,24 +173,41 @@ function NetworkExplorerContent() {
   return (
     <MobileResponsiveLayout>
       <div className="min-h-screen bg-[var(--spotify-black)]">
-        {/* Unified Hero Section */}
-        <div className="px-4 sm:px-6 lg:px-8 py-6">
-          {/* Breadcrumbs */}
-          <div className="mb-4">
-            <Breadcrumbs />
+        {/* Unified Hero Section - Only show when no paper is selected */}
+        {!selectedPMID && (
+          <div className="px-4 sm:px-6 lg:px-8 py-6">
+            {/* Breadcrumbs */}
+            <div className="mb-4">
+              <Breadcrumbs />
+            </div>
+
+            <UnifiedHeroSection
+              emoji="🌐"
+              title="Network Explorer"
+              description="Discover how research papers connect through citations, references, and authors"
+              actions={heroActions}
+              proTip="Click 'Browse Trending' to instantly visualize a popular paper's network, or use the search bar below to find a specific paper by title, PMID, or topic"
+            />
           </div>
+        )}
 
-          <UnifiedHeroSection
-            emoji="🌐"
-            title="Network Explorer"
-            description="Discover how research papers connect through citations, references, and authors"
-            actions={heroActions}
-            proTip="Click 'Browse Trending' to instantly visualize a popular paper's network, or use the search bar below to find a specific paper by title, PMID, or topic"
-          />
-
-          {/* New Search Button (when viewing a network) */}
-          {selectedPMID && (
-            <div className="mt-4 flex justify-end">
+        {/* Compact Header (when viewing a network) */}
+        {selectedPMID && (
+          <div className="px-4 sm:px-6 lg:px-8 py-4 border-b border-gray-800">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    setSelectedPMID(null);
+                    setShowSearch(true);
+                  }}
+                  className="text-[var(--spotify-light-text)] hover:text-white transition-colors"
+                >
+                  ← Back to Explorer
+                </button>
+                <div className="h-4 w-px bg-gray-700"></div>
+                <h2 className="text-lg font-semibold text-white">Network View</h2>
+              </div>
               <Button
                 onClick={() => setShowSearch(!showSearch)}
                 variant="outline"
@@ -199,8 +216,8 @@ function NetworkExplorerContent() {
                 {showSearch ? 'Hide Search' : 'New Search'}
               </Button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Search Section */}
         {showSearch && (
