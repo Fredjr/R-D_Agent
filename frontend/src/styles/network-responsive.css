@@ -1,5 +1,10 @@
 /* Network View Responsive Design Improvements */
 
+/* Ensure network view takes full available space */
+.network-view-container {
+  min-height: 600px;
+}
+
 /* Increase font sizes in NetworkSidebar for better readability */
 .network-sidebar {
   /* Override text-xs (12px) to text-sm (14px) for better readability */
@@ -9,6 +14,11 @@
 .network-sidebar .text-xs {
   font-size: 0.875rem !important; /* 14px instead of 12px */
   line-height: 1.25rem !important;
+}
+
+.network-sidebar h3 {
+  font-size: 1rem !important; /* 16px */
+  line-height: 1.5rem !important;
 }
 
 .network-sidebar h4 {
@@ -24,6 +34,7 @@
 /* Increase button text sizes */
 .network-sidebar button {
   font-size: 0.875rem !important; /* 14px */
+  padding: 0.5rem 0.75rem !important;
 }
 
 /* Increase select and input text sizes */
@@ -88,23 +99,48 @@
   }
 
   .network-sidebar {
-    width: 360px !important;
+    width: 380px !important;
+  }
+
+  .network-view-container {
+    min-height: 700px;
+  }
+
+  /* Better font sizes for desktop */
+  .network-sidebar {
+    font-size: 0.9375rem; /* 15px */
+  }
+
+  .network-sidebar .text-xs {
+    font-size: 0.875rem !important; /* 14px */
+  }
+
+  .network-sidebar h3 {
+    font-size: 1.0625rem !important; /* 17px */
+  }
+
+  .network-sidebar h4 {
+    font-size: 0.9375rem !important; /* 15px */
   }
 }
 
 /* Large Desktop (16" MacBook Pro and above) */
 @media (min-width: 1440px) {
   .network-column {
-    min-width: 1000px !important;
+    min-width: 1100px !important;
   }
 
   .network-sidebar {
-    width: 400px !important;
+    width: 420px !important;
+  }
+
+  .network-view-container {
+    min-height: 800px;
   }
 
   /* Larger font sizes for large screens */
   .network-sidebar {
-    font-size: 0.9375rem; /* 15px */
+    font-size: 1rem; /* 16px */
   }
 
   .network-sidebar .text-xs {
@@ -117,6 +153,48 @@
 
   .network-sidebar h4 {
     font-size: 1rem !important; /* 16px */
+  }
+
+  .network-sidebar button {
+    font-size: 0.9375rem !important; /* 15px */
+    padding: 0.625rem 1rem !important;
+  }
+}
+
+/* Extra Large Desktop (4K and above) */
+@media (min-width: 1920px) {
+  .network-column {
+    min-width: 1200px !important;
+  }
+
+  .network-sidebar {
+    width: 450px !important;
+  }
+
+  .network-view-container {
+    min-height: 900px;
+  }
+
+  /* Even larger font sizes for 4K displays */
+  .network-sidebar {
+    font-size: 1.0625rem; /* 17px */
+  }
+
+  .network-sidebar .text-xs {
+    font-size: 1rem !important; /* 16px */
+  }
+
+  .network-sidebar h3 {
+    font-size: 1.25rem !important; /* 20px */
+  }
+
+  .network-sidebar h4 {
+    font-size: 1.125rem !important; /* 18px */
+  }
+
+  .network-sidebar button {
+    font-size: 1rem !important; /* 16px */
+    padding: 0.75rem 1.25rem !important;
   }
 }
 

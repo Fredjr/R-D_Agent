@@ -1712,7 +1712,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   });
 
   return (
-    <div className={`network-view-container relative ${className || 'h-96'} flex flex-col bg-white rounded-lg border overflow-hidden`}>
+    <div className={`network-view-container relative ${className || 'h-screen'} flex flex-col bg-white rounded-lg border overflow-hidden`}>
       {/* Navigation Breadcrumb Trail */}
       {navigationTrail.length > 0 && (
         <NavigationBreadcrumbs
