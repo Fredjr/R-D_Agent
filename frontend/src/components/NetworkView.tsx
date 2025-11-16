@@ -1072,6 +1072,19 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       } else {
         console.log('✅ All edges have valid source and target nodes');
       }
+
+      // 🎯 CRITICAL: Detect cross-references between non-central nodes
+      // This ensures subsequent graphs have the same cross-reference edges as the initial graph
+      console.log('🔍 [fetchNetworkData] Detecting cross-references for subsequent graphs...');
+      const allNodePmids = flowNodes.map(n => n.id);
+      const crossRefEdges = await detectCrossReferences(allNodePmids, flowEdges);
+
+      if (crossRefEdges.length > 0) {
+        console.log(`✅ [fetchNetworkData] Found ${crossRefEdges.length} cross-reference edges`);
+        setEdges(prevEdges => [...prevEdges, ...crossRefEdges]);
+      } else {
+        console.log('ℹ️ [fetchNetworkData] No additional cross-references found (backend may have already included them)');
+      }
       
     } catch (err) {
       console.error('Error fetching network data:', err);
