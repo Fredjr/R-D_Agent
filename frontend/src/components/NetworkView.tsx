@@ -373,6 +373,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [networkEdges, setNetworkEdges] = useState<NetworkEdge[]>([]); // Store original network edges for sidebar
 
   // Helper function to check if a PMID is in any collection
   const isPmidInCollection = useCallback((pmid: string): boolean => {
@@ -608,10 +609,12 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
     }
   }, [isExpanding, nodes, setNodes, setEdges]);
 
-  // Expose addExplorationNodesToGraph function via ref
+  // Expose addExplorationNodesToGraph function and edges data via ref
   useImperativeHandle(ref, () => ({
-    addExplorationNodesToGraph
-  }), [addExplorationNodesToGraph]);
+    addExplorationNodesToGraph,
+    getEdges: () => networkEdges,
+    getSourceId: () => sourceId
+  }), [addExplorationNodesToGraph, networkEdges, sourceId]);
 
   // Fetch network data with navigation mode support - NOW USING PUBMED APIs
   const fetchNetworkData = useCallback(async () => {
@@ -1048,11 +1051,13 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
       setNodes(flowNodes);
       setEdges(flowEdges);
+      setNetworkEdges(data.edges || []); // Store original network edges for sidebar
 
       console.log('✅ NetworkView state updated:', {
         networkDataSet: !!networkData,
         flowNodesSet: flowNodes.length,
-        flowEdgesSet: flowEdges.length
+        flowEdgesSet: flowEdges.length,
+        networkEdgesSet: (data.edges || []).length
       });
 
       console.log('🔍 React Flow nodes being set:', flowNodes.map(n => ({

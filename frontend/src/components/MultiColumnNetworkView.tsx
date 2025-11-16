@@ -748,6 +748,8 @@ export default function MultiColumnNetworkView({
                   onExploreCluster={onExploreCluster}
                   onShowCitations={handleShowCitations}
                   onShowReferences={handleShowReferences}
+                  edges={mainNetworkViewRef.current?.getEdges?.() || []}
+                  sourceNodeId={mainNetworkViewRef.current?.getSourceId?.() || sourceId}
                 />
               </ErrorBoundary>
               </div>
