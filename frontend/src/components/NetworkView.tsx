@@ -307,12 +307,22 @@ const nodeTypes: NodeTypes = {
   article: ArticleNode,
 };
 
-// Utility function to get node color based on year
-const getNodeColor = (year: number): string => {
-  if (year >= 2020) return '#10b981'; // Green for recent
-  if (year >= 2015) return '#3b82f6'; // Blue for moderate
-  if (year >= 2010) return '#f59e0b'; // Orange for older
-  return '#6b7280'; // Gray for very old
+// Utility function to get node color based on collection status and year
+// ResearchRabbit-style: Green = in collection, Blue gradient = suggested (darker = more recent)
+const getNodeColor = (year: number, isInCollection: boolean = false): string => {
+  if (isInCollection) {
+    return '#10b981'; // Green for papers in collection
+  }
+
+  // Blue gradient for suggested papers based on recency
+  const currentYear = new Date().getFullYear();
+  const yearsSincePublication = currentYear - year;
+
+  if (yearsSincePublication <= 1) return '#1e40af'; // Dark blue - very recent (last year)
+  if (yearsSincePublication <= 3) return '#3b82f6'; // Medium blue - recent (1-3 years)
+  if (yearsSincePublication <= 5) return '#60a5fa'; // Light blue - moderately recent (3-5 years)
+  if (yearsSincePublication <= 10) return '#93c5fd'; // Lighter blue - older (5-10 years)
+  return '#bfdbfe'; // Very light blue - very old (10+ years)
 };
 
 const NetworkView = forwardRef<any, NetworkViewProps>(({
@@ -362,6 +372,17 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+
+  // Helper function to check if a PMID is in any collection
+  const isPmidInCollection = useCallback((pmid: string): boolean => {
+    if (!collections || collections.length === 0) return false;
+
+    // Check all collections for this PMID
+    return collections.some(collection => {
+      const articles = collection.articles || [];
+      return articles.some((article: any) => article.article_pmid === pmid);
+    });
+  }, [collections]);
 
   // ResearchRabbit-style graph expansion - NOW USING PUBMED APIs
   const expandNodeNetwork = useCallback(async (nodeId: string, nodeData: any) => {
@@ -501,13 +522,16 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         const radius = 250 + (index % 3) * 80; // Larger radius for better visibility
 
         // Create node with same structure as initial nodes
+        const paperPmidForCheck = paper.pmid || paper.id;
+        const isInCollection = isPmidInCollection(paperPmidForCheck);
+
         const nodeData = {
           id: newNodeId,
           label: paper.title,
           size: Math.max(40, Math.min((paper.citation_count || 0) * 2, 100)),
-          color: getNodeColor(paper.year || 2020),
+          color: getNodeColor(paper.year || 2020, isInCollection),
           metadata: {
-            pmid: paper.pmid || paper.id,
+            pmid: paperPmidForCheck,
             title: paper.title,
             authors: paper.authors || [],
             journal: paper.journal || '',
@@ -888,6 +912,14 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           };
         }
 
+        // Check if this paper is in any collection
+        const nodePmid = node.metadata?.pmid || node.id;
+        const isInCollection = isPmidInCollection(nodePmid);
+        const nodeYear = node.metadata?.year || new Date().getFullYear();
+
+        // Use ResearchRabbit-style coloring: green for collection, blue gradient for suggested
+        const nodeColor = getNodeColor(nodeYear, isInCollection);
+
         return {
           id: node.id,
           type: 'article',
@@ -897,18 +929,18 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             label: node.label || node.metadata?.title || `Article ${node.id}`,
             // Keep the original metadata structure for ArticleNode component
             metadata: {
-              pmid: node.metadata?.pmid || node.id,
+              pmid: nodePmid,
               title: node.metadata?.title || `Article ${node.id}`,
               authors: node.metadata?.authors || [],
               journal: node.metadata?.journal || '',
-              year: node.metadata?.year || new Date().getFullYear(),
+              year: nodeYear,
               citation_count: node.metadata?.citation_count || 0,
-              url: node.metadata?.url || `https://pubmed.ncbi.nlm.nih.gov/${node.metadata?.pmid || node.id}/`,
+              url: node.metadata?.url || `https://pubmed.ncbi.nlm.nih.gov/${nodePmid}/`,
               abstract: node.metadata?.abstract || '',
             },
             // Also add direct properties for compatibility
             size: node.size || 60,
-            color: node.color || '#2196F3',
+            color: nodeColor, // Use the new color based on collection status
           },
           draggable: true,
         };
@@ -964,7 +996,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
     }
   }, [sourceType, sourceId, navigationMode, user, forceNetworkType, fullTextOnly, projectId]);
 
-  // Fetch collections for sidebar
+  // Fetch collections for sidebar (with articles for green/blue node coloring)
   const fetchCollections = useCallback(async () => {
     if (!projectId) {
       console.warn('⚠️ NetworkView: No projectId available, cannot fetch collections');
@@ -987,7 +1019,44 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         console.log('✅ NetworkView collections fetched:', collectionsData);
         console.log('📊 Collections array:', collectionsData.collections);
         console.log('📊 Collections count:', collectionsData.collections?.length || 0);
-        setCollections(collectionsData.collections || []);
+
+        // Fetch articles for each collection to enable green/blue node coloring
+        const collectionsWithArticles = await Promise.all(
+          (collectionsData.collections || []).map(async (collection: any) => {
+            try {
+              const articlesResponse = await fetch(
+                `/api/proxy/collections/${collection.collection_id}/articles?projectId=${projectId}`,
+                {
+                  headers: {
+                    'User-ID': user?.email || 'default_user',
+                  },
+                }
+              );
+
+              if (articlesResponse.ok) {
+                const articlesData = await articlesResponse.json();
+                return {
+                  ...collection,
+                  articles: articlesData.articles || []
+                };
+              }
+
+              return {
+                ...collection,
+                articles: []
+              };
+            } catch (err) {
+              console.warn(`⚠️ Failed to fetch articles for collection ${collection.collection_id}:`, err);
+              return {
+                ...collection,
+                articles: []
+              };
+            }
+          })
+        );
+
+        console.log('✅ Collections with articles loaded:', collectionsWithArticles.length);
+        setCollections(collectionsWithArticles);
       } else {
         const errorText = await response.text();
         console.warn('⚠️ NetworkView failed to fetch collections:', response.status, errorText);
@@ -1490,29 +1559,49 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           </div>
         </Panel>
 
-        {/* Legend Panel */}
+        {/* Legend Panel - ResearchRabbit Style */}
         <Panel position="top-right" className="bg-white p-3 rounded-lg shadow-lg border">
           <div className="text-sm">
             <div className="font-semibold text-gray-900 mb-2">Legend</div>
             <div className="space-y-2 text-xs">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded-full bg-green-500"></div>
-                <span>Recent (2020+)</span>
+              {/* Collection Status */}
+              <div className="mb-3">
+                <div className="text-xs font-medium text-gray-700 mb-1.5">Collection Status</div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded-full bg-green-500"></div>
+                  <span>In Collection</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded-full bg-blue-500"></div>
-                <span>Moderate (2015-2019)</span>
+
+              {/* Suggested Papers by Recency */}
+              <div className="pt-2 border-t border-gray-200">
+                <div className="text-xs font-medium text-gray-700 mb-1.5">Suggested Papers</div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#1e40af' }}></div>
+                    <span>Very Recent (last year)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#3b82f6' }}></div>
+                    <span>Recent (1-3 years)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#60a5fa' }}></div>
+                    <span>Moderate (3-5 years)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#93c5fd' }}></div>
+                    <span>Older (5-10 years)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#bfdbfe' }}></div>
+                    <span>Very Old (10+ years)</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded-full bg-orange-500"></div>
-                <span>Older (2010-2014)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded-full bg-gray-500"></div>
-                <span>Very Old (&lt;2010)</span>
-              </div>
+
               <div className="mt-2 pt-2 border-t border-gray-200">
-                <div className="text-xs text-gray-500">Node size = Citation count</div>
+                <div className="text-xs text-gray-500">💡 Node size = Citation count</div>
               </div>
             </div>
           </div>

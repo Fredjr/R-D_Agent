@@ -1048,30 +1048,50 @@ export default function NetworkSidebar({
                 : "Shows article list below"}
             </p>
           </div>
-          <div className="p-2 space-y-1">
+          <div className="p-2 space-y-1.5">
+            {/* Similar Work - Most Important, Make it Prominent */}
             <Button
               variant={expandedSection === 'papers' && explorationMode === 'similar' ? 'default' : 'outline'}
               size="sm"
-              className="w-full text-xs justify-start"
+              className={`w-full text-sm justify-start font-medium transition-all ${
+                expandedSection === 'papers' && explorationMode === 'similar'
+                  ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-md'
+                  : 'hover:bg-purple-50 hover:border-purple-300'
+              }`}
               onClick={() => handleExploreSection('papers', 'similar')}
             >
+              <span className="mr-2">🔍</span>
               Similar Work
             </Button>
+
+            {/* All References (Earlier Work) */}
             <Button
               variant={expandedSection === 'papers' && explorationMode === 'earlier' ? 'default' : 'outline'}
               size="sm"
-              className="w-full text-xs justify-start"
+              className={`w-full text-sm justify-start ${
+                expandedSection === 'papers' && explorationMode === 'earlier'
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                  : 'hover:bg-blue-50 hover:border-blue-300'
+              }`}
               onClick={() => handleExploreSection('papers', 'earlier')}
             >
-              Earlier Work
+              <span className="mr-2">📚</span>
+              All References
             </Button>
+
+            {/* All Citations (Later Work) */}
             <Button
               variant={expandedSection === 'papers' && explorationMode === 'later' ? 'default' : 'outline'}
               size="sm"
-              className="w-full text-xs justify-start"
+              className={`w-full text-sm justify-start ${
+                expandedSection === 'papers' && explorationMode === 'later'
+                  ? 'bg-green-600 hover:bg-green-700 text-white'
+                  : 'hover:bg-green-50 hover:border-green-300'
+              }`}
               onClick={() => handleExploreSection('papers', 'later')}
             >
-              Later Work
+              <span className="mr-2">📊</span>
+              All Citations
             </Button>
           </div>
         </div>
@@ -1086,21 +1106,34 @@ export default function NetworkSidebar({
                 : "Shows article list below"}
             </p>
           </div>
-          <div className="p-2 space-y-1">
+          <div className="p-2 space-y-1.5">
+            {/* These Authors */}
             <Button
-              variant={expandedSection === 'people' && explorationMode === 'authors' ? 'secondary' : 'outline'}
+              variant={expandedSection === 'people' && explorationMode === 'authors' ? 'default' : 'outline'}
               size="sm"
-              className="w-full text-xs justify-start"
+              className={`w-full text-sm justify-start ${
+                expandedSection === 'people' && explorationMode === 'authors'
+                  ? 'bg-orange-600 hover:bg-orange-700 text-white'
+                  : 'hover:bg-orange-50 hover:border-orange-300'
+              }`}
               onClick={() => handleExploreSection('people', 'authors')}
             >
+              <span className="mr-2">👤</span>
               These Authors
             </Button>
+
+            {/* Suggested Authors */}
             <Button
-              variant={expandedSection === 'people' && explorationMode === 'suggested' ? 'secondary' : 'outline'}
+              variant={expandedSection === 'people' && explorationMode === 'suggested' ? 'default' : 'outline'}
               size="sm"
-              className="w-full text-xs justify-start"
+              className={`w-full text-sm justify-start ${
+                expandedSection === 'people' && explorationMode === 'suggested'
+                  ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                  : 'hover:bg-amber-50 hover:border-amber-300'
+              }`}
               onClick={() => handleExploreSection('people', 'suggested')}
             >
+              <span className="mr-2">✨</span>
               Suggested Authors
             </Button>
           </div>
