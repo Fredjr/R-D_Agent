@@ -1255,6 +1255,12 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         const x = sourceX + radius * Math.cos(angle);
         const y = sourceY + radius * Math.sin(angle);
 
+        // Check if paper is in collection and get gradient color based on year
+        const paperPmid = paper.pmid;
+        const isInCollection = isPmidInCollection(paperPmid);
+        const paperYear = paper.year || new Date().getFullYear();
+        const nodeColor = getNodeColor(paperYear, isInCollection);
+
         return {
           id: paper.pmid,
           type: 'article',
@@ -1266,7 +1272,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             journal: paper.journal || '',
             year: paper.year || 0,
             citationCount: paper.citation_count || 0,
-            color: '#8b5cf6', // Purple for similar papers
+            color: nodeColor, // Use gradient color based on year
             size: 'medium',
             metadata: {
               pmid: paper.pmid,
@@ -1339,6 +1345,12 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         const x = sourceX - 350;
         const y = sourceY + offsetY;
 
+        // Check if paper is in collection and get gradient color based on year
+        const paperPmid = paper.pmid;
+        const isInCollection = isPmidInCollection(paperPmid);
+        const paperYear = paper.year || new Date().getFullYear();
+        const nodeColor = getNodeColor(paperYear, isInCollection);
+
         return {
           id: paper.pmid,
           type: 'custom',
@@ -1351,7 +1363,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             journal: paper.journal || '',
             year: paper.year || 0,
             citationCount: paper.citation_count || 0,
-            color: '#3b82f6', // Blue for earlier work (references)
+            color: nodeColor, // Use gradient color based on year
             size: 'medium',
             metadata: {
               pmid: paper.pmid,
@@ -1423,6 +1435,12 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         const x = sourceX + 350;
         const y = sourceY + offsetY;
 
+        // Check if paper is in collection and get gradient color based on year
+        const paperPmid = paper.pmid;
+        const isInCollection = isPmidInCollection(paperPmid);
+        const paperYear = paper.year || new Date().getFullYear();
+        const nodeColor = getNodeColor(paperYear, isInCollection);
+
         return {
           id: paper.pmid,
           type: 'custom',
@@ -1435,7 +1453,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             journal: paper.journal || '',
             year: paper.year || 0,
             citationCount: paper.citation_count || 0,
-            color: '#10b981', // Green for later work (citations)
+            color: nodeColor, // Use gradient color based on year
             size: 'medium',
             metadata: {
               pmid: paper.pmid,
