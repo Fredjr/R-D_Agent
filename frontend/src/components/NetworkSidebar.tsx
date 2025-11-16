@@ -133,6 +133,12 @@ export default function NetworkSidebar({
   // PDF Viewer state
   const [showPDFViewer, setShowPDFViewer] = useState(false);
 
+  // Seed paper state (ResearchRabbit-style)
+  const [isSeed, setIsSeed] = useState(false);
+  const [updatingSeed, setUpdatingSeed] = useState(false);
+  const [seedArticleId, setSeedArticleId] = useState<number | null>(null);
+  const [seedCollectionId, setSeedCollectionId] = useState<string | null>(null);
+
   // OA/Full-Text toggle for smart actions
   // Use controlled state if provided, otherwise use internal state
   // Default to false to get ALL PubMed results, not just open access
@@ -157,11 +163,14 @@ export default function NetworkSidebar({
     };
   }, []);
 
-  // NEW: Fetch collections containing the current article
+  // NEW: Fetch collections containing the current article and check seed status
   useEffect(() => {
     const fetchArticleCollections = async () => {
       if (!selectedNode?.id || !projectId) {
         setArticleCollections([]);
+        setIsSeed(false);
+        setSeedArticleId(null);
+        setSeedCollectionId(null);
         return;
       }
 
@@ -177,8 +186,12 @@ export default function NetworkSidebar({
           const data = await response.json();
           const allCollections = Array.isArray(data) ? data : (data.collections || []);
 
-          // Filter collections that contain this article
+          // Filter collections that contain this article and check seed status
           const collectionsWithArticle: any[] = [];
+          let foundSeed = false;
+          let foundSeedArticleId: number | null = null;
+          let foundSeedCollectionId: string | null = null;
+
           for (const collection of allCollections) {
             const articlesResponse = await fetch(
               `/api/proxy/collections/${collection.collection_id}/articles?projectId=${projectId}`,
@@ -194,15 +207,27 @@ export default function NetworkSidebar({
               const articles = Array.isArray(articlesData) ? articlesData : (articlesData.articles || []);
 
               // Check if this collection contains the article
-              if (articles.some((article: any) =>
+              const matchingArticle = articles.find((article: any) =>
                 article.pmid === selectedNode.id || article.article_pmid === selectedNode.id
-              )) {
+              );
+
+              if (matchingArticle) {
                 collectionsWithArticle.push(collection);
+
+                // Check if this article is marked as a seed paper
+                if (matchingArticle.is_seed && !foundSeed) {
+                  foundSeed = true;
+                  foundSeedArticleId = matchingArticle.id;
+                  foundSeedCollectionId = collection.collection_id;
+                }
               }
             }
           }
 
           setArticleCollections(collectionsWithArticle);
+          setIsSeed(foundSeed);
+          setSeedArticleId(foundSeedArticleId);
+          setSeedCollectionId(foundSeedCollectionId);
         }
       } catch (error) {
         console.error('Error fetching article collections:', error);
@@ -363,6 +388,107 @@ export default function NetworkSidebar({
       error('❌ Failed to create collection. Please try again.');
     } finally {
       setCreatingCollection(false);
+    }
+  };
+
+  // Handle seed paper toggle (ResearchRabbit-style)
+  const handleToggleSeed = async () => {
+    if (!selectedNode || !projectId) return;
+
+    // If not in any collection, show error
+    if (articleCollections.length === 0) {
+      error('❌ Please add this paper to a collection first before marking it as a seed');
+      return;
+    }
+
+    // If already a seed, we can toggle it off
+    if (isSeed && seedArticleId && seedCollectionId) {
+      setUpdatingSeed(true);
+      try {
+        const response = await fetch(
+          `/api/proxy/collections/${seedCollectionId}/articles/${seedArticleId}/seed?projectId=${projectId}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'User-ID': user?.email || 'default_user',
+            },
+            body: JSON.stringify({ is_seed: false }),
+          }
+        );
+
+        if (response.ok) {
+          setIsSeed(false);
+          setSeedArticleId(null);
+          setSeedCollectionId(null);
+          success('✅ Paper unmarked as seed');
+        } else {
+          error('❌ Failed to unmark paper as seed');
+        }
+      } catch (err) {
+        console.error('Error unmarking seed:', err);
+        error('❌ Failed to unmark paper as seed');
+      } finally {
+        setUpdatingSeed(false);
+      }
+      return;
+    }
+
+    // If not a seed, mark it as seed in the first collection
+    const firstCollection = articleCollections[0];
+    setUpdatingSeed(true);
+
+    try {
+      // Get the article ID from the collection
+      const articlesResponse = await fetch(
+        `/api/proxy/collections/${firstCollection.collection_id}/articles?projectId=${projectId}`,
+        {
+          headers: {
+            'User-ID': user?.email || 'default_user',
+          },
+        }
+      );
+
+      if (!articlesResponse.ok) {
+        throw new Error('Failed to fetch articles');
+      }
+
+      const articlesData = await articlesResponse.json();
+      const articles = Array.isArray(articlesData) ? articlesData : (articlesData.articles || []);
+      const matchingArticle = articles.find((article: any) =>
+        article.pmid === selectedNode.id || article.article_pmid === selectedNode.id
+      );
+
+      if (!matchingArticle) {
+        throw new Error('Article not found in collection');
+      }
+
+      // Mark as seed
+      const response = await fetch(
+        `/api/proxy/collections/${firstCollection.collection_id}/articles/${matchingArticle.id}/seed?projectId=${projectId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-ID': user?.email || 'default_user',
+          },
+          body: JSON.stringify({ is_seed: true }),
+        }
+      );
+
+      if (response.ok) {
+        setIsSeed(true);
+        setSeedArticleId(matchingArticle.id);
+        setSeedCollectionId(firstCollection.collection_id);
+        success('✅ Paper marked as seed for recommendations');
+      } else {
+        error('❌ Failed to mark paper as seed');
+      }
+    } catch (err) {
+      console.error('Error marking seed:', err);
+      error('❌ Failed to mark paper as seed');
+    } finally {
+      setUpdatingSeed(false);
     }
   };
 
@@ -860,6 +986,53 @@ export default function NetworkSidebar({
                 Open Panel
               </span>
             </Button>
+          )}
+        </div>
+
+        {/* Seed Paper Button (ResearchRabbit-style) */}
+        <div className="mt-2">
+          <Button
+            variant={isSeed ? "default" : "outline"}
+            size="sm"
+            className={`w-full text-sm font-medium transition-all ${
+              isSeed
+                ? 'bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-600'
+                : 'bg-yellow-50 hover:bg-yellow-100 border-yellow-300 text-yellow-700'
+            }`}
+            onClick={handleToggleSeed}
+            disabled={updatingSeed}
+            title={
+              isSeed
+                ? 'This paper is marked as a seed for recommendations'
+                : articleCollections.length === 0
+                ? 'Add to collection first to mark as seed'
+                : 'Mark as seed paper for ResearchRabbit-style exploration'
+            }
+          >
+            {updatingSeed ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Updating...
+              </span>
+            ) : (
+              <span className="flex items-center justify-center gap-2">
+                <span className="text-lg">{isSeed ? '⭐' : '☆'}</span>
+                {isSeed ? 'Seed Paper' : 'Mark as Seed'}
+              </span>
+            )}
+          </Button>
+          {isSeed && (
+            <div className="mt-1 text-xs text-center text-yellow-700 bg-yellow-50 py-1 px-2 rounded">
+              🎯 This paper will be used for recommendations
+            </div>
+          )}
+          {!isSeed && articleCollections.length === 0 && (
+            <div className="mt-1 text-xs text-center text-gray-500">
+              Add to collection first to mark as seed
+            </div>
           )}
         </div>
 
