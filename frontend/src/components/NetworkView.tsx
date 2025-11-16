@@ -381,6 +381,30 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
     onEdgesChange(changes);
   }, [onEdgesChange]);
 
+  // CRITICAL FIX: Store React Flow instance
+  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+
+  // CRITICAL FIX: Force edges to re-render after React Flow initializes
+  useEffect(() => {
+    if (reactFlowInstance && edges.length > 0) {
+      console.log('🔄 [FORCE UPDATE] Forcing React Flow to update edges:', edges.length);
+      console.log('🔄 [FORCE UPDATE] React Flow internal edges:', reactFlowInstance.getEdges().length);
+
+      // NUCLEAR OPTION: Force React Flow to re-set edges
+      setTimeout(() => {
+        const currentEdges = reactFlowInstance.getEdges();
+        console.log('🔄 [FORCE UPDATE] Current edges in React Flow:', currentEdges.length);
+
+        if (currentEdges.length === 0 && edges.length > 0) {
+          console.log('🚨 [FORCE UPDATE] React Flow lost edges! Re-setting...');
+          reactFlowInstance.setEdges(edges);
+        }
+
+        reactFlowInstance.fitView({ padding: 0.3, duration: 200 });
+      }, 100);
+    }
+  }, [reactFlowInstance, edges]);
+
   // CRITICAL TEST: Add hardcoded test edges to verify React Flow can render ANY edges
   const [testMode, setTestMode] = useState(false);
   const testEdges: Edge[] = testMode && nodes.length >= 2 ? [
@@ -1928,6 +1952,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         {/* CENTER PANEL - Network Graph */}
         <div className="flex-1 relative" style={{ width: '100%', height: '100%' }}>
         <ReactFlow
+        key={`reactflow-${edges.length}-${nodes.length}`}
         nodes={nodes}
         edges={displayEdges}
         onNodesChange={onNodesChange}
@@ -1956,6 +1981,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             edges: instance.getEdges().length,
             viewport: instance.getViewport()
           });
+          setReactFlowInstance(instance);
         }}
         proOptions={{ hideAttribution: true }}
         // Google Maps-like smooth interactions
