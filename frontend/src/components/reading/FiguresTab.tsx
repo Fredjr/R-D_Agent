@@ -11,6 +11,7 @@ interface Figure {
   caption: string;
   pageNumber: number;
   imageUrl?: string;
+  imageData?: string; // Base64 encoded image
   type: 'figure' | 'chart' | 'table';
 }
 
@@ -173,8 +174,14 @@ export default function FiguresTab({ pmid, pdfUrl, pdfDocument, onFigureClick }:
                 className="border border-gray-200 rounded-lg p-3 hover:border-purple-400 hover:shadow-md transition-all cursor-pointer"
               >
                 {/* Figure Preview */}
-                <div className="bg-gray-100 rounded-lg h-32 flex items-center justify-center mb-2">
-                  {figure.imageUrl ? (
+                <div className="bg-gray-100 rounded-lg h-32 flex items-center justify-center mb-2 overflow-hidden">
+                  {figure.imageData ? (
+                    <img
+                      src={figure.imageData}
+                      alt={figure.title}
+                      className="w-full h-full object-contain"
+                    />
+                  ) : figure.imageUrl ? (
                     <Image
                       src={figure.imageUrl}
                       alt={figure.title}
@@ -239,7 +246,13 @@ export default function FiguresTab({ pmid, pdfUrl, pdfDocument, onFigureClick }:
             <div className="p-6">
               {/* Figure Image */}
               <div className="bg-gray-100 rounded-lg p-4 mb-4 flex items-center justify-center min-h-[400px]">
-                {selectedFigure.imageUrl ? (
+                {selectedFigure.imageData ? (
+                  <img
+                    src={selectedFigure.imageData}
+                    alt={selectedFigure.title}
+                    className="object-contain max-w-full max-h-[600px]"
+                  />
+                ) : selectedFigure.imageUrl ? (
                   <Image
                     src={selectedFigure.imageUrl}
                     alt={selectedFigure.title}

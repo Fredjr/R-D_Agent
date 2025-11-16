@@ -13,6 +13,7 @@ export interface ExtractedFigure {
 /**
  * Extract figures, charts, and tables from a PDF document
  * This function analyzes the PDF content to find images and their captions
+ * AND renders the actual images
  */
 export async function extractFiguresFromPDF(
   pdfUrl: string,
@@ -20,7 +21,7 @@ export async function extractFiguresFromPDF(
 ): Promise<ExtractedFigure[]> {
   try {
     let pdf = pdfDocument;
-    
+
     // Load PDF if not provided
     if (!pdf) {
       const loadingTask = pdfjs.getDocument(pdfUrl);
@@ -30,83 +31,67 @@ export async function extractFiguresFromPDF(
     const figures: ExtractedFigure[] = [];
     const numPages = pdf.numPages;
 
-    console.log(`🔍 Extracting figures from ${numPages} pages...`);
+    console.log(`🔍 [FigureExtractor] Extracting figures from ${numPages} pages...`);
 
     // Process each page
     for (let pageNum = 1; pageNum <= numPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
-      
-      // Get page operations to find images
-      const ops = await page.getOperatorList();
-      
+
       // Get text content to find captions
       const textContent = await page.getTextContent();
       const pageText = textContent.items
         .map((item: any) => item.str)
         .join(' ');
 
-      // Find images in the page
-      let imageCount = 0;
-      for (let i = 0; i < ops.fnArray.length; i++) {
-        // Check for image operations (paintImageXObject, paintInlineImageXObject)
-        if (ops.fnArray[i] === pdfjs.OPS.paintImageXObject || 
-            ops.fnArray[i] === pdfjs.OPS.paintInlineImageXObject) {
-          imageCount++;
-          
-          // Try to extract caption from nearby text
-          const caption = extractCaptionFromText(pageText, imageCount);
-          const figureType = determineFigureType(caption);
-          
-          figures.push({
-            id: `fig-${pageNum}-${imageCount}`,
-            title: `${figureType === 'table' ? 'Table' : 'Figure'} ${figures.length + 1}`,
-            caption: caption || 'No caption available',
-            pageNumber: pageNum,
-            type: figureType,
-            // Note: Extracting actual image data requires more complex processing
-            // For now, we'll just mark that an image exists
-          });
-        }
-      }
+      // Look for "Figure", "Abb." (German), "Tab." (Table) keywords in text
+      const figureMatches = pageText.match(/(Figure|Fig\.|Abb\.)\s+\d+[:.]/gi) || [];
+      const tableMatches = pageText.match(/(Table|Tab\.)\s+\d+[:.]/gi) || [];
 
-      // Also look for "Figure" or "Table" keywords in text as fallback
-      const figureMatches = pageText.match(/Figure\s+\d+[:.]/gi) || [];
-      const tableMatches = pageText.match(/Table\s+\d+[:.]/gi) || [];
-      
-      // Add figures found by text analysis if not already added
-      figureMatches.forEach((match: string, idx: number) => {
-        if (imageCount === 0 || idx >= imageCount) {
-          const captionStart = pageText.indexOf(match);
-          const caption = pageText.substring(captionStart, captionStart + 200);
+      console.log(`📄 [FigureExtractor] Page ${pageNum}: Found ${figureMatches.length} figures, ${tableMatches.length} tables`);
 
-          figures.push({
-            id: `fig-text-${pageNum}-${idx}`,
-            title: match.replace(/[:.]/g, '').trim(),
-            caption: caption.trim(),
-            pageNumber: pageNum,
-            type: 'figure',
-          });
-        }
-      });
-
-      tableMatches.forEach((match: string, idx: number) => {
+      // Extract figures with actual image data
+      for (let idx = 0; idx < figureMatches.length; idx++) {
+        const match = figureMatches[idx];
         const captionStart = pageText.indexOf(match);
-        const caption = pageText.substring(captionStart, captionStart + 200);
+        const caption = pageText.substring(captionStart, Math.min(captionStart + 300, pageText.length));
+
+        // Render the page as an image
+        const imageData = await extractImageFromPage(pdf, pageNum);
 
         figures.push({
-          id: `table-text-${pageNum}-${idx}`,
+          id: `fig-${pageNum}-${idx}`,
+          title: match.replace(/[:.]/g, '').trim(),
+          caption: caption.trim(),
+          pageNumber: pageNum,
+          type: 'figure',
+          imageData: imageData || undefined,
+        });
+      }
+
+      // Extract tables with actual image data
+      for (let idx = 0; idx < tableMatches.length; idx++) {
+        const match = tableMatches[idx];
+        const captionStart = pageText.indexOf(match);
+        const caption = pageText.substring(captionStart, Math.min(captionStart + 300, pageText.length));
+
+        // Render the page as an image
+        const imageData = await extractImageFromPage(pdf, pageNum);
+
+        figures.push({
+          id: `table-${pageNum}-${idx}`,
           title: match.replace(/[:.]/g, '').trim(),
           caption: caption.trim(),
           pageNumber: pageNum,
           type: 'table',
+          imageData: imageData || undefined,
         });
-      });
+      }
     }
 
-    console.log(`✅ Extracted ${figures.length} figures from PDF`);
+    console.log(`✅ [FigureExtractor] Extracted ${figures.length} figures from PDF`);
     return figures;
   } catch (error) {
-    console.error('Error extracting figures from PDF:', error);
+    console.error('❌ [FigureExtractor] Error extracting figures from PDF:', error);
     return [];
   }
 }

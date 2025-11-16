@@ -48,32 +48,63 @@ export default function RelatedArticlesTab({
   const fetchRelatedArticles = async () => {
     setLoading(true);
     try {
-      console.log(`🔍 Fetching related articles for PMID: ${pmid}`);
-      
-      // Use the similar-network API which finds related papers
-      const response = await fetch(`/api/proxy/articles/${pmid}/similar-network?limit=20&threshold=0.15`, {
+      console.log(`🔍 [RelatedArticlesTab] Fetching related articles for PMID: ${pmid}`);
+
+      // Try backend similar-network API first
+      try {
+        const backendResponse = await fetch(`/api/proxy/articles/${pmid}/similar-network?limit=20&threshold=0.15`, {
+          headers: {
+            'User-ID': userId || 'default_user',
+          },
+        });
+
+        if (backendResponse.ok) {
+          const backendData = await backendResponse.json();
+
+          if (backendData.articles && backendData.articles.length > 0) {
+            console.log(`✅ [RelatedArticlesTab] Found ${backendData.articles.length} articles from backend`);
+
+            // Enrich with relationship explanations
+            const enrichedArticles = backendData.articles.map((article: any) => ({
+              ...article,
+              relationship_type: determineRelationshipType(article),
+              relationship_explanation: generateRelationshipExplanation(article, backendData.source_article),
+            }));
+
+            setRelatedArticles(enrichedArticles);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (backendError) {
+        console.log(`⚠️ [RelatedArticlesTab] Backend API failed, trying PubMed fallback:`, backendError);
+      }
+
+      // Fallback to PubMed recommendations API
+      console.log(`🔄 [RelatedArticlesTab] Using PubMed recommendations API as fallback`);
+      const pubmedResponse = await fetch(`/api/proxy/pubmed/recommendations?type=similar&pmid=${pmid}&limit=20`, {
         headers: {
           'User-ID': userId || 'default_user',
         },
       });
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch related articles: ${response.status}`);
+      if (!pubmedResponse.ok) {
+        throw new Error(`Failed to fetch related articles: ${pubmedResponse.status}`);
       }
 
-      const data = await response.json();
-      console.log(`📊 Found ${data.articles?.length || 0} related articles`);
-      
+      const pubmedData = await pubmedResponse.json();
+      console.log(`📊 [RelatedArticlesTab] Found ${pubmedData.recommendations?.length || 0} related articles from PubMed`);
+
       // Enrich with relationship explanations
-      const enrichedArticles = (data.articles || []).map((article: any) => ({
+      const enrichedArticles = (pubmedData.recommendations || []).map((article: any) => ({
         ...article,
-        relationship_type: determineRelationshipType(article),
-        relationship_explanation: generateRelationshipExplanation(article, data.source_article),
+        relationship_type: 'similar_content',
+        relationship_explanation: 'Similar content based on PubMed\'s similarity algorithm',
       }));
 
       setRelatedArticles(enrichedArticles);
     } catch (error) {
-      console.error('Error fetching related articles:', error);
+      console.error('❌ [RelatedArticlesTab] Error fetching related articles:', error);
       setRelatedArticles([]);
     } finally {
       setLoading(false);

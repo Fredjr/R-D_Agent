@@ -922,30 +922,59 @@ export default function PDFViewer({ pmid, title, projectId, collectionId, onClos
       setShowExplorePanel(true);
 
       try {
+        console.log(`🔍 [PDFViewer] Fetching ${mode} for PMID: ${pmid}`);
+
         let endpoint = '';
         if (mode === 'citations') {
-          endpoint = `/api/proxy/articles/${pmid}/citations`;
+          // Use PubMed citations API
+          endpoint = `/api/proxy/pubmed/citations?pmid=${pmid}&limit=50`;
         } else if (mode === 'references') {
-          endpoint = `/api/proxy/articles/${pmid}/references`;
+          // Use PubMed references API
+          endpoint = `/api/proxy/pubmed/references?pmid=${pmid}&limit=50`;
         } else if (mode === 'similar') {
-          endpoint = `/api/proxy/articles/${pmid}/similar`;
+          // Use PubMed recommendations API for similar papers
+          endpoint = `/api/proxy/pubmed/recommendations?type=similar&pmid=${pmid}&limit=50`;
         }
 
-        const response = await fetch(endpoint);
+        console.log(`📡 [PDFViewer] Fetching from: ${endpoint}`);
+
+        const response = await fetch(endpoint, {
+          headers: {
+            'User-ID': user?.user_id || 'default_user',
+          },
+        });
+
+        console.log(`📊 [PDFViewer] Response status: ${response.status}`);
+
         if (!response.ok) {
-          throw new Error(`Failed to fetch ${mode}`);
+          const errorText = await response.text();
+          console.error(`❌ [PDFViewer] API error: ${response.status} - ${errorText}`);
+          throw new Error(`Failed to fetch ${mode}: ${response.status}`);
         }
 
         const data = await response.json();
-        setExplorationResults(data.articles || data.results || []);
+        console.log(`✅ [PDFViewer] Received data:`, data);
+
+        // Extract articles from different response formats
+        let articles = [];
+        if (mode === 'citations') {
+          articles = data.citations || [];
+        } else if (mode === 'references') {
+          articles = data.references || [];
+        } else if (mode === 'similar') {
+          articles = data.recommendations || [];
+        }
+
+        console.log(`📊 [PDFViewer] Found ${articles.length} ${mode}`);
+        setExplorationResults(articles);
       } catch (err) {
-        console.error(`Error fetching ${mode}:`, err);
+        console.error(`❌ [PDFViewer] Error fetching ${mode}:`, err);
         setExplorationResults([]);
       } finally {
         setLoadingExploration(false);
       }
     },
-    [pmid]
+    [pmid, user]
   );
 
   // Handle tool selection - automatically enable highlight mode for text-based tools
