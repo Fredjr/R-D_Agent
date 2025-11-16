@@ -17,6 +17,7 @@ import {
   NodeTypes,
   OnConnect,
   Panel,
+  MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import NetworkSidebar from './NetworkSidebar';
@@ -1128,7 +1129,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             strokeOpacity: 1,
           },
           markerEnd: {
-            type: 'arrowclosed',
+            type: MarkerType.ArrowClosed,
             color: edgeColor,
           },
           data: {
