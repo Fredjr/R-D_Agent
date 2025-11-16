@@ -1151,9 +1151,92 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
     fetchCollections();
   }, [fetchNetworkData, fetchCollections]);
 
+  // Helper function to detect cross-references between nodes
+  const detectCrossReferences = useCallback(async (
+    allNodePmids: string[],
+    existingEdges: CytoscapeEdge[]
+  ): Promise<CytoscapeEdge[]> => {
+    console.log('🔍 Detecting cross-references between nodes...', allNodePmids);
+    const newCrossRefEdges: CytoscapeEdge[] = [];
+    let crossReferencesFound = 0;
+
+    // Limit to first 10 nodes to avoid too many API calls
+    const nodesToCheck = allNodePmids.slice(0, 10);
+
+    for (const nodePmid of nodesToCheck) {
+      try {
+        // Check if this node cites any other nodes in our network
+        const refsResponse = await fetch(`/api/proxy/pubmed/elink?pmid=${nodePmid}&dbfrom=pubmed&cmd=neighbor&linkname=pubmed_pubmed_refs`);
+        if (refsResponse.ok) {
+          const refsData = await refsResponse.json();
+          const citedByThisNode = refsData.linksets?.[0]?.linksetdbs?.[0]?.links || [];
+
+          for (const citedPmid of citedByThisNode) {
+            // If the cited paper is in our network (and not the same node), create an edge
+            if (allNodePmids.includes(citedPmid) && citedPmid !== nodePmid) {
+              const edgeId = `${nodePmid}-refs-${citedPmid}`;
+              // Check if edge doesn't already exist
+              if (!existingEdges.find(e => e.id === edgeId) && !newCrossRefEdges.find(e => e.id === edgeId)) {
+                newCrossRefEdges.push({
+                  id: edgeId,
+                  source: nodePmid,
+                  target: citedPmid,
+                  animated: false,
+                  label: 'cites',
+                  data: {
+                    relationship: 'reference',
+                    weight: 0.5 // Lower weight for cross-references
+                  }
+                });
+                crossReferencesFound++;
+                console.log(`  ✅ Found cross-reference: ${nodePmid} → ${citedPmid}`);
+              }
+            }
+          }
+        }
+
+        // Check if this node is cited by any other nodes in our network
+        const citesResponse = await fetch(`/api/proxy/pubmed/elink?pmid=${nodePmid}&dbfrom=pubmed&cmd=neighbor&linkname=pubmed_pubmed_citedin`);
+        if (citesResponse.ok) {
+          const citesData = await citesResponse.json();
+          const citingThisNode = citesData.linksets?.[0]?.linksetdbs?.[0]?.links || [];
+
+          for (const citingPmid of citingThisNode) {
+            // If the citing paper is in our network (and not the same node), create an edge
+            if (allNodePmids.includes(citingPmid) && citingPmid !== nodePmid) {
+              const edgeId = `${citingPmid}-cites-${nodePmid}`;
+              // Check if edge doesn't already exist
+              if (!existingEdges.find(e => e.id === edgeId) && !newCrossRefEdges.find(e => e.id === edgeId)) {
+                newCrossRefEdges.push({
+                  id: edgeId,
+                  source: citingPmid,
+                  target: nodePmid,
+                  animated: false,
+                  label: 'cites',
+                  data: {
+                    relationship: 'citation',
+                    weight: 0.5 // Lower weight for cross-references
+                  }
+                });
+                crossReferencesFound++;
+                console.log(`  ✅ Found cross-citation: ${citingPmid} → ${nodePmid}`);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`⚠️ Failed to check cross-references for ${nodePmid}:`, error);
+        // Continue with other nodes even if one fails
+      }
+    }
+
+    console.log(`✅ Found ${crossReferencesFound} cross-references between non-central nodes`);
+    return newCrossRefEdges;
+  }, []);
+
   // Phase 1.4: Listen for similar papers event from NetworkSidebar
   useEffect(() => {
-    const handleAddSimilarPapers = (event: Event) => {
+    const handleAddSimilarPapers = async (event: Event) => {
       const customEvent = event as CustomEvent;
       const { sourcePmid, papers } = customEvent.detail;
 
@@ -1212,11 +1295,21 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         }
       }));
 
-      // Update nodes and edges
+      // Update nodes and edges first
       setNodes(prevNodes => [...prevNodes, ...newNodes]);
       setEdges(prevEdges => [...prevEdges, ...newEdges]);
 
       console.log(`[NetworkView] Added ${newNodes.length} nodes and ${newEdges.length} edges`);
+
+      // Detect cross-references between all nodes (including newly added ones)
+      const allNodePmids = [...nodes.map(n => n.id), ...newNodes.map(n => n.id)];
+      const allEdges = [...edges, ...newEdges];
+      const crossRefEdges = await detectCrossReferences(allNodePmids, allEdges);
+
+      if (crossRefEdges.length > 0) {
+        setEdges(prevEdges => [...prevEdges, ...crossRefEdges]);
+        console.log(`[NetworkView] Added ${crossRefEdges.length} cross-reference edges`);
+      }
     };
 
     window.addEventListener('addSimilarPapers', handleAddSimilarPapers);
@@ -1224,11 +1317,11 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
     return () => {
       window.removeEventListener('addSimilarPapers', handleAddSimilarPapers);
     };
-  }, [nodes, setNodes, setEdges]);
+  }, [nodes, edges, setNodes, setEdges, detectCrossReferences]);
 
   // Phase 1.5: Listen for earlier papers event from NetworkSidebar
   useEffect(() => {
-    const handleAddEarlierPapers = (event: Event) => {
+    const handleAddEarlierPapers = async (event: Event) => {
       const customEvent = event as CustomEvent;
       const { sourcePmid, papers } = customEvent.detail;
 
@@ -1286,11 +1379,21 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         }
       }));
 
-      // Update nodes and edges
+      // Update nodes and edges first
       setNodes(prevNodes => [...prevNodes, ...newNodes]);
       setEdges(prevEdges => [...prevEdges, ...newEdges]);
 
       console.log(`[NetworkView] Added ${newNodes.length} earlier work nodes and ${newEdges.length} edges`);
+
+      // Detect cross-references between all nodes (including newly added ones)
+      const allNodePmids = [...nodes.map(n => n.id), ...newNodes.map(n => n.id)];
+      const allEdges = [...edges, ...newEdges];
+      const crossRefEdges = await detectCrossReferences(allNodePmids, allEdges);
+
+      if (crossRefEdges.length > 0) {
+        setEdges(prevEdges => [...prevEdges, ...crossRefEdges]);
+        console.log(`[NetworkView] Added ${crossRefEdges.length} cross-reference edges`);
+      }
     };
 
     window.addEventListener('addEarlierPapers', handleAddEarlierPapers);
@@ -1298,11 +1401,11 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
     return () => {
       window.removeEventListener('addEarlierPapers', handleAddEarlierPapers);
     };
-  }, [nodes, setNodes, setEdges]);
+  }, [nodes, edges, setNodes, setEdges, detectCrossReferences]);
 
   // Phase 1.5: Listen for later papers event from NetworkSidebar
   useEffect(() => {
-    const handleAddLaterPapers = (event: Event) => {
+    const handleAddLaterPapers = async (event: Event) => {
       const customEvent = event as CustomEvent;
       const { sourcePmid, papers } = customEvent.detail;
 
@@ -1360,11 +1463,21 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         }
       }));
 
-      // Update nodes and edges
+      // Update nodes and edges first
       setNodes(prevNodes => [...prevNodes, ...newNodes]);
       setEdges(prevEdges => [...prevEdges, ...newEdges]);
 
       console.log(`[NetworkView] Added ${newNodes.length} later work nodes and ${newEdges.length} edges`);
+
+      // Detect cross-references between all nodes (including newly added ones)
+      const allNodePmids = [...nodes.map(n => n.id), ...newNodes.map(n => n.id)];
+      const allEdges = [...edges, ...newEdges];
+      const crossRefEdges = await detectCrossReferences(allNodePmids, allEdges);
+
+      if (crossRefEdges.length > 0) {
+        setEdges(prevEdges => [...prevEdges, ...crossRefEdges]);
+        console.log(`[NetworkView] Added ${crossRefEdges.length} cross-reference edges`);
+      }
     };
 
     window.addEventListener('addLaterPapers', handleAddLaterPapers);
@@ -1372,7 +1485,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
     return () => {
       window.removeEventListener('addLaterPapers', handleAddLaterPapers);
     };
-  }, [nodes, setNodes, setEdges]);
+  }, [nodes, edges, setNodes, setEdges, detectCrossReferences]);
 
   // Phase 2.2: Listen for paper added to collection event from NetworkSidebar
   useEffect(() => {
