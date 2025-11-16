@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import {
-  ReactFlow,
+import ReactFlow, {
   Node,
   Edge,
   Controls,
@@ -9,8 +8,8 @@ import {
   useEdgesState,
   ConnectionMode,
   NodeTypes,
-} from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
+} from 'reactflow';
+import 'reactflow/dist/style.css';
 import { NetworkNode } from './NetworkView';
 
 // Custom node component for exploration results

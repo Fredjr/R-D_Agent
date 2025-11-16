@@ -1,5 +1,5 @@
 import React, { memo, useMemo, useCallback } from 'react';
-import { Handle, Position, NodeProps } from '@xyflow/react';
+import { Handle, Position, NodeProps } from 'reactflow';
 
 interface NetworkNodeData {
   pmid: string;

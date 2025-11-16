@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import {
-  ReactFlow,
+import ReactFlow, {
   Node,
   Edge,
   addEdge,
@@ -18,8 +17,8 @@ import {
   OnConnect,
   Panel,
   MarkerType,
-} from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
+} from 'reactflow';
+import 'reactflow/dist/style.css';
 import NetworkSidebar from './NetworkSidebar';
 import PaperListPanel from './PaperListPanel';
 import TimelineView from './TimelineView';
@@ -1838,7 +1837,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   console.log('🎨 React Flow rendering with:', {
     nodesCount: nodes.length,
     edgesCount: edges.length,
-    nodes: nodes.map(n => ({ id: n.id, position: n.position, label: n.data?.label })),
+    nodes: nodes.map(n => ({ id: n.id, position: n.position, label: (n.data as any)?.label })),
     edgesSample: edges.slice(0, 3).map(e => ({
       id: e.id,
       source: e.source,
@@ -2288,7 +2287,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
           // Find the node in the graph by PMID
           const reactFlowNode = nodes.find(n => {
-            const metadata = (n.data?.metadata || n.data) as any;
+            const nodeData = n.data as any;
+            const metadata = (nodeData?.metadata || nodeData) as any;
             const pmid = metadata?.pmid || n.id;
             return pmid === summaryPmid;
           });
@@ -2302,8 +2302,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             // If not found, create a networkNode from the React Flow node data
             if (!networkNode && reactFlowNode.data) {
               console.log('🔄 Creating networkNode from React Flow node data');
-              const metadata = (reactFlowNode.data?.metadata || reactFlowNode.data) as any;
               const nodeData = reactFlowNode.data as any;
+              const metadata = (nodeData?.metadata || nodeData) as any;
               networkNode = {
                 id: reactFlowNode.id,
                 label: metadata?.title || nodeData?.label || 'Unknown Article',
