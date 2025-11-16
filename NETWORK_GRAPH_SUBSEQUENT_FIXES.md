@@ -195,9 +195,11 @@ When clicking Similar/Earlier/Later Work buttons:
 |--------|-------------|--------|
 | `616e8b4` | Fix node gradient coloring for subsequent graphs (INCOMPLETE) | ⚠️ Partial |
 | `5025d7b` | Add cross-reference detection for quick action buttons | ✅ Deployed |
-| `8a52e64` | **CRITICAL FIX**: Remove ...node spread, fix backend colors | ✅ Deployed |
+| `8a52e64` | Remove ...node spread, fix backend colors (INCOMPLETE) | ⚠️ Partial |
+| `bb1f8ed` | Add detailed color debugging logs to CytoscapeGraph | ✅ Deployed |
+| `e56278e` | **FINAL FIX**: Force NetworkView for all exploration columns | ✅ Deployed |
 
-**Vercel**: Should be live in ~2 minutes after push
+**Vercel**: Should be live now!
 
 ---
 
@@ -266,6 +268,92 @@ data: {
 2. **Frontend has full control**: Explicitly sets color from `getNodeColor(year, isInCollection)`
 3. **No property conflicts**: Removed `...node` spread that was copying backend properties
 4. **Consistent across all graphs**: Initial graph AND subsequent graphs use same logic
+
+**BUT THIS STILL DIDN'T FIX SUBSEQUENT GRAPHS!** The real issue was deeper...
+
+---
+
+## The REAL Root Cause (Commit e56278e)
+
+### The Actual Problem
+
+After extensive debugging, we discovered that subsequent graphs were using a **completely different component** called `ExplorationNetworkView` instead of `NetworkView`!
+
+**How it happened:**
+1. When you click "Similar Work", "Earlier Work", or "Later Work" buttons in the sidebar
+2. `NetworkSidebar.tsx` calls `handleExploreSection()` which fetches exploration results
+3. It then creates a column with `explorationResults` in the metadata
+4. `MultiColumnNetworkView.tsx` checks if `explorationData` exists
+5. If yes → renders `ExplorationNetworkView` (simplified component)
+6. If no → renders `NetworkView` (full-featured component)
+
+**ExplorationNetworkView problems:**
+- ❌ No gradient node colors (all nodes same color)
+- ❌ No cross-reference edges (only star topology from center)
+- ❌ No proper edge colors (all edges gray)
+- ❌ No backend network endpoint (just displays the exploration results)
+
+### The FINAL Fix
+
+**File: `frontend/src/components/NetworkSidebar.tsx`** (lines 857-903)
+
+Changed from:
+```typescript
+const columnData = {
+  ...selectedNode,
+  metadata: {
+    ...selectedNode.metadata,
+    explorationType: `${section}-${mode}`,
+    explorationResults: results, // ❌ This caused ExplorationNetworkView
+    explorationTimestamp: new Date().toISOString()
+  }
+};
+```
+
+To:
+```typescript
+const columnData = {
+  ...selectedNode,
+  metadata: {
+    ...selectedNode.metadata,
+    explorationType: `${section}-${mode}`, // ✅ Keep for title
+    // explorationResults: results, // ❌ REMOVED
+    explorationTimestamp: new Date().toISOString()
+  }
+};
+```
+
+**File: `frontend/src/components/MultiColumnNetworkView.tsx`** (lines 317-352)
+
+Added mapping from explorationType to networkType:
+```typescript
+// Map exploration type to network type for proper backend endpoint
+if (paper.metadata.explorationType) {
+  const explorationTypeMap = {
+    'papers-similar': { label: 'Similar Work', networkType: 'similar' as const },
+    'papers-earlier': { label: 'Earlier Work', networkType: 'references' as const },
+    'papers-later': { label: 'Later Work', networkType: 'citations' as const },
+    // ...
+  };
+  const explorationConfig = explorationTypeMap[paper.metadata.explorationType];
+  if (explorationConfig) {
+    columnTitle = `${explorationConfig.label}: ${paper.metadata.title.substring(0, 25)}...`;
+    networkType = explorationConfig.networkType; // ✅ Use correct network type
+  }
+}
+
+// ✅ IMPORTANT: Always use NetworkView
+explorationData: undefined // Never use ExplorationNetworkView
+```
+
+### Why This ACTUALLY Fixes Everything
+
+1. **No more ExplorationNetworkView**: Subsequent graphs now use NetworkView
+2. **Full backend network**: Fetches from `/api/proxy/pubmed/network` with cross-references
+3. **Gradient node colors**: Uses `getNodeColor(year, isInCollection)` function
+4. **Colored edges**: Uses relationship-based edge colors (green, blue, purple)
+5. **Cross-reference detection**: Backend detects edges between non-central nodes
+6. **Consistent behavior**: Initial graph and subsequent graphs use SAME component and logic
 
 ---
 
