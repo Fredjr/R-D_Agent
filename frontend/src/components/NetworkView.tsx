@@ -1009,7 +1009,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           id: edge.id,
           source: edge.from,
           target: edge.to,
-          type: 'smoothstep',
+          type: 'default',
           animated: relationship === 'citation' || relationship === 'reference',
           label: edgeLabel,
           labelStyle: {
@@ -1852,7 +1852,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         )}
 
         {/* CENTER PANEL - Network Graph */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative" style={{ width: '100%', height: '100%' }}>
         <ReactFlow
         key={`network-${nodes.length}-${edges.length}`}
         nodes={nodes}
@@ -1864,7 +1864,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         nodeTypes={nodeTypes}
         connectionMode={ConnectionMode.Loose}
         defaultEdgeOptions={{
-          type: 'smoothstep',
+          type: 'default',
           animated: false,
           style: { stroke: '#3b82f6', strokeWidth: 3, strokeOpacity: 1 },
         }}
