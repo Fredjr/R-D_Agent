@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback, useMemo, forwardRef, useImpera
 import { useAuth } from '@/contexts/AuthContext';
 import {
   ReactFlow,
-  ReactFlowProvider,
   Node,
   Edge,
   addEdge,
@@ -1922,9 +1921,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
         {/* CENTER PANEL - Network Graph */}
         <div className="flex-1 relative" style={{ width: '100%', height: '100%' }}>
-        <ReactFlowProvider>
         <ReactFlow
-        key={`network-${nodes.length}-${displayEdges.length}`}
         nodes={nodes}
         edges={displayEdges}
         onNodesChange={onNodesChange}
@@ -2243,7 +2240,6 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           </Panel>
         )}
       </ReactFlow>
-        </ReactFlowProvider>
         </div>
 
         {/* RIGHT PANEL - Paper Details (NetworkSidebar) */}
