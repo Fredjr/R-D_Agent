@@ -1099,45 +1099,12 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         relationship: e.relationship
       })));
 
-      const flowEdges: Edge[] = (data.edges || []).map((edge) => {
-        const relationship = edge.relationship || 'default';
-        const edgeColor = EDGE_COLORS[relationship] || EDGE_COLORS.default;
-        const edgeLabel = EDGE_LABELS[relationship] || '';
-
-        return {
-          id: edge.id,
-          source: edge.from,
-          target: edge.to,
-          type: 'straight', // Changed from 'default' to 'straight' - more explicit
-          animated: relationship === 'citation' || relationship === 'reference',
-          label: edgeLabel,
-          labelStyle: {
-            fill: edgeColor,
-            fontWeight: 600,
-            fontSize: 11,
-            fontFamily: 'Inter, sans-serif'
-          },
-          labelBgStyle: {
-            fill: 'white',
-            fillOpacity: 0.9
-          },
-          labelBgPadding: [4, 8] as [number, number],
-          labelBgBorderRadius: 4,
-          style: {
-            stroke: edgeColor,
-            strokeWidth: 3,
-            strokeOpacity: 1,
-          },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: edgeColor,
-          },
-          data: {
-            relationship: relationship,
-            tooltip: getEdgeTooltip(relationship)
-          }
-        };
-      });
+      // NUCLEAR OPTION: Absolute bare minimum edge configuration
+      const flowEdges: Edge[] = (data.edges || []).map((edge) => ({
+        id: edge.id,
+        source: edge.from,
+        target: edge.to,
+      }));
 
       console.log('🎯 NetworkView rendering:', {
         sourceType,
@@ -1953,29 +1920,13 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         {/* CENTER PANEL - Network Graph */}
         <div className="flex-1 relative" style={{ width: '100%', height: '100%' }}>
         <ReactFlow
-        key={`reactflow-${edges.length}-${nodes.length}`}
         nodes={nodes}
         edges={displayEdges}
         onNodesChange={onNodesChange}
-        onEdgesChange={debugOnEdgesChange}
-        onConnect={onConnect}
+        onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
-        connectionMode={ConnectionMode.Loose}
-        defaultEdgeOptions={{
-          type: 'straight',
-          animated: false,
-          style: { stroke: '#3b82f6', strokeWidth: 3, strokeOpacity: 1 },
-        }}
-        edgesFocusable={true}
-        elementsSelectable={true}
-        fitView={true}
-        fitViewOptions={{
-          padding: 0.3,
-          includeHiddenNodes: false,
-          maxZoom: 2.0,
-          minZoom: 0.05,
-        }}
+        fitView
         onInit={(instance) => {
           console.log('🎯 [ReactFlow] onInit called:', {
             nodes: instance.getNodes().length,
@@ -1984,7 +1935,6 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           });
           setReactFlowInstance(instance);
         }}
-        proOptions={{ hideAttribution: true }}
         // Google Maps-like smooth interactions
         panOnDrag={true}
         panOnScroll={true}
