@@ -33,10 +33,10 @@ interface NetworkNode {
 
 interface NetworkEdge {
   id: string;
-  source: string;
-  target: string;
-  type: string;
-  weight: number;
+  from: string;
+  to: string;
+  relationship: string;
+  weight?: number;
 }
 
 interface HybridNetworkResponse {
@@ -301,9 +301,9 @@ export async function GET(
             // Add edge from citing article to collection article
             edges.push({
               id: `${citingArticle.pmid}-cites-${pmid}`,
-              source: citingArticle.pmid,
-              target: pmid,
-              type: 'citation',
+              from: citingArticle.pmid,
+              to: pmid,
+              relationship: 'citation',
               weight: 1
             });
           }
@@ -328,9 +328,9 @@ export async function GET(
             // Add edge from collection article to reference article
             edges.push({
               id: `${pmid}-references-${referenceArticle.pmid}`,
-              source: pmid,
-              target: referenceArticle.pmid,
-              type: 'reference',
+              from: pmid,
+              to: referenceArticle.pmid,
+              relationship: 'reference',
               weight: 1
             });
           }

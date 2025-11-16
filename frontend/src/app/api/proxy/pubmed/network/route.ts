@@ -26,10 +26,10 @@ interface NetworkNode {
 
 interface NetworkEdge {
   id: string;
-  source: string;
-  target: string;
-  type: 'citation' | 'reference' | 'similarity';
-  weight: number;
+  from: string;
+  to: string;
+  relationship: 'citation' | 'reference' | 'similarity';
+  weight?: number;
 }
 
 interface NetworkData {
@@ -392,9 +392,9 @@ export async function GET(request: NextRequest) {
         // Create edge from citing article to source
         edges.push({
           id: `${article.pmid}-cites-${pmid}`,
-          source: article.pmid,
-          target: pmid,
-          type: 'citation',
+          from: article.pmid,
+          to: pmid,
+          relationship: 'citation',
           weight: 1
         });
       }
@@ -412,9 +412,9 @@ export async function GET(request: NextRequest) {
         // Create edge from source to reference
         edges.push({
           id: `${pmid}-refs-${article.pmid}`,
-          source: pmid,
-          target: article.pmid,
-          type: 'reference',
+          from: pmid,
+          to: article.pmid,
+          relationship: 'reference',
           weight: 1
         });
       }
@@ -436,9 +436,9 @@ export async function GET(request: NextRequest) {
         // Create bidirectional similarity edge
         edges.push({
           id: `${pmid}-similar-${article.pmid}`,
-          source: pmid,
-          target: article.pmid,
-          type: 'similarity',
+          from: pmid,
+          to: article.pmid,
+          relationship: 'similarity',
           weight: 0.8
         });
       }

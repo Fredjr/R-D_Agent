@@ -1446,7 +1446,19 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
                 setShowSidebar(true);
               }
             }}
-            seedPapers={[]} // TODO: Get seed papers from collections
+            seedPapers={(() => {
+              // Extract seed paper PMIDs from collections
+              const seedPmids: string[] = [];
+              collections.forEach(collection => {
+                const articles = collection.articles || [];
+                articles.forEach((article: any) => {
+                  if (article.is_seed && article.article_pmid) {
+                    seedPmids.push(article.article_pmid);
+                  }
+                });
+              });
+              return seedPmids;
+            })()}
             sourceNodeId={sourceId}
             edges={networkData.edges || []}
           />
