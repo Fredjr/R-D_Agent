@@ -222,15 +222,17 @@ export async function POST(request: NextRequest) {
  */
 async function getSimilarPapers(pmid: string, limit: number): Promise<PubMedPaper[]> {
   try {
+    console.log(`🔍 [getSimilarPapers] Fetching similar papers for PMID: ${pmid}, limit: ${limit}`);
+
     // Step 1: Use eLink to find similar papers
     const elinkUrl = `${PUBMED_LINK_URL}?dbfrom=pubmed&db=pubmed&id=${pmid}&linkname=pubmed_pubmed&retmode=json`;
-    
+
     const elinkResponse = await fetch(elinkUrl, {
       headers: { 'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)' }
     });
 
     if (!elinkResponse.ok) {
-      console.error(`PubMed eLink failed: ${elinkResponse.status}`);
+      console.error(`❌ [getSimilarPapers] PubMed eLink failed: ${elinkResponse.status}`);
       return [];
     }
 
@@ -239,11 +241,17 @@ async function getSimilarPapers(pmid: string, limit: number): Promise<PubMedPape
 
     // Extract similar PMIDs
     const linksets = elinkData.linksets || [];
+    console.log(`📦 [getSimilarPapers] Found ${linksets.length} linksets`);
+
     for (const linkset of linksets) {
       if (linkset.linksetdbs) {
+        console.log(`📦 [getSimilarPapers] Linkset has ${linkset.linksetdbs.length} linksetdbs`);
         for (const linksetdb of linkset.linksetdbs) {
+          console.log(`🔍 [getSimilarPapers] Checking linksetdb: ${linksetdb.linkname}, links: ${linksetdb.links?.length || 0}`);
           if (linksetdb.linkname === 'pubmed_pubmed' && linksetdb.links) {
-            similarPmids = linksetdb.links.slice(0, limit);
+            // Get more PMIDs than requested to account for filtering out the source paper
+            similarPmids = linksetdb.links.slice(0, limit + 5);
+            console.log(`✅ [getSimilarPapers] Found ${similarPmids.length} similar PMIDs (before filtering)`);
             break;
           }
         }
@@ -251,16 +259,25 @@ async function getSimilarPapers(pmid: string, limit: number): Promise<PubMedPape
     }
 
     if (similarPmids.length === 0) {
+      console.log(`⚠️ [getSimilarPapers] No similar PMIDs found`);
+      return [];
+    }
+
+    // Filter out the source paper itself BEFORE fetching details
+    const filteredPmids = similarPmids.filter(id => id !== pmid).slice(0, limit);
+    console.log(`📊 [getSimilarPapers] After filtering source paper: ${filteredPmids.length} PMIDs`);
+
+    if (filteredPmids.length === 0) {
+      console.log(`⚠️ [getSimilarPapers] No PMIDs left after filtering`);
       return [];
     }
 
     // Step 2: Fetch details for similar papers
-    const papers = await fetchPaperDetails(similarPmids);
+    console.log(`🔄 [getSimilarPapers] Fetching details for ${filteredPmids.length} papers...`);
+    const papers = await fetchPaperDetails(filteredPmids);
+    console.log(`✅ [getSimilarPapers] Fetched ${papers.length} paper details`);
 
-    // Filter out the source paper itself
-    const filteredPapers = papers.filter(paper => paper.pmid !== pmid);
-
-    return filteredPapers.map(paper => ({
+    return papers.map(paper => ({
       ...paper,
       relevance_score: 0.8,
       recommendation_reason: 'Similar to your selected paper',
@@ -268,7 +285,7 @@ async function getSimilarPapers(pmid: string, limit: number): Promise<PubMedPape
     }));
 
   } catch (error) {
-    console.error('Error getting similar papers:', error);
+    console.error('❌ [getSimilarPapers] Error getting similar papers:', error);
     return [];
   }
 }
@@ -450,6 +467,7 @@ async function fetchPaperDetails(pmids: string[]): Promise<PubMedPaper[]> {
   try {
     if (pmids.length === 0) return [];
 
+    console.log(`🔄 [fetchPaperDetails] Fetching details for PMIDs: ${pmids.join(', ')}`);
     const fetchUrl = `${PUBMED_FETCH_URL}?db=pubmed&id=${pmids.join(',')}&retmode=xml&rettype=abstract`;
 
     const fetchResponse = await fetch(fetchUrl, {
@@ -457,15 +475,20 @@ async function fetchPaperDetails(pmids: string[]): Promise<PubMedPaper[]> {
     });
 
     if (!fetchResponse.ok) {
-      console.error(`PubMed fetch failed: ${fetchResponse.status}`);
+      console.error(`❌ [fetchPaperDetails] PubMed fetch failed: ${fetchResponse.status}`);
       return [];
     }
 
     const xmlText = await fetchResponse.text();
-    return parsePubMedXML(xmlText);
+    console.log(`📦 [fetchPaperDetails] Received XML response (${xmlText.length} chars)`);
+
+    const papers = parsePubMedXML(xmlText);
+    console.log(`✅ [fetchPaperDetails] Parsed ${papers.length} papers from XML`);
+
+    return papers;
 
   } catch (error) {
-    console.error('Error fetching paper details:', error);
+    console.error('❌ [fetchPaperDetails] Error fetching paper details:', error);
     return [];
   }
 }
