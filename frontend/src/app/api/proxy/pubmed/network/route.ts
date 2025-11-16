@@ -444,6 +444,67 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // ✨ NEW: Detect cross-references between non-central nodes
+    console.log('🔍 Detecting cross-references between non-central nodes...');
+    const nodePmids = nodes.map(n => n.metadata.pmid).filter(id => id !== pmid);
+    let crossReferencesFound = 0;
+
+    // For each non-central node, check if it cites or references other nodes in the network
+    for (let i = 0; i < nodePmids.length && i < 10; i++) { // Limit to first 10 nodes to avoid too many API calls
+      const nodePmid = nodePmids[i];
+
+      try {
+        // Check if this node cites any other nodes in our network
+        const citedByThisNode = await findRelatedArticles(nodePmid, 'pubmed_pubmed_refs', 50);
+
+        for (const citedPmid of citedByThisNode) {
+          // If the cited paper is in our network (and not the source), create an edge
+          if (nodePmids.includes(citedPmid) && citedPmid !== nodePmid) {
+            const edgeId = `${nodePmid}-refs-${citedPmid}`;
+            // Check if edge doesn't already exist
+            if (!edges.find(e => e.id === edgeId)) {
+              edges.push({
+                id: edgeId,
+                from: nodePmid,
+                to: citedPmid,
+                relationship: 'reference',
+                weight: 0.5 // Lower weight for cross-references
+              });
+              crossReferencesFound++;
+              console.log(`  ✅ Found cross-reference: ${nodePmid} → ${citedPmid}`);
+            }
+          }
+        }
+
+        // Check if this node is cited by any other nodes in our network
+        const citingThisNode = await findRelatedArticles(nodePmid, 'pubmed_pubmed_citedin', 50);
+
+        for (const citingPmid of citingThisNode) {
+          // If the citing paper is in our network (and not the source), create an edge
+          if (nodePmids.includes(citingPmid) && citingPmid !== nodePmid) {
+            const edgeId = `${citingPmid}-cites-${nodePmid}`;
+            // Check if edge doesn't already exist
+            if (!edges.find(e => e.id === edgeId)) {
+              edges.push({
+                id: edgeId,
+                from: citingPmid,
+                to: nodePmid,
+                relationship: 'citation',
+                weight: 0.5 // Lower weight for cross-references
+              });
+              crossReferencesFound++;
+              console.log(`  ✅ Found cross-citation: ${citingPmid} → ${nodePmid}`);
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`⚠️ Failed to check cross-references for ${nodePmid}:`, error);
+        // Continue with other nodes even if one fails
+      }
+    }
+
+    console.log(`✅ Found ${crossReferencesFound} cross-references between non-central nodes`);
+
     const networkData: NetworkData = {
       nodes,
       edges,

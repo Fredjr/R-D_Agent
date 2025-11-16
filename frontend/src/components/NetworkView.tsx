@@ -1811,33 +1811,36 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            Relationships
+            Relationship Types
           </div>
           <div className="space-y-1.5 text-xs">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-0.5 bg-green-500 rounded"></div>
-              <span className="text-gray-600">Cites source</span>
+            <div className="flex items-center gap-2 group hover:bg-green-50 px-1 py-0.5 rounded transition-colors">
+              <div className="w-10 h-1 bg-green-500 rounded-full shadow-sm"></div>
+              <span className="text-gray-700 font-medium">🟢 Cites</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-0.5 bg-blue-500 rounded"></div>
-              <span className="text-gray-600">Referenced by source</span>
+            <div className="flex items-center gap-2 group hover:bg-blue-50 px-1 py-0.5 rounded transition-colors">
+              <div className="w-10 h-1 bg-blue-500 rounded-full shadow-sm"></div>
+              <span className="text-gray-700 font-medium">🔵 References</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-0.5 bg-purple-500 rounded"></div>
-              <span className="text-gray-600">Similar topic</span>
+            <div className="flex items-center gap-2 group hover:bg-purple-50 px-1 py-0.5 rounded transition-colors">
+              <div className="w-10 h-1 bg-purple-500 rounded-full shadow-sm" style={{ borderStyle: 'dotted', borderWidth: '2px', borderColor: '#8b5cf6', height: '0px', background: 'transparent' }}></div>
+              <span className="text-gray-700 font-medium">🟣 Similar</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-0.5 bg-orange-500 rounded"></div>
-              <span className="text-gray-600">Co-authored</span>
+            <div className="flex items-center gap-2 group hover:bg-orange-50 px-1 py-0.5 rounded transition-colors">
+              <div className="w-10 h-1 bg-orange-500 rounded-full shadow-sm"></div>
+              <span className="text-gray-700 font-medium">🟠 Co-authored</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-0.5 bg-pink-500 rounded"></div>
-              <span className="text-gray-600">Same journal</span>
+            <div className="flex items-center gap-2 group hover:bg-pink-50 px-1 py-0.5 rounded transition-colors">
+              <div className="w-10 h-1 bg-pink-500 rounded-full shadow-sm"></div>
+              <span className="text-gray-700 font-medium">🩷 Same journal</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-0.5 bg-indigo-500 rounded"></div>
-              <span className="text-gray-600">Related topic</span>
+            <div className="flex items-center gap-2 group hover:bg-indigo-50 px-1 py-0.5 rounded transition-colors">
+              <div className="w-10 h-1 bg-indigo-500 rounded-full shadow-sm"></div>
+              <span className="text-gray-700 font-medium">🔷 Related topic</span>
             </div>
+          </div>
+          <div className="mt-2 pt-2 border-t border-gray-200 text-[10px] text-gray-500 italic">
+            Hover over edges to highlight connections
           </div>
         </CytoscapePanel>
 

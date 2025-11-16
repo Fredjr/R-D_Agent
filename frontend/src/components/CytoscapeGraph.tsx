@@ -102,42 +102,135 @@ const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
         {
           selector: 'edge',
           style: {
-            'width': 3,
-            'line-color': '#3b82f6',
-            'target-arrow-color': '#3b82f6',
+            'width': 2,
+            'line-color': '#94a3b8',
+            'target-arrow-color': '#94a3b8',
             'target-arrow-shape': 'triangle',
             'curve-style': 'bezier',
             'label': 'data(label)',
             'font-size': '10px',
             'text-rotation': 'autorotate',
             'text-margin-y': -10,
+            'color': '#64748b',
+            'text-background-color': '#ffffff',
+            'text-background-opacity': 0.8,
+            'text-background-padding': '3px',
+            'text-background-shape': 'roundrectangle',
+            'opacity': 0.7,
+            'transition-property': 'width, opacity, line-color',
+            'transition-duration': '0.2s',
+          },
+        },
+        {
+          selector: 'edge:hover',
+          style: {
+            'width': 4,
+            'opacity': 1,
+            'z-index': 999,
           },
         },
         {
           selector: 'edge[animated]',
           style: {
             'line-style': 'dashed',
+            'line-dash-pattern': [6, 3],
           },
         },
+        // Citation edges (green) - papers that cite the source
         {
           selector: 'edge[relationship="citation"]',
           style: {
             'line-color': '#10b981',
             'target-arrow-color': '#10b981',
+            'width': 2.5,
           },
         },
+        {
+          selector: 'edge[relationship="citation"]:hover',
+          style: {
+            'line-color': '#059669',
+            'target-arrow-color': '#059669',
+          },
+        },
+        // Reference edges (blue) - papers cited by the source
         {
           selector: 'edge[relationship="reference"]',
           style: {
             'line-color': '#3b82f6',
             'target-arrow-color': '#3b82f6',
+            'width': 2.5,
           },
         },
         {
-          selector: 'edge[relationship="similar"]',
+          selector: 'edge[relationship="reference"]:hover',
           style: {
-            'line-color': '#a855f7',
-            'target-arrow-color': '#a855f7',
+            'line-color': '#2563eb',
+            'target-arrow-color': '#2563eb',
+          },
+        },
+        // Similar edges (purple) - similar papers
+        {
+          selector: 'edge[relationship="similarity"]',
+          style: {
+            'line-color': '#8b5cf6',
+            'target-arrow-color': '#8b5cf6',
+            'width': 2,
+            'line-style': 'dotted',
+          },
+        },
+        {
+          selector: 'edge[relationship="similarity"]:hover',
+          style: {
+            'line-color': '#7c3aed',
+            'target-arrow-color': '#7c3aed',
+          },
+        },
+        // Co-authored edges (orange)
+        {
+          selector: 'edge[relationship="co-authored"]',
+          style: {
+            'line-color': '#f59e0b',
+            'target-arrow-color': '#f59e0b',
+            'width': 2,
+          },
+        },
+        {
+          selector: 'edge[relationship="co-authored"]:hover',
+          style: {
+            'line-color': '#d97706',
+            'target-arrow-color': '#d97706',
+          },
+        },
+        // Same journal edges (pink)
+        {
+          selector: 'edge[relationship="same-journal"]',
+          style: {
+            'line-color': '#ec4899',
+            'target-arrow-color': '#ec4899',
+            'width': 2,
+          },
+        },
+        {
+          selector: 'edge[relationship="same-journal"]:hover',
+          style: {
+            'line-color': '#db2777',
+            'target-arrow-color': '#db2777',
+          },
+        },
+        // Topic-related edges (indigo)
+        {
+          selector: 'edge[relationship="topic-related"]',
+          style: {
+            'line-color': '#6366f1',
+            'target-arrow-color': '#6366f1',
+            'width': 2,
+          },
+        },
+        {
+          selector: 'edge[relationship="topic-related"]:hover',
+          style: {
+            'line-color': '#4f46e5',
+            'target-arrow-color': '#4f46e5',
           },
         },
       ],
@@ -168,12 +261,46 @@ const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
         data: node.data(),
         position: node.position(),
       };
-      
+
       console.log('🖱️ [Cytoscape] Node clicked:', nodeData.id);
-      
+
       if (onNodeClick) {
         onNodeClick(event, nodeData);
       }
+    });
+
+    // Handle edge hover - show tooltip
+    cy.on('mouseover', 'edge', (event) => {
+      const edge = event.target;
+      const relationship = edge.data('relationship');
+      const label = edge.data('label');
+
+      // Create tooltip text
+      const tooltipTexts: Record<string, string> = {
+        citation: 'Citation: This paper cites the target',
+        reference: 'Reference: This paper is cited by the source',
+        similarity: 'Similar: Related by content or topic',
+        'co-authored': 'Co-authored: Shares authors',
+        'same-journal': 'Same Journal: Published in same journal',
+        'topic-related': 'Topic: Related by research topic'
+      };
+
+      const tooltipText = tooltipTexts[relationship] || label || 'Related';
+
+      // Highlight connected nodes
+      const sourceNode = edge.source();
+      const targetNode = edge.target();
+
+      cy.nodes().not(sourceNode).not(targetNode).style('opacity', 0.3);
+      cy.edges().not(edge).style('opacity', 0.2);
+
+      console.log('🔗 Edge hover:', { relationship, label, tooltipText });
+    });
+
+    cy.on('mouseout', 'edge', () => {
+      // Reset opacity
+      cy.nodes().style('opacity', 1);
+      cy.edges().style('opacity', 0.7);
     });
 
     // Handle pan/zoom changes
