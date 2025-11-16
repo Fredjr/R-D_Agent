@@ -328,6 +328,12 @@ export default function NetworkSidebar({
 
       if (response.ok) {
         onAddToCollection(selectedNode.metadata.pmid);
+
+        // Phase 2.2: Emit event for real-time node color update
+        window.dispatchEvent(new CustomEvent('paperAddedToCollection', {
+          detail: { pmid: selectedNode.metadata.pmid }
+        }));
+
         // Show success message
         success('✅ Paper added to collection successfully!');
       } else {
@@ -389,6 +395,12 @@ export default function NetworkSidebar({
 
         if (addResponse.ok) {
           onAddToCollection(selectedNode.metadata.pmid);
+
+          // Phase 2.2: Emit event for real-time node color update
+          window.dispatchEvent(new CustomEvent('paperAddedToCollection', {
+            detail: { pmid: selectedNode.metadata.pmid }
+          }));
+
           success(`✨ Collection "${newCollectionName}" created and paper added successfully!`);
         } else {
           error('❌ Failed to add paper to new collection');
@@ -1224,6 +1236,12 @@ export default function NetworkSidebar({
 
                     if (response.ok) {
                       onAddToCollection(selectedNode.metadata.pmid);
+
+                      // Phase 2.2: Emit event for real-time node color update
+                      window.dispatchEvent(new CustomEvent('paperAddedToCollection', {
+                        detail: { pmid: selectedNode.metadata.pmid }
+                      }));
+
                       success(`✅ Added to "${collections[0].name}"!`);
                     } else {
                       error('❌ Failed to add paper to collection');

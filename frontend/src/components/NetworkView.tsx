@@ -1386,6 +1386,43 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
     };
   }, [nodes, setNodes, setEdges]);
 
+  // Phase 2.2: Listen for paper added to collection event from NetworkSidebar
+  useEffect(() => {
+    const handlePaperAddedToCollection = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { pmid } = customEvent.detail;
+
+      console.log(`🎨 Phase 2.2: Received paperAddedToCollection event for PMID ${pmid}`);
+
+      // Update node color from blue to green
+      setNodes((prevNodes) =>
+        prevNodes.map((node) => {
+          const nodePmid = (node.data as any)?.metadata?.pmid;
+          if (nodePmid === pmid) {
+            console.log(`🎨 Phase 2.2: Updating node ${pmid} color to green (in collection)`);
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                color: '#10b981', // Green for papers in collection
+              },
+            };
+          }
+          return node;
+        })
+      );
+
+      // Refresh collections to update state
+      fetchCollections();
+    };
+
+    window.addEventListener('paperAddedToCollection', handlePaperAddedToCollection);
+
+    return () => {
+      window.removeEventListener('paperAddedToCollection', handlePaperAddedToCollection);
+    };
+  }, [setNodes, fetchCollections]);
+
   // Handle navigation mode changes
   const handleNavigationChange = useCallback((newMode: string, newSourceId?: string) => {
     const targetSourceId = newSourceId || sourceId;
@@ -1546,9 +1583,27 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   }, [selectedNode, handleNavigationChange]);
 
   const handleAddToCollection = useCallback((pmid: string) => {
-    // Refresh collections after adding
+    // Phase 2.2: Immediately update node color from blue to green
+    setNodes((prevNodes) =>
+      prevNodes.map((node) => {
+        const nodePmid = (node.data as any)?.metadata?.pmid;
+        if (nodePmid === pmid) {
+          console.log(`🎨 Phase 2.2: Updating node ${pmid} color from blue to green (added to collection)`);
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              color: '#10b981', // Green for papers in collection
+            },
+          };
+        }
+        return node;
+      })
+    );
+
+    // Refresh collections to update state
     fetchCollections();
-  }, [fetchCollections]);
+  }, [fetchCollections, setNodes]);
 
   const handleCloseSidebar = useCallback(() => {
     setShowSidebar(false);
