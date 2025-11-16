@@ -148,6 +148,47 @@ Defined in `CytoscapeGraph.tsx`:
 
 ---
 
+## Final Fix: Button Behavior (Commit 28961b5)
+
+### User Feedback
+
+User reported that clicking "All References" and "All Citations" buttons were creating new columns with titles like "Earlier Work: [paper name]" and "Later Work: [paper name]". This was NOT the expected behavior.
+
+**Expected Behavior:**
+- "All References" → Show scrollable list in sidebar only (NO column)
+- "All Citations" → Show scrollable list in sidebar only (NO column)
+- "Similar Work" → Create new column with network graph
+
+### The Fix
+
+**File: `frontend/src/components/NetworkSidebar.tsx`** (lines 847-918)
+
+Added a check to only create columns for "Similar Work":
+
+```typescript
+// Only create column for "Similar Work" (papers-similar)
+const shouldCreateColumn = section === 'papers' && mode === 'similar';
+
+if (results.length > 0 && onCreatePaperColumn && selectedNode && shouldCreateColumn) {
+  // Create column only for Similar Work
+  // ...
+} else {
+  console.log('ℹ️ NetworkSidebar showing results in sidebar only (not creating column):', {
+    reason: !shouldCreateColumn ? 'Only Similar Work creates columns (All References/Citations show list only)' : 'Missing requirements'
+  });
+}
+```
+
+### Result
+
+✅ **"Similar Work"** → Creates new column with full network graph
+✅ **"All References"** → Shows scrollable list in sidebar (NO column)
+✅ **"All Citations"** → Shows scrollable list in sidebar (NO column)
+
+This matches ResearchRabbit-style behavior where exploration lists are shown in the sidebar, and only specific actions create new columns.
+
+---
+
 ## Testing Checklist
 
 ### Node Colors
