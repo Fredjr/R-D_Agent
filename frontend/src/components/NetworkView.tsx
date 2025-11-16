@@ -375,6 +375,43 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [networkEdges, setNetworkEdges] = useState<NetworkEdge[]>([]); // Store original network edges for sidebar
 
+  // Debug: Log edges state changes
+  useEffect(() => {
+    console.log('🔍 [useEffect] Edges state changed:', {
+      edgesCount: edges.length,
+      edgesIds: edges.map(e => e.id),
+      firstEdge: edges[0] ? {
+        id: edges[0].id,
+        source: edges[0].source,
+        target: edges[0].target,
+        type: edges[0].type,
+        hasSourceNode: nodes.some(n => n.id === edges[0].source),
+        hasTargetNode: nodes.some(n => n.id === edges[0].target)
+      } : null
+    });
+
+    // CRITICAL: Validate all edges have valid source/target
+    if (edges.length > 0) {
+      const invalidEdges = edges.filter(edge => {
+        const hasSource = nodes.some(n => n.id === edge.source);
+        const hasTarget = nodes.some(n => n.id === edge.target);
+        return !hasSource || !hasTarget;
+      });
+
+      if (invalidEdges.length > 0) {
+        console.error('❌ INVALID EDGES FOUND:', invalidEdges.map(e => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          hasSource: nodes.some(n => n.id === e.source),
+          hasTarget: nodes.some(n => n.id === e.target)
+        })));
+      } else {
+        console.log('✅ All edges have valid source/target nodes');
+      }
+    }
+  }, [edges, nodes]);
+
   // Helper function to check if a PMID is in any collection
   const isPmidInCollection = useCallback((pmid: string): boolean => {
     if (!collections || collections.length === 0) return false;
