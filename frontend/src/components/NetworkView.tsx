@@ -20,6 +20,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import NetworkSidebar from './NetworkSidebar';
+import PaperListPanel from './PaperListPanel';
 import TimelineView from './TimelineView';
 import ArticleSummaryModal from './ArticleSummaryModal';
 import { useLazyNetworkLoading } from '@/hooks/useLazyNetworkLoading';
@@ -1429,7 +1430,30 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         />
       )}
 
-      <div className="flex-1 relative">
+      {/* Three-Panel Layout (ResearchRabbit-style) */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* LEFT PANEL - Paper List */}
+        {!disableInternalSidebar && networkData && networkData.nodes.length > 0 && (
+          <PaperListPanel
+            papers={networkData.nodes}
+            selectedPaperId={selectedNode?.id || null}
+            onSelectPaper={(paperId) => {
+              // Find the node and select it
+              const node = nodes.find(n => n.id === paperId);
+              const networkNode = networkData.nodes.find(n => n.id === paperId);
+              if (node && networkNode) {
+                setSelectedNode(networkNode);
+                setShowSidebar(true);
+              }
+            }}
+            seedPapers={[]} // TODO: Get seed papers from collections
+            sourceNodeId={sourceId}
+            edges={networkData.edges || []}
+          />
+        )}
+
+        {/* CENTER PANEL - Network Graph */}
+        <div className="flex-1 relative">
         <ReactFlow
         key={`network-${nodes.length}-${edges.length}`}
         nodes={nodes}
@@ -1731,21 +1755,12 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           </Panel>
         )}
       </ReactFlow>
-      </div>
+        </div>
 
-      {/* Enhanced NetworkSidebar - Only show if not disabled */}
-      {(() => {
-        console.log('🔍 [NetworkView] Sidebar render check:', {
-          disableInternalSidebar,
-          showSidebar,
-          hasSelectedNode: !!selectedNode,
-          willRenderSidebar: !disableInternalSidebar && showSidebar && !!selectedNode
-        });
-        return null;
-      })()}
-      {!disableInternalSidebar && showSidebar && selectedNode && (
-        <div className="absolute top-0 right-0 h-full z-10">
-          <NetworkSidebar
+        {/* RIGHT PANEL - Paper Details (NetworkSidebar) */}
+        {!disableInternalSidebar && showSidebar && selectedNode && (
+          <div className="w-96 border-l border-gray-200 bg-white overflow-y-auto">
+            <NetworkSidebar
             selectedNode={{
               id: selectedNode.id,
               label: selectedNode.label,
@@ -1781,8 +1796,9 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             edges={networkData?.edges || []}
             sourceNodeId={sourceId}
           />
-        </div>
-      )}
+          </div>
+        )}
+      </div>
 
       {/* Article Summary Modal - Shows on double-click */}
       <ArticleSummaryModal
