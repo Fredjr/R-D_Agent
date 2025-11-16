@@ -979,6 +979,13 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         return tooltips[relationship] || 'Related paper';
       };
 
+      console.log('🔗 Raw edges from API:', data.edges?.map((e: any) => ({
+        id: e.id,
+        from: e.from,
+        to: e.to,
+        relationship: e.relationship
+      })));
+
       const flowEdges: Edge[] = (data.edges || []).map((edge) => {
         const relationship = edge.relationship || 'default';
         const edgeColor = EDGE_COLORS[relationship] || EDGE_COLORS.default;
@@ -1043,6 +1050,30 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         label: n.data.label,
         type: n.type
       })));
+
+      console.log('🔗 React Flow edges being set:', flowEdges.map(e => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        type: e.type,
+        style: e.style,
+        animated: e.animated
+      })));
+
+      // Validate edges - check if source and target nodes exist
+      const nodeIds = new Set(flowNodes.map(n => n.id));
+      const invalidEdges = flowEdges.filter(e => !nodeIds.has(e.source) || !nodeIds.has(e.target));
+      if (invalidEdges.length > 0) {
+        console.warn('⚠️ Found edges with missing nodes:', invalidEdges.map(e => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          sourceExists: nodeIds.has(e.source),
+          targetExists: nodeIds.has(e.target)
+        })));
+      } else {
+        console.log('✅ All edges have valid source and target nodes');
+      }
       
     } catch (err) {
       console.error('Error fetching network data:', err);
