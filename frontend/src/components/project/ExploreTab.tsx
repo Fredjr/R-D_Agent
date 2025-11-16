@@ -74,7 +74,8 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
   const [createNewCollection, setCreateNewCollection] = useState(false);
 
   // View mode toggle - now supports paper-specific network view
-  const [viewMode, setViewMode] = useState<ViewMode>('network');
+  // Default to 'search' mode to show search interface first
+  const [viewMode, setViewMode] = useState<ViewMode>('search');
 
   // Selected paper for network view (Phase 1-2.3 features)
   const [selectedPaperPMID, setSelectedPaperPMID] = useState<string | null>(null);
