@@ -1766,7 +1766,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   console.log('🎨 React Flow rendering with:', {
     nodesCount: nodes.length,
     edgesCount: edges.length,
-    nodes: nodes.map(n => ({ id: n.id, position: n.position, label: n.data?.label }))
+    nodes: nodes.map(n => ({ id: n.id, position: n.position, label: n.data?.label })),
+    edges: edges.slice(0, 3).map(e => ({ id: e.id, source: e.source, target: e.target, type: e.type, hasStyle: !!e.style, style: e.style }))
   });
 
   return (
@@ -1846,6 +1847,11 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
         connectionMode={ConnectionMode.Loose}
+        defaultEdgeOptions={{
+          type: 'smoothstep',
+          animated: false,
+          style: { stroke: '#94a3b8', strokeWidth: 2 },
+        }}
         fitView={true}
         fitViewOptions={{
           padding: 0.3,
