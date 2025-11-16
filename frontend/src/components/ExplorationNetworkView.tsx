@@ -4,6 +4,24 @@ import CytoscapeGraph, { CytoscapeNode, CytoscapeEdge } from './CytoscapeGraph';
 import CytoscapeControls from './CytoscapeControls';
 import { NetworkNode } from './NetworkView';
 
+// Utility function to get node color based on year (same as NetworkView)
+// ResearchRabbit-style: Blue gradient based on recency (darker = more recent)
+const getNodeColor = (year: number, isInCollection: boolean = false): string => {
+  if (isInCollection) {
+    return '#10b981'; // Green for papers in collection
+  }
+
+  // Blue gradient for suggested papers based on recency
+  const currentYear = new Date().getFullYear();
+  const yearsSincePublication = currentYear - year;
+
+  if (yearsSincePublication <= 1) return '#1e40af'; // Dark blue - very recent (last year)
+  if (yearsSincePublication <= 3) return '#3b82f6'; // Medium blue - recent (1-3 years)
+  if (yearsSincePublication <= 5) return '#60a5fa'; // Light blue - recent (3-5 years)
+  if (yearsSincePublication <= 10) return '#93c5fd'; // Lighter blue (5-10 years)
+  return '#dbeafe'; // Lightest blue - older papers
+};
+
 // Custom node component for exploration results
 const ExplorationNode = ({ data }: { data: any }) => {
   const handleClick = () => {
@@ -98,7 +116,8 @@ export default function ExplorationNetworkView({
 
     console.log('🔍 Creating exploration network with results:', explorationResults);
 
-    // Create source node (center)
+    // Create source node (center) with gradient color
+    const sourceColor = getNodeColor(sourceNode.metadata.year, false);
     const sourceNodeData: CytoscapeNode = {
       id: 'source',
       type: 'source',
@@ -111,13 +130,16 @@ export default function ExplorationNetworkView({
         year: sourceNode.metadata.year,
         citation_count: sourceNode.metadata.citation_count,
         pmid: sourceNode.metadata.pmid,
+        color: sourceColor, // ✅ Add gradient color based on year
         selected: false,
         onNodeClick: handleNodeClick
       }
     };
 
-    // Create exploration result nodes
+    // Create exploration result nodes with gradient colors
     const resultNodes: CytoscapeNode[] = explorationResults.map((result, index) => {
+      const nodeColor = getNodeColor(result.year || new Date().getFullYear(), false);
+
       return {
         id: result.pmid || `result-${index}`,
         type: 'article',
@@ -132,26 +154,55 @@ export default function ExplorationNetworkView({
           pmid: result.pmid,
           abstract: result.abstract,
           url: result.url,
+          color: nodeColor, // ✅ Add gradient color based on year
           selected: selectedNodeId === (result.pmid || `result-${index}`),
           onNodeClick: handleNodeClick
         }
       };
     });
 
-    // Create edges from source to all results
+    // Determine edge relationship type based on exploration type
+    let edgeRelationship: string = 'similarity'; // default
+    if (explorationType === 'papers-similar') {
+      edgeRelationship = 'similarity';
+    } else if (explorationType === 'papers-earlier') {
+      edgeRelationship = 'reference'; // Earlier work = papers we reference
+    } else if (explorationType === 'papers-later') {
+      edgeRelationship = 'citation'; // Later work = papers that cite us
+    }
+
+    // Create edges from source to all results with proper relationship type
     const resultEdges: CytoscapeEdge[] = explorationResults.map((result, index) => ({
       id: `edge-${index}`,
-      source: 'source',
-      target: result.pmid || `result-${index}`,
-      animated: false,
+      source: explorationType === 'papers-later' ? (result.pmid || `result-${index}`) : 'source',
+      target: explorationType === 'papers-later' ? 'source' : (result.pmid || `result-${index}`),
+      animated: edgeRelationship === 'citation' || edgeRelationship === 'reference',
+      label: edgeRelationship === 'citation' ? 'cites' : edgeRelationship === 'reference' ? 'references' : 'similar',
       data: {
-        relationship: 'exploration'
+        relationship: edgeRelationship
       }
     }));
 
+    console.log('🔍 [ExplorationNetworkView] Created edges:', {
+      explorationType,
+      edgeRelationship,
+      edgesCount: resultEdges.length,
+      sampleEdge: resultEdges[0]
+    });
+
+    // ✨ NEW: Detect cross-references between result nodes (same as NetworkView)
+    console.log('🔍 [ExplorationNetworkView] Detecting cross-references between nodes...');
+    const crossReferenceEdges: CytoscapeEdge[] = [];
+    const resultPmids = explorationResults.map(r => r.pmid).filter(Boolean);
+
+    // For now, we'll skip cross-reference detection in ExplorationNetworkView
+    // because it requires API calls to PubMed. The user can click on a node
+    // to create a full NetworkView column which will have cross-references.
+    // TODO: Add cross-reference detection via API calls if needed
+
     setNodes([sourceNodeData, ...resultNodes]);
-    setEdges(resultEdges);
-  }, [explorationResults, sourceNode, selectedNodeId, handleNodeClick]);
+    setEdges([...resultEdges, ...crossReferenceEdges]);
+  }, [explorationResults, sourceNode, selectedNodeId, handleNodeClick, explorationType]);
 
   if (!explorationResults || explorationResults.length === 0) {
     return (

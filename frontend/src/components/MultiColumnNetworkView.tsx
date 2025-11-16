@@ -314,20 +314,25 @@ export default function MultiColumnNetworkView({
     }
 
     try {
-      // Determine column title based on exploration type
+      // Determine column title and network type based on exploration type
       let columnTitle = `${defaultNetworkType.charAt(0).toUpperCase() + defaultNetworkType.slice(1)} of ${paper.metadata.title.substring(0, 30)}...`;
+      let networkType: 'citations' | 'similar' | 'references' = defaultNetworkType;
 
-      if (isExplorationColumn) {
+      // Map exploration type to network type for proper backend endpoint
+      if (paper.metadata.explorationType) {
         const explorationTypeMap = {
-          'papers-similar': 'Similar Work',
-          'papers-earlier': 'Earlier Work',
-          'papers-later': 'Later Work',
-          'people-authors': 'These Authors',
-          'people-suggested': 'Suggested Authors',
-          'content-linked': 'Linked Content'
+          'papers-similar': { label: 'Similar Work', networkType: 'similar' as const },
+          'papers-earlier': { label: 'Earlier Work', networkType: 'references' as const },
+          'papers-later': { label: 'Later Work', networkType: 'citations' as const },
+          'people-authors': { label: 'These Authors', networkType: 'similar' as const },
+          'people-suggested': { label: 'Suggested Authors', networkType: 'similar' as const },
+          'content-linked': { label: 'Linked Content', networkType: 'citations' as const }
         };
-        const explorationLabel = explorationTypeMap[paper.metadata.explorationType as keyof typeof explorationTypeMap] || 'Related';
-        columnTitle = `${explorationLabel}: ${paper.metadata.title.substring(0, 25)}...`;
+        const explorationConfig = explorationTypeMap[paper.metadata.explorationType as keyof typeof explorationTypeMap];
+        if (explorationConfig) {
+          columnTitle = `${explorationConfig.label}: ${paper.metadata.title.substring(0, 25)}...`;
+          networkType = explorationConfig.networkType;
+        }
       }
 
       // Use article sourceType with flexible network type
@@ -338,15 +343,12 @@ export default function MultiColumnNetworkView({
         sourceId: paper.metadata.pmid,
         selectedNode: null,
         networkViewRef: React.createRef(),
-        networkType: defaultNetworkType,
+        networkType: networkType, // ✅ Use mapped network type
         explorationMode: defaultExplorationMode,
         title: columnTitle,
-        // Store exploration data for the column
-        explorationData: isExplorationColumn ? {
-          type: paper.metadata.explorationType!,
-          results: paper.metadata.explorationResults!,
-          timestamp: paper.metadata.explorationTimestamp!
-        } : undefined
+        // ✅ IMPORTANT: Do NOT store explorationData to force NetworkView rendering
+        // This ensures full network with cross-references, gradient colors, and proper edges
+        explorationData: undefined // Always use NetworkView, never ExplorationNetworkView
       };
 
       console.log('🔍 Column will use NetworkView with:', {

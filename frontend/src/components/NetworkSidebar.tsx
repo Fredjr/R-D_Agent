@@ -865,23 +865,29 @@ export default function NetworkSidebar({
               allResults: results
             });
 
-            // Create a new column with the exploration results
-            // The column will be created based on the selected node and will show the exploration results
+            // ✨ IMPORTANT: Do NOT pass explorationResults to create a full NetworkView
+            // instead of ExplorationNetworkView. This ensures:
+            // 1. Full network is fetched from backend with cross-reference detection
+            // 2. Nodes get gradient colors based on year
+            // 3. Edges get proper colors based on relationship type
+            // 4. Same logic as initial graph is used
             const columnData = {
               ...selectedNode,
               metadata: {
                 ...selectedNode.metadata,
+                // Store exploration type for column title, but NO explorationResults
                 explorationType: `${section}-${mode}`,
-                explorationResults: results,
+                // explorationResults: results, // ❌ REMOVED - causes ExplorationNetworkView
                 explorationTimestamp: new Date().toISOString()
               }
             };
 
-            console.log('🔍 Column data being passed:', {
+            console.log('🔍 Column data being passed (WITHOUT explorationResults):', {
               hasExplorationType: !!columnData.metadata.explorationType,
               hasExplorationResults: !!columnData.metadata.explorationResults,
               explorationResultsLength: columnData.metadata.explorationResults?.length,
-              columnData
+              columnData,
+              willUseNetworkView: true // ✅ Will use NetworkView instead of ExplorationNetworkView
             });
 
             // Add a small delay to ensure the callback is properly executed
