@@ -9,7 +9,8 @@ import {
   ArrowTopRightOnSquareIcon,
   DocumentTextIcon,
   Squares2X2Icon,
-  ListBulletIcon
+  ListBulletIcon,
+  GlobeAltIcon
 } from '@heroicons/react/24/outline';
 import { BookmarkIcon as BookmarkSolidIcon } from '@heroicons/react/24/solid';
 import MultiColumnNetworkView from '@/components/MultiColumnNetworkView';
@@ -17,6 +18,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import FilterPanel, { type FilterSection } from '@/components/filters/FilterPanel';
 import FilterChips, { type FilterChip } from '@/components/filters/FilterChips';
 import dynamic from 'next/dynamic';
+import MeSHAutocompleteSearch from '@/components/MeSHAutocompleteSearch';
+import { useRouter } from 'next/navigation';
 import {
   SpotifyTabSection,
   SpotifyTabCard,
@@ -53,6 +56,7 @@ type ViewMode = 'network' | 'search';
 
 export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
   const { user } = useAuth();
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<PubMedArticle[]>([]);
@@ -86,33 +90,57 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
   const [selectedPMID, setSelectedPMID] = useState<string | null>(null);
   const [selectedTitle, setSelectedTitle] = useState<string | null>(null);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
+  // Handle MeSH-enhanced search
+  const handleMeSHSearch = async (query: string, meshData?: any) => {
+    if (!query.trim()) return;
 
+    setSearchQuery(query);
     setIsSearching(true);
     setHasSearched(true);
     setViewMode('search'); // Switch to search view
-    try {
-      console.log('🔍 Searching PubMed for:', searchQuery);
 
-      // Call PubMed search API - FIXED: Use 'q' parameter instead of 'query'
-      const response = await fetch(`/api/proxy/pubmed/search?q=${encodeURIComponent(searchQuery)}&limit=20`);
+    try {
+      console.log('🔍 [ExploreTab] Searching PubMed for:', query, 'with MeSH data:', meshData);
+
+      // Build API URL with parameters
+      const params = new URLSearchParams({
+        q: query,
+        limit: '20'
+      });
+
+      // Add MeSH data if available
+      if (meshData?.mesh_terms && meshData.mesh_terms.length > 0) {
+        params.append('mesh_terms', JSON.stringify(meshData.mesh_terms));
+      }
+      if (meshData?.suggested_queries && meshData.suggested_queries.length > 0) {
+        params.append('suggested_queries', JSON.stringify(meshData.suggested_queries));
+      }
+
+      const apiUrl = `/api/proxy/pubmed/search?${params}`;
+      console.log('🔍 [ExploreTab] API call:', apiUrl);
+
+      const response = await fetch(apiUrl);
 
       if (!response.ok) {
         throw new Error(`Search failed: ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log('✅ Search results:', data);
+      console.log('✅ [ExploreTab] Search results:', data);
 
       setSearchResults(data.articles || []);
     } catch (error) {
-      console.error('❌ Search error:', error);
+      console.error('❌ [ExploreTab] Search error:', error);
       setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
+  };
+
+  // Legacy search handler for backward compatibility
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    handleMeSHSearch(searchQuery);
   };
 
   const clearSearch = () => {
@@ -461,59 +489,13 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
           </div>
         </div>
 
-        {/* PubMed Search Bar */}
-        <form onSubmit={handleSearch} className="mt-4">
-          <div className="relative">
-            <MagnifyingGlassIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[var(--spotify-light-text)]" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search PubMed for papers (e.g., 'CRISPR gene editing', 'PMID:40310133', 'machine learning cancer')"
-              className="w-full pl-12 pr-32 py-3 bg-[var(--spotify-dark-gray)] border-2 border-purple-500/30 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-[var(--spotify-white)] placeholder-[var(--spotify-light-text)]"
-              disabled={isSearching}
-              autoComplete="off"
-              data-1p-ignore
-              data-lpignore="true"
-              data-form-type="other"
-            />
-            <button
-              type="submit"
-              disabled={isSearching || !searchQuery.trim()}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors font-medium"
-            >
-              {isSearching ? 'Searching...' : 'Search'}
-            </button>
-          </div>
-        </form>
-
-        {/* Quick Tips */}
-        <div className="mt-4 flex flex-wrap gap-2">
-          <span className="text-xs text-[var(--spotify-light-text)]">Quick tips:</span>
-          <button
-            onClick={() => setSearchQuery('machine learning')}
-            className="text-xs px-2 py-1 bg-[var(--spotify-dark-gray)] border border-[var(--spotify-border-gray)] rounded-md hover:bg-[var(--spotify-medium-gray)] text-[var(--spotify-white)]"
-          >
-            machine learning
-          </button>
-          <button
-            onClick={() => setSearchQuery('CRISPR')}
-            className="text-xs px-2 py-1 bg-[var(--spotify-dark-gray)] border border-[var(--spotify-border-gray)] rounded-md hover:bg-[var(--spotify-medium-gray)] text-[var(--spotify-white)]"
-          >
-            CRISPR
-          </button>
-          <button
-            onClick={() => setSearchQuery('PMID:40310133')}
-            className="text-xs px-2 py-1 bg-[var(--spotify-dark-gray)] border border-[var(--spotify-border-gray)] rounded-md hover:bg-[var(--spotify-medium-gray)] text-[var(--spotify-white)]"
-          >
-            PMID:40310133
-          </button>
-          <button
-            onClick={() => setSearchQuery('neural networks')}
-            className="text-xs px-2 py-1 bg-[var(--spotify-dark-gray)] border border-[var(--spotify-border-gray)] rounded-md hover:bg-[var(--spotify-medium-gray)] text-[var(--spotify-white)]"
-          >
-            neural networks
-          </button>
+        {/* MeSH-Enhanced PubMed Search Bar */}
+        <div className="mt-4">
+          <MeSHAutocompleteSearch
+            onSearch={handleMeSHSearch}
+            placeholder="Search MeSH terms, topics, or enter PMIDs (e.g., 'CRISPR gene editing', 'PMID:40310133')"
+            className="w-full"
+          />
         </div>
       </SpotifyTabCard>
 
@@ -585,40 +567,45 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
                         <span className="text-blue-600">PMID: {article.pmid}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          setSelectedPMID(article.pmid);
-                          setSelectedTitle(article.title);
-                          setShowPDFViewer(true);
-                        }}
-                        className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-md transition-colors"
-                        title="Read PDF"
-                      >
-                        <DocumentTextIcon className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => handleSaveArticle(article)}
-                        disabled={savingPmids.has(article.pmid)}
-                        className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors disabled:opacity-50"
-                        title="Save to collection"
-                      >
-                        {savingPmids.has(article.pmid) ? (
-                          <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <BookmarkIcon className="w-5 h-5" />
-                        )}
-                      </button>
-                      <a
-                        href={`https://pubmed.ncbi.nlm.nih.gov/${article.pmid}/`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
-                        title="View on PubMed"
-                      >
-                        <ArrowTopRightOnSquareIcon className="w-5 h-5" />
-                      </a>
-                    </div>
+                  </div>
+
+                  {/* Action Buttons - Matching /search page layout */}
+                  <div className="flex flex-wrap gap-2 mt-4 mb-3">
+                    <button
+                      onClick={() => {
+                        router.push(`/explore/network?pmid=${article.pmid}&context=project-explore`);
+                      }}
+                      className="inline-flex items-center px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-purple-400 border border-purple-500/30 rounded hover:from-purple-500/30 hover:to-blue-500/30 transition-all"
+                      title="Explore Network"
+                    >
+                      <GlobeAltIcon className="w-4 h-4 mr-1" />
+                      Explore Network
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedPMID(article.pmid);
+                        setSelectedTitle(article.title);
+                        setShowPDFViewer(true);
+                      }}
+                      className="inline-flex items-center px-3 py-1.5 text-xs bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition-colors"
+                      title="Read PDF"
+                    >
+                      <DocumentTextIcon className="w-4 h-4 mr-1" />
+                      Read PDF
+                    </button>
+                    <button
+                      onClick={() => handleSaveArticle(article)}
+                      disabled={savingPmids.has(article.pmid)}
+                      className="inline-flex items-center px-3 py-1.5 text-xs bg-[var(--spotify-green)]/20 text-[var(--spotify-green)] rounded hover:bg-[var(--spotify-green)]/30 transition-colors disabled:opacity-50"
+                      title="Save to collection"
+                    >
+                      {savingPmids.has(article.pmid) ? (
+                        <div className="w-4 h-4 border-2 border-[var(--spotify-green)] border-t-transparent rounded-full animate-spin mr-1" />
+                      ) : (
+                        <BookmarkIcon className="w-4 h-4 mr-1" />
+                      )}
+                      {savingPmids.has(article.pmid) ? 'Saving...' : 'Add to Collection'}
+                    </button>
                   </div>
 
                   {/* Authors */}
