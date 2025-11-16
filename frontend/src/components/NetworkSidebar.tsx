@@ -153,6 +153,8 @@ export default function NetworkSidebar({
 
   // Similar Work state (Phase 1.4)
   const [loadingSimilar, setLoadingSimilar] = useState(false);
+  const [loadingEarlier, setLoadingEarlier] = useState(false);
+  const [loadingLater, setLoadingLater] = useState(false);
 
   // OA/Full-Text toggle for smart actions
   // Use controlled state if provided, otherwise use internal state
@@ -548,6 +550,94 @@ export default function NetworkSidebar({
       error('❌ Failed to fetch similar papers');
     } finally {
       setLoadingSimilar(false);
+    }
+  };
+
+  // Earlier Work handler (Phase 1.5)
+  const handleEarlierWork = async () => {
+    if (!selectedNode?.id) {
+      error('❌ No paper selected');
+      return;
+    }
+
+    setLoadingEarlier(true);
+    try {
+      console.log(`[Earlier Work] Fetching earlier work for PMID: ${selectedNode.id}`);
+
+      const response = await fetch(
+        `/api/proxy/articles/${selectedNode.id}/references?limit=15`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch earlier work: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log(`[Earlier Work] Found ${data.references?.length || 0} earlier work papers`);
+
+      if (!data.references || data.references.length === 0) {
+        info('ℹ️ No earlier work found');
+        return;
+      }
+
+      // Emit event to NetworkView to add earlier work papers
+      window.dispatchEvent(new CustomEvent('addEarlierPapers', {
+        detail: {
+          sourcePmid: selectedNode.id,
+          papers: data.references
+        }
+      }));
+
+      success(`✅ Found ${data.references.length} earlier work papers`);
+    } catch (err) {
+      console.error('[Earlier Work] Error:', err);
+      error('❌ Failed to fetch earlier work');
+    } finally {
+      setLoadingEarlier(false);
+    }
+  };
+
+  // Later Work handler (Phase 1.5)
+  const handleLaterWork = async () => {
+    if (!selectedNode?.id) {
+      error('❌ No paper selected');
+      return;
+    }
+
+    setLoadingLater(true);
+    try {
+      console.log(`[Later Work] Fetching later work for PMID: ${selectedNode.id}`);
+
+      const response = await fetch(
+        `/api/proxy/articles/${selectedNode.id}/citations?limit=15`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch later work: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log(`[Later Work] Found ${data.citations?.length || 0} later work papers`);
+
+      if (!data.citations || data.citations.length === 0) {
+        info('ℹ️ No later work found');
+        return;
+      }
+
+      // Emit event to NetworkView to add later work papers
+      window.dispatchEvent(new CustomEvent('addLaterPapers', {
+        detail: {
+          sourcePmid: selectedNode.id,
+          papers: data.citations
+        }
+      }));
+
+      success(`✅ Found ${data.citations.length} later work papers`);
+    } catch (err) {
+      console.error('[Later Work] Error:', err);
+      error('❌ Failed to fetch later work');
+    } finally {
+      setLoadingLater(false);
     }
   };
 
@@ -1164,6 +1254,60 @@ export default function NetworkSidebar({
               <span className="flex items-center justify-center gap-2">
                 <span className="text-lg">🔍</span>
                 Similar Work
+              </span>
+            )}
+          </Button>
+        </div>
+
+        {/* Earlier Work Button (Phase 1.5) */}
+        <div className="mt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full text-sm font-medium transition-all bg-blue-50 hover:bg-blue-100 border-blue-300 text-blue-700"
+            onClick={handleEarlierWork}
+            disabled={loadingEarlier || !selectedNode}
+            title="Find papers this paper cites (references)"
+          >
+            {loadingEarlier ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Finding Earlier Work...
+              </span>
+            ) : (
+              <span className="flex items-center justify-center gap-2">
+                <span className="text-lg">⏪</span>
+                Earlier Work
+              </span>
+            )}
+          </Button>
+        </div>
+
+        {/* Later Work Button (Phase 1.5) */}
+        <div className="mt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full text-sm font-medium transition-all bg-green-50 hover:bg-green-100 border-green-300 text-green-700"
+            onClick={handleLaterWork}
+            disabled={loadingLater || !selectedNode}
+            title="Find papers that cite this paper"
+          >
+            {loadingLater ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Finding Later Work...
+              </span>
+            ) : (
+              <span className="flex items-center justify-center gap-2">
+                <span className="text-lg">⏩</span>
+                Later Work
               </span>
             )}
           </Button>

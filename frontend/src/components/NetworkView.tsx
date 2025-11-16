@@ -1216,6 +1216,176 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
     };
   }, [nodes, setNodes, setEdges]);
 
+  // Phase 1.5: Listen for earlier papers event from NetworkSidebar
+  useEffect(() => {
+    const handleAddEarlierPapers = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { sourcePmid, papers } = customEvent.detail;
+
+      console.log(`[NetworkView] Adding ${papers.length} earlier work papers for source ${sourcePmid}`);
+
+      // Find source node position for layout
+      const sourceNode = nodes.find(n => n.id === sourcePmid);
+      const sourceX = sourceNode?.position.x || 0;
+      const sourceY = sourceNode?.position.y || 0;
+
+      // Create new nodes for earlier work papers (positioned to the left)
+      const newNodes: Node[] = papers.map((paper: any, index: number) => {
+        // Position in a vertical line to the left of source
+        const offsetY = (index - papers.length / 2) * 80;
+        const x = sourceX - 350;
+        const y = sourceY + offsetY;
+
+        return {
+          id: paper.pmid,
+          type: 'custom',
+          position: { x, y },
+          data: {
+            id: paper.pmid,
+            label: paper.title,
+            title: paper.title,
+            authors: paper.authors || [],
+            journal: paper.journal || '',
+            year: paper.year || 0,
+            citationCount: paper.citation_count || 0,
+            color: '#3b82f6', // Blue for earlier work (references)
+            size: 'medium',
+            metadata: {
+              pmid: paper.pmid,
+              title: paper.title,
+              authors: paper.authors || [],
+              journal: paper.journal || '',
+              year: paper.year || 0,
+              citation_count: paper.citation_count || 0,
+              url: paper.url || `https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`,
+              abstract: paper.abstract || ''
+            }
+          }
+        };
+      });
+
+      // Create blue edges from earlier papers to source (they are referenced by source)
+      const newEdges: Edge[] = papers.map((paper: any) => ({
+        id: `${paper.pmid}-reference-${sourcePmid}`,
+        source: paper.pmid,
+        target: sourcePmid,
+        type: 'smoothstep',
+        animated: true,
+        label: 'referenced by',
+        labelStyle: {
+          fill: '#3b82f6',
+          fontWeight: 600,
+          fontSize: 11,
+          fontFamily: 'Inter, sans-serif'
+        },
+        style: {
+          stroke: '#3b82f6', // Blue
+          strokeWidth: 2
+        },
+        data: {
+          relationship: 'reference'
+        }
+      }));
+
+      // Update nodes and edges
+      setNodes(prevNodes => [...prevNodes, ...newNodes]);
+      setEdges(prevEdges => [...prevEdges, ...newEdges]);
+
+      console.log(`[NetworkView] Added ${newNodes.length} earlier work nodes and ${newEdges.length} edges`);
+    };
+
+    window.addEventListener('addEarlierPapers', handleAddEarlierPapers);
+
+    return () => {
+      window.removeEventListener('addEarlierPapers', handleAddEarlierPapers);
+    };
+  }, [nodes, setNodes, setEdges]);
+
+  // Phase 1.5: Listen for later papers event from NetworkSidebar
+  useEffect(() => {
+    const handleAddLaterPapers = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { sourcePmid, papers } = customEvent.detail;
+
+      console.log(`[NetworkView] Adding ${papers.length} later work papers for source ${sourcePmid}`);
+
+      // Find source node position for layout
+      const sourceNode = nodes.find(n => n.id === sourcePmid);
+      const sourceX = sourceNode?.position.x || 0;
+      const sourceY = sourceNode?.position.y || 0;
+
+      // Create new nodes for later work papers (positioned to the right)
+      const newNodes: Node[] = papers.map((paper: any, index: number) => {
+        // Position in a vertical line to the right of source
+        const offsetY = (index - papers.length / 2) * 80;
+        const x = sourceX + 350;
+        const y = sourceY + offsetY;
+
+        return {
+          id: paper.pmid,
+          type: 'custom',
+          position: { x, y },
+          data: {
+            id: paper.pmid,
+            label: paper.title,
+            title: paper.title,
+            authors: paper.authors || [],
+            journal: paper.journal || '',
+            year: paper.year || 0,
+            citationCount: paper.citation_count || 0,
+            color: '#10b981', // Green for later work (citations)
+            size: 'medium',
+            metadata: {
+              pmid: paper.pmid,
+              title: paper.title,
+              authors: paper.authors || [],
+              journal: paper.journal || '',
+              year: paper.year || 0,
+              citation_count: paper.citation_count || 0,
+              url: paper.url || `https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`,
+              abstract: paper.abstract || ''
+            }
+          }
+        };
+      });
+
+      // Create green edges from source to later papers (they cite the source)
+      const newEdges: Edge[] = papers.map((paper: any) => ({
+        id: `${sourcePmid}-citation-${paper.pmid}`,
+        source: sourcePmid,
+        target: paper.pmid,
+        type: 'smoothstep',
+        animated: true,
+        label: 'cited by',
+        labelStyle: {
+          fill: '#10b981',
+          fontWeight: 600,
+          fontSize: 11,
+          fontFamily: 'Inter, sans-serif'
+        },
+        style: {
+          stroke: '#10b981', // Green
+          strokeWidth: 2
+        },
+        data: {
+          relationship: 'citation'
+        }
+      }));
+
+      // Update nodes and edges
+      setNodes(prevNodes => [...prevNodes, ...newNodes]);
+      setEdges(prevEdges => [...prevEdges, ...newEdges]);
+
+      console.log(`[NetworkView] Added ${newNodes.length} later work nodes and ${newEdges.length} edges`);
+    };
+
+    window.addEventListener('addLaterPapers', handleAddLaterPapers);
+
+    return () => {
+      window.removeEventListener('addLaterPapers', handleAddLaterPapers);
+    };
+  }, [nodes, setNodes, setEdges]);
+
   // Handle navigation mode changes
   const handleNavigationChange = useCallback((newMode: string, newSourceId?: string) => {
     const targetSourceId = newSourceId || sourceId;
