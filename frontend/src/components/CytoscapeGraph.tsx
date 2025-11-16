@@ -66,7 +66,7 @@ const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
         {
           selector: 'node',
           style: {
-            'background-color': '#3b82f6',
+            'background-color': 'data(color)', // Use color from node data (year-based gradient)
             'label': 'data(label)',
             'color': '#fff',
             'text-valign': 'center',

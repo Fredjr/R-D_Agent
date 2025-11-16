@@ -178,7 +178,7 @@ const SpotifySidebar: React.FC<SpotifySidebarProps> = ({
     <div
       className={cn(
         "flex flex-col h-full bg-[var(--spotify-black)] border-r border-[var(--spotify-border-gray)] transition-all duration-300",
-        collapsed ? "w-16" : "w-64",
+        collapsed ? "w-16" : "w-64 lg:w-72 xl:w-80", // Responsive width: 256px -> 288px (lg) -> 320px (xl)
         className
       )}
     >
