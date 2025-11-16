@@ -1129,6 +1129,93 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
     fetchCollections();
   }, [fetchNetworkData, fetchCollections]);
 
+  // Phase 1.4: Listen for similar papers event from NetworkSidebar
+  useEffect(() => {
+    const handleAddSimilarPapers = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { sourcePmid, papers } = customEvent.detail;
+
+      console.log(`[NetworkView] Adding ${papers.length} similar papers for source ${sourcePmid}`);
+
+      // Find source node position for layout
+      const sourceNode = nodes.find(n => n.id === sourcePmid);
+      const sourceX = sourceNode?.position.x || 0;
+      const sourceY = sourceNode?.position.y || 0;
+
+      // Create new nodes for similar papers
+      const newNodes: Node[] = papers.map((paper: any, index: number) => {
+        // Position in a circle around source
+        const angle = (2 * Math.PI * index) / papers.length;
+        const radius = 250;
+        const x = sourceX + radius * Math.cos(angle);
+        const y = sourceY + radius * Math.sin(angle);
+
+        return {
+          id: paper.pmid,
+          type: 'custom',
+          position: { x, y },
+          data: {
+            id: paper.pmid,
+            label: paper.title,
+            title: paper.title,
+            authors: paper.authors || [],
+            journal: paper.journal || '',
+            year: paper.year || 0,
+            citationCount: paper.citation_count || 0,
+            color: '#8b5cf6', // Purple for similar papers
+            size: 'medium',
+            metadata: {
+              pmid: paper.pmid,
+              title: paper.title,
+              authors: paper.authors || [],
+              journal: paper.journal || '',
+              year: paper.year || 0,
+              citation_count: paper.citation_count || 0,
+              url: paper.url || `https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`,
+              abstract: paper.abstract || ''
+            }
+          }
+        };
+      });
+
+      // Create purple edges from source to similar papers
+      const newEdges: Edge[] = papers.map((paper: any) => ({
+        id: `${sourcePmid}-similar-${paper.pmid}`,
+        source: sourcePmid,
+        target: paper.pmid,
+        type: 'smoothstep',
+        animated: false,
+        label: 'similar',
+        labelStyle: {
+          fill: '#8b5cf6',
+          fontWeight: 600,
+          fontSize: 11,
+          fontFamily: 'Inter, sans-serif'
+        },
+        style: {
+          stroke: '#8b5cf6', // Purple
+          strokeWidth: 2
+        },
+        data: {
+          relationship: 'similarity',
+          similarity_score: paper.similarity_score || 0.8
+        }
+      }));
+
+      // Update nodes and edges
+      setNodes(prevNodes => [...prevNodes, ...newNodes]);
+      setEdges(prevEdges => [...prevEdges, ...newEdges]);
+
+      console.log(`[NetworkView] Added ${newNodes.length} nodes and ${newEdges.length} edges`);
+    };
+
+    window.addEventListener('addSimilarPapers', handleAddSimilarPapers);
+
+    return () => {
+      window.removeEventListener('addSimilarPapers', handleAddSimilarPapers);
+    };
+  }, [nodes, setNodes, setEdges]);
+
   // Handle navigation mode changes
   const handleNavigationChange = useCallback((newMode: string, newSourceId?: string) => {
     const targetSourceId = newSourceId || sourceId;

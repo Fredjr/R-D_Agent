@@ -151,6 +151,9 @@ export default function NetworkSidebar({
   const [seedArticleId, setSeedArticleId] = useState<number | null>(null);
   const [seedCollectionId, setSeedCollectionId] = useState<string | null>(null);
 
+  // Similar Work state (Phase 1.4)
+  const [loadingSimilar, setLoadingSimilar] = useState(false);
+
   // OA/Full-Text toggle for smart actions
   // Use controlled state if provided, otherwise use internal state
   // Default to false to get ALL PubMed results, not just open access
@@ -501,6 +504,50 @@ export default function NetworkSidebar({
       error('❌ Failed to mark paper as seed');
     } finally {
       setUpdatingSeed(false);
+    }
+  };
+
+  // Similar Work handler (Phase 1.4)
+  const handleSimilarWork = async () => {
+    if (!selectedNode?.id) {
+      error('❌ No paper selected');
+      return;
+    }
+
+    setLoadingSimilar(true);
+    try {
+      console.log(`[Similar Work] Fetching similar papers for PMID: ${selectedNode.id}`);
+
+      const response = await fetch(
+        `/api/proxy/articles/${selectedNode.id}/similar?limit=10&threshold=0.1`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch similar papers: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log(`[Similar Work] Found ${data.similar_articles?.length || 0} similar papers`);
+
+      if (!data.similar_articles || data.similar_articles.length === 0) {
+        info('ℹ️ No similar papers found');
+        return;
+      }
+
+      // Emit event to NetworkView to add similar papers
+      window.dispatchEvent(new CustomEvent('addSimilarPapers', {
+        detail: {
+          sourcePmid: selectedNode.id,
+          papers: data.similar_articles
+        }
+      }));
+
+      success(`✅ Found ${data.similar_articles.length} similar papers`);
+    } catch (err) {
+      console.error('[Similar Work] Error:', err);
+      error('❌ Failed to fetch similar papers');
+    } finally {
+      setLoadingSimilar(false);
     }
   };
 
@@ -1093,6 +1140,33 @@ export default function NetworkSidebar({
               Add to collection first to mark as seed
             </div>
           )}
+        </div>
+
+        {/* Similar Work Button (Phase 1.4) */}
+        <div className="mt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full text-sm font-medium transition-all bg-purple-50 hover:bg-purple-100 border-purple-300 text-purple-700"
+            onClick={handleSimilarWork}
+            disabled={loadingSimilar || !selectedNode}
+            title="Find papers similar to this one"
+          >
+            {loadingSimilar ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Finding Similar Work...
+              </span>
+            ) : (
+              <span className="flex items-center justify-center gap-2">
+                <span className="text-lg">🔍</span>
+                Similar Work
+              </span>
+            )}
+          </Button>
         </div>
 
         {/* OA/Full-Text Toggle for Smart Actions */}
