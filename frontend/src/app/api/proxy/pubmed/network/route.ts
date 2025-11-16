@@ -265,27 +265,23 @@ async function findRelatedArticles(pmid: string, linkType: string, limit: number
 
 /**
  * Convert PubMed article to network node
+ * NOTE: Color is intentionally set to a placeholder (#94a3b8 gray) because the frontend
+ * will calculate the correct gradient color based on publication year and collection status.
+ * This ensures consistent coloring across all graphs (initial and subsequent).
  */
 function createNetworkNode(article: PubMedArticle, nodeType: NetworkNode['metadata']['node_type']): NetworkNode {
-  const colors = {
-    'base_article': '#4CAF50',      // Green for source
-    'citing_article': '#2196F3',    // Blue for citations
-    'reference_article': '#FF9800', // Orange for references
-    'similar_article': '#9C27B0'    // Purple for similar
-  };
-  
   const sizes = {
     'base_article': 25,
     'citing_article': 15,
     'reference_article': 15,
     'similar_article': 15
   };
-  
+
   return {
     id: article.pmid,
     label: article.title.length > 60 ? article.title.substring(0, 60) + '...' : article.title,
     size: sizes[nodeType],
-    color: colors[nodeType],
+    color: '#94a3b8', // Placeholder gray - frontend will override with gradient color
     metadata: {
       pmid: article.pmid,
       title: article.title,

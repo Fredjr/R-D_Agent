@@ -932,11 +932,18 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         // Use ResearchRabbit-style coloring: green for collection, blue gradient for suggested
         const nodeColor = getNodeColor(nodeYear, isInCollection);
 
+        console.log(`🎨 [NetworkView] Node ${nodePmid} color calculation:`, {
+          year: nodeYear,
+          isInCollection,
+          calculatedColor: nodeColor,
+          backendColor: node.color
+        });
+
         return {
           id: node.id,
           type: index === 0 ? 'source' : 'article',
           data: {
-            ...node,
+            // DO NOT spread ...node here to avoid backend color override
             label: node.label || node.metadata?.title || `Article ${node.id}`,
             node_type: index === 0 ? 'source' : 'article',
             // Keep the original metadata structure for ArticleNode component
@@ -950,9 +957,9 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
               url: node.metadata?.url || `https://pubmed.ncbi.nlm.nih.gov/${nodePmid}/`,
               abstract: node.metadata?.abstract || '',
             },
-            // Also add direct properties for compatibility
+            // Set size and color explicitly (DO NOT use backend values)
             size: node.size || 60,
-            color: nodeColor, // Use the new color based on collection status
+            color: nodeColor, // ALWAYS use frontend-calculated gradient color
           },
         };
       });
