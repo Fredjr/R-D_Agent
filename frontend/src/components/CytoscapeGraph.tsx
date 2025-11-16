@@ -345,15 +345,23 @@ const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
     const cy = cyRef.current;
 
     // Convert nodes to Cytoscape format
-    const cyNodes = nodes.map(node => ({
-      data: {
-        id: node.id,
-        label: node.data?.label || node.data?.title?.substring(0, 50) || node.id,
-        type: node.data?.node_type || node.type,
-        ...node.data,
-      },
-      position: node.position,
-    }));
+    const cyNodes = nodes.map(node => {
+      console.log(`🎨 [Cytoscape] Converting node ${node.id}:`, {
+        nodeDataColor: node.data?.color,
+        nodeDataKeys: Object.keys(node.data || {}),
+        fullNodeData: node.data
+      });
+
+      return {
+        data: {
+          id: node.id,
+          label: node.data?.label || node.data?.title?.substring(0, 50) || node.id,
+          type: node.data?.node_type || node.type,
+          ...node.data,
+        },
+        position: node.position,
+      };
+    });
 
     // Convert edges to Cytoscape format
     const cyEdges = edges.map(edge => ({
@@ -375,6 +383,15 @@ const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
     console.log('✅ [Cytoscape] Added elements:', {
       nodes: cy.nodes().length,
       edges: cy.edges().length,
+    });
+
+    // Log actual node colors in Cytoscape
+    cy.nodes().forEach(node => {
+      console.log(`🎨 [Cytoscape] Node ${node.id()} in graph:`, {
+        dataColor: node.data('color'),
+        styleColor: node.style('background-color'),
+        allData: node.data()
+      });
     });
 
     // Run layout
