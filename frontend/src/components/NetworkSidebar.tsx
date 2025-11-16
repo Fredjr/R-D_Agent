@@ -15,6 +15,13 @@ const PDFViewer = dynamic(() => import('@/components/reading/PDFViewer'), {
   loading: () => <div className="flex items-center justify-center p-8">Loading PDF viewer...</div>
 });
 
+interface NetworkEdge {
+  id: string;
+  from: string;
+  to: string;
+  relationship: string;
+}
+
 interface NetworkSidebarProps {
   selectedNode: NetworkNode | null;
   onNavigationChange: (mode: 'similar' | 'references' | 'citations' | 'authors') => void;
@@ -43,6 +50,9 @@ interface NetworkSidebarProps {
   onFullTextOnlyChange?: (value: boolean) => void;
   // NEW: Context indicator for multi-column support
   supportsMultiColumn?: boolean;
+  // NEW: Edge data for relationship visualization (Phase 1.3)
+  edges?: NetworkEdge[];
+  sourceNodeId?: string; // The original source paper PMID
 }
 
 export default function NetworkSidebar({
@@ -66,7 +76,9 @@ export default function NetworkSidebar({
   onExploreCluster,
   fullTextOnly: propFullTextOnly,
   onFullTextOnlyChange,
-  supportsMultiColumn = false
+  supportsMultiColumn = false,
+  edges = [],
+  sourceNodeId
 }: NetworkSidebarProps) {
   console.log('🔍 NetworkSidebar rendered with props:', {
     hasSelectedNode: !!selectedNode,
@@ -941,6 +953,53 @@ export default function NetworkSidebar({
                 {metadata.abstract}
               </div>
             </details>
+          </div>
+        )}
+
+        {/* Relationship to Source Paper (Phase 1.3 - ResearchRabbit-style) */}
+        {edges && edges.length > 0 && selectedNode && sourceNodeId && (
+          <div className="mt-2">
+            {(() => {
+              // Find relationships between selected node and source
+              const nodeId = selectedNode.id;
+              const relationships = edges.filter(
+                edge =>
+                  (edge.from === nodeId && edge.to === sourceNodeId) ||
+                  (edge.from === sourceNodeId && edge.to === nodeId)
+              );
+
+              if (relationships.length === 0) return null;
+
+              const relationshipLabels: Record<string, { icon: string; color: string; text: string }> = {
+                citation: { icon: '🟢', color: 'bg-green-50 border-green-200 text-green-800', text: 'Cites the source paper' },
+                reference: { icon: '🔵', color: 'bg-blue-50 border-blue-200 text-blue-800', text: 'Referenced by source paper' },
+                similarity: { icon: '🟣', color: 'bg-purple-50 border-purple-200 text-purple-800', text: 'Similar topic/content' },
+                'co-authored': { icon: '🟠', color: 'bg-orange-50 border-orange-200 text-orange-800', text: 'Shares authors' },
+                'same-journal': { icon: '🩷', color: 'bg-pink-50 border-pink-200 text-pink-800', text: 'Same journal' },
+                'topic-related': { icon: '🔷', color: 'bg-indigo-50 border-indigo-200 text-indigo-800', text: 'Related topic' }
+              };
+
+              return (
+                <div className="space-y-1">
+                  {relationships.map((rel, idx) => {
+                    const info = relationshipLabels[rel.relationship] || {
+                      icon: '⚪',
+                      color: 'bg-gray-50 border-gray-200 text-gray-800',
+                      text: 'Related'
+                    };
+                    return (
+                      <div
+                        key={idx}
+                        className={`p-2 rounded border ${info.color} text-xs font-medium flex items-center gap-2`}
+                      >
+                        <span className="text-base">{info.icon}</span>
+                        <span>{info.text}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         )}
 

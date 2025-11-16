@@ -946,21 +946,76 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         };
       });
 
-      const flowEdges: Edge[] = (data.edges || []).map((edge) => ({
-        id: edge.id,
-        source: edge.from,
-        target: edge.to,
-        type: 'smoothstep',
-        animated: true,
-        style: {
-          stroke: '#94a3b8',
-          strokeWidth: 2,
-        },
-        markerEnd: {
-          type: 'arrowclosed',
-          color: '#94a3b8',
-        },
-      }));
+      // Edge colors and labels by relationship type (ResearchRabbit-style)
+      const EDGE_COLORS: Record<string, string> = {
+        citation: '#10b981',      // 🟢 Green - Papers that cite the source
+        reference: '#3b82f6',     // 🔵 Blue - Papers cited by the source
+        similarity: '#8b5cf6',    // 🟣 Purple - Similar papers
+        'co-authored': '#f59e0b', // 🟠 Orange - Same authors
+        'same-journal': '#ec4899',// 🩷 Pink - Same journal
+        'topic-related': '#6366f1', // 🔷 Indigo - Related topics
+        default: '#94a3b8'        // ⚪ Gray - Unknown
+      };
+
+      const EDGE_LABELS: Record<string, string> = {
+        citation: 'cites',
+        reference: 'references',
+        similarity: 'similar',
+        'co-authored': 'co-author',
+        'same-journal': 'same journal',
+        'topic-related': 'related'
+      };
+
+      const getEdgeTooltip = (relationship: string): string => {
+        const tooltips: Record<string, string> = {
+          citation: 'Citation: This paper cites the source paper',
+          reference: 'Reference: The source paper cites this paper',
+          similarity: 'Similar: Related by content or topic',
+          'co-authored': 'Co-authored: Shares authors with source',
+          'same-journal': 'Same Journal: Published in same journal',
+          'topic-related': 'Topic: Related by research topic'
+        };
+        return tooltips[relationship] || 'Related paper';
+      };
+
+      const flowEdges: Edge[] = (data.edges || []).map((edge) => {
+        const relationship = edge.relationship || 'default';
+        const edgeColor = EDGE_COLORS[relationship] || EDGE_COLORS.default;
+        const edgeLabel = EDGE_LABELS[relationship] || '';
+
+        return {
+          id: edge.id,
+          source: edge.from,
+          target: edge.to,
+          type: 'smoothstep',
+          animated: relationship === 'citation' || relationship === 'reference',
+          label: edgeLabel,
+          labelStyle: {
+            fill: edgeColor,
+            fontWeight: 600,
+            fontSize: 11,
+            fontFamily: 'Inter, sans-serif'
+          },
+          labelBgStyle: {
+            fill: 'white',
+            fillOpacity: 0.9
+          },
+          labelBgPadding: [4, 8] as [number, number],
+          labelBgBorderRadius: 4,
+          style: {
+            stroke: edgeColor,
+            strokeWidth: 2,
+          },
+          markerEnd: {
+            type: 'arrowclosed',
+            color: edgeColor,
+          },
+          data: {
+            relationship: relationship,
+            tooltip: getEdgeTooltip(relationship)
+          }
+        };
+      });
 
       console.log('🎯 NetworkView rendering:', {
         sourceType,
@@ -1437,7 +1492,41 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           className="opacity-30"
         />
 
-
+        {/* Edge Relationship Legend (ResearchRabbit-style) */}
+        <Panel position="bottom-left" className="bg-white/95 backdrop-blur-sm p-3 rounded-lg shadow-lg border border-gray-200">
+          <div className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Relationships
+          </div>
+          <div className="space-y-1.5 text-xs">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-0.5 bg-green-500 rounded"></div>
+              <span className="text-gray-600">Cites source</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-0.5 bg-blue-500 rounded"></div>
+              <span className="text-gray-600">Referenced by source</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-0.5 bg-purple-500 rounded"></div>
+              <span className="text-gray-600">Similar topic</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-0.5 bg-orange-500 rounded"></div>
+              <span className="text-gray-600">Co-authored</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-0.5 bg-pink-500 rounded"></div>
+              <span className="text-gray-600">Same journal</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-0.5 bg-indigo-500 rounded"></div>
+              <span className="text-gray-600">Related topic</span>
+            </div>
+          </div>
+        </Panel>
 
         {/* Enhanced Navigation Mode Controls - Google Maps Style */}
         {sourceType === 'article' && (
@@ -1689,6 +1778,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             onGenerateReview={onGenerateReview}
             onDeepDive={onDeepDive}
             onExploreCluster={onExploreCluster}
+            edges={networkData?.edges || []}
+            sourceNodeId={sourceId}
           />
         </div>
       )}
