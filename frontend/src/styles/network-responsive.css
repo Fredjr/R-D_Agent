@@ -1,0 +1,301 @@
+/* Network View Responsive Design Improvements */
+
+/* Increase font sizes in NetworkSidebar for better readability */
+.network-sidebar {
+  /* Override text-xs (12px) to text-sm (14px) for better readability */
+  font-size: 0.875rem; /* 14px */
+}
+
+.network-sidebar .text-xs {
+  font-size: 0.875rem !important; /* 14px instead of 12px */
+  line-height: 1.25rem !important;
+}
+
+.network-sidebar h4 {
+  font-size: 0.9375rem !important; /* 15px */
+  line-height: 1.375rem !important;
+}
+
+.network-sidebar h5 {
+  font-size: 0.875rem !important; /* 14px */
+  line-height: 1.25rem !important;
+}
+
+/* Increase button text sizes */
+.network-sidebar button {
+  font-size: 0.875rem !important; /* 14px */
+}
+
+/* Increase select and input text sizes */
+.network-sidebar select,
+.network-sidebar input {
+  font-size: 0.875rem !important; /* 14px */
+}
+
+/* Mobile Responsive Design */
+@media (max-width: 767px) {
+  /* Full-width network view on mobile */
+  .multi-column-network-view {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Stack columns vertically on mobile */
+  .network-column {
+    min-width: 100vw !important;
+    width: 100vw !important;
+  }
+
+  /* Larger touch targets on mobile */
+  .network-sidebar button {
+    min-height: 44px;
+    padding: 0.75rem 1rem;
+  }
+
+  /* Larger font sizes on mobile for better readability */
+  .network-sidebar {
+    font-size: 1rem; /* 16px */
+  }
+
+  .network-sidebar .text-xs {
+    font-size: 0.9375rem !important; /* 15px */
+  }
+
+  .network-sidebar h3 {
+    font-size: 1.125rem !important; /* 18px */
+  }
+
+  .network-sidebar h4 {
+    font-size: 1rem !important; /* 16px */
+  }
+}
+
+/* Tablet Responsive Design */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .network-column {
+    min-width: 600px !important;
+  }
+
+  .network-sidebar {
+    width: 340px !important;
+  }
+}
+
+/* Desktop Responsive Design */
+@media (min-width: 1024px) {
+  .network-column {
+    min-width: 900px !important;
+  }
+
+  .network-sidebar {
+    width: 360px !important;
+  }
+}
+
+/* Large Desktop (16" MacBook Pro and above) */
+@media (min-width: 1440px) {
+  .network-column {
+    min-width: 1000px !important;
+  }
+
+  .network-sidebar {
+    width: 400px !important;
+  }
+
+  /* Larger font sizes for large screens */
+  .network-sidebar {
+    font-size: 0.9375rem; /* 15px */
+  }
+
+  .network-sidebar .text-xs {
+    font-size: 0.9375rem !important; /* 15px */
+  }
+
+  .network-sidebar h3 {
+    font-size: 1.125rem !important; /* 18px */
+  }
+
+  .network-sidebar h4 {
+    font-size: 1rem !important; /* 16px */
+  }
+}
+
+/* 4K and Ultra-Wide Displays */
+@media (min-width: 1920px) {
+  .network-column {
+    min-width: 1200px !important;
+  }
+
+  .network-sidebar {
+    width: 450px !important;
+  }
+
+  /* Even larger font sizes for 4K displays */
+  .network-sidebar {
+    font-size: 1rem; /* 16px */
+  }
+
+  .network-sidebar .text-xs {
+    font-size: 1rem !important; /* 16px */
+  }
+
+  .network-sidebar h3 {
+    font-size: 1.25rem !important; /* 20px */
+  }
+
+  .network-sidebar h4 {
+    font-size: 1.125rem !important; /* 18px */
+  }
+}
+
+/* Smooth scrolling for horizontal network view */
+.multi-column-network-view {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Better touch interactions on mobile */
+@media (hover: none) and (pointer: coarse) {
+  /* Mobile/touch devices */
+  .network-node {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .network-sidebar button {
+    min-height: 48px;
+    font-size: 1rem !important;
+  }
+
+  /* Larger tap targets */
+  .network-sidebar a,
+  .network-sidebar button,
+  .network-sidebar select {
+    padding: 0.875rem 1rem;
+  }
+}
+
+/* Improve readability of paper lists */
+.network-sidebar .paper-list-item {
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.network-sidebar .paper-list-item .title {
+  font-size: 0.9375rem !important; /* 15px */
+  font-weight: 500;
+  line-height: 1.4;
+  margin-bottom: 0.375rem;
+}
+
+.network-sidebar .paper-list-item .authors {
+  font-size: 0.875rem !important; /* 14px */
+  color: #6b7280;
+  margin-bottom: 0.25rem;
+}
+
+.network-sidebar .paper-list-item .metadata {
+  font-size: 0.8125rem !important; /* 13px */
+  color: #9ca3af;
+}
+
+/* Improve button spacing and sizing */
+.network-sidebar .action-buttons {
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.network-sidebar .action-buttons button {
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem !important;
+  font-weight: 500;
+}
+
+/* Better section headers */
+.network-sidebar .section-header {
+  padding: 0.875rem 1rem;
+  background-color: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.network-sidebar .section-header h4 {
+  font-size: 0.9375rem !important; /* 15px */
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 0.25rem;
+}
+
+.network-sidebar .section-header p {
+  font-size: 0.8125rem !important; /* 13px */
+  color: #6b7280;
+}
+
+/* Improve exploration results display */
+.network-sidebar .exploration-results {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.network-sidebar .exploration-results .result-item {
+  padding: 0.75rem;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.network-sidebar .exploration-results .result-item:hover {
+  background-color: #f9fafb;
+}
+
+/* Better scrollbar styling */
+.network-sidebar ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.network-sidebar ::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 4px;
+}
+
+.network-sidebar ::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+.network-sidebar ::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Improve mobile navigation */
+@media (max-width: 767px) {
+  /* Bottom navigation bar for mobile */
+  .mobile-network-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    border-top: 1px solid #e5e7eb;
+    padding: 0.75rem;
+    display: flex;
+    justify-content: space-around;
+    z-index: 50;
+  }
+
+  .mobile-network-nav button {
+    flex: 1;
+    padding: 0.75rem;
+    font-size: 0.875rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  /* Adjust network view height for mobile nav */
+  .network-view-mobile {
+    padding-bottom: 80px;
+  }
+}
+

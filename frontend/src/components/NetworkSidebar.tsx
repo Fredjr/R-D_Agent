@@ -740,8 +740,8 @@ export default function NetworkSidebar({
     return (
       <div className="w-80 bg-white border-l border-gray-200 p-4">
         <div className="text-center text-gray-500 mt-8">
-          <div className="text-lg mb-2">📄</div>
-          <div className="text-sm">Select a paper to view details</div>
+          <div className="text-2xl mb-2">📄</div>
+          <div className="text-base">Select a paper to view details</div>
         </div>
       </div>
     );
@@ -750,20 +750,20 @@ export default function NetworkSidebar({
   const { metadata } = selectedNode;
 
   return (
-    <div className="w-full h-full bg-white border-l border-gray-200 flex flex-col overflow-hidden">
+    <div className="network-sidebar w-full h-full bg-white border-l border-gray-200 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b border-gray-200 flex justify-between items-start flex-shrink-0">
         <div className="flex-1">
-          <div className="text-xs text-gray-500 mb-1">
+          <div className="text-sm text-gray-500 mb-1">
             Article
           </div>
-          <h3 className="font-semibold text-sm text-gray-900 leading-tight">
+          <h3 className="font-semibold text-base text-gray-900 leading-tight">
             {metadata.title}
           </h3>
         </div>
         <button
           onClick={onClose}
-          className="ml-2 text-gray-400 hover:text-gray-600 text-lg"
+          className="ml-2 text-gray-400 hover:text-gray-600 text-2xl"
         >
           ×
         </button>
@@ -771,7 +771,7 @@ export default function NetworkSidebar({
 
       {/* Paper Details - Compact & Scrollable */}
       <div className="p-3 border-b border-gray-200 flex-shrink-0">
-        <div className="space-y-1.5 text-xs">
+        <div className="space-y-1.5 text-sm">
           <div>
             <span className="font-medium text-gray-700">Authors:</span>
             <div className="text-gray-600 mt-0.5 leading-tight">
@@ -808,10 +808,10 @@ export default function NetworkSidebar({
         {metadata.abstract && (
           <div className="mt-2">
             <details className="group">
-              <summary className="cursor-pointer text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors select-none">
+              <summary className="cursor-pointer text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors select-none">
                 📄 Abstract ▼
               </summary>
-              <div className="mt-1 p-2 bg-gray-50 rounded text-xs text-gray-600 leading-relaxed max-h-24 overflow-y-auto">
+              <div className="mt-1 p-2 bg-gray-50 rounded text-sm text-gray-600 leading-relaxed max-h-32 overflow-y-auto">
                 {metadata.abstract}
               </div>
             </details>
@@ -824,7 +824,7 @@ export default function NetworkSidebar({
             <Button
               variant="default"
               size="sm"
-              className="flex-1 text-xs"
+              className="flex-1 text-sm"
               onClick={() => {
                 // Always construct PubMed URL from PMID to ensure correctness
                 const pubmedUrl = `https://pubmed.ncbi.nlm.nih.gov/${metadata.pmid}/`;
@@ -841,7 +841,7 @@ export default function NetworkSidebar({
             <Button
               variant="success"
               size="sm"
-              className="flex-1 text-xs relative group"
+              className="flex-1 text-sm relative group"
               onClick={() => {
                 console.log('🎯 Create Paper Column button clicked!', selectedNode);
                 if (selectedNode) {
@@ -864,8 +864,8 @@ export default function NetworkSidebar({
         </div>
 
         {/* OA/Full-Text Toggle for Smart Actions */}
-        <div className="mt-2 mb-2 p-2 bg-gray-50 rounded-lg border">
-          <div className="flex items-center justify-between text-xs">
+        <div className="mt-2 mb-2 p-3 bg-gray-50 rounded-lg border">
+          <div className="flex items-center justify-between text-sm">
             <span className="text-gray-600 font-medium">Analysis Mode:</span>
             <label className="flex items-center cursor-pointer">
               <input
@@ -874,21 +874,21 @@ export default function NetworkSidebar({
                 onChange={(e) => handleFullTextOnlyChange(e.target.checked)}
                 className="sr-only"
               />
-              <div className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors ${
+              <div className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors ${
                 fullTextOnly ? 'bg-green-500' : 'bg-gray-300'
               }`}>
-                <div className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                  fullTextOnly ? 'translate-x-4' : 'translate-x-0.5'
+                <div className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  fullTextOnly ? 'translate-x-5' : 'translate-x-0.5'
                 }`} />
               </div>
-              <span className={`ml-2 text-xs font-medium ${
+              <span className={`ml-2 text-sm font-medium ${
                 fullTextOnly ? 'text-green-700' : 'text-gray-500'
               }`}>
                 {fullTextOnly ? 'OA/Full-Text Only' : 'All Articles'}
               </span>
             </label>
           </div>
-          <div className="mt-1 text-xs text-gray-500">
+          <div className="mt-1 text-sm text-gray-500">
             {fullTextOnly
               ? '🔓 Higher quality analysis with full-text access'
               : '📄 May include limited analysis from abstracts only'
@@ -902,7 +902,7 @@ export default function NetworkSidebar({
             <Button
               variant="outline"
               size="sm"
-              className="flex-1 text-xs bg-blue-50 hover:bg-blue-100 border-blue-200"
+              className="flex-1 text-sm bg-blue-50 hover:bg-blue-100 border-blue-200"
               onClick={() => {
                 console.log('🚀 Generate Review button clicked!', selectedNode, { fullTextOnly });
                 if (selectedNode) {
@@ -921,7 +921,7 @@ export default function NetworkSidebar({
             <Button
               variant="outline"
               size="sm"
-              className="flex-1 text-xs bg-purple-50 hover:bg-purple-100 border-purple-200"
+              className="flex-1 text-sm bg-purple-50 hover:bg-purple-100 border-purple-200"
               onClick={() => {
                 console.log('🔍 Deep Dive button clicked!', selectedNode, { fullTextOnly });
                 if (selectedNode) {
@@ -940,7 +940,7 @@ export default function NetworkSidebar({
             <Button
               variant="outline"
               size="sm"
-              className="flex-1 text-xs bg-green-50 hover:bg-green-100 border-green-200"
+              className="flex-1 text-sm bg-green-50 hover:bg-green-100 border-green-200"
               onClick={() => {
                 console.log('🌐 Explore Cluster button clicked!', selectedNode);
                 if (selectedNode) {
@@ -961,7 +961,7 @@ export default function NetworkSidebar({
           <Button
             variant="outline"
             size="sm"
-            className="w-full text-xs bg-purple-50 hover:bg-purple-100 border-purple-200"
+            className="w-full text-sm bg-purple-50 hover:bg-purple-100 border-purple-200"
             onClick={() => {
               console.log('📄 Read PDF button clicked!', selectedNode);
               setShowPDFViewer(true);

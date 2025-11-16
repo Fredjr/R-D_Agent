@@ -422,13 +422,31 @@ export default function MultiColumnNetworkView({
     setMainSelectedNode(null);
   }, []);
 
-  // Calculate column widths with fixed minimum widths for horizontal scrolling
+  // Calculate column widths with responsive design
   const hasColumns = columns.length > 0;
-  const MAIN_VIEW_MIN_WIDTH = 800; // Increased minimum width for main view
-  const COLUMN_MIN_WIDTH = 700; // Increased minimum width for each column to prevent cramping
-  const SIDEBAR_WIDTH = 320; // Standard sidebar width
-  const mainViewWidth = `${MAIN_VIEW_MIN_WIDTH}px`;
-  const columnWidth = `${COLUMN_MIN_WIDTH}px`;
+
+  // Responsive widths based on screen size
+  const [screenWidth, setScreenWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1440);
+
+  useEffect(() => {
+    const handleResize = () => setScreenWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Adaptive widths based on screen size
+  const isMobile = screenWidth < 768;
+  const isTablet = screenWidth >= 768 && screenWidth < 1024;
+  const isDesktop = screenWidth >= 1024;
+  const isLargeDesktop = screenWidth >= 1440;
+
+  // Dynamic minimum widths
+  const MAIN_VIEW_MIN_WIDTH = isMobile ? screenWidth : isTablet ? 600 : isLargeDesktop ? 1000 : 900;
+  const COLUMN_MIN_WIDTH = isMobile ? screenWidth : isTablet ? 500 : isLargeDesktop ? 800 : 700;
+  const SIDEBAR_WIDTH = isMobile ? screenWidth : 360; // Wider sidebar for better readability
+
+  const mainViewWidth = isMobile ? '100vw' : `${MAIN_VIEW_MIN_WIDTH}px`;
+  const columnWidth = isMobile ? '100vw' : `${COLUMN_MIN_WIDTH}px`;
 
   // Scroll container ref for keyboard/mouse navigation
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -581,7 +599,7 @@ export default function MultiColumnNetworkView({
       )}
       <div
         ref={scrollContainerRef}
-        className={`h-full overflow-x-auto overflow-y-hidden custom-scrollbar ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        className={`multi-column-network-view h-full overflow-x-auto overflow-y-hidden custom-scrollbar ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         style={{
           scrollbarWidth: 'thin',
           scrollBehavior: 'smooth'
@@ -598,7 +616,7 @@ export default function MultiColumnNetworkView({
         <div className="flex h-full gap-1" style={{ minWidth: `${MAIN_VIEW_MIN_WIDTH + (columns.length * COLUMN_MIN_WIDTH) + (columns.length * 4)}px` }}>
         {/* Main Network View */}
         <div
-          className="flex-shrink-0 border-r-2 border-gray-300 relative shadow-md bg-white"
+          className="network-column flex-shrink-0 border-r-2 border-gray-300 relative shadow-md bg-white"
           style={{ width: mainViewWidth }}
         >
         <div className="h-full relative flex flex-col">
@@ -739,7 +757,7 @@ export default function MultiColumnNetworkView({
       {columns.map((column) => (
         <div
           key={column.id}
-          className="flex-shrink-0 border-r-2 border-gray-300 relative shadow-md bg-white"
+          className="network-column flex-shrink-0 border-r-2 border-gray-300 relative shadow-md bg-white"
           style={{ width: columnWidth }}
         >
           <div className="h-full flex flex-col">

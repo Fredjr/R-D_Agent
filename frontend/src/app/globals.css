@@ -2,6 +2,7 @@
 @import "../styles/palantir-theme.css";
 @import "../styles/spotify-theme.css";
 @import "../styles/context-menu.css";
+@import "../styles/network-responsive.css";
 
 /* Legacy variables for backward compatibility */
 :root {
