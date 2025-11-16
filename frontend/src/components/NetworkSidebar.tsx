@@ -1029,8 +1029,20 @@ export default function NetworkSidebar({
       {/* Header */}
       <div className="p-4 border-b border-gray-200 flex justify-between items-start flex-shrink-0">
         <div className="flex-1">
-          <div className="text-sm text-gray-500 mb-1">
-            Article
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-sm text-gray-500">Article</span>
+            {/* Phase 2: Collection Status Badge */}
+            {articleCollections.length > 0 ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800 rounded-full border border-green-300">
+                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                In Collection
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded-full border border-blue-300">
+                <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                Suggested
+              </span>
+            )}
           </div>
           <h3 className="font-semibold text-base text-gray-900 leading-tight">
             {metadata.title}
@@ -1184,6 +1196,65 @@ export default function NetworkSidebar({
             </Button>
           )}
         </div>
+
+        {/* Phase 2: Quick Add to Collection Button (for papers NOT in collection) */}
+        {articleCollections.length === 0 && projectId && collections.length > 0 && (
+          <div className="mt-2">
+            <Button
+              variant="default"
+              size="sm"
+              className="w-full text-sm font-medium transition-all bg-green-500 hover:bg-green-600 text-white border-green-600"
+              onClick={async () => {
+                if (!selectedNode || !projectId) return;
+
+                // If only one collection, add directly
+                if (collections.length === 1) {
+                  try {
+                    const response = await fetch(`/api/proxy/collections/${collections[0].collection_id}/articles`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'User-ID': user?.email || 'default_user',
+                      },
+                      body: JSON.stringify({
+                        pmid: selectedNode.metadata.pmid,
+                        projectId: projectId
+                      })
+                    });
+
+                    if (response.ok) {
+                      onAddToCollection(selectedNode.metadata.pmid);
+                      success(`✅ Added to "${collections[0].name}"!`);
+                    } else {
+                      error('❌ Failed to add paper to collection');
+                    }
+                  } catch (err) {
+                    console.error('Error adding to collection:', err);
+                    error('❌ Failed to add paper to collection');
+                  }
+                } else {
+                  // Multiple collections - scroll to collection selector
+                  const collectionSection = document.querySelector('.network-sidebar [class*="Add to Collection"]');
+                  if (collectionSection) {
+                    collectionSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }
+                  info('👇 Select a collection below');
+                }
+              }}
+              title="Add this paper to your collection"
+            >
+              <span className="flex items-center justify-center gap-2">
+                <span className="text-lg">➕</span>
+                Add to Collection
+              </span>
+            </Button>
+            <div className="mt-1 text-xs text-center text-gray-500">
+              {collections.length === 1
+                ? `Will add to "${collections[0].name}"`
+                : `Choose from ${collections.length} collections`}
+            </div>
+          </div>
+        )}
 
         {/* Seed Paper Button (ResearchRabbit-style) */}
         <div className="mt-2">
