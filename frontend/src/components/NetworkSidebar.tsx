@@ -845,6 +845,7 @@ export default function NetworkSidebar({
           }
 
           // 🚀 NEW: Create new column for exploration results (ResearchRabbit-style)!
+          // 🎯 IMPORTANT: Only "Similar Work" creates columns. "All References" and "All Citations" show list only.
           console.log('🔍 Checking conditions for new column creation:', {
             resultsLength: results.length,
             hasCreateColumnCallback: !!onCreatePaperColumn,
@@ -854,8 +855,11 @@ export default function NetworkSidebar({
             mode
           });
 
-          if (results.length > 0 && onCreatePaperColumn && selectedNode) {
-            console.log('🎯 NetworkSidebar creating new column for exploration results:', {
+          // Only create column for "Similar Work" (papers-similar)
+          const shouldCreateColumn = section === 'papers' && mode === 'similar';
+
+          if (results.length > 0 && onCreatePaperColumn && selectedNode && shouldCreateColumn) {
+            console.log('🎯 NetworkSidebar creating new column for Similar Work:', {
               selectedNodeId: selectedNode.id,
               resultsCount: results.length,
               section,
@@ -901,12 +905,15 @@ export default function NetworkSidebar({
               timeoutRef.current = null;
             }, 100);
           } else {
-            console.log('❌ NetworkSidebar NOT creating new column:', {
+            console.log('ℹ️ NetworkSidebar showing results in sidebar only (not creating column):', {
               hasResults: results.length > 0,
               hasCreateColumnCallback: !!onCreatePaperColumn,
               hasSelectedNode: !!selectedNode,
               selectedNodeId: selectedNode?.id,
-              resultsData: results
+              section,
+              mode,
+              shouldCreateColumn,
+              reason: !shouldCreateColumn ? 'Only Similar Work creates columns (All References/Citations show list only)' : 'Missing requirements'
             });
           }
         } else {
