@@ -565,7 +565,7 @@ export default function NetworkSidebar({
     }
   };
 
-  // Earlier Work handler (Phase 1.5)
+  // Earlier Work handler (Phase 1.5) - NOW USING PUBMED API
   const handleEarlierWork = async () => {
     if (!selectedNode?.id) {
       error('❌ No paper selected');
@@ -574,10 +574,13 @@ export default function NetworkSidebar({
 
     setLoadingEarlier(true);
     try {
-      console.log(`[Earlier Work] Fetching earlier work for PMID: ${selectedNode.id}`);
+      const pmid = selectedNode?.metadata?.pmid || selectedNode?.id;
+      console.log(`[Earlier Work] Fetching earlier work (references) for PMID: ${pmid}`);
 
+      // Use PubMed references endpoint
+      const oaParam = fullTextOnly ? '&open_access_only=true' : '';
       const response = await fetch(
-        `/api/proxy/articles/${selectedNode.id}/references?limit=15`
+        `/api/proxy/pubmed/references?pmid=${pmid}&limit=15${oaParam}`
       );
 
       if (!response.ok) {
@@ -585,17 +588,17 @@ export default function NetworkSidebar({
       }
 
       const data = await response.json();
-      console.log(`[Earlier Work] Found ${data.references?.length || 0} earlier work papers`);
+      console.log(`[Earlier Work] Found ${data.references?.length || 0} earlier work papers from PubMed`);
 
       if (!data.references || data.references.length === 0) {
-        info('ℹ️ No earlier work found');
+        info('ℹ️ No earlier work found for this paper');
         return;
       }
 
       // Emit event to NetworkView to add earlier work papers
       window.dispatchEvent(new CustomEvent('addEarlierPapers', {
         detail: {
-          sourcePmid: selectedNode.id,
+          sourcePmid: pmid,
           papers: data.references
         }
       }));
@@ -609,7 +612,7 @@ export default function NetworkSidebar({
     }
   };
 
-  // Later Work handler (Phase 1.5)
+  // Later Work handler (Phase 1.5) - NOW USING PUBMED API
   const handleLaterWork = async () => {
     if (!selectedNode?.id) {
       error('❌ No paper selected');
@@ -618,10 +621,13 @@ export default function NetworkSidebar({
 
     setLoadingLater(true);
     try {
-      console.log(`[Later Work] Fetching later work for PMID: ${selectedNode.id}`);
+      const pmid = selectedNode?.metadata?.pmid || selectedNode?.id;
+      console.log(`[Later Work] Fetching later work (citations) for PMID: ${pmid}`);
 
+      // Use PubMed citations endpoint
+      const oaParam = fullTextOnly ? '&open_access_only=true' : '';
       const response = await fetch(
-        `/api/proxy/articles/${selectedNode.id}/citations?limit=15`
+        `/api/proxy/pubmed/citations?pmid=${pmid}&type=citations&limit=15${oaParam}`
       );
 
       if (!response.ok) {
@@ -629,17 +635,17 @@ export default function NetworkSidebar({
       }
 
       const data = await response.json();
-      console.log(`[Later Work] Found ${data.citations?.length || 0} later work papers`);
+      console.log(`[Later Work] Found ${data.citations?.length || 0} later work papers from PubMed`);
 
       if (!data.citations || data.citations.length === 0) {
-        info('ℹ️ No later work found');
+        info('ℹ️ No later work found for this paper (it may be too recent to have citations)');
         return;
       }
 
       // Emit event to NetworkView to add later work papers
       window.dispatchEvent(new CustomEvent('addLaterPapers', {
         detail: {
-          sourcePmid: selectedNode.id,
+          sourcePmid: pmid,
           papers: data.citations
         }
       }));
