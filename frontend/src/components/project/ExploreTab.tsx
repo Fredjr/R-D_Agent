@@ -52,7 +52,7 @@ interface PubMedArticle {
   doi?: string;
 }
 
-type ViewMode = 'network' | 'search';
+type ViewMode = 'network' | 'search' | 'paper-network';
 
 export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
   const { user } = useAuth();
@@ -73,8 +73,11 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
   const [newCollectionName, setNewCollectionName] = useState('');
   const [createNewCollection, setCreateNewCollection] = useState(false);
 
-  // View mode toggle
+  // View mode toggle - now supports paper-specific network view
   const [viewMode, setViewMode] = useState<ViewMode>('network');
+
+  // Selected paper for network view (Phase 1-2.3 features)
+  const [selectedPaperPMID, setSelectedPaperPMID] = useState<string | null>(null);
 
   // 🔍 Week 6: Filter state
   const [showFilters, setShowFilters] = useState(false);
@@ -573,10 +576,12 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
                   <div className="flex flex-wrap gap-2 mt-4 mb-3">
                     <button
                       onClick={() => {
-                        router.push(`/explore/network?pmid=${article.pmid}&context=project-explore`);
+                        // Switch to paper-network mode with Phase 1-2.3 features
+                        setSelectedPaperPMID(article.pmid);
+                        setViewMode('paper-network');
                       }}
                       className="inline-flex items-center px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-purple-400 border border-purple-500/30 rounded hover:from-purple-500/30 hover:to-blue-500/30 transition-all"
-                      title="Explore Network"
+                      title="Explore Network with Phase 1-2.3 Features"
                     >
                       <GlobeAltIcon className="w-4 h-4 mr-1" />
                       Explore Network
@@ -656,9 +661,48 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
           )}
         </div>
         </>
+      ) : viewMode === 'paper-network' && selectedPaperPMID ? (
+        <>
+          {/* Paper-Specific Network View with Phase 1-2.3 Features */}
+          <div className="mb-4 flex items-center justify-between">
+            <button
+              onClick={() => {
+                setViewMode('network');
+                setSelectedPaperPMID(null);
+              }}
+              className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+            >
+              ← Back to Project Network
+            </button>
+            <div className="text-sm text-gray-600">
+              Exploring network for selected paper
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <MultiColumnNetworkView
+              sourceType="article"
+              sourceId={selectedPaperPMID}
+              projectId={project.project_id}
+            />
+          </div>
+
+          {/* Help Section for Paper Network */}
+          <div className="bg-blue-50 rounded-lg p-4 border border-blue-200 mt-6">
+            <h3 className="text-sm font-semibold text-gray-900 mb-2">🎯 Phase 1-2.3 Features Active:</h3>
+            <ul className="text-sm text-gray-700 space-y-1">
+              <li>• <strong>⭐ Seed Papers:</strong> Yellow star indicators show starting papers</li>
+              <li>• <strong>🎨 Edge Visualization:</strong> 6 color-coded edge types (citations, references, similar work, etc.)</li>
+              <li>• <strong>📋 Paper List Panel:</strong> Enhanced search, sort, and filter options</li>
+              <li>• <strong>✓ Collection Status:</strong> Green nodes = in collection, blue = not in collection</li>
+              <li>• <strong>➕ Quick Add:</strong> One-click "Add to Collection" button</li>
+              <li>• <strong>🔍 Smart Filters:</strong> Seeds Only, Recent Papers, Highly Cited</li>
+            </ul>
+          </div>
+        </>
       ) : (
         <>
-          {/* Network Visualization */}
+          {/* Project-Level Network Visualization */}
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
             <MultiColumnNetworkView
               sourceType="project"
