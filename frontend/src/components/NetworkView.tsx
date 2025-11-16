@@ -1077,6 +1077,11 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         animated: e.animated
       })));
 
+      // Log FULL first edge for debugging
+      if (flowEdges.length > 0) {
+        console.log('🔍 FULL FIRST EDGE:', JSON.stringify(flowEdges[0], null, 2));
+      }
+
       // Validate edges - check if source and target nodes exist
       const nodeIds = new Set(flowNodes.map(n => n.id));
       const invalidEdges = flowEdges.filter(e => !nodeIds.has(e.source) || !nodeIds.has(e.target));
@@ -1863,6 +1868,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           animated: false,
           style: { stroke: '#3b82f6', strokeWidth: 3, strokeOpacity: 1 },
         }}
+        edgesFocusable={true}
+        elementsSelectable={true}
         fitView={true}
         fitViewOptions={{
           padding: 0.3,
