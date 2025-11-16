@@ -81,14 +81,16 @@ export default function MultiColumnNetworkView({
         // Fetch all collections across all projects for the user
         console.log('🔍 Fetching all collections across all projects for user:', user.email);
         // First get all projects
-        const projectsResponse = await fetch(`/api/proxy/projects`, {
+        const projectsResponse = await fetch(`/api/proxy/projects?user_id=${user.email}`, {
           headers: {
             'User-ID': user.email,
+            'Content-Type': 'application/json',
           },
         });
 
         if (projectsResponse.ok) {
-          const projects = await projectsResponse.json();
+          const projectsData = await projectsResponse.json();
+          const projects = projectsData.projects || [];
           console.log('✅ Found projects:', projects.length);
 
           // Fetch collections from all projects
@@ -96,6 +98,7 @@ export default function MultiColumnNetworkView({
             fetch(`/api/proxy/projects/${project.project_id}/collections`, {
               headers: {
                 'User-ID': user.email,
+                'Content-Type': 'application/json',
               },
             }).then(res => res.ok ? res.json() : [])
           );
