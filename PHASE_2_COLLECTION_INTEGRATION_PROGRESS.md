@@ -2,10 +2,11 @@
 
 ## 📋 Overview
 
-**Phase:** 2 - Collection Integration (ResearchRabbit Green/Blue Distinction)  
-**Status:** 🔄 **IN PROGRESS** (1/4 features complete)  
-**Date Started:** 2025-11-16  
-**Current Focus:** Collection status visualization and quick add functionality
+**Phase:** 2 - Collection Integration (ResearchRabbit Green/Blue Distinction)
+**Status:** 🔄 **IN PROGRESS** (3/5 features complete - 60%)
+**Date Started:** 2025-11-16
+**Date Updated:** 2025-11-16
+**Current Focus:** Real-time node color updates and collection management
 
 ---
 
@@ -99,54 +100,112 @@ According to the master plan (`RESEARCHRABBIT_COMPREHENSIVE_GAP_ANALYSIS_V2.md`)
 
 ---
 
-## 🔄 In Progress Features
-
-### **Phase 2.2: Real-Time Node Color Updates** 🔄
+### **Phase 2.2: Real-Time Node Color Updates** ✅
 
 **Goal:** When a paper is added to a collection, its node color should immediately change from blue to green in the network view.
 
-**What Needs to Be Done:**
-1. Add event listener in NetworkView for collection updates
-2. Update node color when `onAddToCollection` is called
-3. Emit custom event from NetworkSidebar when paper added
-4. Update node data in React Flow state
-5. Ensure smooth visual transition
+**What Was Implemented:**
 
-**Implementation Plan:**
+1. **Event Emission in NetworkSidebar**
+   - Emits `paperAddedToCollection` event in all three add-to-collection paths:
+     - Quick add button (single collection)
+     - Collection selector add
+     - Create & add flow
+   - Event includes PMID in detail object
+
+2. **Event Listener in NetworkView**
+   - Added `useEffect` hook to listen for `paperAddedToCollection` events
+   - Updates node color from blue to green immediately
+   - Refreshes collections in background
+   - Proper TypeScript type handling with `(node.data as any)`
+
+3. **Dual Update Mechanism**
+   - `handleAddToCollection` callback updates node color directly
+   - Event listener updates node color for all add paths
+   - Ensures consistent behavior across all scenarios
+
+#### **Files Modified:**
+- `frontend/src/components/NetworkView.tsx`:
+  - Lines 1389-1423: Event listener for `paperAddedToCollection`
+  - Lines 1585-1606: Updated `handleAddToCollection` to change node color
+- `frontend/src/components/NetworkSidebar.tsx`:
+  - Lines 332-336: Emit event in collection selector add
+  - Lines 399-403: Emit event in create & add flow
+  - Lines 1228-1231: Emit event in quick add button
+
+#### **Technical Implementation:**
 ```typescript
-// In NetworkSidebar.tsx - emit event when adding to collection
-window.dispatchEvent(new CustomEvent('paperAddedToCollection', {
-  detail: { pmid: selectedNode.metadata.pmid }
-}));
+// NetworkSidebar.tsx - emit event when adding to collection
+if (response.ok) {
+  onAddToCollection(selectedNode.metadata.pmid);
 
-// In NetworkView.tsx - listen for event and update node color
+  // Phase 2.2: Emit event for real-time node color update
+  window.dispatchEvent(new CustomEvent('paperAddedToCollection', {
+    detail: { pmid: selectedNode.metadata.pmid }
+  }));
+
+  success('✅ Paper added to collection successfully!');
+}
+
+// NetworkView.tsx - listen for event and update node color
 useEffect(() => {
   const handlePaperAddedToCollection = (event: Event) => {
-    const { pmid } = (event as CustomEvent).detail;
-    
-    // Find node and update color to green
-    setNodes(prevNodes => 
-      prevNodes.map(node => {
-        if (node.data?.metadata?.pmid === pmid) {
+    const customEvent = event as CustomEvent;
+    const { pmid } = customEvent.detail;
+
+    console.log(`🎨 Phase 2.2: Received paperAddedToCollection event for PMID ${pmid}`);
+
+    // Update node color from blue to green
+    setNodes((prevNodes) =>
+      prevNodes.map((node) => {
+        const nodePmid = (node.data as any)?.metadata?.pmid;
+        if (nodePmid === pmid) {
+          console.log(`🎨 Phase 2.2: Updating node ${pmid} color to green (in collection)`);
           return {
             ...node,
             data: {
               ...node.data,
-              color: '#10b981' // Green
-            }
+              color: '#10b981', // Green for papers in collection
+            },
           };
         }
         return node;
       })
     );
+
+    // Refresh collections to update state
+    fetchCollections();
   };
-  
+
   window.addEventListener('paperAddedToCollection', handlePaperAddedToCollection);
-  return () => window.removeEventListener('paperAddedToCollection', handlePaperAddedToCollection);
-}, [setNodes]);
+
+  return () => {
+    window.removeEventListener('paperAddedToCollection', handlePaperAddedToCollection);
+  };
+}, [setNodes, fetchCollections]);
 ```
 
-**Status:** ⏳ Not started
+#### **User Experience Flow:**
+1. User clicks "Add to Collection" button
+2. Paper added to backend via API
+3. Event emitted immediately
+4. Node color changes blue → green instantly
+5. Toast notification confirms success
+6. Collections refreshed in background
+7. No page refresh needed
+
+#### **Testing:**
+- ✅ Build successful (0 errors)
+- ✅ TypeScript validation passed
+- ✅ All routes functional
+- ✅ Event system tested
+- ⏳ End-to-end testing pending
+
+**Status:** ✅ **COMPLETE**
+
+---
+
+## 🔄 In Progress Features
 
 ---
 
@@ -196,11 +255,11 @@ useEffect(() => {
 |---------|--------|----------|
 | **2.1 Collection Status Badge** | ✅ COMPLETE | 🔴 HIGH |
 | **2.1 Quick Add Button** | ✅ COMPLETE | 🔴 HIGH |
-| **2.2 Real-Time Node Color Updates** | ⏳ TODO | 🔴 HIGH |
+| **2.2 Real-Time Node Color Updates** | ✅ COMPLETE | 🔴 HIGH |
 | **2.3 Paper List Enhancements** | ⏳ TODO | 🟡 MEDIUM |
 | **2.4 Collection Management** | ⏳ TODO | 🟡 MEDIUM |
 
-**Progress:** 2/5 features (40%) ✅
+**Progress:** 3/5 features (60%) ✅
 
 ---
 
@@ -211,11 +270,11 @@ useEffect(() => {
 | Phase | Features | Status | Progress |
 |-------|----------|--------|----------|
 | **Phase 1: Foundation** | 5 features | ✅ COMPLETE | 5/5 (100%) |
-| **Phase 2: Collection Integration** | 5 features | 🔄 IN PROGRESS | 2/5 (40%) |
+| **Phase 2: Collection Integration** | 5 features | 🔄 IN PROGRESS | 3/5 (60%) |
 | **Phase 3: Author Features** | 4 features | ⏳ PLANNED | 0/4 (0%) |
 | **Phase 4: Export & Polish** | 3 features | ⏳ PLANNED | 0/3 (0%) |
 
-**Total Progress:** 7/17 features (41%) ✅
+**Total Progress:** 8/17 features (47%) ✅
 
 ---
 
@@ -318,6 +377,7 @@ useEffect(() => {
 
 ### **Git Commits:**
 ```bash
+✅ 0b195d0 - Implement Phase 2.2: Real-Time Node Color Updates
 ✅ 30d9dfd - Implement Phase 2.1: Collection Status & Quick Add Button
 ✅ c559dbe - Add Phase 1 completion documentation
 ✅ cc5ad81 - Add Phase 1.5 deployment summary
@@ -336,19 +396,20 @@ useEffect(() => {
 
 ## 🎉 Summary
 
-**Phase 2.1 is COMPLETE!**
+**Phase 2.1 & 2.2 are COMPLETE!**
 
 **What works:**
 1. ✅ Collection status badge (green/blue)
 2. ✅ Quick "Add to Collection" button
 3. ✅ Smart behavior based on collection count
-4. ✅ Visual feedback and guidance
-5. ✅ Integration with existing system
+4. ✅ Real-time node color updates (blue → green)
+5. ✅ Event-based communication
+6. ✅ Visual feedback and guidance
+7. ✅ Integration with existing system
 
 **Next:**
-1. ⏳ Real-time node color updates (Phase 2.2)
-2. ⏳ Paper list enhancements (Phase 2.3)
-3. ⏳ Collection management improvements (Phase 2.4)
+1. ⏳ Paper list enhancements (Phase 2.3)
+2. ⏳ Collection management improvements (Phase 2.4)
 
-**Status:** 🔄 **PHASE 2 IN PROGRESS - 40% COMPLETE!**
+**Status:** 🔄 **PHASE 2 IN PROGRESS - 60% COMPLETE!**
 
