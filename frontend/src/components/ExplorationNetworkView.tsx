@@ -1,15 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import ReactFlow, {
-  Node,
-  Edge,
-  Controls,
-  Background,
-  useNodesState,
-  useEdgesState,
-  ConnectionMode,
-  NodeTypes,
-} from 'reactflow';
-import 'reactflow/dist/style.css';
+import { Core } from 'cytoscape';
+import CytoscapeGraph, { CytoscapeNode, CytoscapeEdge } from './CytoscapeGraph';
+import CytoscapeControls from './CytoscapeControls';
 import { NetworkNode } from './NetworkView';
 
 // Custom node component for exploration results
@@ -49,10 +41,6 @@ const ExplorationNode = ({ data }: { data: any }) => {
   );
 };
 
-const nodeTypes: NodeTypes = {
-  explorationNode: ExplorationNode,
-};
-
 interface ExplorationNetworkViewProps {
   explorationResults: any[];
   explorationType: string;
@@ -68,9 +56,10 @@ export default function ExplorationNetworkView({
   onNodeSelect,
   className = ''
 }: ExplorationNetworkViewProps) {
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [nodes, setNodes] = useState<CytoscapeNode[]>([]);
+  const [edges, setEdges] = useState<CytoscapeEdge[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [cyInstance, setCyInstance] = useState<Core | null>(null);
 
   // Handle node selection
   const handleNodeClick = useCallback((nodeData: any) => {
@@ -99,7 +88,7 @@ export default function ExplorationNetworkView({
     }
   }, [onNodeSelect]);
 
-  // Convert exploration results to React Flow nodes
+  // Convert exploration results to Cytoscape nodes
   useEffect(() => {
     if (!explorationResults || explorationResults.length === 0) {
       setNodes([]);
@@ -110,12 +99,12 @@ export default function ExplorationNetworkView({
     console.log('🔍 Creating exploration network with results:', explorationResults);
 
     // Create source node (center)
-    const sourceNodeData: Node = {
+    const sourceNodeData: CytoscapeNode = {
       id: 'source',
-      type: 'explorationNode',
-      position: { x: 0, y: 0 },
+      type: 'source',
       data: {
         id: 'source',
+        label: sourceNode.metadata.title,
         title: sourceNode.metadata.title,
         authors: sourceNode.metadata.authors,
         journal: sourceNode.metadata.journal,
@@ -127,19 +116,14 @@ export default function ExplorationNetworkView({
       }
     };
 
-    // Create exploration result nodes in a circular layout
-    const resultNodes: Node[] = explorationResults.map((result, index) => {
-      const angle = (index * 2 * Math.PI) / explorationResults.length;
-      const radius = 300;
-      const x = Math.cos(angle) * radius;
-      const y = Math.sin(angle) * radius;
-
+    // Create exploration result nodes
+    const resultNodes: CytoscapeNode[] = explorationResults.map((result, index) => {
       return {
         id: result.pmid || `result-${index}`,
-        type: 'explorationNode',
-        position: { x, y },
+        type: 'article',
         data: {
           id: result.pmid || `result-${index}`,
+          label: result.title,
           title: result.title,
           authors: result.authors,
           journal: result.journal,
@@ -155,13 +139,14 @@ export default function ExplorationNetworkView({
     });
 
     // Create edges from source to all results
-    const resultEdges: Edge[] = explorationResults.map((result, index) => ({
+    const resultEdges: CytoscapeEdge[] = explorationResults.map((result, index) => ({
       id: `edge-${index}`,
       source: 'source',
       target: result.pmid || `result-${index}`,
-      type: 'straight',
-      style: { stroke: '#94a3b8', strokeWidth: 1 },
-      animated: false
+      animated: false,
+      data: {
+        relationship: 'exploration'
+      }
     }));
 
     setNodes([sourceNodeData, ...resultNodes]);
@@ -183,22 +168,21 @@ export default function ExplorationNetworkView({
 
   return (
     <div className={`h-full ${className}`}>
-      <ReactFlow
+      <CytoscapeGraph
         nodes={nodes}
         edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        nodeTypes={nodeTypes}
-        connectionMode={ConnectionMode.Loose}
+        onNodeClick={(event, node) => {
+          if (node.data?.onNodeClick) {
+            node.data.onNodeClick(node.data);
+          }
+        }}
         fitView
-        fitViewOptions={{ padding: 0.2 }}
-        minZoom={0.1}
-        maxZoom={2}
-        defaultViewport={{ x: 0, y: 0, zoom: 0.5 }}
+        onInit={(instance) => {
+          setCyInstance(instance);
+        }}
       >
-        <Background />
-        <Controls />
-      </ReactFlow>
+        <CytoscapeControls cy={cyInstance} />
+      </CytoscapeGraph>
     </div>
   );
 }

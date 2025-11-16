@@ -2,23 +2,10 @@
 
 import React, { useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import ReactFlow, {
-  Node,
-  Edge,
-  addEdge,
-  useNodesState,
-  useEdgesState,
-  Controls,
-  MiniMap,
-  Background,
-  BackgroundVariant,
-  ConnectionMode,
-  NodeTypes,
-  OnConnect,
-  Panel,
-  MarkerType,
-} from 'reactflow';
-import 'reactflow/dist/style.css';
+import { Core } from 'cytoscape';
+import CytoscapeGraph, { CytoscapeNode, CytoscapeEdge } from './CytoscapeGraph';
+import CytoscapeControls from './CytoscapeControls';
+import CytoscapePanel from './CytoscapePanel';
 import NetworkSidebar from './NetworkSidebar';
 import PaperListPanel from './PaperListPanel';
 import TimelineView from './TimelineView';
@@ -304,10 +291,6 @@ const ArticleNode = ({ data }: { data: any }) => {
   );
 };
 
-const nodeTypes: NodeTypes = {
-  article: ArticleNode,
-};
-
 // Utility function to get node color based on collection status and year
 // ResearchRabbit-style: Green = in collection, Blue gradient = suggested (darker = more recent)
 const getNodeColor = (year: number, isInCollection: boolean = false): string => {
@@ -371,70 +354,21 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   const [graphDepth, setGraphDepth] = useState<number>(1);
   const [isExpanding, setIsExpanding] = useState<boolean>(false);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [nodes, setNodes] = useState<CytoscapeNode[]>([]);
+  const [edges, setEdges] = useState<CytoscapeEdge[]>([]);
   const [networkEdges, setNetworkEdges] = useState<NetworkEdge[]>([]); // Store original network edges for sidebar
 
-  // CRITICAL DEBUG: Log when onEdgesChange is called
-  const debugOnEdgesChange = useCallback((changes: any) => {
+  // Store Cytoscape instance
+  const [cyInstance, setCyInstance] = useState<Core | null>(null);
+
+  // Dummy callbacks for compatibility
+  const onNodesChange = useCallback((changes: any) => {
+    console.log('🔧 [onNodesChange] Called with changes:', changes);
+  }, []);
+
+  const onEdgesChange = useCallback((changes: any) => {
     console.log('🔧 [onEdgesChange] Called with changes:', changes);
-    onEdgesChange(changes);
-  }, [onEdgesChange]);
-
-  // CRITICAL FIX: Store React Flow instance
-  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
-
-  // CRITICAL FIX: Force edges to re-render after React Flow initializes
-  useEffect(() => {
-    if (reactFlowInstance && edges.length > 0) {
-      console.log('🔄 [FORCE UPDATE] Forcing React Flow to update edges:', edges.length);
-      console.log('🔄 [FORCE UPDATE] React Flow internal edges:', reactFlowInstance.getEdges().length);
-
-      // NUCLEAR OPTION: Force React Flow to re-set edges
-      setTimeout(() => {
-        const currentEdges = reactFlowInstance.getEdges();
-        console.log('🔄 [FORCE UPDATE] Current edges in React Flow:', currentEdges.length);
-
-        if (currentEdges.length === 0 && edges.length > 0) {
-          console.log('🚨 [FORCE UPDATE] React Flow lost edges! Re-setting...');
-          reactFlowInstance.setEdges(edges);
-        }
-
-        reactFlowInstance.fitView({ padding: 0.3, duration: 200 });
-      }, 100);
-    }
-  }, [reactFlowInstance, edges]);
-
-  // CRITICAL TEST: Add hardcoded test edges to verify React Flow can render ANY edges
-  const [testMode, setTestMode] = useState(false);
-  const testEdges: Edge[] = testMode && nodes.length >= 2 ? [
-    {
-      id: 'test-edge-1',
-      source: nodes[0].id,
-      target: nodes[1].id,
-      type: 'straight',
-      style: { stroke: '#ff0000', strokeWidth: 5 },
-      animated: true
-    }
-  ] : [];
-
-  // Use test edges if in test mode, otherwise use real edges
-  const displayEdges = testMode ? testEdges : edges;
-
-  // Log what edges are being displayed
-  useEffect(() => {
-    console.log('🎯 [displayEdges] Edges being passed to ReactFlow:', {
-      testMode,
-      displayEdgesCount: displayEdges.length,
-      displayEdges: displayEdges.map(e => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        type: e.type,
-        style: e.style
-      }))
-    });
-  }, [displayEdges, testMode]);
+  }, []);
 
   // Debug: Log edges state changes
   useEffect(() => {
@@ -445,7 +379,6 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         id: edges[0].id,
         source: edges[0].source,
         target: edges[0].target,
-        type: edges[0].type,
         hasSourceNode: nodes.some(n => n.id === edges[0].source),
         hasTargetNode: nodes.some(n => n.id === edges[0].target)
       } : null
@@ -512,8 +445,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       console.log(`📊 Found ${citations.length} citations and ${references.length} references for expansion`);
 
       // Add new nodes and edges to the graph
-      const newNodes: Node[] = [];
-      const newEdges: Edge[] = [];
+      const newNodes: CytoscapeNode[] = [];
+      const newEdges: CytoscapeEdge[] = [];
 
       // Add citation nodes (papers that cite this one)
       citations.forEach((citation: any, index: number) => {
@@ -521,11 +454,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         newNodes.push({
           id: newNodeId,
           type: 'article',
-          position: {
-            x: Math.random() * 400 - 200,
-            y: Math.random() * 400 - 200
-          },
           data: {
+            label: citation.title || `Citation ${index}`,
             metadata: citation,
             size: Math.max(40, Math.min(citation.citation_count * 2, 100)),
             color: getNodeColor(citation.year || 2020)
@@ -536,10 +466,11 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           id: `edge_${newNodeId}_${nodeId}`,
           source: newNodeId,
           target: nodeId,
-          type: 'smoothstep',
           animated: true,
-          style: { stroke: '#10b981', strokeWidth: 2 },
-          label: 'cites'
+          label: 'cites',
+          data: {
+            relationship: 'citation'
+          }
         });
       });
 
@@ -549,11 +480,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         newNodes.push({
           id: newNodeId,
           type: 'article',
-          position: {
-            x: Math.random() * 400 - 200,
-            y: Math.random() * 400 - 200
-          },
           data: {
+            label: reference.title || `Reference ${index}`,
             metadata: reference,
             size: Math.max(40, Math.min(reference.citation_count * 2, 100)),
             color: getNodeColor(reference.year || 2020)
@@ -564,10 +492,11 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           id: `edge_${nodeId}_${newNodeId}`,
           source: nodeId,
           target: newNodeId,
-          type: 'smoothstep',
           animated: true,
-          style: { stroke: '#3b82f6', strokeWidth: 2 },
-          label: 'references'
+          label: 'references',
+          data: {
+            relationship: 'reference'
+          }
         });
       });
 
@@ -597,8 +526,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
     setIsExpanding(true);
 
     try {
-      const newNodes: Node[] = [];
-      const newEdges: Edge[] = [];
+      const newNodes: CytoscapeNode[] = [];
+      const newEdges: CytoscapeEdge[] = [];
 
       // Find the source node position for better positioning
       const sourceNode = nodes.find(n => n.id === sourceNodeId);
@@ -645,35 +574,29 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         newNodes.push({
           id: newNodeId,
           type: 'article',
-          position: {
-            x: sourcePosition.x + Math.cos(angle) * radius,
-            y: sourcePosition.y + Math.sin(angle) * radius
-          },
           data: {
             ...nodeData,
             label: nodeData.label
-          },
-          draggable: true
+          }
         });
 
         // Create edge based on relation type
-        const edgeStyle = {
-          similar: { stroke: '#f59e0b', strokeWidth: 2, label: 'similar to' },
-          citations: { stroke: '#10b981', strokeWidth: 2, label: 'cites' },
-          references: { stroke: '#3b82f6', strokeWidth: 2, label: 'referenced by' },
-          authors: { stroke: '#8b5cf6', strokeWidth: 2, label: 'co-authored' }
+        const edgeLabels: Record<string, string> = {
+          similar: 'similar to',
+          citations: 'cites',
+          references: 'referenced by',
+          authors: 'co-authored'
         };
-
-        const style = edgeStyle[relationType];
 
         newEdges.push({
           id: `edge_${sourceNodeId}_${newNodeId}`,
           source: sourceNodeId,
           target: newNodeId,
-          type: 'smoothstep',
           animated: true,
-          style: { stroke: style.stroke, strokeWidth: style.strokeWidth },
-          label: style.label
+          label: edgeLabels[relationType],
+          data: {
+            relationship: relationType
+          }
         });
       });
 
@@ -1000,31 +923,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       }
       
       // Convert network data to react-flow format
-      const flowNodes: Node[] = data.nodes.map((node, index) => {
-        let position;
-
-        if (data.nodes.length === 1) {
-          // Single node: center it in the view
-          position = { x: 300, y: 300 };
-        } else {
-          // Multiple nodes: Hub-and-spoke layout
-          // First node (source) in center, others in circle around it
-          if (index === 0) {
-            // Source node in center
-            position = { x: 400, y: 400 };
-          } else {
-            // Other nodes in circle around source
-            // Adjust index to account for source node being in center
-            const circleIndex = index - 1;
-            const totalCircleNodes = data.nodes.length - 1;
-            const radius = 300; // Larger radius for better visibility
-            position = {
-              x: Math.cos((circleIndex * 2 * Math.PI) / totalCircleNodes) * radius + 400,
-              y: Math.sin((circleIndex * 2 * Math.PI) / totalCircleNodes) * radius + 400,
-            };
-          }
-        }
-
+      const flowNodes: CytoscapeNode[] = data.nodes.map((node, index) => {
         // Check if this paper is in any collection
         const nodePmid = node.metadata?.pmid || node.id;
         const isInCollection = isPmidInCollection(nodePmid);
@@ -1035,11 +934,11 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
         return {
           id: node.id,
-          type: 'article',
-          position,
+          type: index === 0 ? 'source' : 'article',
           data: {
             ...node,
             label: node.label || node.metadata?.title || `Article ${node.id}`,
+            node_type: index === 0 ? 'source' : 'article',
             // Keep the original metadata structure for ArticleNode component
             metadata: {
               pmid: nodePmid,
@@ -1055,7 +954,6 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             size: node.size || 60,
             color: nodeColor, // Use the new color based on collection status
           },
-          draggable: true,
         };
       });
 
@@ -1098,12 +996,20 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         relationship: e.relationship
       })));
 
-      // NUCLEAR OPTION: Absolute bare minimum edge configuration
-      const flowEdges: Edge[] = (data.edges || []).map((edge) => ({
-        id: edge.id,
-        source: edge.from,
-        target: edge.to,
-      }));
+      // Convert to Cytoscape edges with full styling
+      const flowEdges: CytoscapeEdge[] = (data.edges || []).map((edge) => {
+        const relationship = edge.relationship || 'default';
+        return {
+          id: edge.id,
+          source: edge.from,
+          target: edge.to,
+          label: EDGE_LABELS[relationship] || '',
+          animated: relationship === 'citation' || relationship === 'reference',
+          data: {
+            relationship: relationship,
+          },
+        };
+      });
 
       console.log('🎯 NetworkView rendering:', {
         sourceType,
@@ -1133,12 +1039,10 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         type: n.type
       })));
 
-      console.log('🔗 React Flow edges being set:', flowEdges.map(e => ({
+      console.log('🔗 Cytoscape edges being set:', flowEdges.map(e => ({
         id: e.id,
         source: e.source,
         target: e.target,
-        type: e.type,
-        style: e.style,
         animated: e.animated
       })));
 
@@ -1255,13 +1159,13 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
       console.log(`[NetworkView] Adding ${papers.length} similar papers for source ${sourcePmid}`);
 
-      // Find source node position for layout
+      // Find source node position for layout (not used in Cytoscape)
       const sourceNode = nodes.find(n => n.id === sourcePmid);
-      const sourceX = sourceNode?.position.x || 0;
-      const sourceY = sourceNode?.position.y || 0;
+      const sourceX = sourceNode?.position?.x || 0;
+      const sourceY = sourceNode?.position?.y || 0;
 
       // Create new nodes for similar papers
-      const newNodes: Node[] = papers.map((paper: any, index: number) => {
+      const newNodes: CytoscapeNode[] = papers.map((paper: any, index: number) => {
         // Position in a circle around source
         const angle = (2 * Math.PI * index) / papers.length;
         const radius = 250;
@@ -1270,8 +1174,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
         return {
           id: paper.pmid,
-          type: 'custom',
-          position: { x, y },
+          type: 'article',
           data: {
             id: paper.pmid,
             label: paper.title,
@@ -1297,23 +1200,12 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       });
 
       // Create purple edges from source to similar papers
-      const newEdges: Edge[] = papers.map((paper: any) => ({
+      const newEdges: CytoscapeEdge[] = papers.map((paper: any) => ({
         id: `${sourcePmid}-similar-${paper.pmid}`,
         source: sourcePmid,
         target: paper.pmid,
-        type: 'smoothstep',
         animated: false,
         label: 'similar',
-        labelStyle: {
-          fill: '#8b5cf6',
-          fontWeight: 600,
-          fontSize: 11,
-          fontFamily: 'Inter, sans-serif'
-        },
-        style: {
-          stroke: '#8b5cf6', // Purple
-          strokeWidth: 2
-        },
         data: {
           relationship: 'similarity',
           similarity_score: paper.similarity_score || 0.8
@@ -1342,13 +1234,13 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
       console.log(`[NetworkView] Adding ${papers.length} earlier work papers for source ${sourcePmid}`);
 
-      // Find source node position for layout
+      // Find source node position for layout (not used in Cytoscape)
       const sourceNode = nodes.find(n => n.id === sourcePmid);
-      const sourceX = sourceNode?.position.x || 0;
-      const sourceY = sourceNode?.position.y || 0;
+      const sourceX = sourceNode?.position?.x || 0;
+      const sourceY = sourceNode?.position?.y || 0;
 
       // Create new nodes for earlier work papers (positioned to the left)
-      const newNodes: Node[] = papers.map((paper: any, index: number) => {
+      const newNodes: CytoscapeNode[] = papers.map((paper: any, index: number) => {
         // Position in a vertical line to the left of source
         const offsetY = (index - papers.length / 2) * 80;
         const x = sourceX - 350;
@@ -1383,23 +1275,12 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       });
 
       // Create blue edges from earlier papers to source (they are referenced by source)
-      const newEdges: Edge[] = papers.map((paper: any) => ({
+      const newEdges: CytoscapeEdge[] = papers.map((paper: any) => ({
         id: `${paper.pmid}-reference-${sourcePmid}`,
         source: paper.pmid,
         target: sourcePmid,
-        type: 'smoothstep',
         animated: true,
         label: 'referenced by',
-        labelStyle: {
-          fill: '#3b82f6',
-          fontWeight: 600,
-          fontSize: 11,
-          fontFamily: 'Inter, sans-serif'
-        },
-        style: {
-          stroke: '#3b82f6', // Blue
-          strokeWidth: 2
-        },
         data: {
           relationship: 'reference'
         }
@@ -1427,13 +1308,13 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
       console.log(`[NetworkView] Adding ${papers.length} later work papers for source ${sourcePmid}`);
 
-      // Find source node position for layout
+      // Find source node position for layout (not used in Cytoscape)
       const sourceNode = nodes.find(n => n.id === sourcePmid);
-      const sourceX = sourceNode?.position.x || 0;
-      const sourceY = sourceNode?.position.y || 0;
+      const sourceX = sourceNode?.position?.x || 0;
+      const sourceY = sourceNode?.position?.y || 0;
 
       // Create new nodes for later work papers (positioned to the right)
-      const newNodes: Node[] = papers.map((paper: any, index: number) => {
+      const newNodes: CytoscapeNode[] = papers.map((paper: any, index: number) => {
         // Position in a vertical line to the right of source
         const offsetY = (index - papers.length / 2) * 80;
         const x = sourceX + 350;
@@ -1468,23 +1349,12 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       });
 
       // Create green edges from source to later papers (they cite the source)
-      const newEdges: Edge[] = papers.map((paper: any) => ({
+      const newEdges: CytoscapeEdge[] = papers.map((paper: any) => ({
         id: `${sourcePmid}-citation-${paper.pmid}`,
         source: sourcePmid,
         target: paper.pmid,
-        type: 'smoothstep',
         animated: true,
         label: 'cited by',
-        labelStyle: {
-          fill: '#10b981',
-          fontWeight: 600,
-          fontSize: 11,
-          fontFamily: 'Inter, sans-serif'
-        },
-        style: {
-          stroke: '#10b981', // Green
-          strokeWidth: 2
-        },
         data: {
           relationship: 'citation'
         }
@@ -1558,16 +1428,15 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   }, [navigationTrail, handleNavigationChange]);
 
   // Handle node click with navigation support and expansion
-  const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
-    const isDoubleClick = event.detail === 2;
+  const onNodeClick = useCallback((event: any, node: CytoscapeNode) => {
+    const isDoubleClick = event.originalEvent?.detail === 2;
+    const isCtrlClick = event.originalEvent?.ctrlKey || event.originalEvent?.metaKey;
 
     console.log('🎯 NODE CLICK DETECTED:', {
       nodeId: node.id,
-      nodeType: node.type,
       hasData: !!node.data,
       dataKeys: node.data ? Object.keys(node.data) : [],
-      position: node.position,
-      clickType: isDoubleClick ? 'double' : event.ctrlKey || event.metaKey ? 'ctrl' : 'single'
+      clickType: isDoubleClick ? 'double' : isCtrlClick ? 'ctrl' : 'single'
     });
 
     // Track network navigation for weekly mix
@@ -1680,12 +1549,6 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
       console.log('❌ No networkNode found or created for:', node.id);
     }
   }, [networkData, onNodeSelect, navigationMode, expandNodeNetwork]);
-
-  // Handle connection (if needed for future features)
-  const onConnect: OnConnect = useCallback(
-    (params) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges]
-  );
 
   // Sidebar handlers
   const handleSidebarNavigationChange = useCallback((mode: 'similar' | 'references' | 'citations' | 'authors') => {
@@ -1834,19 +1697,16 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
     );
   }
 
-  console.log('🎨 React Flow rendering with:', {
+  console.log('🎨 Cytoscape rendering with:', {
     nodesCount: nodes.length,
     edgesCount: edges.length,
-    nodes: nodes.map(n => ({ id: n.id, position: n.position, label: (n.data as any)?.label })),
+    nodes: nodes.map(n => ({ id: n.id, type: n.type, label: (n.data as any)?.label })),
     edgesSample: edges.slice(0, 3).map(e => ({
       id: e.id,
       source: e.source,
       target: e.target,
-      type: e.type,
-      hasStyle: !!e.style,
-      style: e.style,
       animated: e.animated,
-      markerEnd: e.markerEnd
+      label: e.label
     })),
     allEdgeIds: edges.map(e => e.id)
   });
@@ -1918,70 +1778,35 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
         {/* CENTER PANEL - Network Graph */}
         <div className="flex-1 relative" style={{ width: '100%', height: '100%' }}>
-        <ReactFlow
+        <CytoscapeGraph
         nodes={nodes}
-        edges={displayEdges}
+        edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onNodeClick={onNodeClick}
-        nodeTypes={nodeTypes}
+        onNodeClick={(event, node) => {
+          console.log('🖱️ [NetworkView] Node clicked:', node.id);
+          onNodeClick(event, node);
+        }}
         fitView
         onInit={(instance) => {
-          console.log('🎯 [ReactFlow] onInit called:', {
-            nodes: instance.getNodes().length,
-            edges: instance.getEdges().length,
-            viewport: instance.getViewport()
+          console.log('🎯 [Cytoscape] onInit called:', {
+            nodes: instance.nodes().length,
+            edges: instance.edges().length,
           });
-          setReactFlowInstance(instance);
-        }}
-        // Google Maps-like smooth interactions
-        panOnDrag={true}
-        panOnScroll={true}
-        panOnScrollSpeed={0.5}
-        zoomOnScroll={true}
-        zoomOnPinch={true}
-        zoomOnDoubleClick={false}
-        preventScrolling={false}
-        // Enhanced mouse interactions
-        onPaneMouseEnter={() => {
-          // Enable smooth cursor interactions
-          document.body.style.cursor = 'grab';
-        }}
-        onPaneMouseLeave={() => {
-          document.body.style.cursor = 'default';
-        }}
-        onPaneClick={() => {
-          // Smooth deselection
-          setSelectedNode(null);
-          setShowSidebar(false);
+          setCyInstance(instance);
         }}
       >
-        <Controls
+        <CytoscapeControls
+          cy={cyInstance}
           className="!bg-white/90 !backdrop-blur-sm !border !border-gray-200 !rounded-lg !shadow-lg"
           showZoom={true}
           showFitView={true}
           showInteractive={true}
           position="bottom-right"
         />
-        <MiniMap
-          nodeColor={(node) => (node.data?.color as string) || '#94a3b8'}
-          nodeStrokeWidth={3}
-          zoomable
-          pannable
-          className="!bg-white/90 !backdrop-blur-sm !border !border-gray-200 !rounded-lg !shadow-lg"
-          position="bottom-right"
-          style={{ bottom: 80 }}
-        />
-        <Background
-          variant={BackgroundVariant.Dots}
-          gap={20}
-          size={1.5}
-          color="#e5e7eb"
-          className="opacity-30"
-        />
 
         {/* Edge Relationship Legend (ResearchRabbit-style) */}
-        <Panel position="bottom-left" className="bg-white/95 backdrop-blur-sm p-3 rounded-lg shadow-lg border border-gray-200">
+        <CytoscapePanel position="bottom-left" className="bg-white/95 backdrop-blur-sm p-3 rounded-lg shadow-lg border border-gray-200">
           <div className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -2014,23 +1839,10 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
               <span className="text-gray-600">Related topic</span>
             </div>
           </div>
-        </Panel>
-
-        {/* TEST BUTTON FOR EDGE RENDERING */}
-        <Panel position="top-left" className="bg-red-500 text-white p-2 rounded shadow">
-          <button
-            onClick={() => {
-              setTestMode(!testMode);
-              console.log('🧪 Test mode:', !testMode, 'Nodes:', nodes.length);
-            }}
-            className="px-3 py-1 bg-white text-red-500 rounded font-bold"
-          >
-            {testMode ? '❌ Disable Test Edge' : '✅ Enable Test Edge'}
-          </button>
-        </Panel>
+        </CytoscapePanel>
 
         {/* Enhanced Navigation Mode Controls - Google Maps Style */}
-        <Panel position="top-right" className="bg-white/95 backdrop-blur-sm p-4 rounded-2xl shadow-2xl border border-gray-200 ml-4">
+        <CytoscapePanel position="top-right" className="bg-white/95 backdrop-blur-sm p-4 rounded-2xl shadow-2xl border border-gray-200 ml-4">
             <div className="text-sm">
               <div className="font-semibold text-gray-900 mb-3 text-center flex items-center justify-center gap-2">
                 <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2091,10 +1903,10 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
                 </button>
               </div>
             </div>
-          </Panel>
+          </CytoscapePanel>
 
         {/* Network Statistics Panel */}
-        <Panel position="top-left" className={`p-3 rounded-lg shadow-lg border ${
+        <CytoscapePanel position="top-left" className={`p-3 rounded-lg shadow-lg border ${
           (networkData?.metadata as any)?.demo_mode
             ? 'bg-blue-50 border-blue-200'
             : (networkData?.metadata as any)?.fallback_mode
@@ -2145,10 +1957,10 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
               </div>
             )}
           </div>
-        </Panel>
+        </CytoscapePanel>
 
         {/* Legend Panel - ResearchRabbit Style */}
-        <Panel position="top-right" className="bg-white p-3 rounded-lg shadow-lg border">
+        <CytoscapePanel position="top-right" className="bg-white p-3 rounded-lg shadow-lg border">
           <div className="text-sm">
             <div className="font-semibold text-gray-900 mb-2">Legend</div>
             <div className="space-y-2 text-xs">
@@ -2193,11 +2005,11 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
               </div>
             </div>
           </div>
-        </Panel>
+        </CytoscapePanel>
 
         {/* Exploration Controls Panel */}
         {(expandedNodes.size > 0 || explorationHistory.length > 0) && (
-          <Panel position="bottom-center" className="bg-white p-3 rounded-lg shadow-lg border">
+          <CytoscapePanel position="bottom-left" className="bg-white p-3 rounded-lg shadow-lg border" style={{ bottom: '100px' }}>
             <div className="text-sm">
               <div className="font-semibold text-gray-900 mb-2">Graph Exploration</div>
               <div className="flex items-center gap-2">
@@ -2227,9 +2039,9 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
                 Double-click for AI summary • Ctrl+Click to expand
               </div>
             </div>
-          </Panel>
+          </CytoscapePanel>
         )}
-      </ReactFlow>
+      </CytoscapeGraph>
         </div>
 
         {/* RIGHT PANEL - Paper Details (NetworkSidebar) */}
