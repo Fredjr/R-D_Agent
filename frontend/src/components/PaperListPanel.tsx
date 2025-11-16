@@ -10,6 +10,7 @@ interface PaperListPanelProps {
   seedPapers?: string[]; // PMIDs of seed papers
   sourceNodeId?: string; // The original source paper
   edges?: Array<{ id: string; from: string; to: string; relationship: string }>;
+  collectionsMap?: Map<string, boolean>; // PMID -> isInCollection
 }
 
 export default function PaperListPanel({
@@ -18,11 +19,15 @@ export default function PaperListPanel({
   onSelectPaper,
   seedPapers = [],
   sourceNodeId,
-  edges = []
+  edges = [],
+  collectionsMap = new Map()
 }: PaperListPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'relevance' | 'year' | 'citations'>('relevance');
+  const [sortBy, setSortBy] = useState<'relevance' | 'year' | 'citations' | 'title'>('relevance');
   const [filterRelationship, setFilterRelationship] = useState<string>('all');
+  const [showSeedsOnly, setShowSeedsOnly] = useState(false);
+  const [showRecentOnly, setShowRecentOnly] = useState(false);
+  const [showHighlyCitedOnly, setShowHighlyCitedOnly] = useState(false);
 
   // Get relationship for a paper
   const getRelationship = (paperId: string): string | null => {
@@ -52,14 +57,26 @@ export default function PaperListPanel({
     return badges[relationship] || null;
   };
 
-  // Filter and sort papers
+  // Highlight search terms in text
+  const highlightText = (text: string, query: string) => {
+    if (!query.trim()) return text;
+
+    const parts = text.split(new RegExp(`(${query})`, 'gi'));
+    return parts.map((part, index) =>
+      part.toLowerCase() === query.toLowerCase()
+        ? `<mark class="bg-yellow-200 text-gray-900">${part}</mark>`
+        : part
+    ).join('');
+  };
+
+  // Filter and sort papers (Phase 2.3: Enhanced)
   const filteredAndSortedPapers = useMemo(() => {
     let filtered = papers;
 
     // Search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(paper => 
+      filtered = filtered.filter(paper =>
         paper.metadata.title?.toLowerCase().includes(query) ||
         paper.metadata.authors?.some(author => author.toLowerCase().includes(query)) ||
         paper.metadata.journal?.toLowerCase().includes(query)
@@ -74,19 +91,43 @@ export default function PaperListPanel({
       });
     }
 
-    // Sort
+    // Phase 2.3: Smart Filters
+    if (showSeedsOnly) {
+      filtered = filtered.filter(paper => seedPapers.includes(paper.id));
+    }
+
+    if (showRecentOnly) {
+      const currentYear = new Date().getFullYear();
+      filtered = filtered.filter(paper => {
+        const year = paper.metadata.year || 0;
+        return currentYear - year <= 3; // Papers from last 3 years
+      });
+    }
+
+    if (showHighlyCitedOnly) {
+      const citationThreshold = 50; // Papers with 50+ citations
+      filtered = filtered.filter(paper =>
+        (paper.metadata.citation_count || 0) >= citationThreshold
+      );
+    }
+
+    // Phase 2.3: Enhanced Sort
     const sorted = [...filtered].sort((a, b) => {
       if (sortBy === 'year') {
         return (b.metadata.year || 0) - (a.metadata.year || 0);
       } else if (sortBy === 'citations') {
         return (b.metadata.citation_count || 0) - (a.metadata.citation_count || 0);
+      } else if (sortBy === 'title') {
+        const titleA = a.metadata.title?.toLowerCase() || '';
+        const titleB = b.metadata.title?.toLowerCase() || '';
+        return titleA.localeCompare(titleB);
       }
       // Default: relevance (keep original order)
       return 0;
     });
 
     return sorted;
-  }, [papers, searchQuery, sortBy, filterRelationship, edges, sourceNodeId]);
+  }, [papers, searchQuery, sortBy, filterRelationship, showSeedsOnly, showRecentOnly, showHighlyCitedOnly, seedPapers, edges, sourceNodeId]);
 
   // Count papers by relationship
   const relationshipCounts = useMemo(() => {
@@ -135,67 +176,112 @@ export default function PaperListPanel({
           </svg>
         </div>
 
-        {/* Sort */}
-        <div className="flex gap-2 mb-3">
+        {/* Phase 2.3: Enhanced Sort */}
+        <div className="mb-3">
+          <label className="block text-xs font-medium text-gray-700 mb-1">Sort by</label>
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
-            className="flex-1 px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
-            <option value="relevance">Relevance</option>
-            <option value="year">Year</option>
-            <option value="citations">Citations</option>
+            <option value="relevance">📊 Relevance</option>
+            <option value="year">📅 Year (Newest First)</option>
+            <option value="citations">📈 Citations (Most First)</option>
+            <option value="title">🔤 Title (A-Z)</option>
           </select>
         </div>
 
-        {/* Relationship Filter */}
-        <div className="flex flex-wrap gap-1">
-          <button
-            onClick={() => setFilterRelationship('all')}
-            className={`px-2 py-1 text-xs rounded-md border transition-colors ${
-              filterRelationship === 'all'
-                ? 'bg-blue-100 text-blue-700 border-blue-300 font-medium'
-                : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-            }`}
-          >
-            All ({relationshipCounts.all})
-          </button>
-          {relationshipCounts.citation > 0 && (
+        {/* Phase 2.3: Smart Filters */}
+        <div className="mb-3">
+          <label className="block text-xs font-medium text-gray-700 mb-1">Quick Filters</label>
+          <div className="flex flex-wrap gap-1">
             <button
-              onClick={() => setFilterRelationship('citation')}
+              onClick={() => setShowSeedsOnly(!showSeedsOnly)}
               className={`px-2 py-1 text-xs rounded-md border transition-colors ${
-                filterRelationship === 'citation'
-                  ? 'bg-green-100 text-green-700 border-green-300 font-medium'
+                showSeedsOnly
+                  ? 'bg-yellow-100 text-yellow-800 border-yellow-300 font-medium'
                   : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
               }`}
+              title="Show only seed papers"
             >
-              🟢 {relationshipCounts.citation}
+              ⭐ Seeds {seedPapers.length > 0 && `(${seedPapers.length})`}
             </button>
-          )}
-          {relationshipCounts.reference > 0 && (
             <button
-              onClick={() => setFilterRelationship('reference')}
+              onClick={() => setShowRecentOnly(!showRecentOnly)}
               className={`px-2 py-1 text-xs rounded-md border transition-colors ${
-                filterRelationship === 'reference'
+                showRecentOnly
+                  ? 'bg-blue-100 text-blue-800 border-blue-300 font-medium'
+                  : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+              }`}
+              title="Show papers from last 3 years"
+            >
+              🆕 Recent
+            </button>
+            <button
+              onClick={() => setShowHighlyCitedOnly(!showHighlyCitedOnly)}
+              className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                showHighlyCitedOnly
+                  ? 'bg-purple-100 text-purple-800 border-purple-300 font-medium'
+                  : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+              }`}
+              title="Show papers with 50+ citations"
+            >
+              🔥 Highly Cited
+            </button>
+          </div>
+        </div>
+
+        {/* Relationship Filter */}
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Filter by Relationship</label>
+          <div className="flex flex-wrap gap-1">
+            <button
+              onClick={() => setFilterRelationship('all')}
+              className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                filterRelationship === 'all'
                   ? 'bg-blue-100 text-blue-700 border-blue-300 font-medium'
                   : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
               }`}
             >
-              🔵 {relationshipCounts.reference}
+              All ({relationshipCounts.all})
             </button>
-          )}
-          {relationshipCounts.similarity > 0 && (
-            <button
-              onClick={() => setFilterRelationship('similarity')}
-              className={`px-2 py-1 text-xs rounded-md border transition-colors ${
-                filterRelationship === 'similarity'
-                  ? 'bg-purple-100 text-purple-700 border-purple-300 font-medium'
-                  : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-              }`}
-            >
-              🟣 {relationshipCounts.similarity}
-            </button>
-          )}
+            {relationshipCounts.citation > 0 && (
+              <button
+                onClick={() => setFilterRelationship('citation')}
+                className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                  filterRelationship === 'citation'
+                    ? 'bg-green-100 text-green-700 border-green-300 font-medium'
+                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                🟢 {relationshipCounts.citation}
+              </button>
+            )}
+            {relationshipCounts.reference > 0 && (
+              <button
+                onClick={() => setFilterRelationship('reference')}
+                className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                  filterRelationship === 'reference'
+                    ? 'bg-blue-100 text-blue-700 border-blue-300 font-medium'
+                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                🔵 {relationshipCounts.reference}
+              </button>
+            )}
+            {relationshipCounts.similarity > 0 && (
+              <button
+                onClick={() => setFilterRelationship('similarity')}
+                className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                  filterRelationship === 'similarity'
+                    ? 'bg-purple-100 text-purple-700 border-purple-300 font-medium'
+                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                🟣 {relationshipCounts.similarity}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -214,6 +300,11 @@ export default function PaperListPanel({
               const relationship = getRelationship(paper.id);
               const badge = getRelationshipBadge(relationship);
 
+              const isInCollection = collectionsMap.has(paper.id);
+              const citationCount = paper.metadata.citation_count || 0;
+              const isHighlyCited = citationCount >= 50;
+              const isRecent = (new Date().getFullYear() - (paper.metadata.year || 0)) <= 3;
+
               return (
                 <button
                   key={paper.id}
@@ -222,7 +313,7 @@ export default function PaperListPanel({
                     isSelected ? 'bg-blue-50 border-l-4 border-blue-500' : ''
                   }`}
                 >
-                  {/* Title and Seed Indicator */}
+                  {/* Phase 2.3: Enhanced Title Row with Multiple Indicators */}
                   <div className="flex items-start gap-2 mb-1">
                     {isSeed && (
                       <span className="text-yellow-500 text-sm flex-shrink-0 mt-0.5" title="Seed Paper">
@@ -234,23 +325,54 @@ export default function PaperListPanel({
                         🎯
                       </span>
                     )}
-                    <h3 className="text-sm font-medium text-gray-900 leading-tight line-clamp-2 flex-1">
-                      {paper.metadata.title || 'Untitled'}
-                    </h3>
+                    {isInCollection && !isSeed && (
+                      <span className="text-green-500 text-sm flex-shrink-0 mt-0.5" title="In Collection">
+                        ✓
+                      </span>
+                    )}
+                    <h3
+                      className="text-sm font-medium text-gray-900 leading-tight line-clamp-2 flex-1"
+                      dangerouslySetInnerHTML={{
+                        __html: highlightText(paper.metadata.title || 'Untitled', searchQuery)
+                      }}
+                    />
                   </div>
 
-                  {/* Authors */}
-                  <p className="text-xs text-gray-600 mb-1 line-clamp-1">
-                    {paper.metadata.authors?.slice(0, 2).join(', ')}
-                    {paper.metadata.authors && paper.metadata.authors.length > 2 && ' et al.'}
-                  </p>
+                  {/* Authors with Search Highlighting */}
+                  <p
+                    className="text-xs text-gray-600 mb-1 line-clamp-1"
+                    dangerouslySetInnerHTML={{
+                      __html: highlightText(
+                        `${paper.metadata.authors?.slice(0, 2).join(', ')}${
+                          paper.metadata.authors && paper.metadata.authors.length > 2 ? ' et al.' : ''
+                        }`,
+                        searchQuery
+                      )
+                    }}
+                  />
 
-                  {/* Metadata Row */}
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <span>{paper.metadata.year || 'N/A'}</span>
+                  {/* Phase 2.3: Enhanced Metadata Row with Visual Indicators */}
+                  <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
+                    <span className={isRecent ? 'text-blue-600 font-medium' : ''}>
+                      {paper.metadata.year || 'N/A'}
+                      {isRecent && ' 🆕'}
+                    </span>
                     <span>•</span>
-                    <span>{paper.metadata.citation_count || 0} citations</span>
+                    <span className={isHighlyCited ? 'text-purple-600 font-medium' : ''}>
+                      {citationCount} citation{citationCount !== 1 ? 's' : ''}
+                      {isHighlyCited && ' 🔥'}
+                    </span>
                   </div>
+
+                  {/* Journal with Search Highlighting */}
+                  {paper.metadata.journal && (
+                    <p
+                      className="text-xs text-gray-500 mb-1 line-clamp-1 italic"
+                      dangerouslySetInnerHTML={{
+                        __html: highlightText(paper.metadata.journal, searchQuery)
+                      }}
+                    />
+                  )}
 
                   {/* Relationship Badge */}
                   {badge && (
@@ -268,17 +390,43 @@ export default function PaperListPanel({
         )}
       </div>
 
-      {/* Footer Stats */}
+      {/* Phase 2.3: Enhanced Footer Stats */}
       <div className="p-3 border-t border-gray-200 bg-gray-50 flex-shrink-0">
-        <div className="text-xs text-gray-600">
-          <div className="flex justify-between">
-            <span>Showing {filteredAndSortedPapers.length} of {papers.length}</span>
-            {seedPapers.length > 0 && (
+        <div className="text-xs text-gray-600 space-y-1">
+          <div className="flex justify-between items-center">
+            <span className="font-medium">
+              Showing {filteredAndSortedPapers.length} of {papers.length}
+            </span>
+            {(showSeedsOnly || showRecentOnly || showHighlyCitedOnly) && (
+              <button
+                onClick={() => {
+                  setShowSeedsOnly(false);
+                  setShowRecentOnly(false);
+                  setShowHighlyCitedOnly(false);
+                  setFilterRelationship('all');
+                  setSearchQuery('');
+                }}
+                className="text-blue-600 hover:text-blue-800 underline"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+          {seedPapers.length > 0 && (
+            <div className="flex items-center gap-2">
               <span className="text-yellow-600 font-medium">
                 ⭐ {seedPapers.length} seed{seedPapers.length !== 1 ? 's' : ''}
               </span>
-            )}
-          </div>
+              {collectionsMap.size > 0 && (
+                <>
+                  <span>•</span>
+                  <span className="text-green-600 font-medium">
+                    ✓ {collectionsMap.size} in collection
+                  </span>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

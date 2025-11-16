@@ -1773,6 +1773,19 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             })()}
             sourceNodeId={sourceId}
             edges={networkData.edges || []}
+            collectionsMap={(() => {
+              // Phase 2.3: Create map of PMIDs in collections
+              const map = new Map<string, boolean>();
+              collections.forEach(collection => {
+                const articles = collection.articles || [];
+                articles.forEach((article: any) => {
+                  if (article.article_pmid) {
+                    map.set(article.article_pmid, true);
+                  }
+                });
+              });
+              return map;
+            })()}
           />
         )}
 
