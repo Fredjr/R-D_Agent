@@ -1,7 +1,12 @@
-# Network Graph Edge Enhancements
+# Network Graph Edge Enhancements & Responsive Design Fixes
 
 ## Summary
-Enhanced the network graph visualization with better edge styling, color differentiation, animations, and cross-reference detection between non-central nodes.
+Enhanced the network graph visualization with better edge styling, color differentiation, animations, cross-reference detection between non-central nodes, and fixed responsive design issues to ensure consistent display across localhost and Vercel deployments.
+
+## Deployment Status
+- ✅ **Commit 1**: Enhanced edge styling and cross-references (d2a52ac)
+- ✅ **Commit 2**: Fixed responsive design and layout (297d2a5)
+- 🚀 **Vercel**: Deploying now (should be live in ~2 minutes)
 
 ## Changes Made
 
@@ -163,8 +168,77 @@ The cross-reference detection makes additional PubMed API calls. To avoid rate l
 7. **Animation on Load**: Animate edges appearing one by one
 8. **Edge Search**: Allow users to search for specific relationships
 
+## 4. Responsive Design Fixes
+**Files:** `frontend/src/components/NetworkView.tsx`, `frontend/src/styles/network-responsive.css`
+
+### Layout Issues Fixed
+The Vercel deployment had poor responsive design compared to localhost:
+- Small fonts in sidebar
+- Graph not optimized for screen size
+- Inconsistent sizing across devices
+
+### Changes Made
+
+#### NetworkView Container Height
+**Before:** `className || 'h-96'` (384px fallback - too small!)
+**After:** `className || 'h-screen'` (full screen height)
+
+This ensures the network graph takes up the full available space instead of being cramped into a small 384px container.
+
+#### Responsive Breakpoints Enhanced
+
+**Mobile (< 768px)**
+- Full-width network view
+- Font size: 16px base
+- Larger touch targets (44px min-height)
+- Stack columns vertically
+
+**Tablet (768px - 1023px)**
+- Sidebar width: 340px
+- Column width: 600px
+- Font size: 15px base
+
+**Desktop (1024px - 1439px)**
+- Sidebar width: 380px (was 360px)
+- Column width: 900px
+- Min-height: 700px (was undefined)
+- Font size: 15px base
+- Heading sizes: h3=17px, h4=15px
+
+**Large Desktop (1440px - 1919px)**
+- Sidebar width: 420px (was 400px)
+- Column width: 1100px (was 1000px)
+- Min-height: 800px
+- Font size: 16px base
+- Heading sizes: h3=18px, h4=16px
+- Button padding: 0.625rem × 1rem
+
+**4K Displays (1920px+)** - NEW!
+- Sidebar width: 450px
+- Column width: 1200px
+- Min-height: 900px
+- Font size: 17px base
+- Heading sizes: h3=20px, h4=18px
+- Button padding: 0.75rem × 1.25rem
+
+### Typography Improvements
+- **Sidebar base font**: 14px → 15px (desktop) → 16px (large) → 17px (4K)
+- **Small text (.text-xs)**: 12px → 14px (desktop) → 15px (large) → 16px (4K)
+- **Headings (h3)**: 14px → 17px (desktop) → 18px (large) → 20px (4K)
+- **Buttons**: Added consistent padding that scales with screen size
+
+### Network View Container
+Added minimum height constraints:
+- Base: 600px
+- Desktop: 700px
+- Large Desktop: 800px
+- 4K: 900px
+
+This ensures the graph is always large enough to be useful, even on smaller screens.
+
 ## Related Files
-- `frontend/src/components/CytoscapeGraph.tsx` - Main graph component
-- `frontend/src/components/NetworkView.tsx` - Network view with legend
-- `frontend/src/app/api/proxy/pubmed/network/route.ts` - Network data API
+- `frontend/src/components/CytoscapeGraph.tsx` - Main graph component with enhanced styling
+- `frontend/src/components/NetworkView.tsx` - Network view with legend and layout
+- `frontend/src/app/api/proxy/pubmed/network/route.ts` - Network data API with cross-reference detection
+- `frontend/src/styles/network-responsive.css` - Responsive design rules for all screen sizes
 

@@ -118,7 +118,7 @@ const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
             'text-background-shape': 'roundrectangle',
             'opacity': 0.7,
             'transition-property': 'width, opacity, line-color',
-            'transition-duration': '0.2s',
+            'transition-duration': 200,
           },
         },
         {
