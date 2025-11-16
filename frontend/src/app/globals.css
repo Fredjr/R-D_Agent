@@ -264,3 +264,15 @@ body {
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #2563eb;
 }
+
+/* Force React Flow edges to be visible */
+.react-flow__edge-path {
+  stroke: #3b82f6 !important;
+  stroke-width: 3px !important;
+  stroke-opacity: 1 !important;
+}
+
+.react-flow__edge {
+  pointer-events: all !important;
+  z-index: 1 !important;
+}
