@@ -375,6 +375,12 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [networkEdges, setNetworkEdges] = useState<NetworkEdge[]>([]); // Store original network edges for sidebar
 
+  // CRITICAL DEBUG: Log when onEdgesChange is called
+  const debugOnEdgesChange = useCallback((changes: any) => {
+    console.log('🔧 [onEdgesChange] Called with changes:', changes);
+    onEdgesChange(changes);
+  }, [onEdgesChange]);
+
   // CRITICAL TEST: Add hardcoded test edges to verify React Flow can render ANY edges
   const [testMode, setTestMode] = useState(false);
   const testEdges: Edge[] = testMode && nodes.length >= 2 ? [
@@ -1077,7 +1083,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           id: edge.id,
           source: edge.from,
           target: edge.to,
-          type: 'default',
+          type: 'straight', // Changed from 'default' to 'straight' - more explicit
           animated: relationship === 'citation' || relationship === 'reference',
           label: edgeLabel,
           labelStyle: {
@@ -1925,13 +1931,13 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         nodes={nodes}
         edges={displayEdges}
         onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
+        onEdgesChange={debugOnEdgesChange}
         onConnect={onConnect}
         onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
         connectionMode={ConnectionMode.Loose}
         defaultEdgeOptions={{
-          type: 'default',
+          type: 'straight',
           animated: false,
           style: { stroke: '#3b82f6', strokeWidth: 3, strokeOpacity: 1 },
         }}
@@ -1944,6 +1950,14 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           maxZoom: 2.0,
           minZoom: 0.05,
         }}
+        onInit={(instance) => {
+          console.log('🎯 [ReactFlow] onInit called:', {
+            nodes: instance.getNodes().length,
+            edges: instance.getEdges().length,
+            viewport: instance.getViewport()
+          });
+        }}
+        proOptions={{ hideAttribution: true }}
         // Google Maps-like smooth interactions
         panOnDrag={true}
         panOnScroll={true}
