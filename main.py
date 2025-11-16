@@ -9464,6 +9464,10 @@ class ArticleToCollection(BaseModel):
     source_analysis_id: Optional[str] = Field(None, description="Source analysis ID if from deep dive")
     notes: Optional[str] = Field(None, max_length=2000, description="User notes about the article")
 
+class ArticleSeedUpdate(BaseModel):
+    """Update seed status for an article in a collection"""
+    is_seed: bool = Field(..., description="Whether this article is a seed paper for recommendations")
+
 @app.post("/projects/{project_id}/collections")
 async def create_collection(
     project_id: str,
@@ -9889,6 +9893,90 @@ async def add_article_to_collection(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to add article to collection: {str(e)}")
 
+@app.patch("/projects/{project_id}/collections/{collection_id}/articles/{article_id}/seed")
+async def update_article_seed_status(
+    project_id: str,
+    collection_id: str,
+    article_id: int,
+    seed_data: ArticleSeedUpdate,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Update seed status for an article in a collection (ResearchRabbit-style)"""
+    current_user = request.headers.get("User-ID", "default_user")
+
+    # Resolve email to UUID
+    user_id = resolve_user_id(current_user, db)
+
+    # Check project access
+    has_access = (
+        db.query(Project).filter(
+            Project.project_id == project_id,
+            Project.owner_user_id == user_id
+        ).first() is not None or
+        db.query(ProjectCollaborator).filter(
+            ProjectCollaborator.project_id == project_id,
+            ProjectCollaborator.user_id == user_id,
+            ProjectCollaborator.is_active == True
+        ).first() is not None
+    )
+
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    try:
+        # Find the article in the collection
+        article_collection = db.query(ArticleCollection).join(
+            Collection, ArticleCollection.collection_id == Collection.collection_id
+        ).filter(
+            ArticleCollection.id == article_id,
+            ArticleCollection.collection_id == collection_id,
+            Collection.project_id == project_id,
+            Collection.is_active == True
+        ).first()
+
+        if not article_collection:
+            raise HTTPException(status_code=404, detail="Article not found in collection")
+
+        # Update seed status
+        article_collection.is_seed = seed_data.is_seed
+        article_collection.seed_marked_at = datetime.utcnow() if seed_data.is_seed else None
+
+        db.commit()
+        db.refresh(article_collection)
+
+        # Log activity
+        await log_activity(
+            project_id=project_id,
+            user_id=user_id,
+            activity_type="article_seed_updated",
+            description=f"{'Marked' if seed_data.is_seed else 'Unmarked'} article '{article_collection.article_title}' as seed paper",
+            metadata={
+                "collection_id": collection_id,
+                "article_id": article_id,
+                "article_pmid": article_collection.article_pmid,
+                "is_seed": seed_data.is_seed
+            },
+            db=db
+        )
+
+        logger.info(f"✅ Updated seed status for article {article_id} in collection {collection_id}: is_seed={seed_data.is_seed}")
+
+        return {
+            "id": article_collection.id,
+            "article_pmid": article_collection.article_pmid,
+            "article_title": article_collection.article_title,
+            "is_seed": article_collection.is_seed,
+            "seed_marked_at": article_collection.seed_marked_at
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"❌ Failed to update seed status: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update seed status: {str(e)}")
+
 @app.post("/projects/{project_id}/collections/migrate-articles")
 async def migrate_collection_articles_to_main_table(
     project_id: str,
@@ -10227,7 +10315,9 @@ async def get_collection_articles(
                     "source_analysis_id": article.source_analysis_id,
                     "added_by": article.added_by,
                     "added_at": article.added_at,
-                    "notes": article.notes
+                    "notes": article.notes,
+                    "is_seed": getattr(article, 'is_seed', False),
+                    "seed_marked_at": getattr(article, 'seed_marked_at', None)
                 }
                 for article in articles
             ],

@@ -378,6 +378,10 @@ class ArticleCollection(Base):
     added_at = Column(DateTime(timezone=True), server_default=func.now())
     notes = Column(Text, nullable=True)  # User notes about why this article is in the collection
 
+    # Seed paper system (ResearchRabbit-style exploration)
+    is_seed = Column(Boolean, default=False)  # Mark as seed paper for recommendations
+    seed_marked_at = Column(DateTime(timezone=True), nullable=True)  # When marked as seed
+
     # Relationships
     collection = relationship("Collection", back_populates="article_collections")
     adder = relationship("User", back_populates="article_collections")
