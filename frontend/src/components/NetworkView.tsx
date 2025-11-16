@@ -906,11 +906,22 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           // Single node: center it in the view
           position = { x: 300, y: 300 };
         } else {
-          // Multiple nodes: arrange in circle
-          position = {
-            x: Math.cos((index * 2 * Math.PI) / data.nodes.length) * 200 + 300,
-            y: Math.sin((index * 2 * Math.PI) / data.nodes.length) * 200 + 300,
-          };
+          // Multiple nodes: Hub-and-spoke layout
+          // First node (source) in center, others in circle around it
+          if (index === 0) {
+            // Source node in center
+            position = { x: 400, y: 400 };
+          } else {
+            // Other nodes in circle around source
+            // Adjust index to account for source node being in center
+            const circleIndex = index - 1;
+            const totalCircleNodes = data.nodes.length - 1;
+            const radius = 300; // Larger radius for better visibility
+            position = {
+              x: Math.cos((circleIndex * 2 * Math.PI) / totalCircleNodes) * radius + 400,
+              y: Math.sin((circleIndex * 2 * Math.PI) / totalCircleNodes) * radius + 400,
+            };
+          }
         }
 
         // Check if this paper is in any collection
