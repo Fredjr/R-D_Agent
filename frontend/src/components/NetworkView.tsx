@@ -376,6 +376,37 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [networkEdges, setNetworkEdges] = useState<NetworkEdge[]>([]); // Store original network edges for sidebar
 
+  // CRITICAL TEST: Add hardcoded test edges to verify React Flow can render ANY edges
+  const [testMode, setTestMode] = useState(false);
+  const testEdges: Edge[] = testMode && nodes.length >= 2 ? [
+    {
+      id: 'test-edge-1',
+      source: nodes[0].id,
+      target: nodes[1].id,
+      type: 'straight',
+      style: { stroke: '#ff0000', strokeWidth: 5 },
+      animated: true
+    }
+  ] : [];
+
+  // Use test edges if in test mode, otherwise use real edges
+  const displayEdges = testMode ? testEdges : edges;
+
+  // Log what edges are being displayed
+  useEffect(() => {
+    console.log('🎯 [displayEdges] Edges being passed to ReactFlow:', {
+      testMode,
+      displayEdgesCount: displayEdges.length,
+      displayEdges: displayEdges.map(e => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        type: e.type,
+        style: e.style
+      }))
+    });
+  }, [displayEdges, testMode]);
+
   // Debug: Log edges state changes
   useEffect(() => {
     console.log('🔍 [useEffect] Edges state changed:', {
@@ -1893,9 +1924,9 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         <div className="flex-1 relative" style={{ width: '100%', height: '100%' }}>
         <ReactFlowProvider>
         <ReactFlow
-        key={`network-${nodes.length}-${edges.length}`}
+        key={`network-${nodes.length}-${displayEdges.length}`}
         nodes={nodes}
-        edges={edges}
+        edges={displayEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
@@ -1996,6 +2027,19 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
               <span className="text-gray-600">Related topic</span>
             </div>
           </div>
+        </Panel>
+
+        {/* TEST BUTTON FOR EDGE RENDERING */}
+        <Panel position="top-left" className="bg-red-500 text-white p-2 rounded shadow">
+          <button
+            onClick={() => {
+              setTestMode(!testMode);
+              console.log('🧪 Test mode:', !testMode, 'Nodes:', nodes.length);
+            }}
+            className="px-3 py-1 bg-white text-red-500 rounded font-bold"
+          >
+            {testMode ? '❌ Disable Test Edge' : '✅ Enable Test Edge'}
+          </button>
         </Panel>
 
         {/* Enhanced Navigation Mode Controls - Google Maps Style */}
