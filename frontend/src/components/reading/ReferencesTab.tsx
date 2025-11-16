@@ -44,8 +44,9 @@ export default function ReferencesTab({
   const fetchReferences = async () => {
     setLoading(true);
     try {
-      console.log(`🔍 Fetching references for PMID: ${pmid}`);
-      
+      console.log(`🔍 [ReferencesTab] Fetching references for PMID: ${pmid}`);
+      console.log(`🔍 [ReferencesTab] User ID: ${userId || 'default_user'}`);
+
       // Use the PubMed references API
       const response = await fetch(`/api/proxy/pubmed/references?pmid=${pmid}&limit=50`, {
         headers: {
@@ -53,16 +54,21 @@ export default function ReferencesTab({
         },
       });
 
+      console.log(`📡 [ReferencesTab] Response status: ${response.status}`);
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ [ReferencesTab] API error: ${response.status} - ${errorText}`);
         throw new Error(`Failed to fetch references: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log(`📊 Found ${data.references?.length || 0} references`);
-      
+      console.log(`📊 [ReferencesTab] API response:`, data);
+      console.log(`📊 [ReferencesTab] Found ${data.references?.length || 0} references`);
+
       setReferences(data.references || []);
     } catch (error) {
-      console.error('Error fetching references:', error);
+      console.error('❌ [ReferencesTab] Error fetching references:', error);
       setReferences([]);
     } finally {
       setLoading(false);
@@ -178,11 +184,18 @@ export default function ReferencesTab({
       {/* References List */}
       <div className="flex-1 overflow-y-auto">
         {filteredReferences.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-500">
-            <BookOpenIcon className="w-12 h-12 mb-2" />
-            <p className="text-sm">
-              {searchQuery ? 'No references match your search' : 'No references found'}
-            </p>
+          <div className="flex flex-col items-center justify-center h-full text-gray-500 px-6">
+            <BookOpenIcon className="w-12 h-12 mb-3" />
+            {searchQuery ? (
+              <p className="text-sm text-center">No references match your search</p>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-gray-700 mb-2">No References Found</p>
+                <p className="text-xs text-gray-500 text-center max-w-xs">
+                  This paper may not have references indexed in PubMed, or they may not be available yet.
+                </p>
+              </>
+            )}
           </div>
         ) : (
           <div className="divide-y divide-gray-200">

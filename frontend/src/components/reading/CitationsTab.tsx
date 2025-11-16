@@ -175,11 +175,19 @@ export default function CitationsTab({
       {/* Citations List */}
       <div className="flex-1 overflow-y-auto">
         {filteredCitations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-500">
-            <DocumentDuplicateIcon className="w-12 h-12 mb-2" />
-            <p className="text-sm">
-              {searchQuery ? 'No citations match your search' : 'No citations found'}
-            </p>
+          <div className="flex flex-col items-center justify-center h-full text-gray-500 px-6">
+            <DocumentDuplicateIcon className="w-12 h-12 mb-3" />
+            {searchQuery ? (
+              <p className="text-sm text-center">No citations match your search</p>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-gray-700 mb-2">No Citations Yet</p>
+                <p className="text-xs text-gray-500 text-center max-w-xs">
+                  This paper may be recently published. It can take time for other papers to cite it.
+                  Check back later for citation data.
+                </p>
+              </>
+            )}
           </div>
         ) : (
           <div className="divide-y divide-gray-200">

@@ -208,11 +208,27 @@ export default function RelatedArticlesTab({
       {/* Related Articles List */}
       <div className="flex-1 overflow-y-auto">
         {filteredArticles.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-500">
-            <LinkIcon className="w-12 h-12 mb-2" />
-            <p className="text-sm">
-              {searchQuery ? 'No articles match your search' : 'No related articles found'}
-            </p>
+          <div className="flex flex-col items-center justify-center h-full text-gray-500 px-6">
+            <LinkIcon className="w-12 h-12 mb-3" />
+            {searchQuery ? (
+              <p className="text-sm text-center">No articles match your search</p>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-gray-700 mb-2">Not Yet Indexed</p>
+                <p className="text-xs text-gray-500 text-center max-w-xs mb-4">
+                  This paper is not yet in our similarity database.
+                  Try searching PubMed for related papers on similar topics.
+                </p>
+                <a
+                  href={`https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent('chronic kidney disease')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 rounded transition-colors"
+                >
+                  Search PubMed
+                </a>
+              </>
+            )}
           </div>
         ) : (
           <div className="divide-y divide-gray-200">
