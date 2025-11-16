@@ -1026,7 +1026,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           labelBgBorderRadius: 4,
           style: {
             stroke: edgeColor,
-            strokeWidth: 2,
+            strokeWidth: 3,
+            strokeOpacity: 1,
           },
           markerEnd: {
             type: 'arrowclosed',
@@ -1767,7 +1768,17 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
     nodesCount: nodes.length,
     edgesCount: edges.length,
     nodes: nodes.map(n => ({ id: n.id, position: n.position, label: n.data?.label })),
-    edges: edges.slice(0, 3).map(e => ({ id: e.id, source: e.source, target: e.target, type: e.type, hasStyle: !!e.style, style: e.style }))
+    edgesSample: edges.slice(0, 3).map(e => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      type: e.type,
+      hasStyle: !!e.style,
+      style: e.style,
+      animated: e.animated,
+      markerEnd: e.markerEnd
+    })),
+    allEdgeIds: edges.map(e => e.id)
   });
 
   return (
@@ -1850,7 +1861,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         defaultEdgeOptions={{
           type: 'smoothstep',
           animated: false,
-          style: { stroke: '#94a3b8', strokeWidth: 2 },
+          style: { stroke: '#3b82f6', strokeWidth: 3, strokeOpacity: 1 },
         }}
         fitView={true}
         fitViewOptions={{
