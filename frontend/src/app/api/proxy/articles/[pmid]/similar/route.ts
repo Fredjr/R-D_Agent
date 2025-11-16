@@ -24,12 +24,15 @@ export async function GET(
     
     console.log(`[Similar Articles] Fetching from: ${url}`);
     
+    // Get User-ID from request headers
+    const userId = request.headers.get('User-ID') || 'default_user';
+
     // Forward request to backend
     const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'User-ID': 'default-user', // TODO: Get from session
+        'User-ID': userId,
       },
       next: { revalidate: 3600 } // Cache for 1 hour
     });
