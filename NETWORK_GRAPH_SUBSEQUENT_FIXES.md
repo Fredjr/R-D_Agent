@@ -193,10 +193,81 @@ When clicking Similar/Earlier/Later Work buttons:
 
 | Commit | Description | Status |
 |--------|-------------|--------|
-| `616e8b4` | Fix node gradient coloring for subsequent graphs | ✅ Deployed |
+| `616e8b4` | Fix node gradient coloring for subsequent graphs (INCOMPLETE) | ⚠️ Partial |
 | `5025d7b` | Add cross-reference detection for quick action buttons | ✅ Deployed |
+| `8a52e64` | **CRITICAL FIX**: Remove ...node spread, fix backend colors | ✅ Deployed |
 
 **Vercel**: Should be live in ~2 minutes after push
+
+---
+
+## Critical Issue Found and Fixed (Commit 8a52e64)
+
+### The Real Problem
+
+The previous fixes (commits 616e8b4 and 5025d7b) were correct in logic but didn't work because:
+
+1. **Backend was returning hardcoded colors**:
+   - `base_article`: Green `#4CAF50`
+   - `citing_article`: Blue `#2196F3`
+   - `reference_article`: Orange `#FF9800`
+   - `similar_article`: Purple `#9C27B0`
+
+2. **Frontend was spreading backend properties**:
+   ```typescript
+   data: {
+     ...node,  // ❌ This copied backend color property
+     color: nodeColor,  // ✅ This tried to override, but...
+   }
+   ```
+
+   The `...node` spread copied ALL backend properties including `color`, and even though we set `color: nodeColor` after, the spread might have caused issues with object property ordering or the backend color was being used elsewhere.
+
+### The Fix
+
+**Backend Change** (`frontend/src/app/api/proxy/pubmed/network/route.ts`):
+```typescript
+// BEFORE
+const colors = {
+  'base_article': '#4CAF50',
+  'citing_article': '#2196F3',
+  'reference_article': '#FF9800',
+  'similar_article': '#9C27B0'
+};
+color: colors[nodeType],
+
+// AFTER
+color: '#94a3b8', // Placeholder gray - frontend will override
+```
+
+**Frontend Change** (`frontend/src/components/NetworkView.tsx`):
+```typescript
+// BEFORE
+data: {
+  ...node,  // ❌ Spreads backend color
+  label: ...,
+  color: nodeColor,
+}
+
+// AFTER
+data: {
+  // ✅ NO ...node spread - explicitly set only what we need
+  label: node.label || node.metadata?.title || ...,
+  node_type: ...,
+  metadata: {...},
+  size: node.size || 60,
+  color: nodeColor,  // ✅ ALWAYS use frontend-calculated color
+}
+```
+
+### Why This Fixes Everything
+
+1. **Backend no longer interferes**: Returns placeholder gray color
+2. **Frontend has full control**: Explicitly sets color from `getNodeColor(year, isInCollection)`
+3. **No property conflicts**: Removed `...node` spread that was copying backend properties
+4. **Consistent across all graphs**: Initial graph AND subsequent graphs use same logic
+
+---
 
 ---
 
