@@ -521,7 +521,7 @@ export default function NetworkSidebar({
     }
   };
 
-  // Similar Work handler (Phase 1.4)
+  // Similar Work handler (Phase 1.4) - NOW USING PUBMED API
   const handleSimilarWork = async () => {
     if (!selectedNode?.id) {
       error('❌ No paper selected');
@@ -530,10 +530,13 @@ export default function NetworkSidebar({
 
     setLoadingSimilar(true);
     try {
-      console.log(`[Similar Work] Fetching similar papers for PMID: ${selectedNode.id}`);
+      const pmid = selectedNode?.metadata?.pmid || selectedNode?.id;
+      console.log(`[Similar Work] Fetching similar papers for PMID: ${pmid}`);
 
+      // Use PubMed similar papers endpoint
+      const oaParam = fullTextOnly ? '&open_access_only=true' : '';
       const response = await fetch(
-        `/api/proxy/articles/${selectedNode.id}/similar?limit=10&threshold=0.1`
+        `/api/proxy/pubmed/citations?pmid=${pmid}&type=similar&limit=15${oaParam}`
       );
 
       if (!response.ok) {
@@ -541,22 +544,22 @@ export default function NetworkSidebar({
       }
 
       const data = await response.json();
-      console.log(`[Similar Work] Found ${data.similar_articles?.length || 0} similar papers`);
+      console.log(`[Similar Work] Found ${data.citations?.length || 0} similar papers from PubMed`);
 
-      if (!data.similar_articles || data.similar_articles.length === 0) {
-        info('ℹ️ No similar papers found');
+      if (!data.citations || data.citations.length === 0) {
+        info('ℹ️ No similar papers found for this paper');
         return;
       }
 
       // Emit event to NetworkView to add similar papers
       window.dispatchEvent(new CustomEvent('addSimilarPapers', {
         detail: {
-          sourcePmid: selectedNode.id,
-          papers: data.similar_articles
+          sourcePmid: pmid,
+          papers: data.citations // PubMed returns citations array for similar papers
         }
       }));
 
-      success(`✅ Found ${data.similar_articles.length} similar papers`);
+      success(`✅ Found ${data.citations.length} similar papers`);
     } catch (err) {
       console.error('[Similar Work] Error:', err);
       error('❌ Failed to fetch similar papers');
