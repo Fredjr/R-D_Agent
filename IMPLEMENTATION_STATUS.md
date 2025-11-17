@@ -10,8 +10,8 @@
 
 ### Phase 1: Foundation (Months 1-2, Weeks 1-8)
 - **Week 1**: ✅ **COMPLETED** - Database Schema Migration
-- **Week 2**: ⏳ **NEXT** - Core API Endpoints
-- **Week 3**: 📋 Planned - Questions Tab UI
+- **Week 2**: ✅ **COMPLETED** - Core API Endpoints
+- **Week 3**: ⏳ **NEXT** - Questions Tab UI
 - **Week 4**: 📋 Planned - Evidence Linking UI
 - **Week 5**: 📋 Planned - Hypothesis Tracking
 - **Week 6**: 📋 Planned - Hypothesis-Evidence Linking
@@ -235,5 +235,114 @@ git checkout -b recovery-branch v1.0-pre-pivot
 
 ---
 
-**Status**: ✅ Week 1 Complete | ⏳ Week 2 Next | 📊 4% Complete (1/24 weeks)
+## ✅ Week 2 Completed: Core API Endpoints
+
+### What Was Done
+
+#### 1. Research Questions Router
+
+**File Created**: `backend/app/routers/research_questions.py` (383 lines)
+
+**Endpoints** (6 total):
+1. ✅ `POST /api/questions` - Create research question
+2. ✅ `GET /api/questions/project/{project_id}` - Get all questions for project
+3. ✅ `GET /api/questions/{question_id}` - Get question details
+4. ✅ `PUT /api/questions/{question_id}` - Update question
+5. ✅ `DELETE /api/questions/{question_id}` - Delete question (CASCADE)
+6. ✅ `POST /api/questions/{question_id}/evidence` - Link evidence to question
+
+**Features**:
+- ✅ Hierarchical question structure support
+- ✅ Automatic depth level calculation
+- ✅ Evidence count tracking
+- ✅ Question types: main, sub, exploratory
+- ✅ Status tracking: exploring, investigating, answered, parked
+- ✅ Priority levels: low, medium, high, critical
+- ✅ Evidence types: supports, contradicts, context, methodology
+- ✅ Relevance scoring (1-10 scale)
+
+#### 2. Hypotheses Router
+
+**File Created**: `backend/app/routers/hypotheses.py` (353 lines)
+
+**Endpoints** (5 total):
+1. ✅ `POST /api/hypotheses` - Create hypothesis
+2. ✅ `GET /api/hypotheses/project/{project_id}` - Get all hypotheses
+3. ✅ `GET /api/hypotheses/question/{question_id}` - Get hypotheses for question
+4. ✅ `PUT /api/hypotheses/{hypothesis_id}` - Update hypothesis
+5. ✅ `POST /api/hypotheses/{hypothesis_id}/evidence` - Link evidence to hypothesis
+
+**Features**:
+- ✅ Linked to research questions
+- ✅ Hypothesis types: mechanistic, predictive, descriptive, null
+- ✅ Status tracking: proposed, testing, supported, rejected, inconclusive
+- ✅ Confidence level (0-100 scale)
+- ✅ Supporting/contradicting evidence counts
+- ✅ Evidence strength: weak, moderate, strong
+
+#### 3. Pydantic Models
+
+**Created comprehensive request/response models**:
+- `QuestionCreate`, `QuestionUpdate`, `QuestionResponse`
+- `EvidenceLink`, `EvidenceResponse`
+- `HypothesisCreate`, `HypothesisUpdate`, `HypothesisResponse`
+- `HypothesisEvidenceLink`, `HypothesisEvidenceResponse`
+
+**Validation Features**:
+- ✅ Field length constraints
+- ✅ Regex pattern validation for enums
+- ✅ Range validation for scores
+- ✅ Optional field handling
+
+#### 4. Router Registration
+
+**File Modified**: `main.py` (added 33 lines)
+
+**Changes**:
+- ✅ Imported research_questions and hypotheses routers
+- ✅ Registered routers with FastAPI app
+- ✅ Added error handling for import failures
+
+### Testing Results
+
+#### Server Startup Test
+```bash
+python3 -m uvicorn main:app --host 0.0.0.0 --port 8080
+```
+
+**Result**: ✅ Server started successfully
+
+**Output**:
+```
+✅ Research questions and hypotheses endpoints registered successfully
+INFO:     Started server process [61094]
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8080
+```
+
+#### API Documentation Test
+
+**URL**: http://localhost:8080/docs
+
+**Result**: ✅ All 11 endpoints visible in Swagger UI
+
+#### Backward Compatibility Test
+
+**Result**: ✅ All existing endpoints still working
+
+### Commits
+
+- **Commit f68b876**: "✅ Phase 1, Week 2: Add Core API Endpoints (Research Questions & Hypotheses)"
+  - Added 736 lines of code
+  - Created 2 new router files
+  - Modified main.py
+
+### Documentation
+
+- ✅ Created `WEEK2_COMPLETION_SUMMARY.md` (comprehensive summary)
+- ✅ Updated `IMPLEMENTATION_STATUS.md` (this file)
+
+---
+
+**Status**: ✅ Week 2 Complete | ⏳ Week 3 Next | 📊 8% Complete (2/24 weeks)
 
