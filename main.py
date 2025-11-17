@@ -869,6 +869,25 @@ except ImportError as e:
     print(f"⚠️ Failed to import article summary routers: {e}")
     print("   Article summary feature will not be available")
 
+
+# =============================================================================
+# PRODUCT PIVOT ENDPOINTS - Research Project OS (Phase 1, Week 2)
+# =============================================================================
+
+# Import and register research questions and hypotheses routers
+try:
+    from backend.app.routers.research_questions import router as research_questions_router
+    from backend.app.routers.hypotheses import router as hypotheses_router
+    app.include_router(research_questions_router)
+    app.include_router(hypotheses_router)
+    print("✅ Research questions and hypotheses endpoints registered successfully")
+except ImportError as e:
+    print(f"⚠️ Failed to import pivot routers: {e}")
+    print(f"   Error details: {type(e).__name__}")
+    import traceback
+    traceback.print_exc()
+    print("   Research Project OS features will not be available")
+
 # Database migration endpoint for Phase 5
 @app.post("/admin/migrate-citation-schema")
 async def migrate_citation_schema(user_id: str = Header(..., alias="User-ID")):
