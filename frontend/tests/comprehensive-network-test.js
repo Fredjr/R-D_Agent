@@ -277,27 +277,22 @@ function waitForCondition(conditionFn, timeout = 5000, interval = 100) {
 }
 
 function getCytoscapeInstance() {
-  // Try to find Cytoscape instance in window or React components
-  const cyContainer = document.querySelector('[data-id="cytoscape-container"]') || 
-                      document.querySelector('.cytoscape-container') ||
-                      document.querySelector('[class*="cytoscape"]');
-  
-  if (!cyContainer) return null;
-  
-  // Check if cy instance is attached to container
-  if (cyContainer.cy) return cyContainer.cy;
-  
-  // Try to find in React fiber
-  const fiberKey = Object.keys(cyContainer).find(key => key.startsWith('__reactFiber'));
-  if (fiberKey) {
-    let fiber = cyContainer[fiberKey];
-    while (fiber) {
-      if (fiber.memoizedProps?.cy) return fiber.memoizedProps.cy;
-      if (fiber.stateNode?.cy) return fiber.stateNode.cy;
-      fiber = fiber.return;
+  // Find all divs and check for _cytoscape property
+  const allDivs = document.querySelectorAll('div');
+  for (const div of allDivs) {
+    if (div._cytoscape) {
+      console.log('✅ Found Cytoscape instance on div');
+      return div._cytoscape;
     }
   }
-  
+
+  // Try window.cy (if exposed)
+  if (window.cy) {
+    console.log('✅ Found Cytoscape instance on window.cy');
+    return window.cy;
+  }
+
+  console.log('❌ Cytoscape instance not found');
   return null;
 }
 
@@ -314,7 +309,7 @@ async function testPhase1Foundation(runner) {
     return await testAPI(url, {
       nodes: 'array',
       edges: 'array',
-      source_article: 'object'
+      metadata: 'object'
     });
   });
   
@@ -445,7 +440,8 @@ async function testPhase13AEdgeVisualization(runner) {
 
   // Test: Edge colors are applied
   await runner.test('Edges have correct colors based on relationship', async () => {
-    await waitForElement('[data-id="cytoscape-container"]', 5000);
+    // Wait for graph to be rendered
+    await new Promise(resolve => setTimeout(resolve, 2000));
     const cy = getCytoscapeInstance();
 
     if (!cy) {
@@ -559,19 +555,19 @@ async function testPhase13BThreePanelLayout(runner) {
 
   // Test: Center panel (Network Graph) exists
   await runner.test('Center panel (Network Graph) is rendered', async () => {
-    const centerPanel = document.querySelector('[data-id="cytoscape-container"]') ||
-                        document.querySelector('.cytoscape-container');
+    // Check if Cytoscape instance exists
+    const cy = getCytoscapeInstance();
 
-    if (!centerPanel) {
+    if (!cy) {
       return {
         passed: false,
-        reason: 'Center panel not found'
+        reason: 'Center panel (Cytoscape graph) not found'
       };
     }
 
     return {
       passed: true,
-      details: 'Center panel found'
+      details: 'Center panel found with Cytoscape instance'
     };
   });
 
