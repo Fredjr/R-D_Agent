@@ -5,17 +5,28 @@ function buildTargetUrl(req: Request, path: string[]): string {
   const suffix = path.join("/");
   const url = new URL(req.url);
   const search = url.search;
-  
+
   // Always use the production backend as primary
   const backend = BACKEND_BASE || "https://r-dagent-production.up.railway.app";
-  const targetUrl = `${backend}/${suffix}${search}`;
-  
+
+  // Routes that need /api prefix (new pivot endpoints)
+  const needsApiPrefix = suffix.startsWith('questions') ||
+                         suffix.startsWith('hypotheses') ||
+                         suffix.startsWith('analytics');
+
+  const finalPath = needsApiPrefix ? `api/${suffix}` : suffix;
+
+  const targetUrl = `${backend}/${finalPath}${search}`;
+
   console.log("Proxying request to:", targetUrl, {
     env_backend: BACKEND_BASE,
     path: path,
+    original_suffix: suffix,
+    needs_api_prefix: needsApiPrefix,
+    final_path: finalPath,
     search: search
   });
-  
+
   return targetUrl;
 }
 

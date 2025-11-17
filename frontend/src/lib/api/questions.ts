@@ -240,3 +240,47 @@ export async function deleteHypothesis(
   }
 }
 
+// ============================================================================
+// Evidence API
+// ============================================================================
+
+/**
+ * Get evidence links for a question
+ */
+export async function getQuestionEvidence(
+  questionId: string,
+  userId: string
+): Promise<any[]> {
+  const response = await fetch(`${API_BASE_URL}/questions/${questionId}/evidence`, {
+    headers: {
+      'User-ID': userId
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch question evidence: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Get evidence links for a hypothesis
+ */
+export async function getHypothesisEvidence(
+  hypothesisId: string,
+  userId: string
+): Promise<any[]> {
+  const response = await fetch(`${API_BASE_URL}/hypotheses/${hypothesisId}/evidence`, {
+    headers: {
+      'User-ID': userId
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch hypothesis evidence: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+

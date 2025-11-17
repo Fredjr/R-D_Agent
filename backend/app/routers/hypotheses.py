@@ -275,6 +275,48 @@ async def update_hypothesis(
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
+@router.delete("/{hypothesis_id}", status_code=204)
+async def delete_hypothesis(
+    hypothesis_id: str,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete a hypothesis
+
+    This will also delete all evidence links (CASCADE)
+    """
+    logger.info(f"🗑️ Deleting hypothesis: {hypothesis_id}")
+
+    try:
+        hypothesis = db.query(Hypothesis).filter(
+            Hypothesis.hypothesis_id == hypothesis_id
+        ).first()
+
+        if not hypothesis:
+            raise HTTPException(status_code=404, detail="Hypothesis not found")
+
+        # Update question's hypothesis count before deleting
+        question = db.query(ResearchQuestion).filter(
+            ResearchQuestion.question_id == hypothesis.question_id
+        ).first()
+        if question and question.hypothesis_count > 0:
+            question.hypothesis_count -= 1
+
+        db.delete(hypothesis)
+        db.commit()
+
+        logger.info(f"✅ Deleted hypothesis: {hypothesis_id}")
+        return None
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error deleting hypothesis: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
 @router.post("/{hypothesis_id}/evidence", response_model=HypothesisEvidenceResponse, status_code=201)
 async def link_hypothesis_evidence(
     hypothesis_id: str,
@@ -350,5 +392,42 @@ async def link_hypothesis_evidence(
     except Exception as e:
         logger.error(f"❌ Error linking evidence: {e}")
         db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@router.get("/{hypothesis_id}/evidence", response_model=List[HypothesisEvidenceResponse])
+async def get_hypothesis_evidence(
+    hypothesis_id: str,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all evidence links for a hypothesis
+    """
+    logger.info(f"📊 Fetching evidence for hypothesis: {hypothesis_id}")
+
+    try:
+        # Verify hypothesis exists
+        hypothesis = db.query(Hypothesis).filter(
+            Hypothesis.hypothesis_id == hypothesis_id
+        ).first()
+
+        if not hypothesis:
+            raise HTTPException(status_code=404, detail="Hypothesis not found")
+
+        # Get all evidence links
+        evidence_links = db.query(HypothesisEvidence).filter(
+            HypothesisEvidence.hypothesis_id == hypothesis_id
+        ).order_by(
+            HypothesisEvidence.added_at.desc()
+        ).all()
+
+        logger.info(f"✅ Found {len(evidence_links)} evidence links for hypothesis {hypothesis_id}")
+        return evidence_links
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error fetching hypothesis evidence: {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 

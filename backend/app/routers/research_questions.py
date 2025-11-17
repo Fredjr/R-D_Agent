@@ -382,3 +382,41 @@ async def link_evidence(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+
+@router.get("/{question_id}/evidence", response_model=List[EvidenceResponse])
+async def get_question_evidence(
+    question_id: str,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all evidence links for a research question
+    """
+    logger.info(f"📊 Fetching evidence for question: {question_id}")
+
+    try:
+        # Verify question exists
+        question = db.query(ResearchQuestion).filter(
+            ResearchQuestion.question_id == question_id
+        ).first()
+
+        if not question:
+            raise HTTPException(status_code=404, detail="Question not found")
+
+        # Get all evidence links
+        evidence_links = db.query(QuestionEvidence).filter(
+            QuestionEvidence.question_id == question_id
+        ).order_by(
+            QuestionEvidence.relevance_score.desc(),
+            QuestionEvidence.added_at.desc()
+        ).all()
+
+        logger.info(f"✅ Found {len(evidence_links)} evidence links for question {question_id}")
+        return evidence_links
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error fetching question evidence: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
