@@ -599,6 +599,415 @@ class ActivityLog(Base):
     analysis = relationship("DeepDiveAnalysis")
     collection = relationship("Collection")
 
+
+# ============================================================================
+# PRODUCT PIVOT: NEW TABLES FOR RESEARCH PROJECT OS
+# Added: November 17, 2025
+# Phase 1, Week 1: Database Schema Migration
+# ============================================================================
+
+class ResearchQuestion(Base):
+    """Research questions with tree structure for project organization"""
+    __tablename__ = "research_questions"
+
+    question_id = Column(String, primary_key=True)  # UUID
+    project_id = Column(String, ForeignKey("projects.project_id", ondelete="CASCADE"), nullable=False)
+    parent_question_id = Column(String, ForeignKey("research_questions.question_id", ondelete="CASCADE"), nullable=True)
+
+    # Question content
+    question_text = Column(Text, nullable=False)
+    question_type = Column(String, default='sub')  # main, sub, exploratory
+    description = Column(Text, nullable=True)  # Additional context
+
+    # Question status and priority
+    status = Column(String, default='exploring')  # exploring, investigating, answered, parked
+    priority = Column(String, default='medium')  # low, medium, high, critical
+
+    # Tree structure metadata
+    depth_level = Column(Integer, default=0)  # 0 for main question, 1 for sub-questions, etc.
+    sort_order = Column(Integer, default=0)  # User-defined ordering within same parent
+
+    # Computed fields (updated by triggers)
+    evidence_count = Column(Integer, default=0)  # Number of linked papers
+    hypothesis_count = Column(Integer, default=0)  # Number of linked hypotheses
+
+    # Metadata
+    created_by = Column(String, ForeignKey("users.user_id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    project = relationship("Project")
+    creator = relationship("User")
+    parent_question = relationship("ResearchQuestion", remote_side=[question_id], backref="sub_questions")
+    evidence_links = relationship("QuestionEvidence", back_populates="question", cascade="all, delete-orphan")
+    hypotheses = relationship("Hypothesis", back_populates="question", cascade="all, delete-orphan")
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_question_project', 'project_id'),
+        Index('idx_question_parent', 'parent_question_id'),
+        Index('idx_question_status', 'status'),
+        Index('idx_question_priority', 'priority'),
+        Index('idx_question_depth', 'depth_level'),
+    )
+
+
+class QuestionEvidence(Base):
+    """Junction table linking research questions to papers (evidence)"""
+    __tablename__ = "question_evidence"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    question_id = Column(String, ForeignKey("research_questions.question_id", ondelete="CASCADE"), nullable=False)
+    article_pmid = Column(String, ForeignKey("articles.pmid", ondelete="CASCADE"), nullable=False)
+
+    # Evidence metadata
+    evidence_type = Column(String, default='supports')  # supports, contradicts, context, methodology
+    relevance_score = Column(Integer, default=5)  # 1-10 scale
+    key_finding = Column(Text, nullable=True)  # User's note about why this paper is relevant
+
+    # Metadata
+    added_by = Column(String, ForeignKey("users.user_id"), nullable=False)
+    added_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    question = relationship("ResearchQuestion", back_populates="evidence_links")
+    article = relationship("Article")
+    adder = relationship("User")
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_qe_question', 'question_id'),
+        Index('idx_qe_article', 'article_pmid'),
+        Index('idx_qe_type', 'evidence_type'),
+        Index('idx_qe_relevance', 'relevance_score'),
+        # Unique constraint to prevent duplicate evidence links
+        Index('idx_unique_question_evidence', 'question_id', 'article_pmid', unique=True),
+    )
+
+
+class Hypothesis(Base):
+    """Hypotheses linked to research questions"""
+    __tablename__ = "hypotheses"
+
+    hypothesis_id = Column(String, primary_key=True)  # UUID
+    project_id = Column(String, ForeignKey("projects.project_id", ondelete="CASCADE"), nullable=False)
+    question_id = Column(String, ForeignKey("research_questions.question_id", ondelete="CASCADE"), nullable=False)
+
+    # Hypothesis content
+    hypothesis_text = Column(Text, nullable=False)
+    hypothesis_type = Column(String, default='mechanistic')  # mechanistic, predictive, descriptive, null
+    description = Column(Text, nullable=True)  # Additional context
+
+    # Hypothesis status
+    status = Column(String, default='proposed')  # proposed, testing, supported, rejected, inconclusive
+    confidence_level = Column(Integer, default=50)  # 0-100 scale
+
+    # Computed fields (updated by triggers)
+    supporting_evidence_count = Column(Integer, default=0)
+    contradicting_evidence_count = Column(Integer, default=0)
+
+    # Metadata
+    created_by = Column(String, ForeignKey("users.user_id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    project = relationship("Project")
+    question = relationship("ResearchQuestion", back_populates="hypotheses")
+    creator = relationship("User")
+    evidence_links = relationship("HypothesisEvidence", back_populates="hypothesis", cascade="all, delete-orphan")
+    experiments = relationship("Experiment", back_populates="hypothesis", cascade="all, delete-orphan")
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_hypothesis_project', 'project_id'),
+        Index('idx_hypothesis_question', 'question_id'),
+        Index('idx_hypothesis_status', 'status'),
+        Index('idx_hypothesis_type', 'hypothesis_type'),
+    )
+
+
+class HypothesisEvidence(Base):
+    """Junction table linking hypotheses to papers (evidence)"""
+    __tablename__ = "hypothesis_evidence"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    hypothesis_id = Column(String, ForeignKey("hypotheses.hypothesis_id", ondelete="CASCADE"), nullable=False)
+    article_pmid = Column(String, ForeignKey("articles.pmid", ondelete="CASCADE"), nullable=False)
+
+    # Evidence metadata
+    evidence_type = Column(String, default='supports')  # supports, contradicts, neutral
+    strength = Column(String, default='moderate')  # weak, moderate, strong
+    key_finding = Column(Text, nullable=True)  # User's note about the evidence
+
+    # Metadata
+    added_by = Column(String, ForeignKey("users.user_id"), nullable=False)
+    added_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    hypothesis = relationship("Hypothesis", back_populates="evidence_links")
+    article = relationship("Article")
+    adder = relationship("User")
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_he_hypothesis', 'hypothesis_id'),
+        Index('idx_he_article', 'article_pmid'),
+        Index('idx_he_type', 'evidence_type'),
+        Index('idx_he_strength', 'strength'),
+        # Unique constraint to prevent duplicate evidence links
+        Index('idx_unique_hypothesis_evidence', 'hypothesis_id', 'article_pmid', unique=True),
+    )
+
+
+class ProjectDecision(Base):
+    """Decision timeline for tracking pivots and methodology changes"""
+    __tablename__ = "project_decisions"
+
+    decision_id = Column(String, primary_key=True)  # UUID
+    project_id = Column(String, ForeignKey("projects.project_id", ondelete="CASCADE"), nullable=False)
+
+    # Decision content
+    decision_type = Column(String, nullable=False)  # pivot, methodology, scope, hypothesis, other
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+    rationale = Column(Text, nullable=True)  # Why this decision was made
+
+    # Decision context
+    alternatives_considered = Column(JSON, default=list)  # List of alternatives that were considered
+    impact_assessment = Column(Text, nullable=True)  # Expected impact of this decision
+
+    # Links to affected items
+    affected_questions = Column(JSON, default=list)  # List of question_ids
+    affected_hypotheses = Column(JSON, default=list)  # List of hypothesis_ids
+    related_pmids = Column(JSON, default=list)  # Papers that influenced this decision
+
+    # Metadata
+    decided_by = Column(String, ForeignKey("users.user_id"), nullable=False)
+    decided_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    project = relationship("Project")
+    decider = relationship("User")
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_decision_project', 'project_id'),
+        Index('idx_decision_type', 'decision_type'),
+        Index('idx_decision_date', 'decided_at'),
+    )
+
+
+class PaperTriage(Base):
+    """Smart inbox for AI-powered paper triage"""
+    __tablename__ = "paper_triage"
+
+    triage_id = Column(String, primary_key=True)  # UUID
+    project_id = Column(String, ForeignKey("projects.project_id", ondelete="CASCADE"), nullable=False)
+    article_pmid = Column(String, ForeignKey("articles.pmid", ondelete="CASCADE"), nullable=False)
+
+    # Triage status
+    triage_status = Column(String, default='must_read')  # must_read, nice_to_know, ignore
+    relevance_score = Column(Integer, default=50)  # 0-100 scale (AI-generated)
+    read_status = Column(String, default='unread')  # unread, reading, read
+
+    # AI analysis
+    impact_assessment = Column(Text, nullable=True)  # AI's assessment of why this paper matters
+    affected_questions = Column(JSON, default=list)  # Question IDs this paper addresses
+    affected_hypotheses = Column(JSON, default=list)  # Hypothesis IDs this paper supports/contradicts
+    ai_reasoning = Column(Text, nullable=True)  # AI's reasoning for the triage decision
+
+    # Triage metadata
+    triaged_by = Column(String, default='ai')  # 'ai' or 'user'
+    triaged_at = Column(DateTime(timezone=True), server_default=func.now())
+    reviewed_by = Column(String, ForeignKey("users.user_id"), nullable=True)  # User who reviewed AI triage
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    project = relationship("Project")
+    article = relationship("Article")
+    reviewer = relationship("User", foreign_keys=[reviewed_by])
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_triage_project', 'project_id'),
+        Index('idx_triage_status', 'triage_status'),
+        Index('idx_triage_relevance', 'relevance_score'),
+        Index('idx_triage_read_status', 'read_status'),
+        # Unique constraint to prevent duplicate triage entries
+        Index('idx_unique_project_article_triage', 'project_id', 'article_pmid', unique=True),
+    )
+
+
+class Protocol(Base):
+    """Extracted protocols from papers for experiment planning"""
+    __tablename__ = "protocols"
+
+    protocol_id = Column(String, primary_key=True)  # UUID
+    project_id = Column(String, ForeignKey("projects.project_id", ondelete="CASCADE"), nullable=False)
+    source_pmid = Column(String, ForeignKey("articles.pmid", ondelete="SET NULL"), nullable=True)
+
+    # Protocol content
+    protocol_name = Column(String, nullable=False)
+    protocol_type = Column(String, nullable=True)  # delivery, assay, synthesis, analysis, etc.
+    description = Column(Text, nullable=True)
+
+    # Structured protocol data (AI-extracted)
+    materials = Column(JSON, default=list)  # List of materials with catalog numbers, suppliers
+    steps = Column(JSON, default=list)  # Numbered steps with durations
+    equipment = Column(JSON, default=list)  # Required equipment
+    duration_estimate = Column(String, nullable=True)  # e.g., "5-7 days"
+    difficulty_level = Column(String, default='moderate')  # easy, moderate, difficult
+
+    # Metadata
+    extracted_by = Column(String, default='ai')  # 'ai' or 'manual'
+    created_by = Column(String, ForeignKey("users.user_id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    project = relationship("Project")
+    source_article = relationship("Article")
+    creator = relationship("User")
+    experiments = relationship("Experiment", back_populates="protocol")
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_protocol_project', 'project_id'),
+        Index('idx_protocol_source', 'source_pmid'),
+        Index('idx_protocol_type', 'protocol_type'),
+    )
+
+
+class Experiment(Base):
+    """Experiment planning linked to hypotheses and protocols"""
+    __tablename__ = "experiments"
+
+    experiment_id = Column(String, primary_key=True)  # UUID
+    project_id = Column(String, ForeignKey("projects.project_id", ondelete="CASCADE"), nullable=False)
+    hypothesis_id = Column(String, ForeignKey("hypotheses.hypothesis_id", ondelete="SET NULL"), nullable=True)
+    protocol_id = Column(String, ForeignKey("protocols.protocol_id", ondelete="SET NULL"), nullable=True)
+
+    # Experiment details
+    experiment_title = Column(String, nullable=False)
+    objective = Column(Text, nullable=False)
+    status = Column(String, default='planned')  # planned, in_progress, completed, failed
+
+    # Timeline
+    start_date = Column(DateTime(timezone=True), nullable=True)
+    end_date = Column(DateTime(timezone=True), nullable=True)
+
+    # Results
+    results_summary = Column(Text, nullable=True)
+    outcome = Column(String, nullable=True)  # supports, contradicts, inconclusive
+
+    # Metadata
+    created_by = Column(String, ForeignKey("users.user_id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    project = relationship("Project")
+    hypothesis = relationship("Hypothesis", back_populates="experiments")
+    protocol = relationship("Protocol", back_populates="experiments")
+    creator = relationship("User")
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_experiment_project', 'project_id'),
+        Index('idx_experiment_hypothesis', 'hypothesis_id'),
+        Index('idx_experiment_protocol', 'protocol_id'),
+        Index('idx_experiment_status', 'status'),
+    )
+
+
+class FieldSummary(Base):
+    """Living literature reviews that auto-update with new papers"""
+    __tablename__ = "field_summaries"
+
+    summary_id = Column(String, primary_key=True)  # UUID
+    project_id = Column(String, ForeignKey("projects.project_id", ondelete="CASCADE"), nullable=False)
+    question_id = Column(String, ForeignKey("research_questions.question_id", ondelete="SET NULL"), nullable=True)
+
+    # Summary content
+    summary_title = Column(String, nullable=False)
+    summary_type = Column(String, default='field_overview')  # field_overview, question_specific
+    content = Column(JSON, nullable=False)  # Structured summary with sections
+
+    # Summary metadata
+    paper_count = Column(Integer, default=0)  # Number of papers included
+    version = Column(Integer, default=1)  # Version number for tracking updates
+
+    # Metadata
+    generated_by = Column(String, default='ai')  # 'ai' or 'user'
+    created_by = Column(String, ForeignKey("users.user_id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    project = relationship("Project")
+    question = relationship("ResearchQuestion")
+    creator = relationship("User")
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_summary_project', 'project_id'),
+        Index('idx_summary_question', 'question_id'),
+        Index('idx_summary_type', 'summary_type'),
+        Index('idx_summary_version', 'version'),
+    )
+
+
+class ProjectAlert(Base):
+    """Proactive alerts for contradicting evidence, gaps, and high-impact papers"""
+    __tablename__ = "project_alerts"
+
+    alert_id = Column(String, primary_key=True)  # UUID
+    project_id = Column(String, ForeignKey("projects.project_id", ondelete="CASCADE"), nullable=False)
+
+    # Alert details
+    alert_type = Column(String, nullable=False)  # new_paper, contradicting_evidence, gap_identified, high_impact_paper
+    severity = Column(String, default='medium')  # low, medium, high, critical
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+
+    # Alert context
+    affected_questions = Column(JSON, default=list)  # Question IDs affected
+    affected_hypotheses = Column(JSON, default=list)  # Hypothesis IDs affected
+    related_pmids = Column(JSON, default=list)  # Related papers
+
+    # Alert status
+    action_required = Column(Boolean, default=True)
+    dismissed = Column(Boolean, default=False)
+    dismissed_by = Column(String, ForeignKey("users.user_id"), nullable=True)
+    dismissed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    project = relationship("Project")
+    dismisser = relationship("User", foreign_keys=[dismissed_by])
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_alert_project', 'project_id'),
+        Index('idx_alert_type', 'alert_type'),
+        Index('idx_alert_severity', 'severity'),
+        Index('idx_alert_dismissed', 'dismissed'),
+        Index('idx_alert_created', 'created_at'),
+    )
+
+
 # Database session dependency
 def get_db():
     """Dependency to get database session"""
