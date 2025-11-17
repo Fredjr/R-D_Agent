@@ -26,6 +26,7 @@ import {
   SpotifyTabIconButton,
   SpotifyTabQuickAction
 } from './shared';
+import { QuestionsTreeSection } from './questions';
 
 // Dynamically import PDFViewer to avoid SSR issues
 const PDFViewer = dynamic(() => import('@/components/reading/PDFViewer'), {
@@ -35,6 +36,7 @@ const PDFViewer = dynamic(() => import('@/components/reading/PDFViewer'), {
 
 interface ResearchQuestionTabProps {
   project: any;
+  user?: any;
   totalPapers?: number;
   collectionsCount?: number;
   onUpdateProject: (updates: any) => Promise<void>;
@@ -44,6 +46,7 @@ interface ResearchQuestionTabProps {
 
 export function ResearchQuestionTab({
   project,
+  user,
   totalPapers = 0,
   collectionsCount = 0,
   onUpdateProject,
@@ -321,6 +324,14 @@ export function ResearchQuestionTab({
             </div>
           </SpotifyTabCardContent>
         </SpotifyTabCard>
+
+        {/* Research Questions Tree - NEW FEATURE */}
+        {user && (
+          <QuestionsTreeSection
+            projectId={project.project_id}
+            userId={user.email || user.user_id}
+          />
+        )}
         </SpotifyTabSection>
       </div>
 

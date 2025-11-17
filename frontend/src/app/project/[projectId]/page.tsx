@@ -1742,6 +1742,7 @@ export default function ProjectPage() {
           <div className="mb-8 space-y-6">
             <ResearchQuestionTab
               project={project}
+              user={user}
               totalPapers={totalPapers}
               collectionsCount={collections.length}
               onUpdateProject={async (updates) => {
