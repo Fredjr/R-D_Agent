@@ -278,19 +278,25 @@ function waitForCondition(conditionFn, timeout = 5000, interval = 100) {
 }
 
 function getCytoscapeInstance() {
-  // Find all divs and check for _cytoscape property
-  const allDivs = document.querySelectorAll('div');
-  for (const div of allDivs) {
-    if (div._cytoscape) {
-      console.log('✅ Found Cytoscape instance on div');
-      return div._cytoscape;
-    }
+  // Try window.__cytoscapeInstance (exposed by NetworkView for testing)
+  if (window.__cytoscapeInstance) {
+    console.log('✅ Found Cytoscape instance on window.__cytoscapeInstance');
+    return window.__cytoscapeInstance;
   }
 
-  // Try window.cy (if exposed)
+  // Fallback: Try window.cy (if exposed)
   if (window.cy) {
     console.log('✅ Found Cytoscape instance on window.cy');
     return window.cy;
+  }
+
+  // Fallback: Find all divs and check for _cytoscape property
+  const allDivs = document.querySelectorAll('div');
+  for (const div of allDivs) {
+    if (div._cytoscape) {
+      console.log('✅ Found Cytoscape instance on div._cytoscape');
+      return div._cytoscape;
+    }
   }
 
   console.log('❌ Cytoscape instance not found');
@@ -303,60 +309,74 @@ function getCytoscapeInstance() {
 
 async function testPhase1Foundation(runner) {
   runner.startPhase('PHASE 1: FOUNDATION');
-  
+
+  // Get PMID from URL or use default
+  const urlParams = new URLSearchParams(window.location.search);
+  const currentPmid = urlParams.get('pmid') || TEST_CONFIG.TEST_PMID_MAIN;
+  console.log(`🧪 Testing with PMID: ${currentPmid}`);
+
   // Test 1.1: PubMed Network API
   await runner.test('PubMed Network API returns valid data', async () => {
-    const url = `${TEST_CONFIG.PUBMED_NETWORK_API}?pmid=${TEST_CONFIG.TEST_PMID_MAIN}&type=citations&limit=15`;
+    const url = `${TEST_CONFIG.PUBMED_NETWORK_API}?pmid=${currentPmid}&type=citations&limit=15`;
     return await testAPI(url, {
       nodes: 'array',
       edges: 'array',
       metadata: 'object'
     });
   });
-  
-  // Test 1.2: Network has minimum nodes
+
+  // Test 1.2: Network has minimum nodes (check actual graph, not API)
   await runner.test('Network has minimum required nodes', async () => {
-    const url = `${TEST_CONFIG.PUBMED_NETWORK_API}?pmid=${TEST_CONFIG.TEST_PMID_MAIN}&type=citations&limit=15`;
-    const result = await testAPI(url, { nodes: 'array' });
-    
-    if (!result.passed) return result;
-    
-    const nodeCount = result.data.nodes.length;
+    // Wait for Cytoscape instance
+    const cy = await waitForCondition(() => getCytoscapeInstance(), 10000);
+
+    if (!cy) {
+      return {
+        passed: false,
+        reason: 'Cytoscape instance not found'
+      };
+    }
+
+    const nodeCount = cy.nodes().length;
     if (nodeCount < TEST_CONFIG.MIN_NODES_INITIAL_GRAPH) {
       return {
         passed: false,
-        reason: 'Insufficient nodes',
+        reason: 'Insufficient nodes in graph',
         expected: `>= ${TEST_CONFIG.MIN_NODES_INITIAL_GRAPH}`,
         actual: nodeCount
       };
     }
-    
+
     return {
       passed: true,
-      details: `Found ${nodeCount} nodes`
+      details: `Found ${nodeCount} nodes in graph`
     };
   });
-  
-  // Test 1.3: Network has edges
+
+  // Test 1.3: Network has edges (check actual graph, not API)
   await runner.test('Network has edges between nodes', async () => {
-    const url = `${TEST_CONFIG.PUBMED_NETWORK_API}?pmid=${TEST_CONFIG.TEST_PMID_MAIN}&type=citations&limit=15`;
-    const result = await testAPI(url, { edges: 'array' });
-    
-    if (!result.passed) return result;
-    
-    const edgeCount = result.data.edges.length;
+    const cy = getCytoscapeInstance();
+
+    if (!cy) {
+      return {
+        passed: false,
+        reason: 'Cytoscape instance not found'
+      };
+    }
+
+    const edgeCount = cy.edges().length;
     if (edgeCount < TEST_CONFIG.MIN_EDGES_INITIAL_GRAPH) {
       return {
         passed: false,
-        reason: 'Insufficient edges',
+        reason: 'Insufficient edges in graph',
         expected: `>= ${TEST_CONFIG.MIN_EDGES_INITIAL_GRAPH}`,
         actual: edgeCount
       };
     }
-    
+
     return {
       passed: true,
-      details: `Found ${edgeCount} edges`
+      details: `Found ${edgeCount} edges in graph`
     };
   });
   

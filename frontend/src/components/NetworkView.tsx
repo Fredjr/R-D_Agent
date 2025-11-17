@@ -1945,6 +1945,12 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             edges: instance.edges().length,
           });
           setCyInstance(instance);
+
+          // Expose to window for testing purposes
+          if (typeof window !== 'undefined') {
+            (window as any).__cytoscapeInstance = instance;
+            console.log('🧪 [Cytoscape] Instance exposed to window.__cytoscapeInstance for testing');
+          }
         }}
       >
         <CytoscapeControls
