@@ -283,29 +283,10 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Final fallback to sample data only if all real searches fail
+      // If all search strategies fail, return empty array (NO SAMPLE DATA)
       if (referenceArticles.length === 0) {
-        console.log(`⚠️ All reference search strategies failed for PMID ${pmid}, providing sample data`);
-        referenceArticles = [
-          {
-            pmid: "ref_sample1",
-            title: "Sample Reference Article 1",
-            authors: ['Reference Author'],
-            journal: 'Reference Journal',
-            year: new Date().getFullYear() - 3,
-            citation_count: 10,
-            abstract: 'This is a sample reference article for demonstration purposes.'
-          },
-          {
-            pmid: "ref_sample2",
-            title: "Sample Reference Article 2",
-            authors: ['Another Reference Author'],
-            journal: 'Another Reference Journal',
-            year: new Date().getFullYear() - 4,
-            citation_count: 8,
-            abstract: 'Another sample reference article for demonstration.'
-          }
-        ];
+        console.log(`⚠️ All reference search strategies failed for PMID ${pmid}, returning empty array`);
+        referenceArticles = [];
       }
     }
     

@@ -259,19 +259,20 @@ function waitForElement(selector, timeout = 5000) {
 }
 
 function waitForCondition(conditionFn, timeout = 5000, interval = 100) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const startTime = Date.now();
-    
+
     const check = () => {
-      if (conditionFn()) {
-        resolve(true);
+      const result = conditionFn();
+      if (result) {
+        resolve(result); // Return the actual result, not just true
       } else if (Date.now() - startTime > timeout) {
-        reject(new Error('Condition not met within timeout'));
+        resolve(null); // Return null instead of rejecting
       } else {
         setTimeout(check, interval);
       }
     };
-    
+
     check();
   });
 }
@@ -1261,16 +1262,17 @@ async function testPerformance(runner) {
   await runner.test('Initial graph loads within 5 seconds', async () => {
     const startTime = Date.now();
 
-    await waitForElement('[data-id="cytoscape-container"]', 5000);
-    const cy = getCytoscapeInstance();
+    // Wait for Cytoscape instance to be available
+    const cy = await waitForCondition(() => getCytoscapeInstance(), 5000);
 
     if (!cy) {
       return {
         passed: false,
-        reason: 'Cytoscape instance not found'
+        reason: 'Cytoscape instance not found after 5 seconds'
       };
     }
 
+    // Wait for nodes to be loaded
     await waitForCondition(() => cy.nodes().length > 0, 5000);
 
     const loadTime = Date.now() - startTime;
