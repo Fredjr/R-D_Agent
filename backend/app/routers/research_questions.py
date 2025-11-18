@@ -8,7 +8,7 @@ Phase 1, Week 2: Core API Endpoints
 from fastapi import APIRouter, HTTPException, Depends, Header
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 from datetime import datetime
 from typing import Optional, List
 import logging
@@ -84,7 +84,6 @@ class QuestionResponse(BaseModel):
 class EvidenceResponse(BaseModel):
     """Response model for question evidence"""
     id: int
-    evidence_id: Optional[str] = None  # Alias for id (for frontend compatibility)
     question_id: str
     article_pmid: str
     evidence_type: str
@@ -96,13 +95,16 @@ class EvidenceResponse(BaseModel):
     class Config:
         from_attributes = True
 
-    @classmethod
-    def model_validate(cls, obj, **kwargs):
-        """Override to set evidence_id from id"""
-        instance = super().model_validate(obj, **kwargs)
-        if instance.evidence_id is None and instance.id is not None:
-            instance.evidence_id = str(instance.id)
-        return instance
+    @property
+    def evidence_id(self) -> str:
+        """Alias for id (for frontend compatibility)"""
+        return str(self.id)
+
+    def model_dump(self, **kwargs):
+        """Override to include evidence_id in serialization"""
+        data = super().model_dump(**kwargs)
+        data['evidence_id'] = str(self.id)
+        return data
 
 
 # =============================================================================
