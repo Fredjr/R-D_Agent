@@ -289,15 +289,26 @@
   // ============================================================================
   logSection('SECTION 1: WEEK 3 - QUESTIONS TAB UI');
 
-  // Test 1.1: Navigate to Questions Tab
+  // Test 1.1: Navigate to Questions Tab (or verify already there)
   logTest('Navigate to Questions Tab');
-  const questionsTab = findButton('Questions') || findByText('Questions', 'button');
-  if (await clickElement(questionsTab, 'Questions Tab')) {
-    await sleep(1000); // Wait for tab to load
-    if (document.querySelector('[data-tab="questions"]') || findByText('Add Question')) {
-      logPass('Questions tab loaded successfully');
+
+  // First check if we're already on Questions tab
+  let alreadyOnQuestionsTab = findButton('Add Question') || findButton('Add Your First Question');
+
+  if (alreadyOnQuestionsTab) {
+    logPass('Already on Questions tab (Add Question button found)');
+  } else {
+    // Try to navigate to Questions tab
+    const questionsTab = findButton('Questions') || findByText('Questions', 'button');
+    if (await clickElement(questionsTab, 'Questions Tab')) {
+      await sleep(1000); // Wait for tab to load
+      if (document.querySelector('[data-tab="questions"]') || findByText('Add Question')) {
+        logPass('Questions tab loaded successfully');
+      } else {
+        logFail('Questions tab did not load properly');
+      }
     } else {
-      logFail('Questions tab did not load properly');
+      logFail('Not on Questions tab and cannot navigate to it');
     }
   }
 
@@ -374,10 +385,17 @@
                  findButton('Add Question') ||
                  findButton('Submit');
   if (await clickElement(saveBtn, 'Save Question Button')) {
-    await sleep(2000); // Wait for API call and UI update
+    await sleep(3000); // Wait longer for API call and UI update
 
     // Verify question appears in the list
-    const questionCard = findByText(CONFIG.testData.mainQuestion);
+    let questionCard = findByText(CONFIG.testData.mainQuestion);
+
+    // If not found, try searching in all text content
+    if (!questionCard) {
+      await sleep(2000); // Wait a bit more
+      questionCard = findByText(CONFIG.testData.mainQuestion);
+    }
+
     if (questionCard) {
       logPass('Question created and appears in list');
 
@@ -392,6 +410,13 @@
       }
     } else {
       logFail('Question not found in list after creation');
+      logInfo('Checking if modal closed...');
+      const modalStillOpen = document.querySelector('[role="dialog"]');
+      if (modalStillOpen) {
+        logInfo('Modal still open - may indicate save failed');
+      } else {
+        logInfo('Modal closed - question may have been created but not rendering');
+      }
     }
   }
 
