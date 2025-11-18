@@ -22,7 +22,7 @@ interface HypothesesSectionProps {
   questionText: string;
   projectId: string;
   userId: string;
-  onLinkEvidence?: (hypothesisId: string) => void;
+  onLinkEvidence?: (hypothesisId: string, hypothesisText: string) => void;
 }
 
 export function HypothesesSection({
@@ -167,9 +167,10 @@ export function HypothesesSection({
             <HypothesisCard
               key={hypothesis.hypothesis_id}
               hypothesis={hypothesis}
+              userId={userId}
               onEdit={handleEdit}
               onDelete={handleDelete}
-              onLinkEvidence={onLinkEvidence}
+              onLinkEvidence={() => onLinkEvidence?.(hypothesis.hypothesis_id, hypothesis.hypothesis_text)}
               onUpdateStatus={handleStatusUpdate}
             />
           ))}

@@ -5,9 +5,10 @@ import { PlusIcon } from '@heroicons/react/24/outline';
 import { QuestionTree } from './QuestionTree';
 import { AddQuestionModal } from './AddQuestionModal';
 import { LinkEvidenceModal } from './LinkEvidenceModal';
+import { LinkHypothesisEvidenceModal } from './LinkHypothesisEvidenceModal';
 import { useQuestions } from '@/lib/hooks/useQuestions';
-import type { QuestionTreeNode, QuestionFormData, QuestionEvidence, LinkEvidenceRequest } from '@/lib/types/questions';
-import { getQuestionEvidence, linkQuestionEvidence, removeQuestionEvidence } from '@/lib/api/questions';
+import type { QuestionTreeNode, QuestionFormData, QuestionEvidence, LinkEvidenceRequest, LinkHypothesisEvidenceRequest } from '@/lib/types/questions';
+import { getQuestionEvidence, linkQuestionEvidence, removeQuestionEvidence, linkHypothesisEvidence } from '@/lib/api/questions';
 import {
   SpotifyTabCard,
   SpotifyTabCardHeader,
@@ -37,11 +38,16 @@ export function QuestionsTreeSection({ projectId, userId }: QuestionsTreeSection
   const [parentQuestionId, setParentQuestionId] = useState<string | null>(null);
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
 
-  // Evidence linking state
+  // Evidence linking state (for questions)
   const [isLinkEvidenceModalOpen, setIsLinkEvidenceModalOpen] = useState(false);
   const [linkingQuestionId, setLinkingQuestionId] = useState<string | null>(null);
   const [linkingQuestionText, setLinkingQuestionText] = useState<string>('');
   const [evidenceByQuestion, setEvidenceByQuestion] = useState<Record<string, QuestionEvidence[]>>({});
+
+  // Hypothesis evidence linking state
+  const [isLinkHypothesisEvidenceModalOpen, setIsLinkHypothesisEvidenceModalOpen] = useState(false);
+  const [linkingHypothesisId, setLinkingHypothesisId] = useState<string | null>(null);
+  const [linkingHypothesisText, setLinkingHypothesisText] = useState<string>('');
 
   // Toggle expand/collapse
   const handleToggleExpand = useCallback((questionId: string) => {
@@ -137,6 +143,28 @@ export function QuestionsTreeSection({ projectId, userId }: QuestionsTreeSection
       }
       // Refresh evidence for this question
       loadEvidenceForQuestion(linkingQuestionId);
+    } catch (err) {
+      throw err; // Let modal handle the error
+    }
+  };
+
+  // Handle link hypothesis evidence
+  const handleLinkHypothesisEvidence = (hypothesisId: string, hypothesisText: string) => {
+    setLinkingHypothesisId(hypothesisId);
+    setLinkingHypothesisText(hypothesisText);
+    setIsLinkHypothesisEvidenceModalOpen(true);
+  };
+
+  // Handle link hypothesis evidence submit
+  const handleLinkHypothesisEvidenceSubmit = async (evidenceRequests: LinkHypothesisEvidenceRequest[]) => {
+    if (!linkingHypothesisId) return;
+
+    try {
+      // Link all selected papers
+      for (const request of evidenceRequests) {
+        await linkHypothesisEvidence(linkingHypothesisId, request, userId);
+      }
+      // Note: Evidence refresh is handled by HypothesisCard component
     } catch (err) {
       throw err; // Let modal handle the error
     }
@@ -268,6 +296,7 @@ export function QuestionsTreeSection({ projectId, userId }: QuestionsTreeSection
               onToggleExpand={handleToggleExpand}
               onLinkEvidence={handleLinkEvidence}
               onRemoveEvidence={handleRemoveEvidence}
+              onLinkHypothesisEvidence={handleLinkHypothesisEvidence}
             />
           )}
         </SpotifyTabCardContent>
@@ -283,7 +312,7 @@ export function QuestionsTreeSection({ projectId, userId }: QuestionsTreeSection
         projectId={projectId}
       />
 
-      {/* Link Evidence Modal */}
+      {/* Link Evidence Modal (for questions) */}
       {isLinkEvidenceModalOpen && linkingQuestionId && (
         <LinkEvidenceModal
           questionId={linkingQuestionId}
@@ -295,6 +324,21 @@ export function QuestionsTreeSection({ projectId, userId }: QuestionsTreeSection
             setLinkingQuestionText('');
           }}
           onLink={handleLinkEvidenceSubmit}
+        />
+      )}
+
+      {/* Link Hypothesis Evidence Modal */}
+      {isLinkHypothesisEvidenceModalOpen && linkingHypothesisId && (
+        <LinkHypothesisEvidenceModal
+          hypothesisId={linkingHypothesisId}
+          hypothesisText={linkingHypothesisText}
+          projectId={projectId}
+          onClose={() => {
+            setIsLinkHypothesisEvidenceModalOpen(false);
+            setLinkingHypothesisId(null);
+            setLinkingHypothesisText('');
+          }}
+          onLink={handleLinkHypothesisEvidenceSubmit}
         />
       )}
     </>

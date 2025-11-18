@@ -27,7 +27,7 @@ interface QuestionCardProps {
   onLinkEvidence?: (questionId: string) => void;
   onRemoveEvidence?: (questionId: string, evidenceId: string) => void;
   onViewPaper?: (pmid: string) => void;
-  onLinkHypothesisEvidence?: (hypothesisId: string) => void;
+  onLinkHypothesisEvidence?: (hypothesisId: string, hypothesisText: string) => void;
 }
 
 const statusColors: Record<QuestionStatus, string> = {

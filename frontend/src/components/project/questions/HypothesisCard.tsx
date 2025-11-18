@@ -1,11 +1,11 @@
 /**
  * HypothesisCard Component
  * Displays a single hypothesis with status, confidence level, and evidence counts
- * Phase 1, Week 5: Hypothesis UI Components
+ * Phase 1, Week 5-6: Hypothesis UI Components + Evidence Display
  */
 
-import { useState } from 'react';
-import type { Hypothesis } from '@/lib/types/questions';
+import { useState, useEffect } from 'react';
+import type { Hypothesis, HypothesisEvidence } from '@/lib/types/questions';
 import {
   CheckCircleIcon,
   XCircleIcon,
@@ -16,27 +16,67 @@ import {
   TrashIcon,
   LinkIcon,
   ChevronDownIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  SignalIcon
 } from '@heroicons/react/24/outline';
+import { getHypothesisEvidence, removeHypothesisEvidence } from '@/lib/api/questions';
 
 interface HypothesisCardProps {
   hypothesis: Hypothesis;
+  userId: string;
   onEdit?: (hypothesisId: string) => void;
   onDelete?: (hypothesisId: string) => void;
   onLinkEvidence?: (hypothesisId: string) => void;
   onUpdateStatus?: (hypothesisId: string, status: string) => void;
+  onViewPaper?: (pmid: string) => void;
   compact?: boolean;
 }
 
 export function HypothesisCard({
   hypothesis,
+  userId,
   onEdit,
   onDelete,
   onLinkEvidence,
   onUpdateStatus,
+  onViewPaper,
   compact = false
 }: HypothesisCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showEvidence, setShowEvidence] = useState(false);
+  const [evidence, setEvidence] = useState<HypothesisEvidence[]>([]);
+  const [isLoadingEvidence, setIsLoadingEvidence] = useState(false);
+
+  // Load evidence when evidence section is expanded
+  useEffect(() => {
+    if (showEvidence && evidence.length === 0) {
+      loadEvidence();
+    }
+  }, [showEvidence]);
+
+  const loadEvidence = async () => {
+    setIsLoadingEvidence(true);
+    try {
+      const data = await getHypothesisEvidence(hypothesis.hypothesis_id, userId);
+      setEvidence(data);
+    } catch (error) {
+      console.error('Failed to load hypothesis evidence:', error);
+    } finally {
+      setIsLoadingEvidence(false);
+    }
+  };
+
+  const handleRemoveEvidence = async (evidenceId: string) => {
+    if (!confirm('Remove this evidence link?')) return;
+
+    try {
+      await removeHypothesisEvidence(hypothesis.hypothesis_id, evidenceId, userId);
+      setEvidence(evidence.filter(e => e.evidence_id !== evidenceId));
+    } catch (error) {
+      console.error('Failed to remove evidence:', error);
+      alert('Failed to remove evidence. Please try again.');
+    }
+  };
 
   // Status configuration
   const getStatusConfig = (status: string) => {
@@ -202,9 +242,12 @@ export function HypothesisCard({
         </div>
       </div>
 
-      {/* Evidence counts */}
+      {/* Evidence counts - Clickable to expand */}
       {hasEvidence && (
-        <div className="mt-3 flex items-center gap-3 text-xs">
+        <button
+          onClick={() => setShowEvidence(!showEvidence)}
+          className="mt-3 flex items-center gap-3 text-xs hover:bg-[var(--spotify-light-gray)] p-2 rounded-lg transition-colors w-full"
+        >
           {hypothesis.supporting_evidence_count > 0 && (
             <div className="flex items-center gap-1 text-green-400">
               <CheckCircleIcon className="w-4 h-4" />
@@ -215,6 +258,104 @@ export function HypothesisCard({
             <div className="flex items-center gap-1 text-red-400">
               <XCircleIcon className="w-4 h-4" />
               <span>{hypothesis.contradicting_evidence_count} contradicting</span>
+            </div>
+          )}
+          <ChevronDownIcon className={`w-4 h-4 text-gray-400 ml-auto transition-transform ${showEvidence ? 'rotate-180' : ''}`} />
+        </button>
+      )}
+
+      {/* Evidence List - Collapsible */}
+      {showEvidence && (
+        <div className="mt-3 pt-3 border-t border-[var(--spotify-border-gray)]">
+          {isLoadingEvidence ? (
+            <div className="text-center py-4 text-[var(--spotify-light-text)] text-sm">
+              Loading evidence...
+            </div>
+          ) : evidence.length === 0 ? (
+            <div className="text-center py-4 text-[var(--spotify-light-text)] text-sm">
+              No evidence linked yet
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {evidence.map((ev) => {
+                // Get evidence type styling
+                const getEvidenceTypeStyle = (type: string) => {
+                  switch (type) {
+                    case 'supports':
+                      return { icon: <CheckCircleIcon className="w-4 h-4" />, color: 'text-green-400', bg: 'bg-green-500/10' };
+                    case 'contradicts':
+                      return { icon: <XCircleIcon className="w-4 h-4" />, color: 'text-red-400', bg: 'bg-red-500/10' };
+                    case 'neutral':
+                      return { icon: <MinusCircleIcon className="w-4 h-4" />, color: 'text-gray-400', bg: 'bg-gray-500/10' };
+                    default:
+                      return { icon: <BeakerIcon className="w-4 h-4" />, color: 'text-gray-400', bg: 'bg-gray-500/10' };
+                  }
+                };
+
+                // Get strength styling
+                const getStrengthStyle = (strength: string) => {
+                  switch (strength) {
+                    case 'weak':
+                      return { color: 'text-yellow-400', label: 'Weak' };
+                    case 'moderate':
+                      return { color: 'text-blue-400', label: 'Moderate' };
+                    case 'strong':
+                      return { color: 'text-purple-400', label: 'Strong' };
+                    default:
+                      return { color: 'text-gray-400', label: strength };
+                  }
+                };
+
+                const typeStyle = getEvidenceTypeStyle(ev.evidence_type);
+                const strengthStyle = getStrengthStyle(ev.strength);
+
+                return (
+                  <div
+                    key={ev.evidence_id}
+                    className="p-3 rounded-lg bg-[var(--spotify-light-gray)] hover:bg-[var(--spotify-medium-gray)] transition-colors"
+                  >
+                    <div className="flex items-start gap-2">
+                      <div className="flex-1 min-w-0">
+                        {/* Paper title */}
+                        <button
+                          onClick={() => onViewPaper?.(ev.article_pmid)}
+                          className="text-sm text-[var(--spotify-white)] hover:text-[var(--spotify-green)] font-medium line-clamp-2 text-left mb-2"
+                        >
+                          {ev.article_title || 'Untitled Paper'}
+                        </button>
+
+                        {/* Evidence type and strength badges */}
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs ${typeStyle.color} ${typeStyle.bg}`}>
+                            {typeStyle.icon}
+                            {ev.evidence_type}
+                          </span>
+                          <span className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs ${strengthStyle.color} bg-opacity-10`}>
+                            <SignalIcon className="w-3 h-3" />
+                            {strengthStyle.label}
+                          </span>
+                        </div>
+
+                        {/* Key finding */}
+                        {ev.key_finding && (
+                          <p className="text-xs text-[var(--spotify-light-text)] italic">
+                            "{ev.key_finding}"
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Remove button */}
+                      <button
+                        onClick={() => handleRemoveEvidence(ev.evidence_id)}
+                        className="flex-shrink-0 p-1 rounded hover:bg-red-500/20 transition-colors"
+                        title="Remove evidence"
+                      >
+                        <XCircleIcon className="w-4 h-4 text-red-400" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
