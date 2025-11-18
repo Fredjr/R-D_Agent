@@ -54,7 +54,7 @@ class QuestionUpdate(BaseModel):
 class EvidenceLink(BaseModel):
     """Request model for linking evidence to a question"""
     article_pmid: str
-    evidence_type: str = Field(default='supports', pattern='^(supports|contradicts|context|methodology)$')
+    evidence_type: str = Field(default='supports', pattern='^(supports|contradicts|neutral|context|methodology)$')
     relevance_score: int = Field(default=5, ge=1, le=10)
     key_finding: Optional[str] = None
 
@@ -84,6 +84,7 @@ class QuestionResponse(BaseModel):
 class EvidenceResponse(BaseModel):
     """Response model for question evidence"""
     id: int
+    evidence_id: Optional[str] = None  # Alias for id (for frontend compatibility)
     question_id: str
     article_pmid: str
     evidence_type: str
@@ -91,9 +92,17 @@ class EvidenceResponse(BaseModel):
     key_finding: Optional[str]
     added_by: str
     added_at: datetime
-    
+
     class Config:
         from_attributes = True
+
+    @classmethod
+    def model_validate(cls, obj, **kwargs):
+        """Override to set evidence_id from id"""
+        instance = super().model_validate(obj, **kwargs)
+        if instance.evidence_id is None and instance.id is not None:
+            instance.evidence_id = str(instance.id)
+        return instance
 
 
 # =============================================================================
