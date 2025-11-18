@@ -8,17 +8,22 @@ import {
   TrashIcon,
   PlusIcon,
   BeakerIcon,
-  LightBulbIcon
+  LightBulbIcon,
+  LinkIcon
 } from '@heroicons/react/24/outline';
 import { cn } from '@/lib/utils';
-import type { QuestionTreeNode, QuestionStatus, QuestionPriority } from '@/lib/types/questions';
+import type { QuestionTreeNode, QuestionStatus, QuestionPriority, QuestionEvidence } from '@/lib/types/questions';
 
 interface QuestionCardProps {
   question: QuestionTreeNode;
+  evidence?: QuestionEvidence[];
   onEdit: (question: QuestionTreeNode) => void;
   onDelete: (questionId: string) => void;
   onAddSubQuestion: (parentId: string) => void;
   onToggleExpand: (questionId: string) => void;
+  onLinkEvidence?: (questionId: string) => void;
+  onRemoveEvidence?: (questionId: string, evidenceId: string) => void;
+  onViewPaper?: (pmid: string) => void;
 }
 
 const statusColors: Record<QuestionStatus, string> = {
@@ -44,13 +49,19 @@ const statusLabels: Record<QuestionStatus, string> = {
 
 export function QuestionCard({
   question,
+  evidence = [],
   onEdit,
   onDelete,
   onAddSubQuestion,
-  onToggleExpand
+  onToggleExpand,
+  onLinkEvidence,
+  onRemoveEvidence,
+  onViewPaper
 }: QuestionCardProps) {
   const [showActions, setShowActions] = useState(false);
+  const [showEvidence, setShowEvidence] = useState(false);
   const hasChildren = question.children && question.children.length > 0;
+  const hasEvidence = evidence.length > 0;
 
   return (
     <div
@@ -113,12 +124,19 @@ export function QuestionCard({
                 {question.priority.toUpperCase()}
               </span>
 
-              {/* Evidence Count */}
+              {/* Evidence Count - Clickable */}
               {question.evidence_count > 0 && (
-                <span className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-purple-500/20 text-purple-400">
+                <button
+                  onClick={() => setShowEvidence(!showEvidence)}
+                  className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 transition-colors"
+                >
                   <BeakerIcon className="w-3 h-3" />
                   {question.evidence_count} evidence
-                </span>
+                  <ChevronDownIcon className={cn(
+                    "w-3 h-3 transition-transform",
+                    showEvidence && "rotate-180"
+                  )} />
+                </button>
               )}
 
               {/* Hypothesis Count */}
@@ -141,6 +159,15 @@ export function QuestionCard({
             "flex-shrink-0 flex items-center gap-1 transition-opacity duration-200",
             showActions ? "opacity-100" : "opacity-0"
           )}>
+            {onLinkEvidence && (
+              <button
+                onClick={() => onLinkEvidence(question.question_id)}
+                className="p-2 rounded-lg hover:bg-[var(--spotify-light-gray)] transition-colors"
+                title="Link evidence"
+              >
+                <LinkIcon className="w-4 h-4 text-purple-400" />
+              </button>
+            )}
             <button
               onClick={() => onAddSubQuestion(question.question_id)}
               className="p-2 rounded-lg hover:bg-[var(--spotify-light-gray)] transition-colors"
@@ -164,6 +191,51 @@ export function QuestionCard({
             </button>
           </div>
         </div>
+
+        {/* Evidence Section - Collapsible */}
+        {showEvidence && hasEvidence && (
+          <div className="mt-4 pt-4 border-t border-[var(--spotify-border-gray)]">
+            <div className="space-y-2">
+              {evidence.map((ev) => (
+                <div key={ev.evidence_id} className="text-sm">
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-[var(--spotify-light-gray)] hover:bg-[var(--spotify-medium-gray)] transition-colors">
+                    <BeakerIcon className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <button
+                        onClick={() => onViewPaper?.(ev.article_pmid)}
+                        className="text-[var(--spotify-white)] hover:text-[var(--spotify-green)] font-medium line-clamp-1 text-left"
+                      >
+                        {ev.article_title || 'Untitled Paper'}
+                      </button>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={cn(
+                          "text-xs px-1.5 py-0.5 rounded",
+                          ev.evidence_type === 'supports' && "bg-green-500/20 text-green-400",
+                          ev.evidence_type === 'contradicts' && "bg-red-500/20 text-red-400",
+                          ev.evidence_type === 'neutral' && "bg-gray-500/20 text-gray-400"
+                        )}>
+                          {ev.evidence_type}
+                        </span>
+                        <span className="text-xs text-[var(--spotify-light-text)]">
+                          Relevance: {ev.relevance_score}/10
+                        </span>
+                      </div>
+                    </div>
+                    {onRemoveEvidence && (
+                      <button
+                        onClick={() => onRemoveEvidence(question.question_id, ev.evidence_id)}
+                        className="flex-shrink-0 p-1 rounded hover:bg-red-500/20 transition-colors"
+                        title="Remove evidence"
+                      >
+                        <TrashIcon className="w-4 h-4 text-red-400" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

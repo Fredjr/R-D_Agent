@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { QuestionTree } from './QuestionTree';
 import { AddQuestionModal } from './AddQuestionModal';
+import { LinkEvidenceModal } from './LinkEvidenceModal';
 import { useQuestions } from '@/lib/hooks/useQuestions';
-import type { QuestionTreeNode, QuestionFormData } from '@/lib/types/questions';
+import type { QuestionTreeNode, QuestionFormData, QuestionEvidence, LinkEvidenceRequest } from '@/lib/types/questions';
+import { getQuestionEvidence, linkQuestionEvidence, removeQuestionEvidence } from '@/lib/api/questions';
 import {
   SpotifyTabCard,
   SpotifyTabCardHeader,
@@ -34,6 +36,12 @@ export function QuestionsTreeSection({ projectId, userId }: QuestionsTreeSection
   const [editingQuestion, setEditingQuestion] = useState<QuestionTreeNode | null>(null);
   const [parentQuestionId, setParentQuestionId] = useState<string | null>(null);
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
+
+  // Evidence linking state
+  const [isLinkEvidenceModalOpen, setIsLinkEvidenceModalOpen] = useState(false);
+  const [linkingQuestionId, setLinkingQuestionId] = useState<string | null>(null);
+  const [linkingQuestionText, setLinkingQuestionText] = useState<string>('');
+  const [evidenceByQuestion, setEvidenceByQuestion] = useState<Record<string, QuestionEvidence[]>>({});
 
   // Toggle expand/collapse
   const handleToggleExpand = useCallback((questionId: string) => {
@@ -91,6 +99,100 @@ export function QuestionsTreeSection({ projectId, userId }: QuestionsTreeSection
     } catch (err) {
       alert('Failed to delete question: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
+  };
+
+  // Handle link evidence
+  const handleLinkEvidence = (questionId: string) => {
+    const question = findQuestionById(questionTree, questionId);
+    if (question) {
+      setLinkingQuestionId(questionId);
+      setLinkingQuestionText(question.question_text);
+      setIsLinkEvidenceModalOpen(true);
+    }
+  };
+
+  // Handle remove evidence
+  const handleRemoveEvidence = async (questionId: string, evidenceId: string) => {
+    if (!confirm('Are you sure you want to remove this evidence link?')) {
+      return;
+    }
+
+    try {
+      await removeQuestionEvidence(questionId, evidenceId, userId);
+      // Refresh evidence for this question
+      loadEvidenceForQuestion(questionId);
+    } catch (err) {
+      alert('Failed to remove evidence: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    }
+  };
+
+  // Handle link evidence submit
+  const handleLinkEvidenceSubmit = async (evidenceRequests: LinkEvidenceRequest[]) => {
+    if (!linkingQuestionId) return;
+
+    try {
+      // Link all selected papers
+      for (const request of evidenceRequests) {
+        await linkQuestionEvidence(linkingQuestionId, request, userId);
+      }
+      // Refresh evidence for this question
+      loadEvidenceForQuestion(linkingQuestionId);
+    } catch (err) {
+      throw err; // Let modal handle the error
+    }
+  };
+
+  // Helper to find question by ID
+  const findQuestionById = (nodes: QuestionTreeNode[], id: string): QuestionTreeNode | null => {
+    for (const node of nodes) {
+      if (node.question_id === id) return node;
+      if (node.children) {
+        const found = findQuestionById(node.children, id);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  // Load evidence for a specific question
+  const loadEvidenceForQuestion = async (questionId: string) => {
+    try {
+      const evidence = await getQuestionEvidence(questionId, userId);
+      setEvidenceByQuestion(prev => ({
+        ...prev,
+        [questionId]: evidence
+      }));
+    } catch (err) {
+      console.error('Failed to load evidence:', err);
+    }
+  };
+
+  // Load evidence for all questions with evidence_count > 0
+  useEffect(() => {
+    const loadAllEvidence = async () => {
+      const questionsWithEvidence = getAllQuestionsWithEvidence(questionTree);
+      for (const questionId of questionsWithEvidence) {
+        loadEvidenceForQuestion(questionId);
+      }
+    };
+
+    if (questionTree.length > 0) {
+      loadAllEvidence();
+    }
+  }, [questionTree]);
+
+  // Helper to get all question IDs with evidence
+  const getAllQuestionsWithEvidence = (nodes: QuestionTreeNode[]): string[] => {
+    const ids: string[] = [];
+    for (const node of nodes) {
+      if (node.evidence_count > 0) {
+        ids.push(node.question_id);
+      }
+      if (node.children) {
+        ids.push(...getAllQuestionsWithEvidence(node.children));
+      }
+    }
+    return ids;
   };
 
   // Handle form submit
@@ -157,10 +259,13 @@ export function QuestionsTreeSection({ projectId, userId }: QuestionsTreeSection
           ) : (
             <QuestionTree
               questions={treeWithExpandState}
+              evidenceByQuestion={evidenceByQuestion}
               onEdit={handleEdit}
               onDelete={handleDelete}
               onAddSubQuestion={handleAddSubQuestion}
               onToggleExpand={handleToggleExpand}
+              onLinkEvidence={handleLinkEvidence}
+              onRemoveEvidence={handleRemoveEvidence}
             />
           )}
         </SpotifyTabCardContent>
@@ -175,6 +280,21 @@ export function QuestionsTreeSection({ projectId, userId }: QuestionsTreeSection
         parentQuestionId={parentQuestionId}
         projectId={projectId}
       />
+
+      {/* Link Evidence Modal */}
+      {isLinkEvidenceModalOpen && linkingQuestionId && (
+        <LinkEvidenceModal
+          questionId={linkingQuestionId}
+          questionText={linkingQuestionText}
+          projectId={projectId}
+          onClose={() => {
+            setIsLinkEvidenceModalOpen(false);
+            setLinkingQuestionId(null);
+            setLinkingQuestionText('');
+          }}
+          onLink={handleLinkEvidenceSubmit}
+        />
+      )}
     </>
   );
 }

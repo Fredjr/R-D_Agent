@@ -1,0 +1,326 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { 
+  XMarkIcon, 
+  MagnifyingGlassIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  MinusCircleIcon
+} from '@heroicons/react/24/outline';
+import { EvidenceType, LinkEvidenceRequest } from '@/lib/types/questions';
+import { SpotifyTabButton } from '@/components/project/shared/SpotifyTabButton';
+
+interface Article {
+  pmid: string;
+  title: string;
+  authors: string[];
+  journal?: string;
+  year?: number;
+}
+
+interface LinkEvidenceModalProps {
+  questionId: string;
+  questionText: string;
+  projectId: string;
+  onClose: () => void;
+  onLink: (evidence: LinkEvidenceRequest[]) => Promise<void>;
+}
+
+/**
+ * LinkEvidenceModal - Modal for linking papers to research questions
+ * Allows users to select papers, set evidence type, relevance score, and key findings
+ */
+export function LinkEvidenceModal({
+  questionId,
+  questionText,
+  projectId,
+  onClose,
+  onLink
+}: LinkEvidenceModalProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedPmids, setSelectedPmids] = useState<Set<string>>(new Set());
+  const [evidenceType, setEvidenceType] = useState<EvidenceType>('supports');
+  const [relevanceScore, setRelevanceScore] = useState(5);
+  const [keyFindings, setKeyFindings] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [isLoadingArticles, setIsLoadingArticles] = useState(true);
+
+  // Load articles from project (mock data for now - will integrate with real API)
+  useEffect(() => {
+    loadArticles();
+  }, [projectId]);
+
+  const loadArticles = async () => {
+    setIsLoadingArticles(true);
+    try {
+      // TODO: Replace with actual API call to get project articles
+      // For now, using mock data
+      const mockArticles: Article[] = [
+        {
+          pmid: '12345678',
+          title: 'Example Paper 1: Understanding the mechanisms of cellular signaling',
+          authors: ['Smith J', 'Johnson A', 'Williams B'],
+          journal: 'Nature',
+          year: 2023
+        },
+        {
+          pmid: '87654321',
+          title: 'Example Paper 2: Novel approaches to protein folding',
+          authors: ['Brown C', 'Davis D'],
+          journal: 'Science',
+          year: 2022
+        },
+        {
+          pmid: '11223344',
+          title: 'Example Paper 3: Advances in CRISPR technology',
+          authors: ['Garcia M', 'Martinez R', 'Lopez S'],
+          journal: 'Cell',
+          year: 2024
+        }
+      ];
+      setArticles(mockArticles);
+    } catch (error) {
+      console.error('Failed to load articles:', error);
+    } finally {
+      setIsLoadingArticles(false);
+    }
+  };
+
+  const togglePaperSelection = (pmid: string) => {
+    const newSelected = new Set(selectedPmids);
+    if (newSelected.has(pmid)) {
+      newSelected.delete(pmid);
+    } else {
+      newSelected.add(pmid);
+    }
+    setSelectedPmids(newSelected);
+  };
+
+  const handleLink = async () => {
+    if (selectedPmids.size === 0) {
+      alert('Please select at least one paper');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const evidenceRequests: LinkEvidenceRequest[] = Array.from(selectedPmids).map(pmid => ({
+        article_pmid: pmid,
+        evidence_type: evidenceType,
+        relevance_score: relevanceScore,
+        key_findings: keyFindings.trim() || undefined
+      }));
+
+      await onLink(evidenceRequests);
+      onClose();
+    } catch (error) {
+      console.error('Failed to link evidence:', error);
+      alert('Failed to link evidence. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Filter articles based on search query
+  const filteredArticles = articles.filter(article =>
+    article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    article.authors.some(author => author.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  const formatAuthors = (authors: string[]) => {
+    if (authors.length === 0) return 'Unknown authors';
+    if (authors.length === 1) return authors[0];
+    if (authors.length === 2) return `${authors[0]} & ${authors[1]}`;
+    return `${authors[0]} et al.`;
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+      <div className="bg-[var(--spotify-dark-gray)] rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-[var(--spotify-medium-gray)]">
+          <div className="flex-1 pr-4">
+            <h2 className="text-xl font-bold text-[var(--spotify-white)] mb-1">
+              Link Evidence to Question
+            </h2>
+            <p className="text-sm text-[var(--spotify-light-text)] line-clamp-2">
+              {questionText}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex-shrink-0 text-[var(--spotify-light-text)] hover:text-[var(--spotify-white)] transition-colors"
+          >
+            <XMarkIcon className="w-6 h-6" />
+          </button>
+        </div>
+
+        {/* Content - Scrollable */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Paper Selection */}
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--spotify-white)] mb-3">
+              📄 Select Papers ({selectedPmids.size} selected)
+            </h3>
+
+            {/* Search Bar */}
+            <div className="relative mb-3">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--spotify-light-text)]" />
+              <input
+                type="text"
+                placeholder="Search papers by title or author..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-[var(--spotify-medium-gray)] text-[var(--spotify-white)] rounded-lg border border-[var(--spotify-medium-gray)] focus:border-[var(--spotify-green)] focus:outline-none text-sm"
+              />
+            </div>
+
+            {/* Paper List */}
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {isLoadingArticles ? (
+                <div className="text-center py-8 text-[var(--spotify-light-text)]">
+                  Loading papers...
+                </div>
+              ) : filteredArticles.length === 0 ? (
+                <div className="text-center py-8 text-[var(--spotify-light-text)]">
+                  {searchQuery ? 'No papers match your search' : 'No papers available'}
+                </div>
+              ) : (
+                filteredArticles.map((article) => {
+                  const isSelected = selectedPmids.has(article.pmid);
+                  return (
+                    <button
+                      key={article.pmid}
+                      onClick={() => togglePaperSelection(article.pmid)}
+                      className={`w-full text-left p-3 rounded-lg border transition-all ${
+                        isSelected
+                          ? 'bg-[var(--spotify-green)]/20 border-[var(--spotify-green)]'
+                          : 'bg-[var(--spotify-medium-gray)] border-[var(--spotify-medium-gray)] hover:border-[var(--spotify-light-text)]'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {}}
+                          className="mt-1 w-4 h-4 text-[var(--spotify-green)] rounded focus:ring-[var(--spotify-green)]"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-sm font-medium text-[var(--spotify-white)] mb-1 line-clamp-2">
+                            {article.title}
+                          </h4>
+                          <p className="text-xs text-[var(--spotify-light-text)]">
+                            {formatAuthors(article.authors)}
+                            {article.journal && ` • ${article.journal}`}
+                            {article.year && ` • ${article.year}`}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Evidence Type */}
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--spotify-white)] mb-3">
+              📊 Evidence Type
+            </h3>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setEvidenceType('supports')}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border transition-all ${
+                  evidenceType === 'supports'
+                    ? 'bg-green-500/20 border-green-500 text-green-500'
+                    : 'bg-[var(--spotify-medium-gray)] border-[var(--spotify-medium-gray)] text-[var(--spotify-light-text)] hover:border-[var(--spotify-light-text)]'
+                }`}
+              >
+                <CheckCircleIcon className="w-5 h-5" />
+                <span className="text-sm font-medium">Supports</span>
+              </button>
+              <button
+                onClick={() => setEvidenceType('contradicts')}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border transition-all ${
+                  evidenceType === 'contradicts'
+                    ? 'bg-red-500/20 border-red-500 text-red-500'
+                    : 'bg-[var(--spotify-medium-gray)] border-[var(--spotify-medium-gray)] text-[var(--spotify-light-text)] hover:border-[var(--spotify-light-text)]'
+                }`}
+              >
+                <XCircleIcon className="w-5 h-5" />
+                <span className="text-sm font-medium">Contradicts</span>
+              </button>
+              <button
+                onClick={() => setEvidenceType('neutral')}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border transition-all ${
+                  evidenceType === 'neutral'
+                    ? 'bg-gray-500/20 border-gray-500 text-gray-500'
+                    : 'bg-[var(--spotify-medium-gray)] border-[var(--spotify-medium-gray)] text-[var(--spotify-light-text)] hover:border-[var(--spotify-light-text)]'
+                }`}
+              >
+                <MinusCircleIcon className="w-5 h-5" />
+                <span className="text-sm font-medium">Neutral</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Relevance Score */}
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--spotify-white)] mb-3">
+              ⭐ Relevance Score: {relevanceScore}/10
+            </h3>
+            <input
+              type="range"
+              min="1"
+              max="10"
+              value={relevanceScore}
+              onChange={(e) => setRelevanceScore(parseInt(e.target.value))}
+              className="w-full h-2 bg-[var(--spotify-medium-gray)] rounded-lg appearance-none cursor-pointer accent-[var(--spotify-green)]"
+            />
+            <div className="flex justify-between text-xs text-[var(--spotify-light-text)] mt-1">
+              <span>Low (1)</span>
+              <span>Medium (5)</span>
+              <span>High (10)</span>
+            </div>
+          </div>
+
+          {/* Key Findings */}
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--spotify-white)] mb-3">
+              📝 Key Findings (Optional)
+            </h3>
+            <textarea
+              value={keyFindings}
+              onChange={(e) => setKeyFindings(e.target.value)}
+              placeholder="Summarize the key findings from these papers that relate to your question..."
+              rows={4}
+              className="w-full px-4 py-3 bg-[var(--spotify-medium-gray)] text-[var(--spotify-white)] rounded-lg border border-[var(--spotify-medium-gray)] focus:border-[var(--spotify-green)] focus:outline-none text-sm resize-none"
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-[var(--spotify-medium-gray)]">
+          <SpotifyTabButton
+            onClick={onClose}
+            variant="secondary"
+            disabled={isLoading}
+          >
+            Cancel
+          </SpotifyTabButton>
+          <SpotifyTabButton
+            onClick={handleLink}
+            variant="primary"
+            disabled={isLoading || selectedPmids.size === 0}
+          >
+            {isLoading ? 'Linking...' : `Link ${selectedPmids.size} Paper${selectedPmids.size !== 1 ? 's' : ''}`}
+          </SpotifyTabButton>
+        </div>
+      </div>
+    </div>
+  );
+}
+

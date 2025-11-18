@@ -284,3 +284,105 @@ export async function getHypothesisEvidence(
   return response.json();
 }
 
+// ============================================================================
+// Evidence Linking API
+// ============================================================================
+
+/**
+ * Link evidence (paper) to a research question
+ */
+export async function linkQuestionEvidence(
+  questionId: string,
+  evidence: {
+    article_pmid: string;
+    evidence_type: 'supports' | 'contradicts' | 'neutral';
+    relevance_score: number;
+    key_findings?: string;
+  },
+  userId: string
+): Promise<any> {
+  const response = await fetch(`${API_BASE_URL}/questions/${questionId}/evidence`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'User-ID': userId
+    },
+    body: JSON.stringify(evidence)
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to link evidence: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Remove evidence link from a research question
+ */
+export async function removeQuestionEvidence(
+  questionId: string,
+  evidenceId: string,
+  userId: string
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/questions/${questionId}/evidence/${evidenceId}`, {
+    method: 'DELETE',
+    headers: {
+      'User-ID': userId
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to remove evidence: ${response.statusText}`);
+  }
+}
+
+/**
+ * Link evidence (paper) to a hypothesis
+ */
+export async function linkHypothesisEvidence(
+  hypothesisId: string,
+  evidence: {
+    article_pmid: string;
+    evidence_strength: 'weak' | 'moderate' | 'strong';
+    supports_hypothesis: boolean;
+    key_findings?: string;
+  },
+  userId: string
+): Promise<any> {
+  const response = await fetch(`${API_BASE_URL}/hypotheses/${hypothesisId}/evidence`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'User-ID': userId
+    },
+    body: JSON.stringify(evidence)
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to link hypothesis evidence: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Remove evidence link from a hypothesis
+ */
+export async function removeHypothesisEvidence(
+  hypothesisId: string,
+  evidenceId: string,
+  userId: string
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/hypotheses/${hypothesisId}/evidence/${evidenceId}`, {
+    method: 'DELETE',
+    headers: {
+      'User-ID': userId
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to remove hypothesis evidence: ${response.statusText}`);
+  }
+}
+

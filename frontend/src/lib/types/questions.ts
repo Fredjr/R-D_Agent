@@ -99,6 +99,60 @@ export interface QuestionTreeNode extends ResearchQuestion {
   isExpanded?: boolean;
 }
 
+// ============================================================================
+// Evidence Types
+// ============================================================================
+
+export type EvidenceType = 'supports' | 'contradicts' | 'neutral';
+
+export interface QuestionEvidence {
+  evidence_id: string;
+  question_id: string;
+  article_pmid: string;
+  evidence_type: EvidenceType;
+  relevance_score: number; // 1-10
+  key_findings?: string;
+  added_by: string;
+  added_at: string;
+
+  // Populated from Article table (joined data)
+  article_title?: string;
+  article_authors?: string[];
+  article_journal?: string;
+  article_year?: number;
+}
+
+export interface LinkEvidenceRequest {
+  article_pmid: string;
+  evidence_type: EvidenceType;
+  relevance_score: number;
+  key_findings?: string;
+}
+
+export interface HypothesisEvidence {
+  evidence_id: string;
+  hypothesis_id: string;
+  article_pmid: string;
+  evidence_strength: 'weak' | 'moderate' | 'strong';
+  supports_hypothesis: boolean;
+  key_findings?: string;
+  added_by: string;
+  added_at: string;
+
+  // Populated from Article table (joined data)
+  article_title?: string;
+  article_authors?: string[];
+  article_journal?: string;
+  article_year?: number;
+}
+
+export interface LinkHypothesisEvidenceRequest {
+  article_pmid: string;
+  evidence_strength: 'weak' | 'moderate' | 'strong';
+  supports_hypothesis: boolean;
+  key_findings?: string;
+}
+
 export interface QuestionFormData {
   question_text: string;
   question_type: QuestionType;
