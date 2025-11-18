@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import type { Hypothesis } from '@/lib/types/questions';
+import type { Hypothesis, HypothesisType, HypothesisStatus } from '@/lib/types/questions';
 import { HypothesisCard } from './HypothesisCard';
 import { AddHypothesisModal } from './AddHypothesisModal';
 import {
@@ -15,8 +15,7 @@ import {
   deleteHypothesis
 } from '@/lib/api/questions';
 import { PlusIcon } from '@heroicons/react/24/outline';
-import { SpotifyTabLoading } from '../shared/SpotifyTabLoading';
-import { SpotifyTabEmptyState } from '../shared/SpotifyTabEmptyState';
+import { SpotifyTabLoading, SpotifyTabEmptyState } from '../shared';
 
 interface HypothesesSectionProps {
   questionId: string;
@@ -62,9 +61,9 @@ export function HypothesesSection({
   // Handle create
   const handleCreate = async (data: {
     hypothesis_text: string;
-    hypothesis_type: string;
+    hypothesis_type: HypothesisType;
     description?: string;
-    status: string;
+    status: HypothesisStatus;
     confidence_level: number;
   }) => {
     await createHypothesis(
@@ -89,9 +88,9 @@ export function HypothesesSection({
   // Handle update
   const handleUpdate = async (data: {
     hypothesis_text: string;
-    hypothesis_type: string;
+    hypothesis_type: HypothesisType;
     description?: string;
-    status: string;
+    status: HypothesisStatus;
     confidence_level: number;
   }) => {
     if (!editingHypothesis) return;
@@ -114,7 +113,7 @@ export function HypothesesSection({
   // Handle status update
   const handleStatusUpdate = async (hypothesisId: string, status: string) => {
     try {
-      await updateHypothesis(hypothesisId, { status }, userId);
+      await updateHypothesis(hypothesisId, { status: status as HypothesisStatus }, userId);
       await loadHypotheses();
     } catch (err) {
       console.error('Failed to update status:', err);
@@ -153,12 +152,13 @@ export function HypothesesSection({
       {/* Hypotheses list */}
       {hypotheses.length === 0 ? (
         <SpotifyTabEmptyState
+          icon="💡"
           title="No hypotheses yet"
           description="Add your first hypothesis to start testing ideas"
           action={{
             label: 'Add Hypothesis',
             onClick: () => setIsAddModalOpen(true),
-            icon: PlusIcon
+            icon: <PlusIcon className="w-5 h-5" />
           }}
         />
       ) : (
