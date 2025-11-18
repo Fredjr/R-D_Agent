@@ -103,7 +103,7 @@ export interface QuestionTreeNode extends ResearchQuestion {
 // Evidence Types
 // ============================================================================
 
-export type EvidenceType = 'supports' | 'contradicts' | 'neutral';
+export type EvidenceType = 'supports' | 'contradicts' | 'neutral' | 'context' | 'methodology';
 
 export interface QuestionEvidence {
   evidence_id: string;
@@ -111,7 +111,7 @@ export interface QuestionEvidence {
   article_pmid: string;
   evidence_type: EvidenceType;
   relevance_score: number; // 1-10
-  key_findings?: string;
+  key_finding?: string;
   added_by: string;
   added_at: string;
 
@@ -126,7 +126,7 @@ export interface LinkEvidenceRequest {
   article_pmid: string;
   evidence_type: EvidenceType;
   relevance_score: number;
-  key_findings?: string;
+  key_finding?: string;
 }
 
 export interface HypothesisEvidence {

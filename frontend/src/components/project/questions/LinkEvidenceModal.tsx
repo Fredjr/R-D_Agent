@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  XMarkIcon, 
+import {
+  XMarkIcon,
   MagnifyingGlassIcon,
   CheckCircleIcon,
   XCircleIcon,
-  MinusCircleIcon
+  MinusCircleIcon,
+  DocumentTextIcon,
+  BeakerIcon
 } from '@heroicons/react/24/outline';
 import { EvidenceType, LinkEvidenceRequest } from '@/lib/types/questions';
 import { SpotifyTabButton } from '@/components/project/shared/SpotifyTabButton';
@@ -110,7 +112,7 @@ export function LinkEvidenceModal({
         article_pmid: pmid,
         evidence_type: evidenceType,
         relevance_score: relevanceScore,
-        key_findings: keyFindings.trim() || undefined
+        key_finding: keyFindings.trim() || undefined
       }));
 
       await onLink(evidenceRequests);
@@ -230,10 +232,10 @@ export function LinkEvidenceModal({
             <h3 className="text-sm font-semibold text-[var(--spotify-white)] mb-3">
               📊 Evidence Type
             </h3>
-            <div className="flex gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <button
                 onClick={() => setEvidenceType('supports')}
-                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border transition-all ${
+                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg border transition-all ${
                   evidenceType === 'supports'
                     ? 'bg-green-500/20 border-green-500 text-green-500'
                     : 'bg-[var(--spotify-medium-gray)] border-[var(--spotify-medium-gray)] text-[var(--spotify-light-text)] hover:border-[var(--spotify-light-text)]'
@@ -244,7 +246,7 @@ export function LinkEvidenceModal({
               </button>
               <button
                 onClick={() => setEvidenceType('contradicts')}
-                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border transition-all ${
+                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg border transition-all ${
                   evidenceType === 'contradicts'
                     ? 'bg-red-500/20 border-red-500 text-red-500'
                     : 'bg-[var(--spotify-medium-gray)] border-[var(--spotify-medium-gray)] text-[var(--spotify-light-text)] hover:border-[var(--spotify-light-text)]'
@@ -255,7 +257,7 @@ export function LinkEvidenceModal({
               </button>
               <button
                 onClick={() => setEvidenceType('neutral')}
-                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border transition-all ${
+                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg border transition-all ${
                   evidenceType === 'neutral'
                     ? 'bg-gray-500/20 border-gray-500 text-gray-500'
                     : 'bg-[var(--spotify-medium-gray)] border-[var(--spotify-medium-gray)] text-[var(--spotify-light-text)] hover:border-[var(--spotify-light-text)]'
@@ -263,6 +265,28 @@ export function LinkEvidenceModal({
               >
                 <MinusCircleIcon className="w-5 h-5" />
                 <span className="text-sm font-medium">Neutral</span>
+              </button>
+              <button
+                onClick={() => setEvidenceType('context')}
+                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg border transition-all ${
+                  evidenceType === 'context'
+                    ? 'bg-purple-500/20 border-purple-500 text-purple-500'
+                    : 'bg-[var(--spotify-medium-gray)] border-[var(--spotify-medium-gray)] text-[var(--spotify-light-text)] hover:border-[var(--spotify-light-text)]'
+                }`}
+              >
+                <DocumentTextIcon className="w-5 h-5" />
+                <span className="text-sm font-medium">Context</span>
+              </button>
+              <button
+                onClick={() => setEvidenceType('methodology')}
+                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg border transition-all ${
+                  evidenceType === 'methodology'
+                    ? 'bg-indigo-500/20 border-indigo-500 text-indigo-500'
+                    : 'bg-[var(--spotify-medium-gray)] border-[var(--spotify-medium-gray)] text-[var(--spotify-light-text)] hover:border-[var(--spotify-light-text)]'
+                }`}
+              >
+                <BeakerIcon className="w-5 h-5" />
+                <span className="text-sm font-medium">Methodology</span>
               </button>
             </div>
           </div>

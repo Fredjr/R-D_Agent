@@ -1,12 +1,13 @@
 'use client';
 
 import React from 'react';
-import { 
-  DocumentTextIcon, 
+import {
+  DocumentTextIcon,
   TrashIcon,
   CheckCircleIcon,
   XCircleIcon,
-  MinusCircleIcon
+  MinusCircleIcon,
+  BeakerIcon
 } from '@heroicons/react/24/outline';
 import { QuestionEvidence } from '@/lib/types/questions';
 import { SpotifyTabCard } from '@/components/project/shared/SpotifyTabCard';
@@ -56,6 +57,22 @@ export function EvidenceCard({
           color: 'text-gray-500',
           bgColor: 'bg-gray-500/10',
           borderColor: 'border-gray-500/20'
+        };
+      case 'context':
+        return {
+          icon: <DocumentTextIcon className="w-4 h-4" />,
+          label: 'Context',
+          color: 'text-purple-500',
+          bgColor: 'bg-purple-500/10',
+          borderColor: 'border-purple-500/20'
+        };
+      case 'methodology':
+        return {
+          icon: <BeakerIcon className="w-4 h-4" />,
+          label: 'Methodology',
+          color: 'text-indigo-500',
+          bgColor: 'bg-indigo-500/10',
+          borderColor: 'border-indigo-500/20'
         };
       default:
         return {
@@ -131,11 +148,11 @@ export function EvidenceCard({
           </div>
 
           {/* Key Findings */}
-          {!compact && evidence.key_findings && (
+          {!compact && evidence.key_finding && (
             <div className="mt-2 p-2 bg-[var(--spotify-medium-gray)] rounded-md">
               <p className="text-xs text-[var(--spotify-light-text)] mb-1 font-medium">💡 Key Findings:</p>
               <p className="text-xs text-[var(--spotify-white)] line-clamp-3">
-                {evidence.key_findings}
+                {evidence.key_finding}
               </p>
             </div>
           )}

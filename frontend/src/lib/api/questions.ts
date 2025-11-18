@@ -67,6 +67,8 @@ export async function createQuestion(
   data: QuestionCreateInput,
   userId: string
 ): Promise<ResearchQuestion> {
+  console.log('[API] Creating question:', { data, userId });
+
   const response = await fetch(`${API_BASE_URL}/questions`, {
     method: 'POST',
     headers: {
@@ -76,12 +78,21 @@ export async function createQuestion(
     body: JSON.stringify(data)
   });
 
+  console.log('[API] Response status:', response.status, response.statusText);
+
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: response.statusText }));
+    console.error('[API] Error creating question:', {
+      status: response.status,
+      error,
+      data
+    });
     throw new Error(error.detail || 'Failed to create question');
   }
 
-  return response.json();
+  const result = await response.json();
+  console.log('[API] Question created successfully:', result.question_id);
+  return result;
 }
 
 /**
@@ -92,6 +103,8 @@ export async function updateQuestion(
   data: QuestionUpdateInput,
   userId: string
 ): Promise<ResearchQuestion> {
+  console.log('[API] Updating question:', { questionId, data, userId });
+
   const response = await fetch(`${API_BASE_URL}/questions/${questionId}`, {
     method: 'PUT',
     headers: {
@@ -101,12 +114,22 @@ export async function updateQuestion(
     body: JSON.stringify(data)
   });
 
+  console.log('[API] Response status:', response.status, response.statusText);
+
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: response.statusText }));
+    console.error('[API] Error updating question:', {
+      status: response.status,
+      error,
+      questionId,
+      data
+    });
     throw new Error(error.detail || 'Failed to update question');
   }
 
-  return response.json();
+  const result = await response.json();
+  console.log('[API] Question updated successfully:', questionId);
+  return result;
 }
 
 /**
@@ -116,6 +139,8 @@ export async function deleteQuestion(
   questionId: string,
   userId: string
 ): Promise<void> {
+  console.log('[API] Deleting question:', { questionId, userId });
+
   const response = await fetch(`${API_BASE_URL}/questions/${questionId}`, {
     method: 'DELETE',
     headers: {
@@ -123,9 +148,17 @@ export async function deleteQuestion(
     }
   });
 
+  console.log('[API] Response status:', response.status, response.statusText);
+
   if (!response.ok) {
+    console.error('[API] Error deleting question:', {
+      status: response.status,
+      questionId
+    });
     throw new Error(`Failed to delete question: ${response.statusText}`);
   }
+
+  console.log('[API] Question deleted successfully:', questionId);
 }
 
 // ============================================================================
@@ -179,6 +212,8 @@ export async function createHypothesis(
   data: HypothesisCreateInput,
   userId: string
 ): Promise<Hypothesis> {
+  console.log('[API] Creating hypothesis:', { data, userId });
+
   const response = await fetch(`${API_BASE_URL}/hypotheses`, {
     method: 'POST',
     headers: {
@@ -188,12 +223,21 @@ export async function createHypothesis(
     body: JSON.stringify(data)
   });
 
+  console.log('[API] Response status:', response.status, response.statusText);
+
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: response.statusText }));
+    console.error('[API] Error creating hypothesis:', {
+      status: response.status,
+      error,
+      data
+    });
     throw new Error(error.detail || 'Failed to create hypothesis');
   }
 
-  return response.json();
+  const result = await response.json();
+  console.log('[API] Hypothesis created successfully:', result.hypothesis_id);
+  return result;
 }
 
 /**
@@ -204,6 +248,8 @@ export async function updateHypothesis(
   data: HypothesisUpdateInput,
   userId: string
 ): Promise<Hypothesis> {
+  console.log('[API] Updating hypothesis:', { hypothesisId, data, userId });
+
   const response = await fetch(`${API_BASE_URL}/hypotheses/${hypothesisId}`, {
     method: 'PUT',
     headers: {
@@ -213,12 +259,22 @@ export async function updateHypothesis(
     body: JSON.stringify(data)
   });
 
+  console.log('[API] Response status:', response.status, response.statusText);
+
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: response.statusText }));
+    console.error('[API] Error updating hypothesis:', {
+      status: response.status,
+      error,
+      hypothesisId,
+      data
+    });
     throw new Error(error.detail || 'Failed to update hypothesis');
   }
 
-  return response.json();
+  const result = await response.json();
+  console.log('[API] Hypothesis updated successfully:', hypothesisId);
+  return result;
 }
 
 /**
@@ -228,6 +284,8 @@ export async function deleteHypothesis(
   hypothesisId: string,
   userId: string
 ): Promise<void> {
+  console.log('[API] Deleting hypothesis:', { hypothesisId, userId });
+
   const response = await fetch(`${API_BASE_URL}/hypotheses/${hypothesisId}`, {
     method: 'DELETE',
     headers: {
@@ -235,9 +293,17 @@ export async function deleteHypothesis(
     }
   });
 
+  console.log('[API] Response status:', response.status, response.statusText);
+
   if (!response.ok) {
+    console.error('[API] Error deleting hypothesis:', {
+      status: response.status,
+      hypothesisId
+    });
     throw new Error(`Failed to delete hypothesis: ${response.statusText}`);
   }
+
+  console.log('[API] Hypothesis deleted successfully:', hypothesisId);
 }
 
 // ============================================================================
@@ -297,10 +363,12 @@ export async function linkQuestionEvidence(
     article_pmid: string;
     evidence_type: 'supports' | 'contradicts' | 'neutral';
     relevance_score: number;
-    key_findings?: string;
+    key_finding?: string;
   },
   userId: string
 ): Promise<any> {
+  console.log('[API] Linking question evidence:', { questionId, evidence, userId });
+
   const response = await fetch(`${API_BASE_URL}/questions/${questionId}/evidence`, {
     method: 'POST',
     headers: {
@@ -310,11 +378,22 @@ export async function linkQuestionEvidence(
     body: JSON.stringify(evidence)
   });
 
+  console.log('[API] Response status:', response.status, response.statusText);
+
   if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: response.statusText }));
+    console.error('[API] Error linking question evidence:', {
+      status: response.status,
+      error,
+      questionId,
+      evidence
+    });
     throw new Error(`Failed to link evidence: ${response.statusText}`);
   }
 
-  return response.json();
+  const result = await response.json();
+  console.log('[API] Question evidence linked successfully');
+  return result;
 }
 
 /**
@@ -350,6 +429,8 @@ export async function linkHypothesisEvidence(
   },
   userId: string
 ): Promise<any> {
+  console.log('[API] Linking hypothesis evidence:', { hypothesisId, evidence, userId });
+
   const response = await fetch(`${API_BASE_URL}/hypotheses/${hypothesisId}/evidence`, {
     method: 'POST',
     headers: {
@@ -359,11 +440,22 @@ export async function linkHypothesisEvidence(
     body: JSON.stringify(evidence)
   });
 
+  console.log('[API] Response status:', response.status, response.statusText);
+
   if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: response.statusText }));
+    console.error('[API] Error linking hypothesis evidence:', {
+      status: response.status,
+      error,
+      hypothesisId,
+      evidence
+    });
     throw new Error(`Failed to link hypothesis evidence: ${response.statusText}`);
   }
 
-  return response.json();
+  const result = await response.json();
+  console.log('[API] Hypothesis evidence linked successfully');
+  return result;
 }
 
 /**
