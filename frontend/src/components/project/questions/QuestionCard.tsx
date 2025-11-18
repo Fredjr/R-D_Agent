@@ -147,20 +147,24 @@ export function QuestionCard({
                 </button>
               )}
 
-              {/* Hypothesis Count - Clickable */}
-              {question.hypothesis_count > 0 && (
-                <button
-                  onClick={() => setShowHypotheses(!showHypotheses)}
-                  className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition-colors"
-                >
-                  <LightBulbIcon className="w-3 h-3" />
-                  {question.hypothesis_count} hypotheses
-                  <ChevronDownIcon className={cn(
-                    "w-3 h-3 transition-transform",
-                    showHypotheses && "rotate-180"
-                  )} />
-                </button>
-              )}
+              {/* Hypothesis Count/Button - Always visible */}
+              <button
+                onClick={() => setShowHypotheses(!showHypotheses)}
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition-colors"
+              >
+                <LightBulbIcon className="w-3 h-3" />
+                {question.hypothesis_count > 0 ? (
+                  <>
+                    {question.hypothesis_count} hypotheses
+                    <ChevronDownIcon className={cn(
+                      "w-3 h-3 transition-transform",
+                      showHypotheses && "rotate-180"
+                    )} />
+                  </>
+                ) : (
+                  'Add Hypothesis'
+                )}
+              </button>
 
               {/* Question Type */}
               <span className="px-2 py-1 rounded-md text-xs font-medium bg-[var(--spotify-light-gray)] text-[var(--spotify-light-text)]">
@@ -252,8 +256,8 @@ export function QuestionCard({
           </div>
         )}
 
-        {/* Hypotheses Section */}
-        {showHypotheses && question.hypothesis_count > 0 && (
+        {/* Hypotheses Section - Always show when expanded */}
+        {showHypotheses && (
           <div className="mt-4 pt-4 border-t border-[var(--spotify-border-gray)]">
             <HypothesesSection
               questionId={question.question_id}
