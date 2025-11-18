@@ -87,9 +87,20 @@ class HypothesisEvidenceResponse(BaseModel):
     key_finding: Optional[str]
     added_by: str
     added_at: datetime
-    
+
     class Config:
         from_attributes = True
+
+    @property
+    def evidence_id(self) -> str:
+        """Alias for id (for frontend compatibility)"""
+        return str(self.id)
+
+    def model_dump(self, **kwargs):
+        """Override to include evidence_id in serialization"""
+        data = super().model_dump(**kwargs)
+        data['evidence_id'] = str(self.id)
+        return data
 
 
 # =============================================================================
