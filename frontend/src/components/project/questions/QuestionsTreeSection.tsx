@@ -148,15 +148,11 @@ export function QuestionsTreeSection({ projectId, userId }: QuestionsTreeSection
               icon="🌳"
               title="No questions yet"
               description="Start organizing your research by adding your first question"
-              action={
-                <SpotifyTabButton
-                  onClick={handleAddQuestion}
-                  icon={<PlusIcon />}
-                  variant="primary"
-                >
-                  Add Your First Question
-                </SpotifyTabButton>
-              }
+              action={{
+                label: 'Add Your First Question',
+                onClick: handleAddQuestion,
+                icon: <PlusIcon className="w-5 h-5" />
+              }}
             />
           ) : (
             <QuestionTree
