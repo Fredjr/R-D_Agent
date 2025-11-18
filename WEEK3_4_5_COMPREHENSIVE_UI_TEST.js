@@ -327,7 +327,6 @@
 
   // Test 1.4: Fill Question Form
   logTest('Fill Question Form - Main Question');
-  let questionFormFilled = true;
 
   // Find and fill question text input
   const questionInput = document.querySelector('input[type="text"]') ||
@@ -342,16 +341,15 @@
     logPass(`Question text filled: "${CONFIG.testData.mainQuestion}"`);
   } else {
     logFail('Question text input not found');
-    questionFormFilled = false;
   }
 
   // Test 1.5: Select Question Status
   logTest('Select Question Status');
-  const statusSelect = document.querySelector('select[name="status"]') ||
+  const questionStatusSelect = document.querySelector('select[name="status"]') ||
                       Array.from(document.querySelectorAll('select')).find(s =>
                         s.previousElementSibling?.textContent?.includes('Status')
                       );
-  if (statusSelect) {
+  if (questionStatusSelect) {
     await selectOption('select[name="status"]', 'active', 'Question Status');
   } else {
     logInfo('Status select not found (may be optional)');
@@ -399,11 +397,11 @@
 
   // Test 1.8: Verify Question Card Elements
   logTest('Verify Question Card Elements');
-  const questionCard = findByText(CONFIG.testData.mainQuestion);
-  if (questionCard) {
-    const card = questionCard.closest('[class*="card"]') ||
-                questionCard.closest('div[class*="border"]') ||
-                questionCard.parentElement;
+  let questionCardForVerify = findByText(CONFIG.testData.mainQuestion);
+  if (questionCardForVerify) {
+    const card = questionCardForVerify.closest('[class*="card"]') ||
+                questionCardForVerify.closest('div[class*="border"]') ||
+                questionCardForVerify.parentElement;
 
     // Check for status badge
     const statusBadge = card?.querySelector('[class*="badge"]') ||
@@ -470,9 +468,9 @@
 
   // Test 1.10: Edit Question
   logTest('Edit Question');
-  const questionCard2 = findByText(CONFIG.testData.mainQuestion);
-  if (questionCard2) {
-    const card = questionCard2.closest('[class*="card"]') || questionCard2.parentElement;
+  let questionCardForEdit = findByText(CONFIG.testData.mainQuestion);
+  if (questionCardForEdit) {
+    const card = questionCardForEdit.closest('[class*="card"]') || questionCardForEdit.parentElement;
     const editBtn = Array.from(card?.querySelectorAll('button') || []).find(b =>
       b.textContent.includes('Edit') ||
       b.getAttribute('aria-label')?.includes('Edit') ||
@@ -629,10 +627,10 @@
 
   // Test 2.7: View Evidence List
   logTest('View Evidence List');
-  const evidenceBadge = findByText('evidence') || findByText('Evidence');
-  if (evidenceBadge) {
+  let evidenceBadgeForView = findByText('evidence') || findByText('Evidence');
+  if (evidenceBadgeForView) {
     // Click to expand evidence section
-    const clickableElement = evidenceBadge.closest('button') || evidenceBadge;
+    const clickableElement = evidenceBadgeForView.closest('button') || evidenceBadgeForView;
     if (await clickElement(clickableElement, 'Evidence Badge')) {
       await sleep(500);
 
@@ -650,8 +648,8 @@
 
   // Test 2.8: Link Contradicting Evidence
   logTest('Link Contradicting Evidence');
-  const linkEvidenceBtn2 = findButton('Link Evidence') || findButton('Add Evidence');
-  if (await clickElement(linkEvidenceBtn2, 'Link Evidence Button (2nd time)')) {
+  let linkEvidenceBtnContradict = findButton('Link Evidence') || findButton('Add Evidence');
+  if (await clickElement(linkEvidenceBtnContradict, 'Link Evidence Button (2nd time)')) {
     await sleep(500);
 
     // Fill PMID
@@ -777,10 +775,10 @@
 
   // Test 3.2: Open Add Hypothesis Modal
   logTest('Open Add Hypothesis Modal');
-  const addHypothesisBtn = findButton('Add Hypothesis') ||
+  let addHypothesisBtnCreate = findButton('Add Hypothesis') ||
                           findButton('Create Hypothesis') ||
                           findButton('New Hypothesis');
-  if (await clickElement(addHypothesisBtn, 'Add Hypothesis Button')) {
+  if (await clickElement(addHypothesisBtnCreate, 'Add Hypothesis Button')) {
     await sleep(500);
 
     const modal = document.querySelector('[role="dialog"]') ||
@@ -844,13 +842,13 @@
 
   // Test 3.6: Select Hypothesis Status - Testing
   logTest('Select Hypothesis Status - Testing');
-  const statusSelect = document.querySelector('select[name="status"]') ||
+  const hypothesisStatusSelect = document.querySelector('select[name="status"]') ||
                       Array.from(document.querySelectorAll('select')).find(s =>
                         s.previousElementSibling?.textContent?.includes('Status')
                       );
-  if (statusSelect) {
-    statusSelect.value = CONFIG.testData.hypothesis.status;
-    statusSelect.dispatchEvent(new Event('change', { bubbles: true }));
+  if (hypothesisStatusSelect) {
+    hypothesisStatusSelect.value = CONFIG.testData.hypothesis.status;
+    hypothesisStatusSelect.dispatchEvent(new Event('change', { bubbles: true }));
     await sleep(100);
     logPass(`Hypothesis status selected: ${CONFIG.testData.hypothesis.status}`);
   } else {
@@ -905,11 +903,11 @@
 
   // Test 3.9: Verify Hypothesis Card Elements
   logTest('Verify Hypothesis Card Elements');
-  const hypothesisCard = findByText(CONFIG.testData.hypothesis.text);
-  if (hypothesisCard) {
-    const card = hypothesisCard.closest('[class*="card"]') ||
-                hypothesisCard.closest('div[class*="border"]') ||
-                hypothesisCard.parentElement;
+  let hypothesisCardVerify = findByText(CONFIG.testData.hypothesis.text);
+  if (hypothesisCardVerify) {
+    const card = hypothesisCardVerify.closest('[class*="card"]') ||
+                hypothesisCardVerify.closest('div[class*="border"]') ||
+                hypothesisCardVerify.parentElement;
 
     // Check for status badge
     const statusBadge = Array.from(card?.querySelectorAll('[class*="badge"]') || []).find(b =>
