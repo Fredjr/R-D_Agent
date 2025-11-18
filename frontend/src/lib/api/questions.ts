@@ -361,7 +361,7 @@ export async function linkQuestionEvidence(
   questionId: string,
   evidence: {
     article_pmid: string;
-    evidence_type: 'supports' | 'contradicts' | 'neutral';
+    evidence_type: 'supports' | 'contradicts' | 'neutral' | 'context' | 'methodology';
     relevance_score: number;
     key_finding?: string;
   },
