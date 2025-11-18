@@ -133,9 +133,9 @@ export interface HypothesisEvidence {
   evidence_id: string;
   hypothesis_id: string;
   article_pmid: string;
-  evidence_strength: 'weak' | 'moderate' | 'strong';
-  supports_hypothesis: boolean;
-  key_findings?: string;
+  evidence_type: 'supports' | 'contradicts' | 'neutral';
+  strength: 'weak' | 'moderate' | 'strong';
+  key_finding?: string;
   added_by: string;
   added_at: string;
 
@@ -148,9 +148,9 @@ export interface HypothesisEvidence {
 
 export interface LinkHypothesisEvidenceRequest {
   article_pmid: string;
-  evidence_strength: 'weak' | 'moderate' | 'strong';
-  supports_hypothesis: boolean;
-  key_findings?: string;
+  evidence_type: 'supports' | 'contradicts' | 'neutral';
+  strength: 'weak' | 'moderate' | 'strong';
+  key_finding?: string;
 }
 
 export interface QuestionFormData {

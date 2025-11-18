@@ -260,6 +260,8 @@ export function QuestionsTreeSection({ projectId, userId }: QuestionsTreeSection
             <QuestionTree
               questions={treeWithExpandState}
               evidenceByQuestion={evidenceByQuestion}
+              projectId={projectId}
+              userId={userId}
               onEdit={handleEdit}
               onDelete={handleDelete}
               onAddSubQuestion={handleAddSubQuestion}

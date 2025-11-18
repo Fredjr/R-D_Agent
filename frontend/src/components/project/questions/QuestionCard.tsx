@@ -13,10 +13,13 @@ import {
 } from '@heroicons/react/24/outline';
 import { cn } from '@/lib/utils';
 import type { QuestionTreeNode, QuestionStatus, QuestionPriority, QuestionEvidence } from '@/lib/types/questions';
+import { HypothesesSection } from './HypothesesSection';
 
 interface QuestionCardProps {
   question: QuestionTreeNode;
   evidence?: QuestionEvidence[];
+  projectId: string;
+  userId: string;
   onEdit: (question: QuestionTreeNode) => void;
   onDelete: (questionId: string) => void;
   onAddSubQuestion: (parentId: string) => void;
@@ -24,6 +27,7 @@ interface QuestionCardProps {
   onLinkEvidence?: (questionId: string) => void;
   onRemoveEvidence?: (questionId: string, evidenceId: string) => void;
   onViewPaper?: (pmid: string) => void;
+  onLinkHypothesisEvidence?: (hypothesisId: string) => void;
 }
 
 const statusColors: Record<QuestionStatus, string> = {
@@ -50,16 +54,20 @@ const statusLabels: Record<QuestionStatus, string> = {
 export function QuestionCard({
   question,
   evidence = [],
+  projectId,
+  userId,
   onEdit,
   onDelete,
   onAddSubQuestion,
   onToggleExpand,
   onLinkEvidence,
   onRemoveEvidence,
-  onViewPaper
+  onViewPaper,
+  onLinkHypothesisEvidence
 }: QuestionCardProps) {
   const [showActions, setShowActions] = useState(false);
   const [showEvidence, setShowEvidence] = useState(false);
+  const [showHypotheses, setShowHypotheses] = useState(false);
   const hasChildren = question.children && question.children.length > 0;
   const hasEvidence = evidence.length > 0;
 
@@ -139,12 +147,19 @@ export function QuestionCard({
                 </button>
               )}
 
-              {/* Hypothesis Count */}
+              {/* Hypothesis Count - Clickable */}
               {question.hypothesis_count > 0 && (
-                <span className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-cyan-500/20 text-cyan-400">
+                <button
+                  onClick={() => setShowHypotheses(!showHypotheses)}
+                  className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition-colors"
+                >
                   <LightBulbIcon className="w-3 h-3" />
                   {question.hypothesis_count} hypotheses
-                </span>
+                  <ChevronDownIcon className={cn(
+                    "w-3 h-3 transition-transform",
+                    showHypotheses && "rotate-180"
+                  )} />
+                </button>
               )}
 
               {/* Question Type */}
@@ -234,6 +249,19 @@ export function QuestionCard({
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Hypotheses Section */}
+        {showHypotheses && question.hypothesis_count > 0 && (
+          <div className="mt-4 pt-4 border-t border-[var(--spotify-border-gray)]">
+            <HypothesesSection
+              questionId={question.question_id}
+              questionText={question.question_text}
+              projectId={projectId}
+              userId={userId}
+              onLinkEvidence={onLinkHypothesisEvidence}
+            />
           </div>
         )}
       </div>

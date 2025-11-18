@@ -7,6 +7,8 @@ import type { QuestionTreeNode, QuestionEvidence } from '@/lib/types/questions';
 interface QuestionTreeProps {
   questions: QuestionTreeNode[];
   evidenceByQuestion?: Record<string, QuestionEvidence[]>;
+  projectId: string;
+  userId: string;
   onEdit: (question: QuestionTreeNode) => void;
   onDelete: (questionId: string) => void;
   onAddSubQuestion: (parentId: string) => void;
@@ -14,6 +16,7 @@ interface QuestionTreeProps {
   onLinkEvidence?: (questionId: string) => void;
   onRemoveEvidence?: (questionId: string, evidenceId: string) => void;
   onViewPaper?: (pmid: string) => void;
+  onLinkHypothesisEvidence?: (hypothesisId: string) => void;
 }
 
 /**
@@ -22,13 +25,16 @@ interface QuestionTreeProps {
 export function QuestionTree({
   questions,
   evidenceByQuestion = {},
+  projectId,
+  userId,
   onEdit,
   onDelete,
   onAddSubQuestion,
   onToggleExpand,
   onLinkEvidence,
   onRemoveEvidence,
-  onViewPaper
+  onViewPaper,
+  onLinkHypothesisEvidence
 }: QuestionTreeProps) {
   if (!questions || questions.length === 0) {
     return null;
@@ -42,6 +48,8 @@ export function QuestionTree({
           <QuestionCard
             question={question}
             evidence={evidenceByQuestion[question.question_id] || []}
+            projectId={projectId}
+            userId={userId}
             onEdit={onEdit}
             onDelete={onDelete}
             onAddSubQuestion={onAddSubQuestion}
@@ -49,6 +57,7 @@ export function QuestionTree({
             onLinkEvidence={onLinkEvidence}
             onRemoveEvidence={onRemoveEvidence}
             onViewPaper={onViewPaper}
+            onLinkHypothesisEvidence={onLinkHypothesisEvidence}
           />
 
           {/* Recursively render children if expanded */}
@@ -57,6 +66,8 @@ export function QuestionTree({
               <QuestionTree
                 questions={question.children}
                 evidenceByQuestion={evidenceByQuestion}
+                projectId={projectId}
+                userId={userId}
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onAddSubQuestion={onAddSubQuestion}
@@ -64,6 +75,7 @@ export function QuestionTree({
                 onLinkEvidence={onLinkEvidence}
                 onRemoveEvidence={onRemoveEvidence}
                 onViewPaper={onViewPaper}
+                onLinkHypothesisEvidence={onLinkHypothesisEvidence}
               />
             </div>
           )}

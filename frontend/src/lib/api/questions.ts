@@ -344,9 +344,9 @@ export async function linkHypothesisEvidence(
   hypothesisId: string,
   evidence: {
     article_pmid: string;
-    evidence_strength: 'weak' | 'moderate' | 'strong';
-    supports_hypothesis: boolean;
-    key_findings?: string;
+    evidence_type: 'supports' | 'contradicts' | 'neutral';
+    strength: 'weak' | 'moderate' | 'strong';
+    key_finding?: string;
   },
   userId: string
 ): Promise<any> {
