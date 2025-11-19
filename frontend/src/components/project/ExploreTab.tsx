@@ -29,6 +29,7 @@ import {
   SpotifyTabEmptyState,
   SpotifyTabLoading
 } from './shared';
+import { triagePaper } from '@/lib/api';
 
 // Dynamically import PDFViewer to avoid SSR issues
 const PDFViewer = dynamic(() => import('@/components/reading/PDFViewer'), {
@@ -63,6 +64,7 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState<PubMedArticle | null>(null);
   const [savingPmids, setSavingPmids] = useState<Set<string>>(new Set());
+  const [triagingPmids, setTriagingPmids] = useState<Set<string>>(new Set());
 
   // Collection selector modal state
   const [showCollectionSelector, setShowCollectionSelector] = useState(false);
@@ -180,6 +182,35 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
       setCollections([]);
     } finally {
       setLoadingCollections(false);
+    }
+  };
+
+  // Triage article with AI
+  const handleTriageArticle = async (article: PubMedArticle) => {
+    if (!user?.user_id) {
+      alert('Please sign in to triage articles');
+      return;
+    }
+
+    setTriagingPmids(prev => new Set(prev).add(article.pmid));
+
+    try {
+      const result = await triagePaper(project.project_id, article.pmid, user.user_id);
+      console.log('✅ Paper triaged:', result);
+
+      // Show success message with relevance score
+      const statusEmoji = result.triage_status === 'must_read' ? '🔴' :
+                         result.triage_status === 'nice_to_know' ? '🟡' : '⚪';
+      alert(`${statusEmoji} Paper triaged!\n\nRelevance Score: ${result.relevance_score}/100\nStatus: ${result.triage_status.replace('_', ' ').toUpperCase()}\n\nCheck the Inbox tab to see AI insights.`);
+    } catch (error) {
+      console.error('❌ Error triaging article:', error);
+      alert('Failed to triage article. Please try again.');
+    } finally {
+      setTriagingPmids(prev => {
+        const next = new Set(prev);
+        next.delete(article.pmid);
+        return next;
+      });
     }
   };
 
@@ -575,6 +606,19 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
 
                   {/* Action Buttons - Matching /search page layout */}
                   <div className="flex flex-wrap gap-2 mt-4 mb-3">
+                    <button
+                      onClick={() => handleTriageArticle(article)}
+                      disabled={triagingPmids.has(article.pmid)}
+                      className="inline-flex items-center px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-400 border border-purple-500/30 rounded hover:from-purple-500/30 hover:to-pink-500/30 transition-all disabled:opacity-50"
+                      title="Triage with AI - Get relevance score and insights"
+                    >
+                      {triagingPmids.has(article.pmid) ? (
+                        <div className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin mr-1" />
+                      ) : (
+                        <SparklesIcon className="w-4 h-4 mr-1" />
+                      )}
+                      {triagingPmids.has(article.pmid) ? 'Triaging...' : 'Triage with AI'}
+                    </button>
                     <button
                       onClick={() => {
                         // Switch to paper-network mode with Phase 1-2.3 features
