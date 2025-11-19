@@ -18,6 +18,7 @@ import InlineJobResults from '@/components/InlineJobResults';
 import { SpotifyTopBar, SpotifyBreadcrumb, SpotifyTabs } from '@/components/ui/SpotifyNavigation';
 import { SpotifyCollectionCard } from '@/components/ui/SpotifyCard';
 import { SpotifyProjectHeader } from '@/components/ui/SpotifyProjectHeader';
+import { EnhancedSpotifyProjectHeader } from '@/components/ui/EnhancedSpotifyProjectHeader';
 import { SpotifyProjectTabs } from '@/components/ui/SpotifyProjectTabs';
 import { SpotifySubTabs } from '@/components/ui/SpotifySubTabs';
 import { SpotifyQuickActions, createQuickActions } from '@/components/ui/SpotifyQuickActions';
@@ -31,6 +32,7 @@ import { ProjectHeroActions } from '@/components/project/ProjectHeroActions';
 import { NetworkQuickStart } from '@/components/project/NetworkQuickStart';
 import { ContextualActions, ProjectState, ActionType } from '@/components/project/ContextualActions';
 import DiscoverSection from '@/components/project/DiscoverSection';
+import EnhancedDiscoverSection from '@/components/project/EnhancedDiscoverSection';
 import GlobalSearch from '@/components/search/GlobalSearch';
 import CollaboratorsList from '@/components/collaboration/CollaboratorsList';
 import {
@@ -1198,9 +1200,15 @@ export default function ProjectPage() {
   return (
     <MobileResponsiveLayout>
       <div className="w-full max-w-none">
-        {/* Spotify-Style Project Header */}
-        <SpotifyProjectHeader
+        {/* Enhanced Spotify-Style Project Header with Research Stats */}
+        <EnhancedSpotifyProjectHeader
           project={project}
+          researchStats={{
+            questionsCount: 0, // TODO: Fetch from API
+            hypothesesCount: 0, // TODO: Fetch from API
+            evidenceCount: 0, // TODO: Fetch from API
+            answeredCount: 0 // TODO: Fetch from API
+          }}
           onPlay={() => {
             // Navigate to first tab or main view
             setActiveTab('research');
@@ -1211,14 +1219,31 @@ export default function ProjectPage() {
           onInvite={() => setShowInviteModal(true)}
         />
 
-        {/* Discover Section - Fixed section with colored boxes, search, and quick actions */}
+        {/* Enhanced Discover Section - Research context boxes with stats and quick actions */}
         <div className="py-6 px-4">
-          <DiscoverSection
+          <EnhancedDiscoverSection
             projectId={projectId as string}
             collectionsCount={collections.length}
+            researchStats={{
+              questionsCount: 0, // TODO: Fetch from API
+              hypothesesCount: 0, // TODO: Fetch from API
+              evidenceCount: 0, // TODO: Fetch from API
+              answeredCount: 0, // TODO: Fetch from API
+              unansweredCount: 0 // TODO: Fetch from API
+            }}
             onAddNote={() => setShowNoteModal(true)}
             onNewReport={() => setShowReportModal(true)}
             onDeepDive={() => setShowDeepDiveModal(true)}
+            onAddQuestion={() => {
+              setActiveTab('research');
+              setActiveSubTab('questions');
+              // TODO: Open add question modal
+            }}
+            onAddHypothesis={() => {
+              setActiveTab('research');
+              setActiveSubTab('hypotheses');
+              // TODO: Open add hypothesis modal
+            }}
           />
         </div>
 
