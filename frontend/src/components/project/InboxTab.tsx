@@ -30,11 +30,84 @@ export const InboxTab: React.FC<InboxTabProps> = ({ projectId }) => {
   const [filter, setFilter] = useState<'all' | 'must_read' | 'nice_to_know' | 'ignore'>('all');
   const [readFilter, setReadFilter] = useState<'all' | 'unread' | 'reading' | 'read'>('all');
 
+  // Week 10: Batch triage mode
+  const [batchMode, setBatchMode] = useState(false);
+  const [selectedPapers, setSelectedPapers] = useState<Set<string>>(new Set());
+
+  // Week 10: Undo functionality
+  const [undoStack, setUndoStack] = useState<Array<{
+    paperId: string;
+    previousStatus: string;
+    previousReadStatus: string;
+  }>>([]);
+
+  // Week 10: Focused paper for keyboard navigation
+  const [focusedPaperIndex, setFocusedPaperIndex] = useState(0);
+
   // Load inbox data
   useEffect(() => {
     loadInbox();
     loadStats();
   }, [projectId, filter, readFilter, user?.user_id]);
+
+  // Week 10: Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Only handle shortcuts when not in an input field
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      const currentPaper = papers[focusedPaperIndex];
+      if (!currentPaper) return;
+
+      switch (e.key.toLowerCase()) {
+        case 'a':
+          // Accept (Must Read)
+          e.preventDefault();
+          handleAccept(currentPaper);
+          break;
+        case 'r':
+          // Reject (Ignore)
+          e.preventDefault();
+          handleReject(currentPaper);
+          break;
+        case 'm':
+          // Maybe (Nice to Know)
+          e.preventDefault();
+          handleMaybe(currentPaper);
+          break;
+        case 'd':
+          // Mark as read
+          e.preventDefault();
+          handleMarkAsRead(currentPaper);
+          break;
+        case 'j':
+          // Next paper
+          e.preventDefault();
+          setFocusedPaperIndex(prev => Math.min(prev + 1, papers.length - 1));
+          break;
+        case 'k':
+          // Previous paper
+          e.preventDefault();
+          setFocusedPaperIndex(prev => Math.max(prev - 1, 0));
+          break;
+        case 'b':
+          // Toggle batch mode
+          e.preventDefault();
+          setBatchMode(prev => !prev);
+          break;
+        case 'u':
+          // Undo last action
+          e.preventDefault();
+          handleUndo();
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [papers, focusedPaperIndex, batchMode]);
 
   const loadInbox = async () => {
     if (!user?.user_id) return;
@@ -69,6 +142,13 @@ export const InboxTab: React.FC<InboxTabProps> = ({ projectId }) => {
   const handleAccept = async (paper: PaperTriageData) => {
     if (!user?.user_id) return;
 
+    // Week 10: Save to undo stack
+    setUndoStack(prev => [...prev, {
+      paperId: paper.triage_id,
+      previousStatus: paper.triage_status,
+      previousReadStatus: paper.read_status
+    }]);
+
     try {
       await updateTriageStatus(paper.triage_id, user.user_id, {
         triage_status: 'must_read',
@@ -79,11 +159,20 @@ export const InboxTab: React.FC<InboxTabProps> = ({ projectId }) => {
       loadStats();
     } catch (error) {
       console.error('Error accepting paper:', error);
+      // Remove from undo stack on error
+      setUndoStack(prev => prev.slice(0, -1));
     }
   };
 
   const handleReject = async (paper: PaperTriageData) => {
     if (!user?.user_id) return;
+
+    // Week 10: Save to undo stack
+    setUndoStack(prev => [...prev, {
+      paperId: paper.triage_id,
+      previousStatus: paper.triage_status,
+      previousReadStatus: paper.read_status
+    }]);
 
     try {
       await updateTriageStatus(paper.triage_id, user.user_id, {
@@ -94,11 +183,19 @@ export const InboxTab: React.FC<InboxTabProps> = ({ projectId }) => {
       loadStats();
     } catch (error) {
       console.error('Error rejecting paper:', error);
+      setUndoStack(prev => prev.slice(0, -1));
     }
   };
 
   const handleMaybe = async (paper: PaperTriageData) => {
     if (!user?.user_id) return;
+
+    // Week 10: Save to undo stack
+    setUndoStack(prev => [...prev, {
+      paperId: paper.triage_id,
+      previousStatus: paper.triage_status,
+      previousReadStatus: paper.read_status
+    }]);
 
     try {
       await updateTriageStatus(paper.triage_id, user.user_id, {
@@ -109,11 +206,19 @@ export const InboxTab: React.FC<InboxTabProps> = ({ projectId }) => {
       loadStats();
     } catch (error) {
       console.error('Error marking paper as maybe:', error);
+      setUndoStack(prev => prev.slice(0, -1));
     }
   };
 
   const handleMarkAsRead = async (paper: PaperTriageData) => {
     if (!user?.user_id) return;
+
+    // Week 10: Save to undo stack
+    setUndoStack(prev => [...prev, {
+      paperId: paper.triage_id,
+      previousStatus: paper.triage_status,
+      previousReadStatus: paper.read_status
+    }]);
 
     try {
       await updateTriageStatus(paper.triage_id, user.user_id, {
@@ -124,6 +229,83 @@ export const InboxTab: React.FC<InboxTabProps> = ({ projectId }) => {
       loadStats();
     } catch (error) {
       console.error('Error marking paper as read:', error);
+      setUndoStack(prev => prev.slice(0, -1));
+    }
+  };
+
+  // Week 10: Undo last action
+  const handleUndo = async () => {
+    if (!user?.user_id || undoStack.length === 0) return;
+
+    const lastAction = undoStack[undoStack.length - 1];
+
+    try {
+      await updateTriageStatus(lastAction.paperId, user.user_id, {
+        triage_status: lastAction.previousStatus as any,
+        read_status: lastAction.previousReadStatus as any
+      });
+      console.log(`↩️ Undid last action`);
+      setUndoStack(prev => prev.slice(0, -1));
+      loadInbox();
+      loadStats();
+    } catch (error) {
+      console.error('Error undoing action:', error);
+    }
+  };
+
+  // Week 10: Toggle paper selection for batch mode
+  const togglePaperSelection = (triageId: string) => {
+    setSelectedPapers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(triageId)) {
+        newSet.delete(triageId);
+      } else {
+        newSet.add(triageId);
+      }
+      return newSet;
+    });
+  };
+
+  // Week 10: Batch accept selected papers
+  const handleBatchAccept = async () => {
+    if (!user?.user_id || selectedPapers.size === 0) return;
+
+    try {
+      const promises = Array.from(selectedPapers).map(triageId =>
+        updateTriageStatus(triageId, user.user_id!, {
+          triage_status: 'must_read',
+          read_status: 'unread'
+        })
+      );
+      await Promise.all(promises);
+      console.log(`✅ Batch accepted ${selectedPapers.size} papers`);
+      setSelectedPapers(new Set());
+      setBatchMode(false);
+      loadInbox();
+      loadStats();
+    } catch (error) {
+      console.error('Error batch accepting papers:', error);
+    }
+  };
+
+  // Week 10: Batch reject selected papers
+  const handleBatchReject = async () => {
+    if (!user?.user_id || selectedPapers.size === 0) return;
+
+    try {
+      const promises = Array.from(selectedPapers).map(triageId =>
+        updateTriageStatus(triageId, user.user_id!, {
+          triage_status: 'ignore'
+        })
+      );
+      await Promise.all(promises);
+      console.log(`❌ Batch rejected ${selectedPapers.size} papers`);
+      setSelectedPapers(new Set());
+      setBatchMode(false);
+      loadInbox();
+      loadStats();
+    } catch (error) {
+      console.error('Error batch rejecting papers:', error);
     }
   };
 
@@ -157,6 +339,70 @@ export const InboxTab: React.FC<InboxTabProps> = ({ projectId }) => {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Week 10: Batch Mode Controls & Keyboard Shortcuts */}
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+        <div className="flex items-center gap-4">
+          {/* Batch Mode Toggle */}
+          <button
+            onClick={() => {
+              setBatchMode(!batchMode);
+              setSelectedPapers(new Set());
+            }}
+            className={`px-4 py-2 rounded-lg transition-all ${
+              batchMode
+                ? 'bg-purple-500 text-white'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+          >
+            {batchMode ? '✓ Batch Mode' : 'Batch Mode'}
+          </button>
+
+          {/* Batch Actions (only show in batch mode) */}
+          {batchMode && selectedPapers.size > 0 && (
+            <>
+              <span className="text-gray-400 text-sm">
+                {selectedPapers.size} selected
+              </span>
+              <button
+                onClick={handleBatchAccept}
+                className="px-4 py-2 rounded-lg bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30 transition-all"
+              >
+                ✓ Accept All
+              </button>
+              <button
+                onClick={handleBatchReject}
+                className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-all"
+              >
+                ✗ Reject All
+              </button>
+            </>
+          )}
+
+          {/* Undo Button */}
+          {undoStack.length > 0 && (
+            <button
+              onClick={handleUndo}
+              className="px-4 py-2 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 transition-all"
+              title="Undo last action (U)"
+            >
+              ↩️ Undo
+            </button>
+          )}
+        </div>
+
+        {/* Keyboard Shortcuts Help */}
+        <div className="flex items-center gap-2 text-xs text-gray-400">
+          <span className="font-semibold">Shortcuts:</span>
+          <span className="bg-gray-700 px-2 py-1 rounded">A</span> Accept
+          <span className="bg-gray-700 px-2 py-1 rounded">R</span> Reject
+          <span className="bg-gray-700 px-2 py-1 rounded">M</span> Maybe
+          <span className="bg-gray-700 px-2 py-1 rounded">D</span> Mark Read
+          <span className="bg-gray-700 px-2 py-1 rounded">J/K</span> Navigate
+          <span className="bg-gray-700 px-2 py-1 rounded">B</span> Batch
+          <span className="bg-gray-700 px-2 py-1 rounded">U</span> Undo
+        </div>
       </div>
 
       {/* Filters */}
@@ -268,15 +514,33 @@ export const InboxTab: React.FC<InboxTabProps> = ({ projectId }) => {
         </div>
       ) : (
         <div className="space-y-4">
-          {papers.map((paper) => (
-            <InboxPaperCard
+          {papers.map((paper, index) => (
+            <div
               key={paper.triage_id}
-              paper={paper}
-              onAccept={() => handleAccept(paper)}
-              onReject={() => handleReject(paper)}
-              onMaybe={() => handleMaybe(paper)}
-              onMarkAsRead={() => handleMarkAsRead(paper)}
-            />
+              className={`relative ${
+                index === focusedPaperIndex ? 'ring-2 ring-purple-500 rounded-lg' : ''
+              }`}
+            >
+              {/* Week 10: Batch Mode Checkbox */}
+              {batchMode && (
+                <div className="absolute top-4 left-4 z-10">
+                  <input
+                    type="checkbox"
+                    checked={selectedPapers.has(paper.triage_id)}
+                    onChange={() => togglePaperSelection(paper.triage_id)}
+                    className="w-5 h-5 rounded border-gray-600 bg-gray-700 text-purple-500 focus:ring-purple-500"
+                  />
+                </div>
+              )}
+
+              <InboxPaperCard
+                paper={paper}
+                onAccept={() => handleAccept(paper)}
+                onReject={() => handleReject(paper)}
+                onMaybe={() => handleMaybe(paper)}
+                onMarkAsRead={() => handleMarkAsRead(paper)}
+              />
+            </div>
           ))}
         </div>
       )}
