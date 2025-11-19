@@ -883,6 +883,14 @@ try:
     print("✅ Research questions and hypotheses endpoints registered successfully")
 except ImportError as e:
     print(f"⚠️ Failed to import pivot routers: {e}")
+
+# Week 9: Paper Triage (Smart Inbox) endpoints
+try:
+    from backend.app.routers.paper_triage import router as paper_triage_router
+    app.include_router(paper_triage_router)
+    print("✅ Paper triage (Smart Inbox) endpoints registered successfully")
+except ImportError as e:
+    print(f"⚠️ Failed to import paper triage router: {e}")
     print(f"   Error details: {type(e).__name__}")
     import traceback
     traceback.print_exc()

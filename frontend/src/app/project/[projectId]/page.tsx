@@ -18,6 +18,7 @@ import InlineJobResults from '@/components/InlineJobResults';
 import { SpotifyTopBar, SpotifyBreadcrumb, SpotifyTabs } from '@/components/ui/SpotifyNavigation';
 import { SpotifyCollectionCard } from '@/components/ui/SpotifyCard';
 import { SpotifyProjectHeader } from '@/components/ui/SpotifyProjectHeader';
+import { InboxTab } from '@/components/project/InboxTab';
 import { EnhancedSpotifyProjectHeader } from '@/components/ui/EnhancedSpotifyProjectHeader';
 import { SpotifyProjectTabs } from '@/components/ui/SpotifyProjectTabs';
 import { SpotifySubTabs } from '@/components/ui/SpotifySubTabs';
@@ -1962,8 +1963,7 @@ export default function ProjectPage() {
           <div className="mb-8">
             {activeSubTab === 'inbox' && (
               <div className="p-6">
-                <h2 className="text-2xl font-bold text-white mb-4">Smart Inbox</h2>
-                <p className="text-gray-400">Coming in Phase 2 - Week 9</p>
+                <InboxTab projectId={projectId as string} />
               </div>
             )}
 

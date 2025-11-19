@@ -507,3 +507,213 @@ export async function fetchResearchStats(projectId: string, userId: string): Pro
     };
   }
 }
+
+// =============================================================================
+// Paper Triage API (Smart Inbox)
+// Phase 2, Week 9: AI-powered paper triage
+// =============================================================================
+
+export interface PaperTriageData {
+  triage_id: string;
+  project_id: string;
+  article_pmid: string;
+  triage_status: 'must_read' | 'nice_to_know' | 'ignore';
+  relevance_score: number;
+  impact_assessment: string | null;
+  affected_questions: string[];
+  affected_hypotheses: string[];
+  ai_reasoning: string | null;
+  read_status: 'unread' | 'reading' | 'read';
+  triaged_by: string;
+  triaged_at: string;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  article?: {
+    pmid: string;
+    title: string;
+    authors: string;
+    abstract: string;
+    journal: string;
+    pub_year: number;
+  };
+}
+
+export interface InboxStats {
+  total_papers: number;
+  must_read_count: number;
+  nice_to_know_count: number;
+  ignore_count: number;
+  unread_count: number;
+  reading_count: number;
+  read_count: number;
+  avg_relevance_score: number;
+}
+
+/**
+ * Triage a paper for a project using AI
+ */
+export async function triagePaper(
+  projectId: string,
+  articlePmid: string,
+  userId: string
+): Promise<PaperTriageData> {
+  try {
+    const response = await fetch(`/api/proxy/triage/project/${projectId}/triage`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId,
+      },
+      body: JSON.stringify({ article_pmid: articlePmid }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to triage paper: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error triaging paper:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get all papers in project inbox
+ */
+export async function getProjectInbox(
+  projectId: string,
+  userId: string,
+  filters?: {
+    triage_status?: 'must_read' | 'nice_to_know' | 'ignore';
+    read_status?: 'unread' | 'reading' | 'read';
+    min_relevance?: number;
+    limit?: number;
+    offset?: number;
+  }
+): Promise<PaperTriageData[]> {
+  try {
+    const params = new URLSearchParams();
+    if (filters?.triage_status) params.append('triage_status', filters.triage_status);
+    if (filters?.read_status) params.append('read_status', filters.read_status);
+    if (filters?.min_relevance !== undefined) params.append('min_relevance', filters.min_relevance.toString());
+    if (filters?.limit) params.append('limit', filters.limit.toString());
+    if (filters?.offset) params.append('offset', filters.offset.toString());
+
+    const queryString = params.toString();
+    const url = `/api/proxy/triage/project/${projectId}/inbox${queryString ? `?${queryString}` : ''}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get inbox: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error getting inbox:', error);
+    return [];
+  }
+}
+
+/**
+ * Update triage status (user override)
+ */
+export async function updateTriageStatus(
+  triageId: string,
+  userId: string,
+  update: {
+    triage_status?: 'must_read' | 'nice_to_know' | 'ignore';
+    read_status?: 'unread' | 'reading' | 'read';
+    user_notes?: string;
+  }
+): Promise<PaperTriageData> {
+  try {
+    const response = await fetch(`/api/proxy/triage/triage/${triageId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId,
+      },
+      body: JSON.stringify(update),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update triage: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating triage:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get inbox statistics
+ */
+export async function getInboxStats(
+  projectId: string,
+  userId: string
+): Promise<InboxStats> {
+  try {
+    const response = await fetch(`/api/proxy/triage/project/${projectId}/stats`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get inbox stats: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error getting inbox stats:', error);
+    return {
+      total_papers: 0,
+      must_read_count: 0,
+      nice_to_know_count: 0,
+      ignore_count: 0,
+      unread_count: 0,
+      reading_count: 0,
+      read_count: 0,
+      avg_relevance_score: 0,
+    };
+  }
+}
+
+/**
+ * Delete a triage entry
+ */
+export async function deleteTriage(
+  triageId: string,
+  userId: string
+): Promise<void> {
+  try {
+    const response = await fetch(`/api/proxy/triage/triage/${triageId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to delete triage: ${response.statusText}`);
+    }
+  } catch (error) {
+    console.error('Error deleting triage:', error);
+    throw error;
+  }
+}
