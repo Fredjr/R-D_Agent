@@ -19,6 +19,7 @@ import { SpotifyTopBar, SpotifyBreadcrumb, SpotifyTabs } from '@/components/ui/S
 import { SpotifyCollectionCard } from '@/components/ui/SpotifyCard';
 import { SpotifyProjectHeader } from '@/components/ui/SpotifyProjectHeader';
 import { SpotifyProjectTabs } from '@/components/ui/SpotifyProjectTabs';
+import { SpotifySubTabs } from '@/components/ui/SpotifySubTabs';
 import { SpotifyQuickActions, createQuickActions } from '@/components/ui/SpotifyQuickActions';
 import { ResearchQuestionTab } from '@/components/project/ResearchQuestionTab';
 import { NotesTab } from '@/components/project/NotesTab';
@@ -159,8 +160,9 @@ export default function ProjectPage() {
   });
   const [creatingCollection, setCreatingCollection] = useState(false);
 
-  // Tab navigation state
-  const [activeTab, setActiveTab] = useState<'research-question' | 'explore' | 'collections' | 'notes' | 'analysis' | 'progress'>('research-question');
+  // Tab navigation state - New 5-tab structure
+  const [activeTab, setActiveTab] = useState<'research' | 'papers' | 'lab' | 'notes' | 'analysis'>('research');
+  const [activeSubTab, setActiveSubTab] = useState<string>('questions'); // Default sub-tab for each main tab
 
   // Global search state
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -234,12 +236,35 @@ export default function ProjectPage() {
   const [comprehensiveSummary, setComprehensiveSummary] = useState<any>(null);
   const [generatingComprehensiveSummary, setGeneratingComprehensiveSummary] = useState(false);
 
-  // 🔧 Handle URL parameters to set active tab
+  // 🔧 Handle URL parameters to set active tab - Map old tab names to new structure
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab && ['research-question', 'explore', 'collections', 'notes', 'analysis', 'progress'].includes(tab)) {
+    if (tab) {
       console.log('📍 Setting active tab from URL:', tab);
-      setActiveTab(tab as 'research-question' | 'explore' | 'collections' | 'notes' | 'analysis' | 'progress');
+      // Map old tab names to new structure
+      if (tab === 'research-question') {
+        setActiveTab('research');
+        setActiveSubTab('questions');
+      } else if (tab === 'explore') {
+        setActiveTab('papers');
+        setActiveSubTab('explore');
+      } else if (tab === 'collections') {
+        setActiveTab('papers');
+        setActiveSubTab('collections');
+      } else if (tab === 'notes') {
+        setActiveTab('notes');
+        setActiveSubTab('ideas');
+      } else if (tab === 'analysis') {
+        setActiveTab('analysis');
+        setActiveSubTab('reports');
+      } else if (tab === 'progress') {
+        setActiveTab('analysis');
+        setActiveSubTab('timeline');
+      }
+      // New tab names
+      else if (['research', 'papers', 'lab', 'notes', 'analysis'].includes(tab)) {
+        setActiveTab(tab as 'research' | 'papers' | 'lab' | 'notes' | 'analysis');
+      }
     }
   }, [searchParams]);
 
@@ -263,31 +288,36 @@ export default function ProjectPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // 🔍 Handle search result navigation
+  // 🔍 Handle search result navigation - Updated for new tab structure
   const handleSearchResultClick = (result: any) => {
     console.log('🔍 [Global Search] Result clicked:', result);
 
     // Navigate to appropriate tab based on result type
     switch (result.type) {
       case 'paper':
-        // Navigate to collections tab (papers are in collections)
-        setActiveTab('collections');
+        // Navigate to papers → collections
+        setActiveTab('papers');
+        setActiveSubTab('collections');
         break;
       case 'collection':
-        // Navigate to collections tab
-        setActiveTab('collections');
+        // Navigate to papers → collections
+        setActiveTab('papers');
+        setActiveSubTab('collections');
         break;
       case 'note':
-        // Navigate to notes tab
+        // Navigate to notes → ideas
         setActiveTab('notes');
+        setActiveSubTab('ideas');
         break;
       case 'report':
-        // Navigate to research question tab (reports are shown there)
-        setActiveTab('research-question');
+        // Navigate to analysis → reports
+        setActiveTab('analysis');
+        setActiveSubTab('reports');
         break;
       case 'analysis':
-        // Navigate to analysis tab
+        // Navigate to analysis → reports
         setActiveTab('analysis');
+        setActiveSubTab('reports');
         break;
       default:
         console.warn('Unknown result type:', result.type);
@@ -1100,7 +1130,8 @@ export default function ProjectPage() {
 
     switch (action) {
       case 'define-question':
-        setActiveTab('research-question');
+        setActiveTab('research');
+        setActiveSubTab('questions');
         // Scroll to research question section after tab change
         setTimeout(() => {
           const element = document.getElementById('research-question-section');
@@ -1111,26 +1142,31 @@ export default function ProjectPage() {
         break;
 
       case 'view-collections':
-        setActiveTab('collections');
+        setActiveTab('papers');
+        setActiveSubTab('collections');
         break;
 
       case 'browse-trending':
-        setActiveTab('explore');
+        setActiveTab('papers');
+        setActiveSubTab('explore');
         // TODO: Trigger trending view in ExploreTab
         break;
 
       case 'recent-papers':
-        setActiveTab('explore');
+        setActiveTab('papers');
+        setActiveSubTab('explore');
         // TODO: Trigger recent papers view in ExploreTab
         break;
 
       case 'ai-suggestions':
-        setActiveTab('explore');
+        setActiveTab('papers');
+        setActiveSubTab('explore');
         // TODO: Trigger AI suggestions in ExploreTab
         break;
 
       case 'custom-search':
-        setActiveTab('explore');
+        setActiveTab('papers');
+        setActiveSubTab('explore');
         // TODO: Focus on search bar in ExploreTab
         break;
 
@@ -1167,7 +1203,8 @@ export default function ProjectPage() {
           project={project}
           onPlay={() => {
             // Navigate to first tab or main view
-            setActiveTab('research-question');
+            setActiveTab('research');
+            setActiveSubTab('questions');
           }}
           onShare={() => setShowShareModal(true)}
           onSettings={() => setShowSettingsModal(true)}
@@ -1194,54 +1231,117 @@ export default function ProjectPage() {
           />
         </div>
 
-        {/* Spotify-Style Tab Navigation */}
+        {/* Spotify-Style Tab Navigation - New 5-Tab Structure */}
         <div className="py-4">
           <SpotifyProjectTabs
             activeTab={activeTab}
-            onTabChange={(tab) => setActiveTab(tab as 'research-question' | 'explore' | 'collections' | 'notes' | 'analysis' | 'progress')}
+            onTabChange={(tab) => {
+              setActiveTab(tab as 'research' | 'papers' | 'lab' | 'notes' | 'analysis');
+              // Set default sub-tab for each main tab
+              if (tab === 'research') setActiveSubTab('questions');
+              else if (tab === 'papers') setActiveSubTab('explore');
+              else if (tab === 'lab') setActiveSubTab('protocols');
+              else if (tab === 'notes') setActiveSubTab('ideas');
+              else if (tab === 'analysis') setActiveSubTab('reports');
+            }}
             tabs={[
               {
-                id: 'research-question',
-                label: 'Research Question',
+                id: 'research',
+                label: 'Research',
                 icon: '🎯',
-                description: 'Project overview and objectives'
+                description: 'Questions, hypotheses, and decisions'
               },
               {
-                id: 'explore',
-                label: 'Explore Papers',
-                icon: '🔍',
-                description: 'Discover and explore related papers'
-              },
-              {
-                id: 'collections',
-                label: 'My Collections',
-                icon: '📚',
+                id: 'papers',
+                label: 'Papers',
+                icon: '📄',
                 count: collections.length,
-                description: 'Organized paper collections'
+                description: 'Explore, organize, and manage papers'
+              },
+              {
+                id: 'lab',
+                label: 'Lab',
+                icon: '🔬',
+                description: 'Protocols, experiments, and summaries'
               },
               {
                 id: 'notes',
-                label: 'Notes & Ideas',
+                label: 'Notes',
                 icon: '📝',
                 count: project.annotations_count || project.annotations?.length || 0,
-                description: 'All your research notes'
+                description: 'Ideas, annotations, and comments'
               },
               {
                 id: 'analysis',
                 label: 'Analysis',
                 icon: '📊',
                 count: (project.reports_count || project.reports?.length || 0) + (project.deep_dive_analyses_count || project.deep_dive_analyses?.length || 0),
-                description: 'Reports and deep dive analyses'
-              },
-              {
-                id: 'progress',
-                label: 'Progress',
-                icon: '📈',
-                description: 'Activity timeline and metrics'
+                description: 'Reports, insights, and timeline'
               }
             ]}
           />
         </div>
+
+        {/* Sub-Tabs Navigation */}
+        {activeTab === 'research' && (
+          <SpotifySubTabs
+            subTabs={[
+              { id: 'questions', label: 'Questions', icon: '❓' },
+              { id: 'hypotheses', label: 'Hypotheses', icon: '💡' },
+              { id: 'decisions', label: 'Decisions', icon: '✅', badge: 'new' }
+            ]}
+            activeSubTab={activeSubTab}
+            onSubTabChange={setActiveSubTab}
+          />
+        )}
+
+        {activeTab === 'papers' && (
+          <SpotifySubTabs
+            subTabs={[
+              { id: 'inbox', label: 'Inbox', icon: '📥', badge: 'new' },
+              { id: 'explore', label: 'Explore', icon: '🔍' },
+              { id: 'collections', label: 'Collections', icon: '📚', count: collections.length }
+            ]}
+            activeSubTab={activeSubTab}
+            onSubTabChange={setActiveSubTab}
+          />
+        )}
+
+        {activeTab === 'lab' && (
+          <SpotifySubTabs
+            subTabs={[
+              { id: 'protocols', label: 'Protocols', icon: '📋', badge: 'beta' },
+              { id: 'experiments', label: 'Experiments', icon: '🧪', badge: 'beta' },
+              { id: 'summaries', label: 'Summaries', icon: '📝', badge: 'beta' }
+            ]}
+            activeSubTab={activeSubTab}
+            onSubTabChange={setActiveSubTab}
+          />
+        )}
+
+        {activeTab === 'notes' && (
+          <SpotifySubTabs
+            subTabs={[
+              { id: 'ideas', label: 'Ideas', icon: '💭', count: project.annotations_count || 0 },
+              { id: 'annotations', label: 'Annotations', icon: '✏️' },
+              { id: 'comments', label: 'Comments', icon: '💬' }
+            ]}
+            activeSubTab={activeSubTab}
+            onSubTabChange={setActiveSubTab}
+          />
+        )}
+
+        {activeTab === 'analysis' && (
+          <SpotifySubTabs
+            subTabs={[
+              { id: 'reports', label: 'Reports', icon: '📊', count: project.reports_count || 0 },
+              { id: 'insights', label: 'Insights', icon: '💡', badge: 'new' },
+              { id: 'timeline', label: 'Timeline', icon: '📈' }
+            ]}
+            activeSubTab={activeSubTab}
+            onSubTabChange={setActiveSubTab}
+          />
+        )}
 
         {/* Create Collection Modal */}
         {showCollectionModal && (
@@ -1611,7 +1711,10 @@ export default function ProjectPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={() => setActiveTab('collections')}
+                  onClick={() => {
+                    setActiveTab('papers');
+                    setActiveSubTab('collections');
+                  }}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
                 >
                   Manage Collections
@@ -1737,108 +1840,183 @@ export default function ProjectPage() {
           </div>
         )}
 
-        {/* Tab Content */}
-        {activeTab === 'research-question' && (
+        {/* Tab Content - New Structure with Sub-Tabs */}
+
+        {/* Research Tab */}
+        {activeTab === 'research' && (
           <div className="mb-8 space-y-6">
-            <ResearchQuestionTab
-              project={project}
-              user={user}
-              totalPapers={totalPapers}
-              collectionsCount={collections.length}
-              onUpdateProject={async (updates) => {
-                try {
-                  const response = await fetch(`/api/proxy/projects/${projectId}`, {
-                    method: 'PATCH',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'User-ID': user?.email || ''
-                    },
-                    body: JSON.stringify(updates)
-                  });
+            {activeSubTab === 'questions' && (
+              <ResearchQuestionTab
+                project={project}
+                user={user}
+                totalPapers={totalPapers}
+                collectionsCount={collections.length}
+                onUpdateProject={async (updates) => {
+                  try {
+                    const response = await fetch(`/api/proxy/projects/${projectId}`, {
+                      method: 'PATCH',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'User-ID': user?.email || ''
+                      },
+                      body: JSON.stringify(updates)
+                    });
 
-                  if (!response.ok) {
-                    throw new Error('Failed to update project');
+                    if (!response.ok) {
+                      throw new Error('Failed to update project');
+                    }
+
+                    await fetchProjectData();
+                  } catch (error) {
+                    console.error('Error updating project:', error);
+                    throw error;
                   }
+                }}
+                onNavigateToTab={(tab) => {
+                  // Map old tab names to new structure
+                  if (tab === 'collections') {
+                    setActiveTab('papers');
+                    setActiveSubTab('collections');
+                  } else if (tab === 'notes') {
+                    setActiveTab('notes');
+                    setActiveSubTab('ideas');
+                  } else if (tab === 'analysis') {
+                    setActiveTab('analysis');
+                    setActiveSubTab('reports');
+                  }
+                }}
+                onOpenModal={(modal) => {
+                  if (modal === 'collection') {
+                    setShowCollectionModal(true);
+                  } else if (modal === 'note') {
+                    setShowNoteModal(true);
+                  } else if (modal === 'report') {
+                    setShowReportModal(true);
+                  }
+                }}
+              />
+            )}
 
-                  // Refresh project data
-                  await fetchProjectData();
-                } catch (error) {
-                  console.error('Error updating project:', error);
-                  throw error;
-                }
-              }}
-              onNavigateToTab={(tab) => setActiveTab(tab as any)}
-              onOpenModal={(modal) => {
-                if (modal === 'collection') {
-                  setShowCollectionModal(true);
-                } else if (modal === 'note') {
-                  setShowNoteModal(true);
-                } else if (modal === 'report') {
-                  setShowReportModal(true);
-                }
-              }}
-            />
+            {activeSubTab === 'hypotheses' && (
+              <div className="p-6">
+                <h2 className="text-2xl font-bold text-white mb-4">Hypotheses</h2>
+                <p className="text-gray-400">Hypotheses view - Already implemented in ResearchQuestionTab</p>
+              </div>
+            )}
 
-            {/* Collaborators List */}
-            <CollaboratorsList
-              projectId={projectId as string}
-              currentUserEmail={user?.email || ''}
-              isOwner={project.owner_user_id === user?.email}
-              onInviteClick={() => setShowInviteModal(true)}
-            />
+            {activeSubTab === 'decisions' && (
+              <div className="p-6">
+                <h2 className="text-2xl font-bold text-white mb-4">Decisions</h2>
+                <p className="text-gray-400">Coming in Phase 2 - Week 10</p>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Explore Papers Tab */}
-        {activeTab === 'explore' && (
+        {/* Papers Tab */}
+        {activeTab === 'papers' && (
           <div className="mb-8">
-            <ExploreTab
-              project={project}
-              onRefresh={fetchProjectData}
-            />
+            {activeSubTab === 'inbox' && (
+              <div className="p-6">
+                <h2 className="text-2xl font-bold text-white mb-4">Smart Inbox</h2>
+                <p className="text-gray-400">Coming in Phase 2 - Week 9</p>
+              </div>
+            )}
+
+            {activeSubTab === 'explore' && (
+              <ExploreTab
+                project={project}
+                onRefresh={fetchProjectData}
+              />
+            )}
+
+            {activeSubTab === 'collections' && (
+              <MyCollectionsTab
+                projectId={projectId}
+                onRefresh={fetchProjectData}
+                onCreateCollection={() => setShowCollectionModal(true)}
+              />
+            )}
           </div>
         )}
 
-        {/* Collections Tab */}
-        {activeTab === 'collections' && (
-          <div className="mb-8">
-            <MyCollectionsTab
-              projectId={projectId}
-              onRefresh={fetchProjectData}
-              onCreateCollection={() => setShowCollectionModal(true)}
-            />
+        {/* Lab Tab */}
+        {activeTab === 'lab' && (
+          <div className="mb-8 p-6">
+            {activeSubTab === 'protocols' && (
+              <div>
+                <h2 className="text-2xl font-bold text-white mb-4">Protocols</h2>
+                <p className="text-gray-400">Coming in Phase 3 - Week 17</p>
+              </div>
+            )}
+
+            {activeSubTab === 'experiments' && (
+              <div>
+                <h2 className="text-2xl font-bold text-white mb-4">Experiments</h2>
+                <p className="text-gray-400">Coming in Phase 3 - Week 18</p>
+              </div>
+            )}
+
+            {activeSubTab === 'summaries' && (
+              <div>
+                <h2 className="text-2xl font-bold text-white mb-4">Living Summaries</h2>
+                <p className="text-gray-400">Coming in Phase 3 - Week 19-20</p>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Notes & Ideas Tab */}
+        {/* Notes Tab */}
         {activeTab === 'notes' && (
           <div className="mb-8">
-            <NotesTab
-              project={project}
-              onRefresh={fetchProjectData}
-            />
+            {activeSubTab === 'ideas' && (
+              <NotesTab
+                project={project}
+                onRefresh={fetchProjectData}
+              />
+            )}
+
+            {activeSubTab === 'annotations' && (
+              <div className="p-6">
+                <h2 className="text-2xl font-bold text-white mb-4">Annotations</h2>
+                <p className="text-gray-400">Paper annotations view</p>
+              </div>
+            )}
+
+            {activeSubTab === 'comments' && (
+              <div className="p-6">
+                <h2 className="text-2xl font-bold text-white mb-4">Comments</h2>
+                <p className="text-gray-400">Collaboration comments</p>
+              </div>
+            )}
           </div>
         )}
 
         {/* Analysis Tab */}
         {activeTab === 'analysis' && (
           <div className="mb-8">
-            <AnalysisTab
-              project={project}
-              onGenerateReport={() => setShowReportModal(true)}
-              onGenerateDeepDive={() => setShowDeepDiveModal(true)}
-            />
-          </div>
-        )}
+            {activeSubTab === 'reports' && (
+              <AnalysisTab
+                project={project}
+                onGenerateReport={() => setShowReportModal(true)}
+                onGenerateDeepDive={() => setShowDeepDiveModal(true)}
+              />
+            )}
 
-        {/* Progress Tab */}
-        {activeTab === 'progress' && (
-          <div className="mb-8">
-            <ProgressTab
-              project={project}
-              totalPapers={totalPapers}
-              collectionsCount={collections.length}
-            />
+            {activeSubTab === 'insights' && (
+              <div className="p-6">
+                <h2 className="text-2xl font-bold text-white mb-4">Insights</h2>
+                <p className="text-gray-400">Coming in Phase 2 - AI-powered insights</p>
+              </div>
+            )}
+
+            {activeSubTab === 'timeline' && (
+              <ProgressTab
+                project={project}
+                totalPapers={totalPapers}
+                collectionsCount={collections.length}
+              />
+            )}
           </div>
         )}
       </div>
@@ -2003,9 +2181,10 @@ export default function ProjectPage() {
           result={inlineResults.result}
           onClose={() => setInlineResults({ show: false, jobType: null, result: null })}
           onViewFullResults={() => {
-            // Close inline results and switch to research question tab where results are displayed
+            // Close inline results and switch to research tab where results are displayed
             setInlineResults({ show: false, jobType: null, result: null });
-            setActiveTab('research-question');
+            setActiveTab('research');
+            setActiveSubTab('questions');
           }}
         />
       )}
