@@ -376,3 +376,134 @@ export async function detectOpenAccessUrl(pmid: string): Promise<string | null> 
     return null;
   }
 }
+
+// =============================================================================
+// Research Questions & Hypotheses API
+// Phase 1, Week 2-6: Research Stats for Enhanced UI
+// =============================================================================
+
+export interface ResearchQuestion {
+  question_id: string;
+  project_id: string;
+  parent_question_id: string | null;
+  question_text: string;
+  question_type: 'main' | 'sub' | 'exploratory';
+  description: string | null;
+  status: 'exploring' | 'investigating' | 'answered' | 'parked';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  evidence_count?: number;
+}
+
+export interface Hypothesis {
+  hypothesis_id: string;
+  project_id: string;
+  question_id: string;
+  hypothesis_text: string;
+  hypothesis_type: 'mechanistic' | 'predictive' | 'descriptive' | 'null';
+  description: string | null;
+  status: 'proposed' | 'testing' | 'supported' | 'rejected' | 'inconclusive';
+  confidence_level: number;
+  created_at: string;
+  updated_at: string;
+  evidence_count?: number;
+}
+
+export interface ResearchStats {
+  questionsCount: number;
+  hypothesesCount: number;
+  evidenceCount: number;
+  answeredCount: number;
+  unansweredCount: number;
+}
+
+/**
+ * Fetch all research questions for a project
+ */
+export async function fetchProjectQuestions(projectId: string, userId: string): Promise<ResearchQuestion[]> {
+  try {
+    const response = await fetch(`/api/proxy/questions/project/${projectId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch questions: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching project questions:', error);
+    return [];
+  }
+}
+
+/**
+ * Fetch all hypotheses for a project
+ */
+export async function fetchProjectHypotheses(projectId: string, userId: string): Promise<Hypothesis[]> {
+  try {
+    const response = await fetch(`/api/proxy/hypotheses/project/${projectId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch hypotheses: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching project hypotheses:', error);
+    return [];
+  }
+}
+
+/**
+ * Calculate research stats for a project
+ */
+export async function fetchResearchStats(projectId: string, userId: string): Promise<ResearchStats> {
+  try {
+    // Fetch questions and hypotheses in parallel
+    const [questions, hypotheses] = await Promise.all([
+      fetchProjectQuestions(projectId, userId),
+      fetchProjectHypotheses(projectId, userId),
+    ]);
+
+    // Calculate stats
+    const questionsCount = questions.length;
+    const hypothesesCount = hypotheses.length;
+    const answeredCount = questions.filter(q => q.status === 'answered').length;
+    const unansweredCount = questionsCount - answeredCount;
+
+    // Calculate total evidence count (sum of evidence for all questions and hypotheses)
+    const questionEvidenceCount = questions.reduce((sum, q) => sum + (q.evidence_count || 0), 0);
+    const hypothesisEvidenceCount = hypotheses.reduce((sum, h) => sum + (h.evidence_count || 0), 0);
+    const evidenceCount = questionEvidenceCount + hypothesisEvidenceCount;
+
+    return {
+      questionsCount,
+      hypothesesCount,
+      evidenceCount,
+      answeredCount,
+      unansweredCount,
+    };
+  } catch (error) {
+    console.error('Error calculating research stats:', error);
+    return {
+      questionsCount: 0,
+      hypothesesCount: 0,
+      evidenceCount: 0,
+      answeredCount: 0,
+      unansweredCount: 0,
+    };
+  }
+}

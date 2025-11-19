@@ -11,7 +11,7 @@ import NetworkViewWithSidebar from '@/components/NetworkViewWithSidebar';
 import MultiColumnNetworkView from '@/components/MultiColumnNetworkView';
 import Collections from '@/components/Collections';
 import { useAsyncJob } from '@/hooks/useAsyncJob';
-import { startReviewJob, startDeepDiveJob } from '../../../lib/api';
+import { startReviewJob, startDeepDiveJob, fetchResearchStats, ResearchStats } from '../../../lib/api';
 import AsyncJobProgress from '@/components/AsyncJobProgress';
 import ClusterExplorationModal from '@/components/ClusterExplorationModal';
 import InlineJobResults from '@/components/InlineJobResults';
@@ -166,6 +166,16 @@ export default function ProjectPage() {
   const [activeTab, setActiveTab] = useState<'research' | 'papers' | 'lab' | 'notes' | 'analysis'>('research');
   const [activeSubTab, setActiveSubTab] = useState<string>('questions'); // Default sub-tab for each main tab
 
+  // Research stats state - For enhanced header and discover section
+  const [researchStats, setResearchStats] = useState<ResearchStats>({
+    questionsCount: 0,
+    hypothesesCount: 0,
+    evidenceCount: 0,
+    answeredCount: 0,
+    unansweredCount: 0,
+  });
+  const [loadingStats, setLoadingStats] = useState(false);
+
   // Global search state
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -237,6 +247,26 @@ export default function ProjectPage() {
   // Comprehensive project summary state
   const [comprehensiveSummary, setComprehensiveSummary] = useState<any>(null);
   const [generatingComprehensiveSummary, setGeneratingComprehensiveSummary] = useState(false);
+
+  // 🔧 Fetch research stats when project loads
+  useEffect(() => {
+    const loadResearchStats = async () => {
+      if (!projectId || !user?.user_id) return;
+
+      setLoadingStats(true);
+      try {
+        const stats = await fetchResearchStats(projectId as string, user.user_id);
+        setResearchStats(stats);
+        console.log('📊 Research stats loaded:', stats);
+      } catch (error) {
+        console.error('❌ Error loading research stats:', error);
+      } finally {
+        setLoadingStats(false);
+      }
+    };
+
+    loadResearchStats();
+  }, [projectId, user?.user_id]);
 
   // 🔧 Handle URL parameters to set active tab - Map old tab names to new structure
   useEffect(() => {
@@ -1203,12 +1233,7 @@ export default function ProjectPage() {
         {/* Enhanced Spotify-Style Project Header with Research Stats */}
         <EnhancedSpotifyProjectHeader
           project={project}
-          researchStats={{
-            questionsCount: 0, // TODO: Fetch from API
-            hypothesesCount: 0, // TODO: Fetch from API
-            evidenceCount: 0, // TODO: Fetch from API
-            answeredCount: 0 // TODO: Fetch from API
-          }}
+          researchStats={researchStats}
           onPlay={() => {
             // Navigate to first tab or main view
             setActiveTab('research');
@@ -1224,13 +1249,7 @@ export default function ProjectPage() {
           <EnhancedDiscoverSection
             projectId={projectId as string}
             collectionsCount={collections.length}
-            researchStats={{
-              questionsCount: 0, // TODO: Fetch from API
-              hypothesesCount: 0, // TODO: Fetch from API
-              evidenceCount: 0, // TODO: Fetch from API
-              answeredCount: 0, // TODO: Fetch from API
-              unansweredCount: 0 // TODO: Fetch from API
-            }}
+            researchStats={researchStats}
             onAddNote={() => setShowNoteModal(true)}
             onNewReport={() => setShowReportModal(true)}
             onDeepDive={() => setShowDeepDiveModal(true)}
