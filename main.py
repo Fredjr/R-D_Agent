@@ -891,6 +891,14 @@ try:
     print("✅ Paper triage (Smart Inbox) endpoints registered successfully")
 except ImportError as e:
     print(f"⚠️ Failed to import paper triage router: {e}")
+
+# Week 11: Decision Timeline endpoints
+try:
+    from backend.app.routers.decisions import router as decisions_router
+    app.include_router(decisions_router)
+    print("✅ Decision timeline endpoints registered successfully")
+except ImportError as e:
+    print(f"⚠️ Failed to import decisions router: {e}")
     print(f"   Error details: {type(e).__name__}")
     import traceback
     traceback.print_exc()
