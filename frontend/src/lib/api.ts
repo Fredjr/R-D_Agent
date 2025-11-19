@@ -717,3 +717,236 @@ export async function deleteTriage(
     throw error;
   }
 }
+
+// =============================================================================
+// Decision Timeline API
+// Phase 2, Week 11-12: Research decision tracking
+// =============================================================================
+
+export interface DecisionData {
+  decision_id: string;
+  project_id: string;
+  decision_type: 'pivot' | 'methodology' | 'scope' | 'hypothesis' | 'other';
+  title: string;
+  description: string;
+  rationale: string | null;
+  alternatives_considered: string[];
+  impact_assessment: string | null;
+  affected_questions: string[];
+  affected_hypotheses: string[];
+  related_pmids: string[];
+  decided_by: string;
+  decided_at: string;
+  updated_at: string;
+}
+
+export interface TimelineGrouping {
+  period: string;
+  decisions: DecisionData[];
+  count: number;
+}
+
+export interface DecisionCreateRequest {
+  project_id: string;
+  decision_type: 'pivot' | 'methodology' | 'scope' | 'hypothesis' | 'other';
+  title: string;
+  description: string;
+  rationale?: string;
+  alternatives_considered?: string[];
+  impact_assessment?: string;
+  affected_questions?: string[];
+  affected_hypotheses?: string[];
+  related_pmids?: string[];
+}
+
+export interface DecisionUpdateRequest {
+  decision_type?: 'pivot' | 'methodology' | 'scope' | 'hypothesis' | 'other';
+  title?: string;
+  description?: string;
+  rationale?: string;
+  alternatives_considered?: string[];
+  impact_assessment?: string;
+  affected_questions?: string[];
+  affected_hypotheses?: string[];
+  related_pmids?: string[];
+}
+
+/**
+ * Create a new decision
+ */
+export async function createDecision(
+  request: DecisionCreateRequest,
+  userId: string
+): Promise<DecisionData> {
+  try {
+    const response = await fetch('/api/proxy/decisions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId,
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create decision: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error creating decision:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get all decisions for a project
+ */
+export async function getProjectDecisions(
+  projectId: string,
+  userId: string,
+  filters?: {
+    decision_type?: string;
+    sort_by?: 'date' | 'type';
+    order?: 'asc' | 'desc';
+    limit?: number;
+    offset?: number;
+  }
+): Promise<DecisionData[]> {
+  try {
+    const params = new URLSearchParams();
+    if (filters?.decision_type) params.append('decision_type', filters.decision_type);
+    if (filters?.sort_by) params.append('sort_by', filters.sort_by);
+    if (filters?.order) params.append('order', filters.order);
+    if (filters?.limit) params.append('limit', filters.limit.toString());
+    if (filters?.offset) params.append('offset', filters.offset.toString());
+
+    const url = `/api/proxy/decisions/project/${projectId}${params.toString() ? `?${params.toString()}` : ''}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get decisions: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error getting decisions:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get a single decision by ID
+ */
+export async function getDecision(
+  decisionId: string,
+  userId: string
+): Promise<DecisionData> {
+  try {
+    const response = await fetch(`/api/proxy/decisions/${decisionId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get decision: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error getting decision:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update a decision
+ */
+export async function updateDecision(
+  decisionId: string,
+  userId: string,
+  update: DecisionUpdateRequest
+): Promise<DecisionData> {
+  try {
+    const response = await fetch(`/api/proxy/decisions/${decisionId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId,
+      },
+      body: JSON.stringify(update),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update decision: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating decision:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a decision
+ */
+export async function deleteDecision(
+  decisionId: string,
+  userId: string
+): Promise<void> {
+  try {
+    const response = await fetch(`/api/proxy/decisions/${decisionId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to delete decision: ${response.statusText}`);
+    }
+  } catch (error) {
+    console.error('Error deleting decision:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get decision timeline grouped by time period
+ */
+export async function getDecisionTimeline(
+  projectId: string,
+  userId: string,
+  grouping: 'month' | 'quarter' | 'year' = 'month'
+): Promise<TimelineGrouping[]> {
+  try {
+    const response = await fetch(`/api/proxy/decisions/timeline/${projectId}?grouping=${grouping}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get timeline: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error getting timeline:', error);
+    throw error;
+  }
+}

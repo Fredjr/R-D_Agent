@@ -29,6 +29,7 @@ import { ExploreTab } from '@/components/project/ExploreTab';
 import { AnalysisTab } from '@/components/project/AnalysisTab';
 import { ProgressTab } from '@/components/project/ProgressTab';
 import { MyCollectionsTab } from '@/components/project/MyCollectionsTab';
+import DecisionTimelineTab from '@/components/project/DecisionTimelineTab';
 import { ProjectHeroActions } from '@/components/project/ProjectHeroActions';
 import { NetworkQuickStart } from '@/components/project/NetworkQuickStart';
 import { ContextualActions, ProjectState, ActionType } from '@/components/project/ContextualActions';
@@ -1950,10 +1951,10 @@ export default function ProjectPage() {
             )}
 
             {activeSubTab === 'decisions' && (
-              <div className="p-6">
-                <h2 className="text-2xl font-bold text-white mb-4">Decisions</h2>
-                <p className="text-gray-400">Coming in Phase 2 - Week 10</p>
-              </div>
+              <DecisionTimelineTab
+                projectId={projectId}
+                user={user}
+              />
             )}
           </div>
         )}
