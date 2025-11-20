@@ -2,14 +2,15 @@
 
 import React, { useState } from 'react';
 import { PaperTriageData } from '@/lib/api';
-import { 
-  CheckCircleIcon, 
-  XCircleIcon, 
+import {
+  CheckCircleIcon,
+  XCircleIcon,
   QuestionMarkCircleIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   BookOpenIcon,
-  SparklesIcon
+  SparklesIcon,
+  BeakerIcon
 } from '@heroicons/react/24/outline';
 
 /**
@@ -25,6 +26,7 @@ interface InboxPaperCardProps {
   onReject: () => void;
   onMaybe: () => void;
   onMarkAsRead: () => void;
+  onExtractProtocol?: () => void;
 }
 
 export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
@@ -32,7 +34,8 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
   onAccept,
   onReject,
   onMaybe,
-  onMarkAsRead
+  onMarkAsRead,
+  onExtractProtocol
 }) => {
   const [showReasoning, setShowReasoning] = useState(false);
   const [showEvidence, setShowEvidence] = useState(false);
@@ -293,35 +296,51 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
       )}
 
       {/* Actions */}
-      <div className="flex gap-3">
-        <button
-          onClick={onAccept}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg transition-colors border border-green-500/30"
-        >
-          <CheckCircleIcon className="w-5 h-5" />
-          <span>Accept</span>
-        </button>
-        <button
-          onClick={onMaybe}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 rounded-lg transition-colors border border-yellow-500/30"
-        >
-          <QuestionMarkCircleIcon className="w-5 h-5" />
-          <span>Maybe</span>
-        </button>
-        <button
-          onClick={onReject}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors border border-red-500/30"
-        >
-          <XCircleIcon className="w-5 h-5" />
-          <span>Reject</span>
-        </button>
-        <button
-          onClick={onMarkAsRead}
-          className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors border border-gray-600"
-        >
-          <BookOpenIcon className="w-5 h-5" />
-          <span>Mark Read</span>
-        </button>
+      <div className="space-y-3">
+        {/* Primary Actions */}
+        <div className="flex gap-3">
+          <button
+            onClick={onAccept}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg transition-colors border border-green-500/30"
+          >
+            <CheckCircleIcon className="w-5 h-5" />
+            <span>Accept</span>
+          </button>
+          <button
+            onClick={onMaybe}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 rounded-lg transition-colors border border-yellow-500/30"
+          >
+            <QuestionMarkCircleIcon className="w-5 h-5" />
+            <span>Maybe</span>
+          </button>
+          <button
+            onClick={onReject}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors border border-red-500/30"
+          >
+            <XCircleIcon className="w-5 h-5" />
+            <span>Reject</span>
+          </button>
+        </div>
+
+        {/* Secondary Actions */}
+        <div className="flex gap-3">
+          <button
+            onClick={onMarkAsRead}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors border border-gray-600"
+          >
+            <BookOpenIcon className="w-5 h-5" />
+            <span>Mark Read</span>
+          </button>
+          {onExtractProtocol && (
+            <button
+              onClick={onExtractProtocol}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg transition-colors border border-purple-500/30"
+            >
+              <BeakerIcon className="w-5 h-5" />
+              <span>Extract Protocol</span>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

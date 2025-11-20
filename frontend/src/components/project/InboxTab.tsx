@@ -233,6 +233,43 @@ export const InboxTab: React.FC<InboxTabProps> = ({ projectId }) => {
     }
   };
 
+  // Week 17: Extract protocol from paper
+  const handleExtractProtocol = async (paper: PaperTriageData) => {
+    if (!user?.user_id) return;
+
+    try {
+      console.log(`🧪 Extracting protocol from paper ${paper.article_pmid}...`);
+
+      const response = await fetch('/api/proxy/protocols/extract', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user.user_id,
+        },
+        body: JSON.stringify({
+          article_pmid: paper.article_pmid,
+          protocol_type: null, // Let AI determine type
+          force_refresh: false, // Use cache if available
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to extract protocol');
+      }
+
+      const protocol = await response.json();
+      console.log(`✅ Protocol extracted: ${protocol.protocol_name}`);
+
+      // Show success message
+      alert(`✅ Protocol extracted successfully!\n\n${protocol.protocol_name}\n\nView it in the Protocols tab.`);
+
+    } catch (error) {
+      console.error('❌ Error extracting protocol:', error);
+      alert(`Failed to extract protocol: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
   // Week 10: Undo last action
   const handleUndo = async () => {
     if (!user?.user_id || undoStack.length === 0) return;
@@ -322,20 +359,20 @@ export const InboxTab: React.FC<InboxTabProps> = ({ projectId }) => {
         {stats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-black/30 rounded-lg p-4">
-              <div className="text-gray-400 text-sm">Total Papers</div>
+              <div className="text-gray-200 text-sm">Total Papers</div>
               <div className="text-2xl font-bold text-white">{stats.total_papers}</div>
             </div>
             <div className="bg-red-500/20 rounded-lg p-4 border border-red-500/30">
-              <div className="text-gray-400 text-sm">Must Read</div>
+              <div className="text-gray-200 text-sm">Must Read</div>
               <div className="text-2xl font-bold text-red-400">{stats.must_read_count}</div>
             </div>
             <div className="bg-yellow-500/20 rounded-lg p-4 border border-yellow-500/30">
-              <div className="text-gray-400 text-sm">Nice to Know</div>
+              <div className="text-gray-200 text-sm">Nice to Know</div>
               <div className="text-2xl font-bold text-yellow-400">{stats.nice_to_know_count}</div>
             </div>
             <div className="bg-gray-500/20 rounded-lg p-4 border border-gray-500/30">
-              <div className="text-gray-400 text-sm">Ignored</div>
-              <div className="text-2xl font-bold text-gray-400">{stats.ignore_count}</div>
+              <div className="text-gray-200 text-sm">Ignored</div>
+              <div className="text-2xl font-bold text-gray-300">{stats.ignore_count}</div>
             </div>
           </div>
         )}
@@ -362,7 +399,7 @@ export const InboxTab: React.FC<InboxTabProps> = ({ projectId }) => {
           {/* Batch Actions (only show in batch mode) */}
           {batchMode && selectedPapers.size > 0 && (
             <>
-              <span className="text-gray-400 text-sm">
+              <span className="text-gray-200 text-sm">
                 {selectedPapers.size} selected
               </span>
               <button
@@ -393,7 +430,7 @@ export const InboxTab: React.FC<InboxTabProps> = ({ projectId }) => {
         </div>
 
         {/* Keyboard Shortcuts Help */}
-        <div className="flex items-center gap-2 text-xs text-gray-400">
+        <div className="flex items-center gap-2 text-xs text-gray-200">
           <span className="font-semibold">Shortcuts:</span>
           <span className="bg-gray-700 px-2 py-1 rounded">A</span> Accept
           <span className="bg-gray-700 px-2 py-1 rounded">R</span> Reject
@@ -408,7 +445,7 @@ export const InboxTab: React.FC<InboxTabProps> = ({ projectId }) => {
       {/* Filters */}
       <div className="flex flex-wrap gap-4">
         <div className="flex gap-2">
-          <span className="text-gray-400 text-sm self-center mr-2">Triage Status:</span>
+          <span className="text-gray-200 text-sm self-center mr-2">Triage Status:</span>
           <button
             onClick={() => setFilter('all')}
             className={`px-4 py-2 rounded-lg transition-colors ${
@@ -452,7 +489,7 @@ export const InboxTab: React.FC<InboxTabProps> = ({ projectId }) => {
         </div>
 
         <div className="flex gap-2">
-          <span className="text-gray-400 text-sm self-center mr-2">Read Status:</span>
+          <span className="text-gray-200 text-sm self-center mr-2">Read Status:</span>
           <button
             onClick={() => setReadFilter('all')}
             className={`px-4 py-2 rounded-lg transition-colors ${
@@ -500,13 +537,13 @@ export const InboxTab: React.FC<InboxTabProps> = ({ projectId }) => {
       {loading ? (
         <div className="text-center py-12">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
-          <p className="text-gray-400 mt-4">Loading inbox...</p>
+          <p className="text-gray-200 mt-4">Loading inbox...</p>
         </div>
       ) : papers.length === 0 ? (
         <div className="text-center py-12 bg-gray-800/50 rounded-lg border border-gray-700">
           <div className="text-6xl mb-4">📭</div>
           <h3 className="text-xl font-semibold text-white mb-2">Inbox is Empty</h3>
-          <p className="text-gray-400">
+          <p className="text-gray-200">
             {filter === 'all' && readFilter === 'all'
               ? 'No papers have been triaged yet. Add papers from the Explore tab to get started.'
               : 'No papers match your current filters.'}
@@ -539,6 +576,7 @@ export const InboxTab: React.FC<InboxTabProps> = ({ projectId }) => {
                 onReject={() => handleReject(paper)}
                 onMaybe={() => handleMaybe(paper)}
                 onMarkAsRead={() => handleMarkAsRead(paper)}
+                onExtractProtocol={() => handleExtractProtocol(paper)}
               />
             </div>
           ))}

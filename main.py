@@ -912,6 +912,17 @@ try:
 except ImportError as e:
     print(f"⚠️ Failed to import alerts router: {e}")
     print(f"   Error details: {type(e).__name__}")
+
+# Week 17: Protocol Extraction endpoints
+try:
+    from backend.app.routers.protocols import router as protocols_router
+    app.include_router(protocols_router)
+    print("✅ Protocol extraction endpoints registered successfully")
+except ImportError as e:
+    print(f"⚠️ Failed to import protocols router: {e}")
+    print(f"   Error details: {type(e).__name__}")
+    import traceback
+    traceback.print_exc()
     import traceback
     traceback.print_exc()
     print("   Project alerts feature will not be available")
