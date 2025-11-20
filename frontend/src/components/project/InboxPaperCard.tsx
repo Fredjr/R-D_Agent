@@ -38,7 +38,7 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
   onExtractProtocol
 }) => {
   const [showReasoning, setShowReasoning] = useState(false);
-  const [showEvidence, setShowEvidence] = useState(false);
+  const [showEvidence, setShowEvidence] = useState(true); // Default expanded - users paid for this!
   const [showQuestionScores, setShowQuestionScores] = useState(false);
   const [showHypothesisScores, setShowHypothesisScores] = useState(false);
 
@@ -78,10 +78,10 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
-          <h3 className="text-lg font-semibold text-gray-100 mb-2">
+          <h3 className="text-lg font-semibold text-white mb-2">
             {paper.article?.title || 'Untitled Paper'}
           </h3>
-          <p className="text-sm text-gray-300 mb-2">
+          <p className="text-sm text-gray-100 mb-2">
             {paper.article?.authors || 'Unknown authors'} • {paper.article?.journal || 'Unknown journal'} • {paper.article?.pub_year || 'Unknown year'}
           </p>
           <div className="flex gap-2 mb-3">
@@ -118,7 +118,7 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
       {/* Abstract */}
       {paper.article?.abstract && (
         <div className="mb-4">
-          <p className="text-sm text-gray-200 line-clamp-3">
+          <p className="text-sm text-white line-clamp-3">
             {paper.article.abstract}
           </p>
         </div>
@@ -129,7 +129,7 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
         <div className="mb-4">
           <button
             onClick={() => setShowEvidence(!showEvidence)}
-            className="flex items-center gap-2 text-sm text-gray-200 hover:text-white transition-colors mb-2"
+            className="flex items-center gap-2 text-sm text-white hover:text-purple-300 transition-colors mb-2"
           >
             {showEvidence ? (
               <ChevronUpIcon className="w-4 h-4" />
@@ -143,10 +143,10 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
             <div className="space-y-2">
               {paper.evidence_excerpts.map((excerpt, idx) => (
                 <div key={idx} className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
-                  <p className="text-sm text-gray-200 italic mb-2">&ldquo;{excerpt.quote}&rdquo;</p>
+                  <p className="text-sm text-white italic mb-2">&ldquo;{excerpt.quote}&rdquo;</p>
                   <div className="flex items-start gap-2 text-xs">
                     <span className="text-purple-300 font-semibold">Relevance:</span>
-                    <span className="text-gray-300">{excerpt.relevance}</span>
+                    <span className="text-gray-100">{excerpt.relevance}</span>
                   </div>
                   <div className="flex items-center gap-2 text-xs mt-1">
                     <span className="text-purple-300 font-semibold">Linked to:</span>
@@ -168,7 +168,7 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
             <SparklesIcon className="w-4 h-4 text-purple-300" />
             <span className="text-sm font-semibold text-purple-300">AI Impact Assessment</span>
           </div>
-          <p className="text-sm text-gray-200">{paper.impact_assessment}</p>
+          <p className="text-sm text-white">{paper.impact_assessment}</p>
         </div>
       )}
 
@@ -177,7 +177,7 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
         <div className="mb-4 flex gap-4">
           {paper.affected_questions.length > 0 && (
             <div className="flex items-center gap-2 text-sm">
-              <span className="text-gray-200">Addresses</span>
+              <span className="text-white">Addresses</span>
               <span className="px-2 py-1 rounded bg-blue-500/20 text-blue-400 font-semibold border border-blue-500/30">
                 {paper.affected_questions.length} question{paper.affected_questions.length !== 1 ? 's' : ''}
               </span>
@@ -185,7 +185,7 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
           )}
           {paper.affected_hypotheses.length > 0 && (
             <div className="flex items-center gap-2 text-sm">
-              <span className="text-gray-200">Relates to</span>
+              <span className="text-white">Relates to</span>
               <span className="px-2 py-1 rounded bg-purple-500/20 text-purple-400 font-semibold border border-purple-500/30">
                 {paper.affected_hypotheses.length} hypothesis{paper.affected_hypotheses.length !== 1 ? 'es' : ''}
               </span>
@@ -199,7 +199,7 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
         <div className="mb-4">
           <button
             onClick={() => setShowQuestionScores(!showQuestionScores)}
-            className="flex items-center gap-2 text-sm text-gray-200 hover:text-white transition-colors mb-2"
+            className="flex items-center gap-2 text-sm text-white hover:text-blue-300 transition-colors mb-2"
           >
             {showQuestionScores ? (
               <ChevronUpIcon className="w-4 h-4" />
@@ -218,10 +218,10 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
                       {data.score}/40
                     </span>
                   </div>
-                  <div className="text-xs text-gray-300 mb-2">
+                  <div className="text-xs text-gray-100 mb-2">
                     <span className="font-semibold text-blue-300">Reasoning:</span> {data.reasoning}
                   </div>
-                  <div className="text-xs text-gray-300 italic">
+                  <div className="text-xs text-gray-100 italic">
                     <span className="font-semibold text-blue-300">Evidence:</span> &ldquo;{data.evidence}&rdquo;
                   </div>
                 </div>
@@ -236,7 +236,7 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
         <div className="mb-4">
           <button
             onClick={() => setShowHypothesisScores(!showHypothesisScores)}
-            className="flex items-center gap-2 text-sm text-gray-200 hover:text-white transition-colors mb-2"
+            className="flex items-center gap-2 text-sm text-white hover:text-purple-300 transition-colors mb-2"
           >
             {showHypothesisScores ? (
               <ChevronUpIcon className="w-4 h-4" />
@@ -260,10 +260,10 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
                       </span>
                     </div>
                   </div>
-                  <div className="text-xs text-gray-300 mb-2">
+                  <div className="text-xs text-gray-100 mb-2">
                     <span className="font-semibold text-purple-300">Reasoning:</span> {data.reasoning}
                   </div>
-                  <div className="text-xs text-gray-300 italic">
+                  <div className="text-xs text-gray-100 italic">
                     <span className="font-semibold text-purple-300">Evidence:</span> &ldquo;{data.evidence}&rdquo;
                   </div>
                 </div>
@@ -278,7 +278,7 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
         <div className="mb-4">
           <button
             onClick={() => setShowReasoning(!showReasoning)}
-            className="flex items-center gap-2 text-sm text-gray-200 hover:text-white transition-colors"
+            className="flex items-center gap-2 text-sm text-white hover:text-gray-300 transition-colors"
           >
             {showReasoning ? (
               <ChevronUpIcon className="w-4 h-4" />
@@ -289,7 +289,7 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
           </button>
           {showReasoning && (
             <div className="mt-2 p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-              <p className="text-sm text-gray-200">{paper.ai_reasoning}</p>
+              <p className="text-sm text-white">{paper.ai_reasoning}</p>
             </div>
           )}
         </div>
