@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { ArrowLeftIcon, BeakerIcon, ChatBubbleLeftRightIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, BeakerIcon, ChatBubbleLeftRightIcon, DocumentTextIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { type Collection } from '@/hooks/useGlobalCollectionSync';
 import MultiColumnNetworkView from './MultiColumnNetworkView';
 import { AnnotationList } from './annotations';
 import SmartAnnotationList from './annotations/SmartAnnotationList';
+import { triagePaper } from '@/lib/api';
 import dynamic from 'next/dynamic';
 
 // Dynamically import PDFViewer to avoid SSR issues
@@ -57,6 +58,9 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
   const [showPDFViewer, setShowPDFViewer] = useState(false);
   const [selectedPMID, setSelectedPMID] = useState<string | null>(null);
   const [selectedTitle, setSelectedTitle] = useState<string | null>(null);
+
+  // Triage state
+  const [triagingPmids, setTriagingPmids] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchArticles();
@@ -109,6 +113,36 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
   const handleArticleSelect = (article: Article) => {
     setSelectedArticle(article);
     setShowNetworkExploration(true);
+  };
+
+  const handleTriageArticle = async (article: Article, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (!user?.user_id || !article.article_pmid) {
+      alert('Unable to triage: Missing user ID or PMID');
+      return;
+    }
+
+    setTriagingPmids(prev => new Set(prev).add(article.article_pmid));
+
+    try {
+      const result = await triagePaper(projectId, article.article_pmid, user.user_id);
+      console.log('✅ Paper triaged:', result);
+
+      // Show success message with relevance score
+      const statusEmoji = result.triage_status === 'must_read' ? '🔴' :
+                         result.triage_status === 'nice_to_know' ? '🟡' : '⚪';
+      alert(`${statusEmoji} Paper triaged!\n\nRelevance Score: ${result.relevance_score}/100\nStatus: ${result.triage_status.replace('_', ' ').toUpperCase()}\n\nCheck the Inbox tab to see AI insights.`);
+    } catch (error) {
+      console.error('❌ Error triaging article:', error);
+      alert('Failed to triage article. Please try again.');
+    } finally {
+      setTriagingPmids(prev => {
+        const next = new Set(prev);
+        next.delete(article.article_pmid);
+        return next;
+      });
+    }
   };
 
   if (showNetworkExploration && selectedArticle) {
@@ -295,6 +329,14 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
                         >
                           <DocumentTextIcon className="w-4 h-4 mr-1" />
                           Read PDF
+                        </button>
+                        <button
+                          onClick={(e) => handleTriageArticle(article, e)}
+                          disabled={triagingPmids.has(article.article_pmid)}
+                          className="inline-flex items-center px-3 py-1.5 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <SparklesIcon className="w-4 h-4 mr-1" />
+                          {triagingPmids.has(article.article_pmid) ? 'Triaging...' : 'Triage with AI'}
                         </button>
                       </div>
                     )}

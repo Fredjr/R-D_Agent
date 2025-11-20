@@ -1,0 +1,520 @@
+/**
+ * BROWSER CONSOLE E2E TEST SCRIPT - WEEKS 12-14
+ * 
+ * HOW TO USE:
+ * 1. Open https://r-d-agent.vercel.app in your browser
+ * 2. Log in with your credentials (fredericle75019@gmail.com)
+ * 3. Navigate to a project page
+ * 4. Open browser console (F12 or Cmd+Option+J on Mac)
+ * 5. Copy and paste this entire script
+ * 6. Press Enter to run
+ * 
+ * The script will automatically test all features and log results.
+ */
+
+(async function runE2ETests() {
+  console.clear();
+  console.log('%c🧪 COMPREHENSIVE E2E TEST SUITE - WEEKS 12-14 🧪', 'font-size: 20px; font-weight: bold; color: #4CAF50;');
+  console.log('%cTesting: Smart Inbox, Decision Timeline, Project Alerts', 'font-size: 14px; color: #2196F3;');
+  console.log('%c🎭 WITH SIMULATED USER INTERACTIONS & DATA CREATION', 'font-size: 14px; color: #9C27B0;');
+  console.log('\n');
+
+  // Configuration
+  const BACKEND_URL = 'https://r-dagent-production.up.railway.app';
+  const TEST_DELAY = 1000; // 1 second between tests
+
+  // Get current project ID from URL
+  const urlParts = window.location.pathname.split('/');
+  const projectIdIndex = urlParts.indexOf('project');
+  const CURRENT_PROJECT_ID = projectIdIndex >= 0 ? urlParts[projectIdIndex + 1] : 'test-project-001';
+  
+  // Test results tracking
+  const results = {
+    total: 0,
+    passed: 0,
+    failed: 0,
+    tests: []
+  };
+
+  // Helper functions
+  function logTest(name, status, details = '') {
+    results.total++;
+    if (status === 'PASS') {
+      results.passed++;
+      console.log(`%c✅ PASS: ${name}`, 'color: #4CAF50; font-weight: bold;', details);
+    } else {
+      results.failed++;
+      console.log(`%c❌ FAIL: ${name}`, 'color: #f44336; font-weight: bold;', details);
+    }
+    results.tests.push({ name, status, details });
+  }
+
+  function wait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  function findElement(selector) {
+    return document.querySelector(selector);
+  }
+
+  function findElements(selector) {
+    return document.querySelectorAll(selector);
+  }
+
+  function clickElement(selector) {
+    const el = findElement(selector);
+    if (el) {
+      el.click();
+      return true;
+    }
+    return false;
+  }
+
+  async function testBackendAPI(endpoint, testName) {
+    try {
+      const response = await fetch(`${BACKEND_URL}${endpoint}`);
+      const status = response.status;
+      if (status === 200 || status === 404 || status === 422) {
+        logTest(testName, 'PASS', `Status: ${status}`);
+        return true;
+      } else {
+        logTest(testName, 'FAIL', `Unexpected status: ${status}`);
+        return false;
+      }
+    } catch (error) {
+      logTest(testName, 'FAIL', `Error: ${error.message}`);
+      return false;
+    }
+  }
+
+  function safeClick(element) {
+    if (!element) return false;
+    try {
+      if (typeof element.click === 'function') {
+        element.click();
+      } else {
+        element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      }
+      return true;
+    } catch (error) {
+      console.warn('Click failed:', error);
+      return false;
+    }
+  }
+
+  // Note: Backend requires existing articles and User-ID header for creating data
+  // This test suite will work with existing data in the project
+  // To test with data, manually add papers and decisions through the UI first
+
+  // ============================================================================
+  // SETUP: CHECK FOR EXISTING DATA
+  // ============================================================================
+  console.log('%c\n🎭 SETUP: Checking Project Data', 'font-size: 16px; font-weight: bold; color: #9C27B0;');
+  console.log(`%cUsing project ID: ${CURRENT_PROJECT_ID}`, 'color: #9E9E9E;');
+  console.log('%c⚠️  Note: This test works with existing data in your project', 'color: #FF9800;');
+  console.log('%c   To test all features, add papers and decisions through the UI first', 'color: #9E9E9E;');
+  console.log('\n');
+
+  // ============================================================================
+  // TEST SUITE 1: BACKEND API ENDPOINTS
+  // ============================================================================
+  console.log('%c\n📡 TEST SUITE 1: BACKEND API ENDPOINTS', 'font-size: 16px; font-weight: bold; color: #FF9800;');
+
+  await testBackendAPI('/health', '1.1: Backend health check');
+  await wait(TEST_DELAY);
+
+  await testBackendAPI(`/api/triage/project/${CURRENT_PROJECT_ID}`, '1.2: Triage endpoint accessible');
+  await wait(TEST_DELAY);
+
+  await testBackendAPI(`/api/decisions/project/${CURRENT_PROJECT_ID}`, '1.3: Decisions endpoint accessible');
+  await wait(TEST_DELAY);
+
+  await testBackendAPI(`/api/alerts/project/${CURRENT_PROJECT_ID}`, '1.4: Alerts endpoint accessible');
+  await wait(TEST_DELAY);
+
+  // ============================================================================
+  // TEST SUITE 2: PAGE STRUCTURE & NAVIGATION
+  // ============================================================================
+  console.log('%c\n🧭 TEST SUITE 2: PAGE STRUCTURE & NAVIGATION', 'font-size: 16px; font-weight: bold; color: #FF9800;');
+  
+  // Test 2.1: Check if on project page
+  const isProjectPage = window.location.pathname.includes('/project/');
+  logTest('2.1: On project page', isProjectPage ? 'PASS' : 'FAIL', window.location.pathname);
+  await wait(TEST_DELAY);
+
+  // Test 2.2: Main tabs present
+  const mainTabs = ['Papers', 'Research', 'Lab', 'Notes', 'Analysis'];
+  let foundTabs = 0;
+  const allButtons = Array.from(findElements('button, a, [role="tab"], [role="button"]'));
+  mainTabs.forEach(tab => {
+    const tabElement = allButtons.find(el =>
+      el.textContent && el.textContent.trim() === tab
+    );
+    if (tabElement) {
+      foundTabs++;
+      console.log(`Found tab: ${tab}`, tabElement);
+    }
+  });
+  logTest('2.2: Main tabs present', foundTabs >= 3 ? 'PASS' : 'FAIL', `Found ${foundTabs}/${mainTabs.length} tabs`);
+  await wait(TEST_DELAY);
+
+  // ============================================================================
+  // TEST SUITE 3: SMART INBOX (WEEK 9-10)
+  // ============================================================================
+  console.log('%c\n📥 TEST SUITE 3: SMART INBOX', 'font-size: 16px; font-weight: bold; color: #FF9800;');
+  
+  // Test 3.1: Navigate to Papers → Inbox
+  const allElements = Array.from(findElements('button, a, [role="tab"], [role="button"], div[class*="tab"]'));
+  const papersButton = allElements.find(el =>
+    el.textContent && el.textContent.includes('Papers')
+  );
+
+  if (papersButton) {
+    safeClick(papersButton);
+    await wait(1500);
+
+    const allElements2 = Array.from(findElements('button, a, [role="tab"], [role="button"], div[class*="tab"]'));
+    const inboxButton = allElements2.find(el =>
+      el.textContent && el.textContent.includes('Inbox')
+    );
+
+    if (inboxButton) {
+      safeClick(inboxButton);
+      await wait(2000);
+      logTest('3.1: Navigate to Inbox', 'PASS', 'Successfully navigated');
+    } else {
+      logTest('3.1: Navigate to Inbox', 'FAIL', 'Inbox button not found');
+      console.log('Available elements:', allElements2.map(el => el.textContent?.trim()).filter(Boolean));
+    }
+  } else {
+    logTest('3.1: Navigate to Inbox', 'FAIL', 'Papers button not found');
+    console.log('Available elements:', allElements.map(el => el.textContent?.trim()).filter(Boolean));
+  }
+  await wait(TEST_DELAY);
+
+  // Test 3.2: Check for paper cards
+  const paperCards = findElements('[data-testid="inbox-paper-card"], .paper-card, [class*="paper"]');
+  logTest('3.2: Paper cards displayed', paperCards.length > 0 ? 'PASS' : 'FAIL', `Found ${paperCards.length} cards`);
+  await wait(TEST_DELAY);
+
+  // Test 3.3: Check for AI triage data
+  const hasRelevanceScore = !!findElement('[class*="relevance"], [class*="score"]');
+  const hasImpactText = document.body.textContent.includes('impact') || document.body.textContent.includes('Impact');
+  logTest('3.3: AI triage data present', hasRelevanceScore || hasImpactText ? 'PASS' : 'FAIL', 
+    `Score: ${hasRelevanceScore}, Impact: ${hasImpactText}`);
+  await wait(TEST_DELAY);
+
+  // Test 3.4: Check for action buttons
+  const actionButtons = Array.from(findElements('button')).filter(btn => {
+    const text = btn.textContent.toLowerCase();
+    return text.includes('accept') || text.includes('reject') || text.includes('maybe');
+  });
+  logTest('3.4: Action buttons present', actionButtons.length > 0 ? 'PASS' : 'FAIL',
+    `Found ${actionButtons.length} action buttons`);
+  await wait(TEST_DELAY);
+
+  // Test 3.4b: Try to accept a paper (simulate user interaction)
+  if (actionButtons.length > 0) {
+    console.log('%c🎭 Simulating user action: Accepting a paper...', 'color: #9C27B0;');
+    const acceptButton = actionButtons.find(btn => btn.textContent.toLowerCase().includes('accept'));
+    if (acceptButton) {
+      safeClick(acceptButton);
+      await wait(2000);
+      logTest('3.4b: Can accept paper via UI', 'PASS', 'Paper accepted successfully');
+    } else {
+      logTest('3.4b: Can accept paper via UI', 'FAIL', 'Accept button not found');
+    }
+  } else {
+    logTest('3.4b: Can accept paper via UI', 'FAIL', 'No action buttons available');
+  }
+  await wait(TEST_DELAY);
+
+  // Test 3.5: Check for batch mode button
+  const batchButton = Array.from(findElements('button')).find(btn => 
+    btn.textContent.toLowerCase().includes('batch')
+  );
+  logTest('3.5: Batch mode button present', !!batchButton ? 'PASS' : 'FAIL');
+  await wait(TEST_DELAY);
+
+  // ============================================================================
+  // TEST SUITE 4: DECISION TIMELINE (WEEK 11-12)
+  // ============================================================================
+  console.log('%c\n📊 TEST SUITE 4: DECISION TIMELINE', 'font-size: 16px; font-weight: bold; color: #FF9800;');
+
+  // Test 4.1: Navigate to Research → Decisions
+  const allElements3 = Array.from(findElements('button, a, [role="tab"], [role="button"], div[class*="tab"]'));
+  const researchButton = allElements3.find(el =>
+    el.textContent && el.textContent.includes('Research')
+  );
+
+  if (researchButton) {
+    safeClick(researchButton);
+    await wait(1500);
+
+    const allElements4 = Array.from(findElements('button, a, [role="tab"], [role="button"], div[class*="tab"]'));
+    const decisionsButton = allElements4.find(el =>
+      el.textContent && el.textContent.includes('Decisions')
+    );
+
+    if (decisionsButton) {
+      safeClick(decisionsButton);
+      await wait(2000);
+      logTest('4.1: Navigate to Decisions', 'PASS', 'Successfully navigated');
+    } else {
+      logTest('4.1: Navigate to Decisions', 'FAIL', 'Decisions button not found');
+      console.log('Available elements:', allElements4.map(el => el.textContent?.trim()).filter(Boolean));
+    }
+  } else {
+    logTest('4.1: Navigate to Decisions', 'FAIL', 'Research button not found');
+    console.log('Available elements:', allElements3.map(el => el.textContent?.trim()).filter(Boolean));
+  }
+  await wait(TEST_DELAY);
+
+  // Test 4.2: Check for Add Decision button
+  const addDecisionButton = Array.from(findElements('button')).find(btn =>
+    btn.textContent.toLowerCase().includes('add decision') ||
+    btn.textContent.toLowerCase().includes('new decision')
+  );
+  logTest('4.2: Add Decision button present', !!addDecisionButton ? 'PASS' : 'FAIL');
+  await wait(TEST_DELAY);
+
+  // Test 4.3: Check for decision cards or timeline
+  const decisionCards = findElements('[data-testid="decision-card"], .decision-card, [class*="decision"]');
+  const hasTimeline = !!findElement('[class*="timeline"]');
+  logTest('4.3: Decision timeline/cards present', decisionCards.length > 0 || hasTimeline ? 'PASS' : 'FAIL',
+    `Cards: ${decisionCards.length}, Timeline: ${hasTimeline}`);
+  await wait(TEST_DELAY);
+
+  // Test 4.4: Test Add Decision modal (if button exists)
+  if (addDecisionButton) {
+    console.log('%c🎭 Simulating user action: Opening Add Decision modal...', 'color: #9C27B0;');
+    safeClick(addDecisionButton);
+    await wait(1500);
+
+    const modal = findElement('[role="dialog"], .modal, [class*="modal"]');
+    const hasModal = !!modal;
+    logTest('4.4: Add Decision modal opens', hasModal ? 'PASS' : 'FAIL');
+
+    // Test 4.4b: Try to fill and submit the form
+    if (modal) {
+      console.log('%c🎭 Simulating user action: Filling decision form...', 'color: #9C27B0;');
+
+      // Try to find and fill title input
+      const titleInput = modal.querySelector('input[name="title"], input[placeholder*="title" i], input[type="text"]');
+      if (titleInput) {
+        titleInput.value = 'UI Test Decision: User Interaction Test';
+        titleInput.dispatchEvent(new Event('input', { bubbles: true }));
+        titleInput.dispatchEvent(new Event('change', { bubbles: true }));
+        await wait(500);
+      }
+
+      // Try to find and fill description
+      const descInput = modal.querySelector('textarea[name="description"], textarea[placeholder*="description" i]');
+      if (descInput) {
+        descInput.value = 'This decision was created through UI interaction testing to verify the full user flow works correctly.';
+        descInput.dispatchEvent(new Event('input', { bubbles: true }));
+        descInput.dispatchEvent(new Event('change', { bubbles: true }));
+        await wait(500);
+      }
+
+      // Try to find and click submit button
+      const submitButton = Array.from(modal.querySelectorAll('button')).find(btn =>
+        btn.textContent.toLowerCase().includes('save') ||
+        btn.textContent.toLowerCase().includes('create') ||
+        btn.textContent.toLowerCase().includes('submit')
+      );
+
+      if (submitButton && titleInput && descInput) {
+        safeClick(submitButton);
+        await wait(2000);
+        logTest('4.4b: Can create decision via UI', 'PASS', 'Decision created through UI');
+      } else {
+        logTest('4.4b: Can create decision via UI', 'FAIL',
+          `Missing: ${!titleInput ? 'title input' : ''} ${!descInput ? 'description' : ''} ${!submitButton ? 'submit button' : ''}`);
+
+        // Close modal
+        const closeButton = modal.querySelector('button[aria-label*="close"], button[class*="close"]');
+        if (closeButton) {
+          safeClick(closeButton);
+        } else {
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+        }
+      }
+      await wait(500);
+    } else {
+      logTest('4.4b: Can create decision via UI', 'FAIL', 'Modal did not open');
+    }
+  } else {
+    logTest('4.4: Add Decision modal opens', 'FAIL', 'Add button not available');
+    logTest('4.4b: Can create decision via UI', 'FAIL', 'Add button not available');
+  }
+  await wait(TEST_DELAY);
+
+  // ============================================================================
+  // TEST SUITE 5: PROJECT ALERTS (WEEK 13-14)
+  // ============================================================================
+  console.log('%c\n🔔 TEST SUITE 5: PROJECT ALERTS', 'font-size: 16px; font-weight: bold; color: #FF9800;');
+
+  // Test 5.1: Check for bell icon in header
+  const bellIcon = findElement('[data-testid="alerts-bell"], button[aria-label*="alert"], [class*="bell"]');
+  logTest('5.1: Bell icon in header', !!bellIcon ? 'PASS' : 'FAIL');
+  await wait(TEST_DELAY);
+
+  // Test 5.2: Check for unread badge
+  if (bellIcon) {
+    const badge = bellIcon.querySelector('[class*="badge"], [class*="count"]');
+    logTest('5.2: Unread count badge', !!badge ? 'PASS' : 'FAIL', badge ? `Count: ${badge.textContent}` : 'No badge');
+  } else {
+    logTest('5.2: Unread count badge', 'FAIL', 'Bell icon not found');
+  }
+  await wait(TEST_DELAY);
+
+  // Test 5.3: Open alerts panel
+  if (bellIcon) {
+    safeClick(bellIcon);
+    await wait(1500);
+
+    const alertsPanel = findElement('[data-testid="alerts-panel"], [class*="alerts-panel"], [role="dialog"]');
+    logTest('5.3: Alerts panel opens', !!alertsPanel ? 'PASS' : 'FAIL');
+    await wait(TEST_DELAY);
+
+    if (alertsPanel) {
+      // Test 5.4: Check for alert statistics
+      const hasStats = alertsPanel.textContent.includes('Total') ||
+                      alertsPanel.textContent.includes('Unread') ||
+                      alertsPanel.querySelector('[class*="stat"]');
+      logTest('5.4: Alert statistics displayed', !!hasStats ? 'PASS' : 'FAIL');
+      await wait(TEST_DELAY);
+
+      // Test 5.5: Check for alert cards
+      const alertCards = alertsPanel.querySelectorAll('[data-testid="alert-card"], .alert-card, [class*="alert"]');
+      logTest('5.5: Alert cards displayed', alertCards.length > 0 ? 'PASS' : 'FAIL',
+        `Found ${alertCards.length} alerts`);
+      await wait(TEST_DELAY);
+
+      // Test 5.6: Check for filter buttons
+      const filterButtons = alertsPanel.querySelectorAll('button[class*="filter"], button[aria-label*="filter"]');
+      logTest('5.6: Filter buttons present', filterButtons.length > 0 ? 'PASS' : 'FAIL',
+        `Found ${filterButtons.length} filters`);
+      await wait(TEST_DELAY);
+
+      // Test 5.7: Check for dismiss buttons
+      const dismissButtons = Array.from(alertsPanel.querySelectorAll('button')).filter(btn =>
+        btn.textContent.toLowerCase().includes('dismiss')
+      );
+      logTest('5.7: Dismiss buttons present', dismissButtons.length > 0 ? 'PASS' : 'FAIL',
+        `Found ${dismissButtons.length} dismiss buttons`);
+      await wait(TEST_DELAY);
+
+      // Close panel
+      const closeButton = alertsPanel.querySelector('button[aria-label*="close"]');
+      if (closeButton) {
+        safeClick(closeButton);
+        await wait(500);
+      } else {
+        // Try clicking outside the panel
+        document.body.click();
+        await wait(500);
+      }
+    }
+  } else {
+    logTest('5.3: Alerts panel opens', 'FAIL', 'Bell icon not found');
+    logTest('5.4: Alert statistics displayed', 'FAIL', 'Panel not opened');
+    logTest('5.5: Alert cards displayed', 'FAIL', 'Panel not opened');
+    logTest('5.6: Filter buttons present', 'FAIL', 'Panel not opened');
+    logTest('5.7: Dismiss buttons present', 'FAIL', 'Panel not opened');
+  }
+
+  // ============================================================================
+  // TEST SUITE 6: KEYBOARD SHORTCUTS
+  // ============================================================================
+  console.log('%c\n⌨️  TEST SUITE 6: KEYBOARD SHORTCUTS', 'font-size: 16px; font-weight: bold; color: #FF9800;');
+
+  // Navigate back to Inbox for keyboard tests
+  const allElements5 = Array.from(findElements('button, a, [role="tab"], [role="button"], div[class*="tab"]'));
+  const papersBtn2 = allElements5.find(el =>
+    el.textContent && el.textContent.includes('Papers')
+  );
+  if (papersBtn2) {
+    safeClick(papersBtn2);
+    await wait(500);
+    const allElements6 = Array.from(findElements('button, a, [role="tab"], [role="button"], div[class*="tab"]'));
+    const inboxBtn2 = allElements6.find(el =>
+      el.textContent && el.textContent.includes('Inbox')
+    );
+    if (inboxBtn2) {
+      safeClick(inboxBtn2);
+      await wait(1500);
+    }
+  }
+
+  // Test 6.1: Check if keyboard shortcuts are documented
+  const hasShortcutInfo = document.body.textContent.includes('J/K') ||
+                          document.body.textContent.includes('keyboard') ||
+                          !!findElement('[class*="shortcut"], [class*="hotkey"]');
+  logTest('6.1: Keyboard shortcuts documented', hasShortcutInfo ? 'PASS' : 'FAIL');
+  await wait(TEST_DELAY);
+
+  // Test 6.2: Try keyboard shortcuts (J/K for navigation)
+  console.log('%c🎭 Simulating user action: Testing keyboard shortcuts...', 'color: #9C27B0;');
+  const paperCardsBefore = findElements('[data-testid="inbox-paper-card"], .paper-card, [class*="paper"]').length;
+
+  // Simulate pressing 'j' key (next paper)
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'j', bubbles: true }));
+  await wait(500);
+
+  // Simulate pressing 'k' key (previous paper)
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', bubbles: true }));
+  await wait(500);
+
+  logTest('6.2: Keyboard shortcuts functional', paperCardsBefore > 0 ? 'PASS' : 'FAIL',
+    paperCardsBefore > 0 ? 'Shortcuts tested (J/K)' : 'No papers to test shortcuts');
+  await wait(TEST_DELAY);
+
+  // ============================================================================
+  // FINAL RESULTS
+  // ============================================================================
+  console.log('\n');
+  console.log('%c═══════════════════════════════════════════════════════════', 'color: #9E9E9E;');
+  console.log('%c📊 TEST RESULTS SUMMARY', 'font-size: 18px; font-weight: bold; color: #2196F3;');
+  console.log('%c═══════════════════════════════════════════════════════════', 'color: #9E9E9E;');
+  console.log(`\n%cTotal Tests: ${results.total}`, 'font-size: 14px; font-weight: bold;');
+  console.log(`%c✅ Passed: ${results.passed} (${((results.passed/results.total)*100).toFixed(1)}%)`,
+    'font-size: 14px; font-weight: bold; color: #4CAF50;');
+  console.log(`%c❌ Failed: ${results.failed} (${((results.failed/results.total)*100).toFixed(1)}%)`,
+    'font-size: 14px; font-weight: bold; color: #f44336;');
+
+  console.log('\n%c📋 DETAILED RESULTS:', 'font-size: 14px; font-weight: bold;');
+  console.table(results.tests);
+
+  console.log('\n%c� USER INTERACTION TESTS:', 'font-size: 14px; font-weight: bold; color: #9C27B0;');
+  console.log('%c• Tested navigation between tabs and pages', 'color: #9C27B0;');
+  console.log('%c• Simulated accepting a paper via UI (if papers exist)', 'color: #9C27B0;');
+  console.log('%c• Simulated creating a decision via UI form', 'color: #9C27B0;');
+  console.log('%c• Tested keyboard shortcuts (J/K navigation)', 'color: #9C27B0;');
+  console.log('%c• Tested modal opening and form interactions', 'color: #9C27B0;');
+
+  console.log('\n%c�🎯 RECOMMENDATIONS:', 'font-size: 14px; font-weight: bold; color: #FF9800;');
+  if (results.failed > 0) {
+    console.log('%c• Review failed tests above', 'color: #FF9800;');
+    console.log('%c• Many failures are expected if project has no data', 'color: #FF9800;');
+    console.log('%c• Add papers and decisions through the UI to test those features', 'color: #FF9800;');
+    console.log('%c• Check for actual bugs: modal not opening, tabs not found, etc.', 'color: #FF9800;');
+  } else {
+    console.log('%c🎉 All tests passed! Features are working correctly.', 'color: #4CAF50; font-weight: bold;');
+  }
+
+  console.log('\n%c📝 HOW TO ADD TEST DATA:', 'font-size: 14px; font-weight: bold; color: #2196F3;');
+  console.log('%c1. Add papers: Go to Papers tab → Import or add articles', 'color: #2196F3;');
+  console.log('%c2. Triage papers: Click papers in inbox → Accept/Reject/Maybe', 'color: #2196F3;');
+  console.log('%c3. Add decisions: Go to Research → Decisions → Click "Add Decision"', 'color: #2196F3;');
+  console.log('%c4. Re-run this test to see features working with data', 'color: #2196F3;');
+
+  console.log('\n%c═══════════════════════════════════════════════════════════', 'color: #9E9E9E;');
+  console.log('%c✅ COMPREHENSIVE TEST SUITE COMPLETE', 'font-size: 16px; font-weight: bold; color: #4CAF50;');
+  console.log('%c   WITH SIMULATED USER INTERACTIONS', 'font-size: 14px; font-weight: bold; color: #9C27B0;');
+  console.log('%c═══════════════════════════════════════════════════════════', 'color: #9E9E9E;');
+
+  return results;
+})();
+

@@ -42,11 +42,163 @@ function logError(error, context = '') {
   console.error(error.stack);
 }
 
+// Helper function to authenticate with Clerk
+async function authenticateWithClerk(page) {
+  try {
+    logStep('Attempting authentication');
+
+    // Go to homepage
+    await page.goto(BASE_URL, { waitUntil: 'networkidle', timeout: 30000 });
+    await page.waitForTimeout(2000);
+
+    // Check if already authenticated
+    const isAuthenticated = await page.locator('[data-testid="user-button"], [class*="cl-userButton"]').count() > 0;
+    if (isAuthenticated) {
+      logStep('Already authenticated');
+      return true;
+    }
+
+    // Look for sign-in button (multiple possible selectors)
+    const signInSelectors = [
+      'button:has-text("Sign In")',
+      'a:has-text("Sign In")',
+      'button:has-text("Sign in")',
+      'a:has-text("Sign in")',
+      '[data-testid="sign-in-button"]',
+      '.cl-signIn-start'
+    ];
+
+    let signInButton = null;
+    for (const selector of signInSelectors) {
+      const count = await page.locator(selector).count();
+      if (count > 0) {
+        signInButton = page.locator(selector).first();
+        break;
+      }
+    }
+
+    if (!signInButton) {
+      logStep('No sign-in button found, may already be on auth page or authenticated');
+      return false;
+    }
+
+    // Click sign-in button
+    await signInButton.click();
+    await page.waitForTimeout(2000);
+
+    // Fill in email
+    const emailSelectors = [
+      'input[name="identifier"]',
+      'input[type="email"]',
+      'input[name="email"]',
+      'input[placeholder*="email" i]',
+      '.cl-formFieldInput[type="email"]'
+    ];
+
+    let emailInput = null;
+    for (const selector of emailSelectors) {
+      const count = await page.locator(selector).count();
+      if (count > 0) {
+        emailInput = page.locator(selector).first();
+        break;
+      }
+    }
+
+    if (!emailInput) {
+      logStep('Email input not found');
+      return false;
+    }
+
+    await emailInput.fill(TEST_USER.email);
+    logStep('Email entered', TEST_USER.email);
+    await page.waitForTimeout(1000);
+
+    // Click continue button
+    const continueSelectors = [
+      'button:has-text("Continue")',
+      'button[type="submit"]',
+      '.cl-formButtonPrimary'
+    ];
+
+    for (const selector of continueSelectors) {
+      const count = await page.locator(selector).count();
+      if (count > 0) {
+        await page.locator(selector).first().click();
+        break;
+      }
+    }
+
+    await page.waitForTimeout(2000);
+
+    // Fill in password
+    const passwordSelectors = [
+      'input[name="password"]',
+      'input[type="password"]',
+      '.cl-formFieldInput[type="password"]'
+    ];
+
+    let passwordInput = null;
+    for (const selector of passwordSelectors) {
+      const count = await page.locator(selector).count();
+      if (count > 0) {
+        passwordInput = page.locator(selector).first();
+        break;
+      }
+    }
+
+    if (!passwordInput) {
+      logStep('Password input not found');
+      return false;
+    }
+
+    await passwordInput.fill(TEST_USER.password);
+    logStep('Password entered');
+    await page.waitForTimeout(1000);
+
+    // Click sign-in submit button
+    const submitSelectors = [
+      'button:has-text("Continue")',
+      'button:has-text("Sign in")',
+      'button[type="submit"]',
+      '.cl-formButtonPrimary'
+    ];
+
+    for (const selector of submitSelectors) {
+      const count = await page.locator(selector).count();
+      if (count > 0) {
+        await page.locator(selector).first().click();
+        break;
+      }
+    }
+
+    // Wait for authentication to complete
+    await page.waitForTimeout(5000);
+
+    // Verify authentication succeeded
+    const authSuccess = await page.locator('[data-testid="user-button"], [class*="cl-userButton"]').count() > 0;
+
+    if (authSuccess) {
+      logStep('Authentication successful');
+      return true;
+    } else {
+      logStep('Authentication may have failed or is still loading');
+      return false;
+    }
+
+  } catch (error) {
+    logError(error, 'Authentication');
+    return false;
+  }
+}
+
 test.describe('WEEKS 12-14: Comprehensive E2E Tests', () => {
-  
+
   test.beforeEach(async ({ page }) => {
     // Set longer timeout for each test
     test.setTimeout(TEST_TIMEOUT);
+
+    // Authenticate before each test
+    await authenticateWithClerk(page);
     
     // Enable console logging
     page.on('console', msg => {

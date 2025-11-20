@@ -875,8 +875,27 @@ class Protocol(Base):
     duration_estimate = Column(String, nullable=True)  # e.g., "5-7 days"
     difficulty_level = Column(String, default='moderate')  # easy, moderate, difficult
 
-    # Metadata
+    # Enhanced protocol data (Week 19: Intelligent extraction)
+    key_parameters = Column(JSON, default=list)  # Critical parameters to control
+    expected_outcomes = Column(JSON, default=list)  # Expected results
+    troubleshooting_tips = Column(JSON, default=list)  # Common issues and solutions
+
+    # Context-aware fields (Week 19: Multi-agent extraction)
+    relevance_score = Column(Integer, default=50)  # 0-100 relevance to project
+    affected_questions = Column(JSON, default=list)  # Research question IDs
+    affected_hypotheses = Column(JSON, default=list)  # Hypothesis IDs
+    relevance_reasoning = Column(Text, nullable=True)  # Why protocol is relevant
+    key_insights = Column(JSON, default=list)  # Key insights for project
+    potential_applications = Column(JSON, default=list)  # How to use protocol
+    recommendations = Column(JSON, default=list)  # Actionable recommendations
+    context_relevance = Column(Text, nullable=True)  # How protocol relates to context
+
+    # Extraction metadata
+    extraction_method = Column(String, default='basic')  # 'basic' or 'intelligent_multi_agent'
+    context_aware = Column(Boolean, default=False)  # Whether extraction used project context
     extracted_by = Column(String, default='ai')  # 'ai' or 'manual'
+
+    # Metadata
     created_by = Column(String, ForeignKey("users.user_id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

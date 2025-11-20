@@ -15,13 +15,19 @@ from pydantic import BaseModel, Field
 
 from database import get_db, Protocol, Project, Article
 from backend.app.services.protocol_extractor_service import ProtocolExtractorService
+from backend.app.services.intelligent_protocol_extractor import intelligent_protocol_extractor
+from backend.app.services.project_context_service import project_context_service
+import uuid
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/protocols", tags=["protocols"])
 
-# Initialize service
+# Initialize services
 protocol_extractor = ProtocolExtractorService()
+
+# Feature flag for intelligent extraction
+USE_INTELLIGENT_EXTRACTION = True  # Set to False to use basic extraction
 
 
 # Helper Functions
@@ -69,6 +75,7 @@ class ProtocolExtractRequest(BaseModel):
     project_id: Optional[str] = Field(None, description="Project ID (optional, will be looked up from triage if not provided)")
     protocol_type: Optional[str] = Field(None, description="Type hint: delivery, editing, screening, analysis, synthesis, imaging, other")
     force_refresh: bool = Field(False, description="If true, bypass cache and re-extract")
+    use_intelligent_extraction: bool = Field(True, description="Use context-aware intelligent extraction (Week 19)")
 
 
 class ProtocolUpdateRequest(BaseModel):
@@ -97,13 +104,30 @@ class ProtocolResponse(BaseModel):
     created_by: str
     created_at: str
     updated_at: Optional[str] = None
-    
+
+    # Enhanced fields (Week 19)
+    key_parameters: Optional[List[str]] = []
+    expected_outcomes: Optional[List[str]] = []
+    troubleshooting_tips: Optional[List[str]] = []
+
+    # Context-aware fields (Week 19)
+    relevance_score: Optional[int] = 50
+    affected_questions: Optional[List[str]] = []
+    affected_hypotheses: Optional[List[str]] = []
+    relevance_reasoning: Optional[str] = None
+    key_insights: Optional[List[str]] = []
+    potential_applications: Optional[List[str]] = []
+    recommendations: Optional[List[dict]] = []
+    context_relevance: Optional[str] = None
+    extraction_method: Optional[str] = "basic"
+    context_aware: Optional[bool] = False
+
     # Article details (for display)
     article_title: Optional[str] = None
     article_authors: Optional[str] = None
     article_journal: Optional[str] = None
     article_year: Optional[int] = None
-    
+
     class Config:
         from_attributes = True
 
@@ -130,17 +154,81 @@ async def extract_protocol(
     """
     try:
         logger.info(f"📥 Protocol extraction request for PMID {request.article_pmid} by user {user_id}")
-        
-        # Extract protocol
-        protocol = await protocol_extractor.extract_protocol(
-            article_pmid=request.article_pmid,
-            protocol_type=request.protocol_type,
-            user_id=user_id,
-            db=db,
-            project_id=request.project_id,  # Optional, will be looked up from triage if None
-            force_refresh=request.force_refresh
-        )
-        
+        logger.info(f"🧠 Intelligent extraction: {request.use_intelligent_extraction and USE_INTELLIGENT_EXTRACTION}")
+
+        # Determine project_id
+        project_id = request.project_id
+        if not project_id:
+            # Look up from triage
+            from database import PaperTriage
+            triage = db.query(PaperTriage).filter(
+                PaperTriage.article_pmid == request.article_pmid
+            ).first()
+            if triage:
+                project_id = triage.project_id
+                logger.info(f"📋 Found project_id from triage: {project_id}")
+
+        # Choose extraction method
+        if request.use_intelligent_extraction and USE_INTELLIGENT_EXTRACTION and project_id:
+            # Use intelligent context-aware extraction
+            logger.info(f"🧠 Using intelligent multi-agent extraction")
+            enhanced_data = await intelligent_protocol_extractor.extract_protocol_with_context(
+                article_pmid=request.article_pmid,
+                project_id=project_id,
+                user_id=user_id,
+                db=db,
+                protocol_type=request.protocol_type,
+                force_refresh=request.force_refresh
+            )
+
+            # Create Protocol object from enhanced data
+            protocol = Protocol(
+                protocol_id=str(uuid.uuid4()),
+                project_id=project_id,
+                source_pmid=request.article_pmid,
+                protocol_name=enhanced_data.get("protocol_name", "Unknown Protocol"),
+                protocol_type=enhanced_data.get("protocol_type", "other"),
+                description=enhanced_data.get("context_relevance"),
+                materials=enhanced_data.get("materials", []),
+                steps=enhanced_data.get("steps", []),
+                equipment=enhanced_data.get("equipment", []),
+                duration_estimate=enhanced_data.get("duration_estimate"),
+                difficulty_level=enhanced_data.get("difficulty_level", "moderate"),
+                key_parameters=enhanced_data.get("key_parameters", []),
+                expected_outcomes=enhanced_data.get("expected_outcomes", []),
+                troubleshooting_tips=enhanced_data.get("troubleshooting_tips", []),
+                relevance_score=enhanced_data.get("relevance_score", 50),
+                affected_questions=enhanced_data.get("affected_questions", []),
+                affected_hypotheses=enhanced_data.get("affected_hypotheses", []),
+                relevance_reasoning=enhanced_data.get("relevance_reasoning"),
+                key_insights=enhanced_data.get("key_insights", []),
+                potential_applications=enhanced_data.get("potential_applications", []),
+                recommendations=enhanced_data.get("recommendations", []),
+                context_relevance=enhanced_data.get("context_relevance"),
+                extraction_method="intelligent_multi_agent",
+                context_aware=True,
+                extracted_by="ai",
+                created_by=user_id
+            )
+
+            db.add(protocol)
+            db.commit()
+            db.refresh(protocol)
+
+            logger.info(f"✅ Intelligent extraction complete: {protocol.protocol_name}")
+
+        else:
+            # Use basic extraction
+            logger.info(f"📊 Using basic extraction")
+            protocol = await protocol_extractor.extract_protocol(
+                article_pmid=request.article_pmid,
+                protocol_type=request.protocol_type,
+                user_id=user_id,
+                db=db,
+                project_id=project_id,
+                force_refresh=request.force_refresh
+            )
+
         # Get article details for response
         article = db.query(Article).filter(Article.pmid == request.article_pmid).first()
 
@@ -158,6 +246,22 @@ async def extract_protocol(
             created_by=protocol.created_by,
             created_at=protocol.created_at.isoformat() if protocol.created_at else None,
             updated_at=protocol.updated_at.isoformat() if protocol.updated_at else None,
+            # Enhanced fields
+            key_parameters=getattr(protocol, 'key_parameters', []),
+            expected_outcomes=getattr(protocol, 'expected_outcomes', []),
+            troubleshooting_tips=getattr(protocol, 'troubleshooting_tips', []),
+            # Context-aware fields
+            relevance_score=getattr(protocol, 'relevance_score', 50),
+            affected_questions=getattr(protocol, 'affected_questions', []),
+            affected_hypotheses=getattr(protocol, 'affected_hypotheses', []),
+            relevance_reasoning=getattr(protocol, 'relevance_reasoning', None),
+            key_insights=getattr(protocol, 'key_insights', []),
+            potential_applications=getattr(protocol, 'potential_applications', []),
+            recommendations=getattr(protocol, 'recommendations', []),
+            context_relevance=getattr(protocol, 'context_relevance', None),
+            extraction_method=getattr(protocol, 'extraction_method', 'basic'),
+            context_aware=getattr(protocol, 'context_aware', False),
+            # Article details
             article_title=article.title if article else None,
             article_authors=format_authors(article.authors) if article else None,
             article_journal=article.journal if article else None,
