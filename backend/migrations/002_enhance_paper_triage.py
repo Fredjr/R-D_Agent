@@ -58,12 +58,20 @@ def upgrade():
     
     # Split by semicolons and execute each statement
     statements = [s.strip() for s in sql_content.split(';') if s.strip()]
-    
+
     with engine.connect() as conn:
         for statement in statements:
             if statement:
+                # Skip comments and empty lines
+                lines = [line for line in statement.split('\n')
+                        if line.strip() and not line.strip().startswith('--')]
+                clean_statement = '\n'.join(lines).strip()
+
+                if not clean_statement:
+                    continue
+
                 try:
-                    conn.execute(text(statement))
+                    conn.execute(text(clean_statement))
                     conn.commit()
                 except Exception as e:
                     # Ignore "column already exists" errors
