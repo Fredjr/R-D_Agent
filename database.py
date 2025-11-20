@@ -821,8 +821,15 @@ class PaperTriage(Base):
     affected_hypotheses = Column(JSON, default=list)  # Hypothesis IDs this paper supports/contradicts
     ai_reasoning = Column(Text, nullable=True)  # AI's reasoning for the triage decision
 
+    # Enhanced AI analysis (Week 9+)
+    confidence_score = Column(Float, default=0.5)  # AI confidence in assessment (0.0-1.0)
+    metadata_score = Column(Integer, default=0)  # Score from citations, recency, journal (0-30)
+    evidence_excerpts = Column(JSON, default=list)  # Array of evidence quotes from abstract
+    question_relevance_scores = Column(JSON, default=dict)  # Per-question scores with reasoning
+    hypothesis_relevance_scores = Column(JSON, default=dict)  # Per-hypothesis scores with support type
+
     # Triage metadata
-    triaged_by = Column(String, default='ai')  # 'ai' or 'user'
+    triaged_by = Column(String, default='ai')  # 'ai', 'ai_enhanced', or 'user'
     triaged_at = Column(DateTime(timezone=True), server_default=func.now())
     reviewed_by = Column(String, ForeignKey("users.user_id"), nullable=True)  # User who reviewed AI triage
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
@@ -842,6 +849,7 @@ class PaperTriage(Base):
         Index('idx_triage_status', 'triage_status'),
         Index('idx_triage_relevance', 'relevance_score'),
         Index('idx_triage_read_status', 'read_status'),
+        Index('idx_triage_confidence', 'confidence_score'),
         # Unique constraint to prevent duplicate triage entries
         Index('idx_unique_project_article_triage', 'project_id', 'article_pmid', unique=True),
     )

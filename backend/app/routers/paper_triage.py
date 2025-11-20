@@ -14,14 +14,22 @@ from pydantic import BaseModel
 
 from database import get_db, PaperTriage, Article, Project
 from backend.app.services.ai_triage_service import AITriageService
+from backend.app.services.enhanced_ai_triage_service import EnhancedAITriageService
 from backend.app.services.alert_generator import alert_generator
+import os
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/triage", tags=["triage"])
 
-# Initialize AI triage service
+# Feature flag for enhanced triage (set via environment variable)
+USE_ENHANCED_TRIAGE = os.getenv("USE_ENHANCED_TRIAGE", "true").lower() == "true"
+
+# Initialize AI triage services
 ai_triage_service = AITriageService()
+enhanced_ai_triage_service = EnhancedAITriageService()
+
+logger.info(f"🎯 Triage service initialized: {'Enhanced' if USE_ENHANCED_TRIAGE else 'Standard'}")
 
 
 # =============================================================================
@@ -41,7 +49,7 @@ class TriageStatusUpdate(BaseModel):
 
 
 class TriageResponse(BaseModel):
-    """Triage response"""
+    """Triage response with enhanced fields"""
     triage_id: str
     project_id: str
     article_pmid: str
@@ -58,6 +66,13 @@ class TriageResponse(BaseModel):
     reviewed_at: Optional[str]
     created_at: str
     updated_at: str
+
+    # Enhanced fields (Week 9+)
+    confidence_score: Optional[float] = 0.5
+    metadata_score: Optional[int] = 0
+    evidence_excerpts: Optional[List[dict]] = []
+    question_relevance_scores: Optional[dict] = {}
+    hypothesis_relevance_scores: Optional[dict] = {}
 
     # Include article details for convenience
     article: Optional[dict] = None
@@ -122,13 +137,23 @@ async def triage_paper(
         if not article:
             raise HTTPException(status_code=404, detail=f"Article {request.article_pmid} not found")
 
-        # Run AI triage
-        triage = await ai_triage_service.triage_paper(
-            project_id=project_id,
-            article_pmid=request.article_pmid,
-            db=db,
-            user_id=user_id
-        )
+        # Run AI triage (use enhanced service if enabled)
+        if USE_ENHANCED_TRIAGE:
+            logger.info(f"🚀 Using enhanced AI triage service")
+            triage = await enhanced_ai_triage_service.triage_paper(
+                project_id=project_id,
+                article_pmid=request.article_pmid,
+                db=db,
+                user_id=user_id
+            )
+        else:
+            logger.info(f"📊 Using standard AI triage service")
+            triage = await ai_triage_service.triage_paper(
+                project_id=project_id,
+                article_pmid=request.article_pmid,
+                db=db,
+                user_id=user_id
+            )
 
         # Generate alerts based on triage results (Week 13 integration)
         try:
