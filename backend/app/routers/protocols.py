@@ -24,6 +24,25 @@ router = APIRouter(prefix="/api/protocols", tags=["protocols"])
 protocol_extractor = ProtocolExtractorService()
 
 
+# Helper Functions
+
+def format_authors(authors) -> Optional[str]:
+    """
+    Convert authors list to comma-separated string.
+
+    Args:
+        authors: List of author names or string
+
+    Returns:
+        Comma-separated string of authors or None
+    """
+    if not authors:
+        return None
+    if isinstance(authors, list):
+        return ", ".join(authors)
+    return authors
+
+
 # Pydantic Models
 
 class MaterialItem(BaseModel):
@@ -124,7 +143,7 @@ async def extract_protocol(
         
         # Get article details for response
         article = db.query(Article).filter(Article.pmid == request.article_pmid).first()
-        
+
         return ProtocolResponse(
             protocol_id=protocol.protocol_id,
             source_pmid=protocol.source_pmid,
@@ -140,7 +159,7 @@ async def extract_protocol(
             created_at=protocol.created_at.isoformat() if protocol.created_at else None,
             updated_at=protocol.updated_at.isoformat() if protocol.updated_at else None,
             article_title=article.title if article else None,
-            article_authors=article.authors if article else None,
+            article_authors=format_authors(article.authors) if article else None,
             article_journal=article.journal if article else None,
             article_year=article.publication_year if article else None
         )
@@ -195,7 +214,7 @@ async def get_project_protocols(
                 created_at=protocol.created_at.isoformat() if protocol.created_at else None,
                 updated_at=protocol.updated_at.isoformat() if protocol.updated_at else None,
                 article_title=article.title if article else None,
-                article_authors=article.authors if article else None,
+                article_authors=format_authors(article.authors) if article else None,
                 article_journal=article.journal if article else None,
                 article_year=article.publication_year if article else None
             ))
@@ -245,7 +264,7 @@ async def get_protocol(
             created_at=protocol.created_at.isoformat() if protocol.created_at else None,
             updated_at=protocol.updated_at.isoformat() if protocol.updated_at else None,
             article_title=article.title if article else None,
-            article_authors=article.authors if article else None,
+            article_authors=format_authors(article.authors) if article else None,
             article_journal=article.journal if article else None,
             article_year=article.publication_year if article else None
         )
@@ -319,7 +338,7 @@ async def update_protocol(
             created_at=protocol.created_at.isoformat() if protocol.created_at else None,
             updated_at=protocol.updated_at.isoformat() if protocol.updated_at else None,
             article_title=article.title if article else None,
-            article_authors=article.authors if article else None,
+            article_authors=format_authors(article.authors) if article else None,
             article_journal=article.journal if article else None,
             article_year=article.publication_year if article else None
         )
