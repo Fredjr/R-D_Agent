@@ -16,23 +16,24 @@ import { Beaker, Lightbulb, Target, TrendingUp, AlertCircle } from 'lucide-react
 interface Recommendation {
   title: string;
   description: string;
-  priority: 'high' | 'medium' | 'low';
+  priority: string;
   action_type: string;
   estimated_effort?: string;
   expected_impact?: string;
+  prerequisites?: string[];
 }
 
 interface EnhancedProtocol {
   protocol_id: string;
   protocol_name: string;
   protocol_type: string;
-  relevance_score: number;
-  affected_questions: string[];
-  affected_hypotheses: string[];
-  key_insights: string[];
-  recommendations: Recommendation[];
-  context_aware: boolean;
-  extraction_method: string;
+  relevance_score?: number;
+  affected_questions?: string[];
+  affected_hypotheses?: string[];
+  key_insights?: string[];
+  recommendations?: Recommendation[];
+  context_aware?: boolean;
+  extraction_method?: string;
   difficulty_level: string;
   duration_estimate?: string;
 }
@@ -136,12 +137,12 @@ export default function EnhancedProtocolCard({
             <span className="text-sm font-medium text-gray-300">Addresses</span>
           </div>
           <div className="flex gap-2 flex-wrap">
-            {protocol.affected_questions?.length > 0 && (
+            {protocol.affected_questions && protocol.affected_questions.length > 0 && (
               <span className="px-2 py-1 rounded text-xs bg-blue-500/10 text-blue-400 border border-blue-500/30">
                 {protocol.affected_questions.length} Question{protocol.affected_questions.length > 1 ? 's' : ''}
               </span>
             )}
-            {protocol.affected_hypotheses?.length > 0 && (
+            {protocol.affected_hypotheses && protocol.affected_hypotheses.length > 0 && (
               <span className="px-2 py-1 rounded text-xs bg-purple-500/10 text-purple-400 border border-purple-500/30">
                 {protocol.affected_hypotheses.length} Hypothesis{protocol.affected_hypotheses.length > 1 ? 'es' : ''}
               </span>

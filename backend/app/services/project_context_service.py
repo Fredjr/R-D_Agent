@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 
 from database import (
-    Project, ResearchQuestion, Hypothesis, Decision, 
+    Project, ResearchQuestion, Hypothesis, ProjectDecision,
     PaperTriage, Protocol, Experiment, Article
 )
 
@@ -165,11 +165,11 @@ class ProjectContextService:
         # Get decisions from last 90 days
         cutoff = datetime.utcnow() - timedelta(days=90)
 
-        decisions = db.query(Decision).filter(
-            Decision.project_id == project_id,
-            Decision.created_at >= cutoff
+        decisions = db.query(ProjectDecision).filter(
+            ProjectDecision.project_id == project_id,
+            ProjectDecision.created_at >= cutoff
         ).order_by(
-            Decision.created_at.desc()
+            ProjectDecision.created_at.desc()
         ).limit(self.max_decisions).all()
 
         return [
