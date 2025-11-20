@@ -114,10 +114,17 @@ class EnhancedAITriageService:
             existing_triage.triaged_by = "ai_enhanced"
             existing_triage.triaged_at = datetime.utcnow()
             existing_triage.updated_at = datetime.utcnow()
-            
+
+            # Enhanced fields (Week 9+)
+            existing_triage.confidence_score = triage_result.get("confidence_score", 0.5)
+            existing_triage.metadata_score = metadata_score
+            existing_triage.evidence_excerpts = triage_result.get("evidence_excerpts", [])
+            existing_triage.question_relevance_scores = triage_result.get("question_relevance_scores", {})
+            existing_triage.hypothesis_relevance_scores = triage_result.get("hypothesis_relevance_scores", {})
+
             db.commit()
             db.refresh(existing_triage)
-            
+
             logger.info(f"✅ Updated existing triage for paper {article_pmid} with enhanced score {final_score}")
             return existing_triage
         else:
@@ -134,7 +141,13 @@ class EnhancedAITriageService:
                 affected_hypotheses=triage_result["affected_hypotheses"],
                 ai_reasoning=triage_result["ai_reasoning"],
                 triaged_by="ai_enhanced",
-                triaged_at=datetime.utcnow()
+                triaged_at=datetime.utcnow(),
+                # Enhanced fields (Week 9+)
+                confidence_score=triage_result.get("confidence_score", 0.5),
+                metadata_score=metadata_score,
+                evidence_excerpts=triage_result.get("evidence_excerpts", []),
+                question_relevance_scores=triage_result.get("question_relevance_scores", {}),
+                hypothesis_relevance_scores=triage_result.get("hypothesis_relevance_scores", {})
             )
 
             db.add(triage)

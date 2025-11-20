@@ -187,6 +187,12 @@ async def triage_paper(
             reviewed_at=triage.reviewed_at.isoformat() if triage.reviewed_at else None,
             created_at=triage.created_at.isoformat() if triage.created_at else None,
             updated_at=triage.updated_at.isoformat() if triage.updated_at else None,
+            # Enhanced fields (Week 9+)
+            confidence_score=getattr(triage, 'confidence_score', 0.5),
+            metadata_score=getattr(triage, 'metadata_score', 0),
+            evidence_excerpts=getattr(triage, 'evidence_excerpts', []),
+            question_relevance_scores=getattr(triage, 'question_relevance_scores', {}),
+            hypothesis_relevance_scores=getattr(triage, 'hypothesis_relevance_scores', {}),
             article={
                 "pmid": article.pmid,
                 "title": article.title,
@@ -284,6 +290,12 @@ async def get_project_inbox(
                 reviewed_at=triage.reviewed_at.isoformat() if triage.reviewed_at else None,
                 created_at=triage.created_at.isoformat() if triage.created_at else None,
                 updated_at=triage.updated_at.isoformat() if triage.updated_at else None,
+                # Enhanced fields (Week 9+)
+                confidence_score=getattr(triage, 'confidence_score', 0.5),
+                metadata_score=getattr(triage, 'metadata_score', 0),
+                evidence_excerpts=getattr(triage, 'evidence_excerpts', []),
+                question_relevance_scores=getattr(triage, 'question_relevance_scores', {}),
+                hypothesis_relevance_scores=getattr(triage, 'hypothesis_relevance_scores', {}),
                 article={
                     "pmid": article.pmid,
                     "title": article.title,
