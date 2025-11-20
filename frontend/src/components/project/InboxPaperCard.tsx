@@ -46,7 +46,7 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
   const getRelevanceColor = (score: number) => {
     if (score >= 70) return 'text-red-400 bg-red-500/20 border-red-500/30';
     if (score >= 40) return 'text-yellow-400 bg-yellow-500/20 border-yellow-500/30';
-    return 'text-gray-300 bg-gray-500/20 border-gray-500/30';
+    return 'text-blue-300 bg-blue-500/20 border-blue-500/30';
   };
 
   // Get status badge
@@ -57,7 +57,7 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
       case 'nice_to_know':
         return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">Nice to Know</span>;
       case 'ignore':
-        return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-500/20 text-gray-300 border border-gray-500/30">Ignored</span>;
+        return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-500/20 text-gray-100 border border-gray-500/30">Ignored</span>;
     }
   };
 
@@ -69,7 +69,7 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
       case 'reading':
         return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-500/20 text-green-400 border border-green-500/30">Reading</span>;
       case 'read':
-        return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-500/20 text-gray-300 border border-gray-500/30">Read</span>;
+        return <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-500/20 text-gray-100 border border-gray-500/30">Read</span>;
     }
   };
 
@@ -278,7 +278,7 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
         <div className="mb-4">
           <button
             onClick={() => setShowReasoning(!showReasoning)}
-            className="flex items-center gap-2 text-sm text-white hover:text-gray-300 transition-colors"
+            className="flex items-center gap-2 text-sm text-white hover:text-blue-300 transition-colors"
           >
             {showReasoning ? (
               <ChevronUpIcon className="w-4 h-4" />
@@ -326,7 +326,7 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
         <div className="flex gap-3">
           <button
             onClick={onMarkAsRead}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors border border-gray-600"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors border border-gray-600"
           >
             <BookOpenIcon className="w-5 h-5" />
             <span>Mark Read</span>

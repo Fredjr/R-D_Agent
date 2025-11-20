@@ -349,28 +349,38 @@
 /* Global text color enforcement for dark theme */
 body {
   background-color: var(--spotify-black);
-  color: var(--spotify-white) !important;
+  color: var(--spotify-white);
   font-family: var(--spotify-font-family);
 }
 
-/* Force proper text colors on all elements */
+/* Force proper text colors on all elements - but allow Tailwind overrides */
 * {
   color: inherit;
 }
 
-/* Primary text elements - White */
-h1, h2, h3, h4, h5, h6,
+/* Primary text elements - White (only on dark backgrounds) */
+body:not(.bg-white) h1:not([class*="text-"]),
+body:not(.bg-white) h2:not([class*="text-"]),
+body:not(.bg-white) h3:not([class*="text-"]),
+body:not(.bg-white) h4:not([class*="text-"]),
+body:not(.bg-white) h5:not([class*="text-"]),
+body:not(.bg-white) h6:not([class*="text-"]),
 .text-primary,
 .heading {
-  color: var(--spotify-white) !important;
+  color: var(--spotify-white);
   font-weight: 700;
 }
 
-/* Body text - White */
-p, span, div, li, td, th,
+/* Body text - White (only on dark backgrounds, don't override Tailwind classes) */
+body:not(.bg-white) p:not([class*="text-"]),
+body:not(.bg-white) span:not([class*="text-"]),
+body:not(.bg-white) div:not([class*="text-"]):not([class*="bg-white"]):not([class*="bg-gray-"]),
+body:not(.bg-white) li:not([class*="text-"]),
+body:not(.bg-white) td:not([class*="text-"]),
+body:not(.bg-white) th:not([class*="text-"]),
 .text-body,
 .content {
-  color: var(--spotify-white) !important;
+  color: var(--spotify-white);
 }
 
 /* Secondary text - Light gray */
@@ -548,19 +558,25 @@ a:hover {
   color: #1a1a1a !important;
 }
 
-/* Override any light text on light backgrounds */
+/* Override any light text on light backgrounds - ONLY for light grays */
 [class*="bg-white"] *,
-[class*="bg-gray-"] * {
+.bg-gray-50 *,
+.bg-gray-100 *,
+.bg-gray-200 * {
   color: #1a1a1a !important;
 }
 
 [class*="bg-white"] .text-secondary,
-[class*="bg-gray-"] .text-secondary {
+.bg-gray-50 .text-secondary,
+.bg-gray-100 .text-secondary,
+.bg-gray-200 .text-secondary {
   color: #4a4a4a !important;
 }
 
 [class*="bg-white"] .text-muted,
-[class*="bg-gray-"] .text-muted {
+.bg-gray-50 .text-muted,
+.bg-gray-100 .text-muted,
+.bg-gray-200 .text-muted {
   color: #6a6a6a !important;
 }
 
@@ -617,12 +633,23 @@ a:hover {
   color: #1a1a1a !important;
 }
 
-/* Fix for light backgrounds */
+/* Fix for light backgrounds - ONLY light grays, not dark grays */
 .bg-gray-50 *,
 .bg-gray-100 *,
+.bg-gray-200 *,
 .bg-slate-50 *,
 .bg-slate-100 * {
   color: #1a1a1a !important;
+}
+
+/* Ensure dark backgrounds have light text */
+.bg-gray-700 *,
+.bg-gray-800 *,
+.bg-gray-900 *,
+.bg-slate-700 *,
+.bg-slate-800 *,
+.bg-slate-900 * {
+  color: #ffffff !important;
 }
 
 /* Fix for any light text on light backgrounds - nuclear option */
@@ -771,8 +798,23 @@ a:hover {
 }
 
 /* Nuclear option for any remaining issues */
-.bg-white *:not(.text-white):not(.text-green-500):not(.text-blue-500):not(.text-red-500):not(.text-yellow-500):not(.text-purple-500):not([class*="text-green"]):not([class*="text-blue"]):not([class*="text-red"]):not([class*="text-yellow"]):not([class*="text-purple"]) {
+.bg-white *:not(.text-white):not(.text-green-500):not(.text-green-600):not(.text-green-700):not(.text-blue-500):not(.text-blue-600):not(.text-blue-700):not(.text-red-500):not(.text-red-600):not(.text-red-700):not(.text-yellow-500):not(.text-yellow-600):not(.text-yellow-700):not(.text-purple-500):not(.text-purple-600):not(.text-purple-700):not([class*="text-green"]):not([class*="text-blue"]):not([class*="text-red"]):not([class*="text-yellow"]):not([class*="text-purple"]) {
   color: #1a1a1a !important;
+}
+
+/* Specific fix for Inbox Tab - ensure white background is visible */
+.bg-white {
+  background-color: white !important;
+}
+
+.bg-white h1, .bg-white h2, .bg-white h3, .bg-white h4, .bg-white h5, .bg-white h6 {
+  color: #111827 !important; /* gray-900 */
+}
+
+.bg-white p:not([class*="text-"]),
+.bg-white span:not([class*="text-"]),
+.bg-white div:not([class*="text-"]):not([class*="bg-"]) {
+  color: #4b5563 !important; /* gray-600 */
 }
 
 /* Ensure colored elements stay colored */
@@ -998,6 +1040,18 @@ button[class*="share"]:hover,
 .bg-gray-100 *:not([class*="text-green"]):not([class*="text-blue"]):not([class*="text-red"]):not([class*="text-yellow"]):not([class*="text-purple"]):not(.text-white) {
   color: #1a1a1a !important;
 }
+
+/* ========================================
+   DARK BACKGROUND TEXT FIXES (INBOX TAB)
+   ======================================== */
+
+/* Override for dark backgrounds - ensure light text */
+/* REMOVED: This was too aggressive and overrode Tailwind classes */
+/* Use Tailwind classes directly instead (text-white, text-gray-100, etc.) */
+
+/* REMOVED: These overrides are no longer needed */
+/* Tailwind classes now work correctly without global overrides */
+/* Use explicit Tailwind classes in components: text-white, text-gray-100, text-blue-300, etc. */
 
 /* ========================================
    SPOTIFY-INSPIRED ANIMATIONS & INTERACTIONS
