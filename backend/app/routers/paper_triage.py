@@ -43,7 +43,7 @@ class TriageRequest(BaseModel):
 
 class TriageStatusUpdate(BaseModel):
     """Update triage status (user override)"""
-    triage_status: str  # must_read, nice_to_know, ignore
+    triage_status: Optional[str] = None  # must_read, nice_to_know, ignore
     read_status: Optional[str] = None  # unread, reading, read
     user_notes: Optional[str] = None
 
