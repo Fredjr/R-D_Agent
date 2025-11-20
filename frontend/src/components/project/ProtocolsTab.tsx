@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Flask, Clock, AlertTriangle, Eye, Trash2, Download } from 'lucide-react';
+import { Beaker, Clock, AlertTriangle, Eye, Trash2, Download } from 'lucide-react';
 import ProtocolDetailModal from './ProtocolDetailModal';
 
 interface Material {
@@ -178,7 +178,7 @@ export default function ProtocolsTab({ projectId, userId }: ProtocolsTabProps) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Flask className="w-6 h-6" />
+            <Beaker className="w-6 h-6" />
             Protocols
           </h2>
           <p className="text-gray-400 mt-1">
@@ -212,7 +212,7 @@ export default function ProtocolsTab({ projectId, userId }: ProtocolsTabProps) {
       {/* Protocols Grid */}
       {filteredProtocols.length === 0 ? (
         <div className="text-center py-12 bg-gray-800/30 rounded-lg border border-gray-800">
-          <Flask className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+          <Beaker className="w-12 h-12 text-gray-600 mx-auto mb-4" />
           <p className="text-gray-400 mb-2">No protocols yet</p>
           <p className="text-sm text-gray-500">
             Extract protocols from papers in your Smart Inbox
