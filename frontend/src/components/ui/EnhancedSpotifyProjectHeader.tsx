@@ -1,15 +1,16 @@
 'use client';
 
 import React from 'react';
-import { 
-  PlayIcon, 
-  ShareIcon, 
+import {
+  PlayIcon,
+  ShareIcon,
   EllipsisHorizontalIcon,
   UserGroupIcon,
   CalendarIcon,
-  DocumentTextIcon
+  DocumentTextIcon,
+  BellIcon
 } from '@heroicons/react/24/outline';
-import { 
+import {
   PlayIcon as PlayIconSolid,
 } from '@heroicons/react/24/solid';
 
@@ -38,6 +39,8 @@ interface EnhancedSpotifyProjectHeaderProps {
   onShare?: () => void;
   onSettings?: () => void;
   onInvite?: () => void;
+  onAlerts?: () => void;
+  alertsCount?: number;
   isPlaying?: boolean;
 }
 
@@ -48,6 +51,8 @@ export function EnhancedSpotifyProjectHeader({
   onShare,
   onSettings,
   onInvite,
+  onAlerts,
+  alertsCount = 0,
   isPlaying = false
 }: EnhancedSpotifyProjectHeaderProps) {
   // Generate a visual representation for the project
@@ -177,6 +182,18 @@ export function EnhancedSpotifyProjectHeader({
             </button>
 
             <button
+              onClick={onAlerts}
+              className="relative p-3 text-[var(--spotify-light-text)] hover:text-[var(--spotify-white)] transition-colors"
+            >
+              <BellIcon className="w-6 h-6" />
+              {alertsCount > 0 && (
+                <span className="absolute top-2 right-2 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                  {alertsCount > 9 ? '9+' : alertsCount}
+                </span>
+              )}
+            </button>
+
+            <button
               onClick={onShare}
               className="p-3 text-[var(--spotify-light-text)] hover:text-[var(--spotify-white)] transition-colors"
             >
@@ -290,6 +307,18 @@ export function EnhancedSpotifyProjectHeader({
             className="text-[var(--spotify-light-text)] hover:text-[var(--spotify-white)] transition-colors"
           >
             <UserGroupIcon className="w-8 h-8" />
+          </button>
+
+          <button
+            onClick={onAlerts}
+            className="relative text-[var(--spotify-light-text)] hover:text-[var(--spotify-white)] transition-colors"
+          >
+            <BellIcon className="w-8 h-8" />
+            {alertsCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-semibold">
+                {alertsCount > 9 ? '9+' : alertsCount}
+              </span>
+            )}
           </button>
 
           <button

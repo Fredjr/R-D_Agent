@@ -950,3 +950,226 @@ export async function getDecisionTimeline(
     throw error;
   }
 }
+
+// ============================================================================
+// WEEK 14: PROJECT ALERTS API
+// ============================================================================
+
+export interface ProjectAlert {
+  alert_id: string;
+  project_id: string;
+  alert_type: 'high_impact_paper' | 'contradicting_evidence' | 'gap_identified' | 'new_paper';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  title: string;
+  description: string;
+  affected_questions: string[];
+  affected_hypotheses: string[];
+  related_pmids: string[];
+  action_required: boolean;
+  dismissed: boolean;
+  dismissed_by?: string;
+  dismissed_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AlertStats {
+  total_alerts: number;
+  unread_alerts: number;
+  by_type: Record<string, number>;
+  by_severity: Record<string, number>;
+  action_required_count: number;
+}
+
+export interface CreateAlertRequest {
+  project_id: string;
+  alert_type: string;
+  severity?: string;
+  title: string;
+  description: string;
+  affected_questions?: string[];
+  affected_hypotheses?: string[];
+  related_pmids?: string[];
+  action_required?: boolean;
+}
+
+/**
+ * Get all alerts for a project
+ */
+export async function getProjectAlerts(
+  projectId: string,
+  userId: string,
+  filters?: {
+    dismissed?: boolean;
+    alert_type?: string;
+    severity?: string;
+    limit?: number;
+    offset?: number;
+  }
+): Promise<ProjectAlert[]> {
+  try {
+    const params = new URLSearchParams();
+    if (filters?.dismissed !== undefined) params.append('dismissed', String(filters.dismissed));
+    if (filters?.alert_type) params.append('alert_type', filters.alert_type);
+    if (filters?.severity) params.append('severity', filters.severity);
+    if (filters?.limit) params.append('limit', String(filters.limit));
+    if (filters?.offset) params.append('offset', String(filters.offset));
+
+    const queryString = params.toString();
+    const url = `/api/proxy/alerts/project/${projectId}${queryString ? `?${queryString}` : ''}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch alerts: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching project alerts:', error);
+    throw error;
+  }
+}
+
+/**
+ * Create a new alert
+ */
+export async function createAlert(
+  request: CreateAlertRequest,
+  userId: string
+): Promise<ProjectAlert> {
+  try {
+    const response = await fetch('/api/proxy/alerts/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId,
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create alert: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error creating alert:', error);
+    throw error;
+  }
+}
+
+/**
+ * Dismiss a single alert
+ */
+export async function dismissAlert(
+  alertId: string,
+  userId: string
+): Promise<ProjectAlert> {
+  try {
+    const response = await fetch(`/api/proxy/alerts/${alertId}/dismiss`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to dismiss alert: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error dismissing alert:', error);
+    throw error;
+  }
+}
+
+/**
+ * Dismiss multiple alerts at once
+ */
+export async function dismissAlertsBatch(
+  alertIds: string[],
+  userId: string
+): Promise<{ success: boolean; dismissed_count: number }> {
+  try {
+    const response = await fetch('/api/proxy/alerts/dismiss-batch', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId,
+      },
+      body: JSON.stringify({ alert_ids: alertIds }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to dismiss alerts: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error dismissing alerts batch:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get alert statistics for a project
+ */
+export async function getAlertStats(
+  projectId: string,
+  userId: string
+): Promise<AlertStats> {
+  try {
+    const response = await fetch(`/api/proxy/alerts/project/${projectId}/stats`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch alert stats: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching alert stats:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete an alert permanently
+ */
+export async function deleteAlert(
+  alertId: string,
+  userId: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const response = await fetch(`/api/proxy/alerts/${alertId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to delete alert: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error deleting alert:', error);
+    throw error;
+  }
+}

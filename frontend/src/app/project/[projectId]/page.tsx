@@ -11,7 +11,7 @@ import NetworkViewWithSidebar from '@/components/NetworkViewWithSidebar';
 import MultiColumnNetworkView from '@/components/MultiColumnNetworkView';
 import Collections from '@/components/Collections';
 import { useAsyncJob } from '@/hooks/useAsyncJob';
-import { startReviewJob, startDeepDiveJob, fetchResearchStats, ResearchStats } from '../../../lib/api';
+import { startReviewJob, startDeepDiveJob, fetchResearchStats, ResearchStats, getAlertStats } from '../../../lib/api';
 import AsyncJobProgress from '@/components/AsyncJobProgress';
 import ClusterExplorationModal from '@/components/ClusterExplorationModal';
 import InlineJobResults from '@/components/InlineJobResults';
@@ -30,6 +30,7 @@ import { AnalysisTab } from '@/components/project/AnalysisTab';
 import { ProgressTab } from '@/components/project/ProgressTab';
 import { MyCollectionsTab } from '@/components/project/MyCollectionsTab';
 import DecisionTimelineTab from '@/components/project/DecisionTimelineTab';
+import { AlertsPanel } from '@/components/project/AlertsPanel';
 import { ProjectHeroActions } from '@/components/project/ProjectHeroActions';
 import { NetworkQuickStart } from '@/components/project/NetworkQuickStart';
 import { ContextualActions, ProjectState, ActionType } from '@/components/project/ContextualActions';
@@ -141,6 +142,10 @@ export default function ProjectPage() {
   const [sendingInvite, setSendingInvite] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+
+  // Week 14: Alerts state
+  const [showAlertsPanel, setShowAlertsPanel] = useState(false);
+  const [alertsUnreadCount, setAlertsUnreadCount] = useState(0);
 
   // Collection management state
   const [collections, setCollections] = useState<any[]>([]);
@@ -267,7 +272,21 @@ export default function ProjectPage() {
       }
     };
 
+    // Week 14: Load alert stats
+    const loadAlertStats = async () => {
+      if (!projectId || !user?.email) return;
+
+      try {
+        const alertStats = await getAlertStats(projectId as string, user.email);
+        setAlertsUnreadCount(alertStats.unread_alerts);
+        console.log('🔔 Alert stats loaded:', alertStats);
+      } catch (error) {
+        console.error('❌ Error loading alert stats:', error);
+      }
+    };
+
     loadResearchStats();
+    loadAlertStats();
   }, [projectId, user?.user_id]);
 
   // 🔧 Handle URL parameters to set active tab - Map old tab names to new structure
@@ -1244,6 +1263,8 @@ export default function ProjectPage() {
           onShare={() => setShowShareModal(true)}
           onSettings={() => setShowSettingsModal(true)}
           onInvite={() => setShowInviteModal(true)}
+          onAlerts={() => setShowAlertsPanel(true)}
+          alertsCount={alertsUnreadCount}
         />
 
         {/* Enhanced Discover Section - Research context boxes with stats and quick actions */}
@@ -2240,6 +2261,20 @@ export default function ProjectPage() {
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
         onResultClick={handleSearchResultClick}
+      />
+
+      {/* Week 14: Alerts Panel */}
+      <AlertsPanel
+        projectId={projectId}
+        isOpen={showAlertsPanel}
+        onClose={() => setShowAlertsPanel(false)}
+        onViewPaper={(pmid) => {
+          // Navigate to explore tab and search for the paper
+          setActiveTab('papers');
+          setActiveSubTab('explore');
+          setShowAlertsPanel(false);
+          // Could add logic to search for the paper by PMID
+        }}
       />
     </MobileResponsiveLayout>
   );
