@@ -1,0 +1,36 @@
+{
+  "name": "rd-agent-e2e-tests",
+  "version": "1.0.0",
+  "description": "Comprehensive E2E tests for R&D Agent Weeks 12-14",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:ui": "playwright test --ui",
+    "test:chromium": "playwright test --project=chromium",
+    "test:firefox": "playwright test --project=firefox",
+    "test:webkit": "playwright test --project=webkit",
+    "test:mobile": "playwright test --project='Mobile Chrome'",
+    "test:backend": "playwright test --grep='Backend API'",
+    "test:inbox": "playwright test --grep='Smart Inbox'",
+    "test:decisions": "playwright test --grep='Decision Timeline'",
+    "test:alerts": "playwright test --grep='Project Alerts'",
+    "test:integration": "playwright test --grep='Integration'",
+    "test:errors": "playwright test --grep='Error Handling'",
+    "test:performance": "playwright test --grep='Performance'",
+    "report": "playwright show-report test-results/html",
+    "install": "playwright install"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
+  },
+  "keywords": [
+    "e2e",
+    "testing",
+    "playwright",
+    "automation"
+  ],
+  "author": "R&D Agent Team",
+  "license": "MIT"
+}
+
