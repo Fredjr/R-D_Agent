@@ -16,7 +16,7 @@ import logging
 import json
 import os
 from typing import Optional, Dict, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from openai import AsyncOpenAI
 
@@ -158,14 +158,14 @@ class ProtocolExtractorService:
         
         if not existing:
             return None
-        
-        # Check if protocol is recent enough
-        cache_cutoff = datetime.utcnow() - timedelta(days=self.cache_ttl_days)
+
+        # Check if protocol is recent enough (use timezone-aware datetime)
+        cache_cutoff = datetime.now(timezone.utc) - timedelta(days=self.cache_ttl_days)
         if existing.created_at < cache_cutoff:
             logger.info(f"🔄 Protocol for PMID {article_pmid} is older than {self.cache_ttl_days} days, re-extracting")
             return None
-        
-        age_days = (datetime.utcnow() - existing.created_at).days
+
+        age_days = (datetime.now(timezone.utc) - existing.created_at).days
         logger.info(f"✅ Using cached protocol for PMID {article_pmid} (age: {age_days} days)")
         return existing
     
