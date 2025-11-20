@@ -52,51 +52,68 @@ class ProtocolExtractorService:
         protocol_type: Optional[str],
         user_id: str,
         db: Session,
+        project_id: Optional[str] = None,
         force_refresh: bool = False
     ) -> Protocol:
         """
         Extract protocol from paper.
-        
+
         Steps:
         1. Check cache (existing protocol for this PMID)
         2. Get article from database
-        3. Extract protocol using AI
-        4. Save to database
-        
+        3. Determine project_id (from parameter or from triage record)
+        4. Extract protocol using AI
+        5. Save to database
+
         Args:
             article_pmid: PubMed ID of the article
             protocol_type: Optional type hint (delivery, editing, screening, analysis, other)
             user_id: User ID for tracking
             db: Database session
+            project_id: Optional project ID (if not provided, will look up from triage)
             force_refresh: If True, bypass cache and re-extract
-            
+
         Returns:
             Protocol object with extracted data
         """
         logger.info(f"🔍 Extracting protocol from PMID {article_pmid}")
-        
+
         # Step 1: Check cache (unless force_refresh)
         if not force_refresh:
             cached_protocol = self._get_cached_protocol(article_pmid, db)
             if cached_protocol:
                 logger.info(f"✅ Cache hit for protocol PMID {article_pmid}")
                 return cached_protocol
-        
+
         # Step 2: Get article
         article = db.query(Article).filter(Article.pmid == article_pmid).first()
         if not article:
             raise ValueError(f"Article {article_pmid} not found in database")
-        
-        # Step 3: Extract protocol using AI
+
+        # Step 3: Determine project_id
+        if not project_id:
+            # Try to get project_id from triage record
+            from database import PaperTriage
+            triage = db.query(PaperTriage).filter(
+                PaperTriage.article_pmid == article_pmid
+            ).first()
+            if triage:
+                project_id = triage.project_id
+                logger.info(f"📋 Found project_id from triage: {project_id}")
+            else:
+                raise ValueError(f"No project_id provided and no triage record found for PMID {article_pmid}")
+
+        # Step 4: Extract protocol using AI
         protocol_data = await self._extract_with_ai(
             article=article,
             protocol_type=protocol_type
         )
-        
-        # Step 4: Save to database
+
+        # Step 5: Save to database
         import uuid
         protocol = Protocol(
             protocol_id=str(uuid.uuid4()),
+            project_id=project_id,  # Now required!
             source_pmid=article_pmid,
             protocol_name=protocol_data["protocol_name"],
             protocol_type=protocol_data.get("protocol_type", "general"),
@@ -108,12 +125,12 @@ class ProtocolExtractorService:
             extracted_by="ai",
             created_by=user_id
         )
-        
+
         db.add(protocol)
         db.commit()
         db.refresh(protocol)
-        
-        logger.info(f"✅ Protocol extracted and saved: {protocol.protocol_id}")
+
+        logger.info(f"✅ Protocol extracted and saved: {protocol.protocol_id} for project {project_id}")
         return protocol
     
     def _get_cached_protocol(

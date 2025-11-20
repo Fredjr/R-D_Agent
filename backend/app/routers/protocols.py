@@ -47,6 +47,7 @@ class ProtocolStep(BaseModel):
 class ProtocolExtractRequest(BaseModel):
     """Request to extract protocol from paper"""
     article_pmid: str = Field(..., description="PubMed ID of the article")
+    project_id: Optional[str] = Field(None, description="Project ID (optional, will be looked up from triage if not provided)")
     protocol_type: Optional[str] = Field(None, description="Type hint: delivery, editing, screening, analysis, synthesis, imaging, other")
     force_refresh: bool = Field(False, description="If true, bypass cache and re-extract")
 
@@ -117,6 +118,7 @@ async def extract_protocol(
             protocol_type=request.protocol_type,
             user_id=user_id,
             db=db,
+            project_id=request.project_id,  # Optional, will be looked up from triage if None
             force_refresh=request.force_refresh
         )
         
