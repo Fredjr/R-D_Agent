@@ -222,7 +222,6 @@ class EnhancedAITriageService:
         return {
             "project_name": project.project_name,
             "project_description": project.description or "",
-            "main_question": project.main_question or "",
             "questions": [
                 {
                     "question_id": q.question_id,
@@ -333,7 +332,6 @@ class EnhancedAITriageService:
 
 **Project Context:**
 Project: {context['project_name']}
-Main Question: {context['main_question']}
 Description: {context['project_description']}
 
 **Research Questions:**
