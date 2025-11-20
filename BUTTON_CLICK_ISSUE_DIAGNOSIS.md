@@ -233,10 +233,64 @@ The protocols router was added in Week 17-18, but the proxy configuration wasn't
 
 ---
 
-**Status**: ✅ Fixed and Deployed  
-**Date**: November 20, 2025  
-**Commit**: 4ca0b47  
-**Vercel**: Auto-deploying  
+---
+
+## 🔧 Additional Fix: Enhanced Fields in Update Response
+
+### Issue 2: Missing Enhanced Fields
+
+**Problem**: After clicking Accept/Maybe/Reject, the frontend reloads the entire inbox because the update response doesn't include enhanced fields.
+
+**Root Cause**: `update_triage_status()` endpoint was not returning Week 16 enhanced fields in the response.
+
+**Fix Applied** (`backend/app/routers/paper_triage.py`):
+```python
+response = TriageResponse(
+    # ... existing fields ...
+    # Enhanced fields (Week 16) - ADDED
+    confidence_score=triage.confidence_score if hasattr(triage, 'confidence_score') else 0.5,
+    metadata_score=triage.metadata_score if hasattr(triage, 'metadata_score') else 0,
+    evidence_excerpts=triage.evidence_excerpts if hasattr(triage, 'evidence_excerpts') else [],
+    question_relevance_scores=triage.question_relevance_scores if hasattr(triage, 'question_relevance_scores') else {},
+    hypothesis_relevance_scores=triage.hypothesis_relevance_scores if hasattr(triage, 'hypothesis_relevance_scores') else {},
+    # ... article details ...
+)
+```
+
+**Impact**:
+- Frontend receives complete triage data immediately after updates
+- UI can display enhanced fields without reloading entire inbox
+- Better user experience (faster response)
+- Reduced API calls
+
+---
+
+## 📊 Complete Fix Summary
+
+### Commits
+1. **88fb860** - UX improvements (text colors, evidence expanded)
+2. **1074da8** - Documentation (Smart Inbox UX fixes)
+3. **4ca0b47** - Proxy fix (protocols endpoint routing)
+4. **5e8bfe5** - Backend fix (enhanced fields in update response)
+
+### Files Changed
+1. `frontend/src/components/project/InboxPaperCard.tsx` - UX improvements
+2. `frontend/src/app/api/proxy/[...path]/route.ts` - Proxy routing fix
+3. `backend/app/routers/paper_triage.py` - Enhanced fields fix
+4. `SMART_INBOX_UX_FIXES.md` - Documentation
+5. `BUTTON_CLICK_ISSUE_DIAGNOSIS.md` - This file
+
+### Deployments
+- ✅ Frontend (Vercel): Auto-deployed
+- ✅ Backend (Railway): Auto-deployed
+
+---
+
+**Status**: ✅ All Issues Fixed and Deployed
+**Date**: November 20, 2025
+**Commits**: 88fb860, 1074da8, 4ca0b47, 5e8bfe5
+**Vercel**: ✅ Deployed
+**Railway**: ✅ Deployed
 
 **All buttons should now work correctly! 🎉**
 
