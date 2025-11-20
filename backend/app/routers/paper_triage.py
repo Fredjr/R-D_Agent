@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 from database import get_db, PaperTriage, Article, Project
 from backend.app.services.ai_triage_service import AITriageService
+from backend.app.services.alert_generator import alert_generator
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +129,20 @@ async def triage_paper(
             db=db,
             user_id=user_id
         )
+
+        # Generate alerts based on triage results (Week 13 integration)
+        try:
+            alerts = await alert_generator.generate_alerts_for_triage(
+                project_id=project_id,
+                triage=triage,
+                article=article,
+                db=db
+            )
+            if alerts:
+                logger.info(f"🔔 Generated {len(alerts)} alerts for paper {request.article_pmid}")
+        except Exception as alert_error:
+            # Don't fail triage if alert generation fails
+            logger.error(f"⚠️ Error generating alerts: {alert_error}")
 
         # Build response with article details
         response = TriageResponse(

@@ -904,6 +904,18 @@ except ImportError as e:
     traceback.print_exc()
     print("   Research Project OS features will not be available")
 
+# Week 13: Project Alerts endpoints
+try:
+    from backend.app.routers.alerts import router as alerts_router
+    app.include_router(alerts_router)
+    print("✅ Project alerts endpoints registered successfully")
+except ImportError as e:
+    print(f"⚠️ Failed to import alerts router: {e}")
+    print(f"   Error details: {type(e).__name__}")
+    import traceback
+    traceback.print_exc()
+    print("   Project alerts feature will not be available")
+
 # Database migration endpoint for Phase 5
 @app.post("/admin/migrate-citation-schema")
 async def migrate_citation_schema(user_id: str = Header(..., alias="User-ID")):
