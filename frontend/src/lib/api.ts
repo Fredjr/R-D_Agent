@@ -530,6 +530,27 @@ export interface PaperTriageData {
   reviewed_at: string | null;
   created_at: string;
   updated_at: string;
+
+  // Enhanced AI triage fields (Phase 1, Week 9+)
+  confidence_score?: number; // AI confidence in assessment (0.0-1.0)
+  metadata_score?: number; // Score from citations, recency, journal (0-30)
+  evidence_excerpts?: Array<{
+    quote: string;
+    relevance: string;
+    linked_to: string;
+  }>;
+  question_relevance_scores?: Record<string, {
+    score: number;
+    reasoning: string;
+    evidence: string;
+  }>;
+  hypothesis_relevance_scores?: Record<string, {
+    score: number;
+    support_type: string;
+    reasoning: string;
+    evidence: string;
+  }>;
+
   article?: {
     pmid: string;
     title: string;
