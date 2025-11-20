@@ -384,6 +384,12 @@ async def update_triage_status(
             reviewed_at=triage.reviewed_at.isoformat() if triage.reviewed_at else None,
             created_at=triage.created_at.isoformat() if triage.created_at else None,
             updated_at=triage.updated_at.isoformat() if triage.updated_at else None,
+            # Enhanced fields (Week 16)
+            confidence_score=triage.confidence_score if hasattr(triage, 'confidence_score') else 0.5,
+            metadata_score=triage.metadata_score if hasattr(triage, 'metadata_score') else 0,
+            evidence_excerpts=triage.evidence_excerpts if hasattr(triage, 'evidence_excerpts') else [],
+            question_relevance_scores=triage.question_relevance_scores if hasattr(triage, 'question_relevance_scores') else {},
+            hypothesis_relevance_scores=triage.hypothesis_relevance_scores if hasattr(triage, 'hypothesis_relevance_scores') else {},
             article={
                 "pmid": article.pmid,
                 "title": article.title,
