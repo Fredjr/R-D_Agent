@@ -17,7 +17,7 @@ import os
 import json
 import logging
 from typing import Dict, List, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from openai import AsyncOpenAI
 
@@ -35,14 +35,16 @@ class EnhancedAITriageService:
     def __init__(self):
         self.model = "gpt-4o-mini"  # Using gpt-4o-mini for cost efficiency
         self.temperature = 0.5  # Increased for more creative connections
-        logger.info(f"✅ EnhancedAITriageService initialized with model: {self.model}")
+        self.cache_ttl_days = 7  # Cache triage results for 7 days
+        logger.info(f"✅ EnhancedAITriageService initialized with model: {self.model}, cache TTL: {self.cache_ttl_days} days")
 
     async def triage_paper(
         self,
         project_id: str,
         article_pmid: str,
         db: Session,
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        force_refresh: bool = False
     ) -> PaperTriage:
         """
         Triage a single paper for a project using enhanced AI analysis.
@@ -52,11 +54,19 @@ class EnhancedAITriageService:
             article_pmid: Article PMID
             db: Database session
             user_id: Optional user ID for tracking
+            force_refresh: If True, bypass cache and re-triage
 
         Returns:
             PaperTriage object with enhanced AI analysis
         """
         logger.info(f"🔍 Starting enhanced AI triage for paper {article_pmid} in project {project_id}")
+
+        # 0. Check cache first (unless force_refresh)
+        if not force_refresh:
+            cached_triage = self._get_cached_triage(project_id, article_pmid, db)
+            if cached_triage:
+                logger.info(f"✅ Cache hit for paper {article_pmid} in project {project_id}")
+                return cached_triage
 
         # 1. Get article
         article = db.query(Article).filter(Article.pmid == article_pmid).first()
@@ -157,6 +167,50 @@ class EnhancedAITriageService:
             logger.info(f"✅ Created new enhanced triage for paper {article_pmid} with score {final_score}")
             return triage
 
+    def _get_cached_triage(
+        self,
+        project_id: str,
+        article_pmid: str,
+        db: Session
+    ) -> Optional[PaperTriage]:
+        """
+        Check if a recent triage exists for this paper in this project.
+
+        Returns cached triage if:
+        1. Triage exists
+        2. Triage was created within cache_ttl_days
+        3. Triage has enhanced fields (not old format)
+
+        Args:
+            project_id: Project ID
+            article_pmid: Article PMID
+            db: Database session
+
+        Returns:
+            PaperTriage if cache hit, None if cache miss
+        """
+        existing = db.query(PaperTriage).filter(
+            PaperTriage.project_id == project_id,
+            PaperTriage.article_pmid == article_pmid
+        ).first()
+
+        if not existing:
+            return None
+
+        # Check if triage is recent enough
+        cache_cutoff = datetime.utcnow() - timedelta(days=self.cache_ttl_days)
+        if existing.triaged_at < cache_cutoff:
+            logger.info(f"🔄 Triage for paper {article_pmid} is older than {self.cache_ttl_days} days, re-triaging")
+            return None
+
+        # Check if triage has enhanced fields (not old format)
+        if not hasattr(existing, 'confidence_score') or existing.confidence_score is None:
+            logger.info(f"🔄 Triage for paper {article_pmid} is old format, re-triaging")
+            return None
+
+        logger.info(f"✅ Using cached triage for paper {article_pmid} (age: {(datetime.utcnow() - existing.triaged_at).days} days)")
+        return existing
+
     def _calculate_metadata_score(self, article: Article) -> int:
         """
         Calculate metadata-based score from citations, recency, and journal impact.
@@ -216,9 +270,45 @@ class EnhancedAITriageService:
         self,
         project: Project,
         questions: List[ResearchQuestion],
-        hypotheses: List[Hypothesis]
+        hypotheses: List[Hypothesis],
+        max_questions: int = 10,
+        max_hypotheses: int = 10
     ) -> Dict:
-        """Build enhanced project context with detailed question/hypothesis info"""
+        """
+        Build enhanced project context with detailed question/hypothesis info.
+
+        Cost Optimization: Limit number of questions/hypotheses to reduce token usage.
+        Prioritize active questions and hypotheses.
+
+        Args:
+            project: Project object
+            questions: List of research questions
+            hypotheses: List of hypotheses
+            max_questions: Maximum number of questions to include (default: 10)
+            max_hypotheses: Maximum number of hypotheses to include (default: 10)
+
+        Returns:
+            Context dictionary with limited questions/hypotheses
+        """
+        # Sort questions by priority and status (active first)
+        sorted_questions = sorted(
+            questions,
+            key=lambda q: (
+                q.status != 'active',  # Active first
+                getattr(q, 'priority', 'medium') != 'high',  # High priority first
+                q.question_type != 'main'  # Main questions first
+            )
+        )[:max_questions]
+
+        # Sort hypotheses by status and confidence (active and high confidence first)
+        sorted_hypotheses = sorted(
+            hypotheses,
+            key=lambda h: (
+                h.status != 'active',  # Active first
+                h.confidence_level != 'high'  # High confidence first
+            )
+        )[:max_hypotheses]
+
         return {
             "project_name": project.project_name,
             "project_description": project.description or "",
@@ -231,7 +321,7 @@ class EnhancedAITriageService:
                     "priority": getattr(q, 'priority', 'medium'),
                     "parent_id": q.parent_question_id
                 }
-                for q in questions
+                for q in sorted_questions
             ],
             "hypotheses": [
                 {
@@ -242,8 +332,12 @@ class EnhancedAITriageService:
                     "confidence": h.confidence_level,
                     "linked_question": h.linked_question_id
                 }
-                for h in hypotheses
-            ]
+                for h in sorted_hypotheses
+            ],
+            "total_questions": len(questions),
+            "total_hypotheses": len(hypotheses),
+            "showing_top_questions": len(sorted_questions),
+            "showing_top_hypotheses": len(sorted_hypotheses)
         }
 
     async def _analyze_paper_relevance_enhanced(
@@ -305,13 +399,43 @@ class EnhancedAITriageService:
                 "question_relevance_scores": {}
             }
 
+    def _truncate_abstract(self, abstract: str, max_words: int = 300) -> str:
+        """
+        Truncate long abstracts to reduce token usage.
+
+        Cost Optimization: Long abstracts increase token costs.
+        Keep first max_words words which usually contain the key findings.
+
+        Args:
+            abstract: Full abstract text
+            max_words: Maximum number of words to keep (default: 300)
+
+        Returns:
+            Truncated abstract with ellipsis if truncated
+        """
+        if not abstract:
+            return "No abstract available"
+
+        words = abstract.split()
+        if len(words) <= max_words:
+            return abstract
+
+        truncated = " ".join(words[:max_words])
+        logger.info(f"📝 Truncated abstract from {len(words)} to {max_words} words")
+        return truncated + "... [truncated for brevity]"
+
     def _build_enhanced_triage_prompt(self, article: Article, context: Dict, metadata_score: int) -> str:
         """Build enhanced prompt with explicit scoring rubric and evidence requirements"""
 
         # Format questions with hierarchy
         questions_text = ""
         if context["questions"]:
-            questions_text = "\n".join([
+            # Show count if truncated
+            total_q = context.get("total_questions", len(context["questions"]))
+            showing_q = context.get("showing_top_questions", len(context["questions"]))
+            questions_header = f"**Research Questions** (showing top {showing_q} of {total_q}):" if showing_q < total_q else "**Research Questions:**"
+
+            questions_text = questions_header + "\n" + "\n".join([
                 f"- **Q{i+1}** [{q['type']}] {q['text']}\n  Status: {q['status']}, Priority: {q.get('priority', 'medium')}, ID: {q['question_id']}"
                 for i, q in enumerate(context["questions"])
             ])
@@ -321,12 +445,20 @@ class EnhancedAITriageService:
         # Format hypotheses with linkage
         hypotheses_text = ""
         if context["hypotheses"]:
-            hypotheses_text = "\n".join([
+            # Show count if truncated
+            total_h = context.get("total_hypotheses", len(context["hypotheses"]))
+            showing_h = context.get("showing_top_hypotheses", len(context["hypotheses"]))
+            hypotheses_header = f"**Hypotheses** (showing top {showing_h} of {total_h}):" if showing_h < total_h else "**Hypotheses:**"
+
+            hypotheses_text = hypotheses_header + "\n" + "\n".join([
                 f"- **H{i+1}** [{h['type']}] {h['text']}\n  Status: {h['status']}, Confidence: {h['confidence']}%, Linked to Q: {h.get('linked_question', 'None')}, ID: {h['hypothesis_id']}"
                 for i, h in enumerate(context["hypotheses"])
             ])
         else:
             hypotheses_text = "No hypotheses defined yet."
+
+        # Truncate long abstract to reduce token usage
+        abstract_text = self._truncate_abstract(article.abstract or "No abstract available")
 
         prompt = f"""Analyze this scientific paper for relevance to the research project with TRANSPARENCY and EVIDENCE.
 
@@ -334,16 +466,14 @@ class EnhancedAITriageService:
 Project: {context['project_name']}
 Description: {context['project_description']}
 
-**Research Questions:**
 {questions_text}
 
-**Hypotheses:**
 {hypotheses_text}
 
 **Paper to Analyze:**
 Title: {article.title}
 Authors: {article.authors}
-Abstract: {article.abstract or 'No abstract available'}
+Abstract: {abstract_text}
 Journal: {article.journal or 'Unknown'}
 Year: {article.publication_year or 'Unknown'}
 Citations: {article.citation_count or 0}
