@@ -31,6 +31,7 @@ import { ProgressTab } from '@/components/project/ProgressTab';
 import { MyCollectionsTab } from '@/components/project/MyCollectionsTab';
 import DecisionTimelineTab from '@/components/project/DecisionTimelineTab';
 import { AlertsPanel } from '@/components/project/AlertsPanel';
+import ProtocolsTab from '@/components/project/ProtocolsTab';
 import { ProjectHeroActions } from '@/components/project/ProjectHeroActions';
 import { NetworkQuickStart } from '@/components/project/NetworkQuickStart';
 import { ContextualActions, ProjectState, ActionType } from '@/components/project/ContextualActions';
@@ -2009,24 +2010,21 @@ export default function ProjectPage() {
         {/* Lab Tab */}
         {activeTab === 'lab' && (
           <div className="mb-8 p-6">
-            {activeSubTab === 'protocols' && (
-              <div>
-                <h2 className="text-2xl font-bold text-white mb-4">Protocols</h2>
-                <p className="text-gray-400">Coming in Phase 3 - Week 17</p>
-              </div>
+            {activeSubTab === 'protocols' && user?.user_id && (
+              <ProtocolsTab projectId={projectId} userId={user.user_id} />
             )}
 
             {activeSubTab === 'experiments' && (
               <div>
                 <h2 className="text-2xl font-bold text-white mb-4">Experiments</h2>
-                <p className="text-gray-400">Coming in Phase 3 - Week 18</p>
+                <p className="text-gray-400">Coming in Phase 3 - Week 19-20</p>
               </div>
             )}
 
             {activeSubTab === 'summaries' && (
               <div>
                 <h2 className="text-2xl font-bold text-white mb-4">Living Summaries</h2>
-                <p className="text-gray-400">Coming in Phase 3 - Week 19-20</p>
+                <p className="text-gray-400">Coming in Phase 3 - Week 21-22</p>
               </div>
             )}
           </div>
