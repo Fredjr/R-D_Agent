@@ -240,7 +240,7 @@ Title: {article.title}
 Authors: {article.authors}
 Abstract: {article.abstract or 'No abstract available'}
 Journal: {article.journal or 'Unknown'}
-Year: {article.pub_year or 'Unknown'}
+Year: {article.publication_year or 'Unknown'}
 
 **Task:**
 Analyze this paper and provide a JSON response with:

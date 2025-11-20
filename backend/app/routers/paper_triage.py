@@ -168,7 +168,7 @@ async def triage_paper(
                 "authors": article.authors,
                 "abstract": article.abstract,
                 "journal": article.journal,
-                "pub_year": article.pub_year
+                "pub_year": article.publication_year
             }
         )
 
@@ -265,7 +265,7 @@ async def get_project_inbox(
                     "authors": article.authors,
                     "abstract": article.abstract,
                     "journal": article.journal,
-                    "pub_year": article.pub_year
+                    "pub_year": article.publication_year
                 } if article else None
             )
             responses.append(response)
@@ -353,7 +353,7 @@ async def update_triage_status(
                 "authors": article.authors,
                 "abstract": article.abstract,
                 "journal": article.journal,
-                "pub_year": article.pub_year
+                "pub_year": article.publication_year
             } if article else None
         )
 
