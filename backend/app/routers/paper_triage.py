@@ -16,6 +16,7 @@ from database import get_db, PaperTriage, Article, Project
 from backend.app.services.ai_triage_service import AITriageService
 from backend.app.services.enhanced_ai_triage_service import EnhancedAITriageService
 from backend.app.services.alert_generator import alert_generator
+from backend.app.services.pubmed_service import fetch_article_from_pubmed
 import os
 
 logger = logging.getLogger(__name__)
@@ -132,10 +133,34 @@ async def triage_paper(
         if not project:
             raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
 
-        # Verify article exists
+        # Get or create article
         article = db.query(Article).filter(Article.pmid == request.article_pmid).first()
         if not article:
-            raise HTTPException(status_code=404, detail=f"Article {request.article_pmid} not found")
+            # Fetch article from PubMed
+            logger.info(f"📡 Article {request.article_pmid} not in database, fetching from PubMed")
+            article_data = await fetch_article_from_pubmed(request.article_pmid)
+
+            if not article_data:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Article {request.article_pmid} not found in PubMed"
+                )
+
+            # Create article record
+            article = Article(
+                pmid=article_data["pmid"],
+                title=article_data["title"],
+                abstract=article_data["abstract"],
+                authors=article_data["authors"],
+                journal=article_data["journal"],
+                publication_year=article_data["publication_year"],
+                doi=article_data.get("doi", ""),
+                citation_count=article_data.get("citation_count", 0)
+            )
+            db.add(article)
+            db.commit()
+            db.refresh(article)
+            logger.info(f"✅ Created article record for PMID {request.article_pmid}: {article.title[:50]}...")
 
         # Run AI triage (use enhanced service if enabled)
         if USE_ENHANCED_TRIAGE:
