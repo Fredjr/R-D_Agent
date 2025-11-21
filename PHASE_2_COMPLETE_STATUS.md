@@ -65,21 +65,38 @@
 
 ### Step 1: Run Database Migration
 
-**On Railway (Production):**
+**CRITICAL: The migration MUST be run before the application will work!**
+
+**Option A: Via Railway Dashboard (Easiest)**
+
+1. Go to https://railway.app
+2. Select your project
+3. Click on your PostgreSQL service
+4. Click "Data" tab → "Query" button
+5. Copy and paste this SQL:
+```sql
+ALTER TABLE project_summaries
+ADD COLUMN IF NOT EXISTS timeline_events JSON DEFAULT '[]'::json;
+
+COMMENT ON COLUMN project_summaries.timeline_events IS
+'Array of timeline event objects with id, timestamp, type, title, description, status, rationale, score, confidence, and metadata for Research Journey visualization';
+```
+6. Click "Run Query"
+7. Verify success message
+
+**Option B: Via Python Script (if you have DATABASE_URL)**
+
 ```bash
-# Connect to Railway PostgreSQL
-railway connect
+# Set your production DATABASE_URL
+export DATABASE_URL="your_production_database_url_here"
 
 # Run migration
-\i backend/migrations/008_add_timeline_events_to_summaries.sql
-
-# Verify column was added
-\d project_summaries
+python3 run_migration_008.py
 ```
 
-**OR via Railway CLI:**
+**Option C: Via Railway CLI**
 ```bash
-railway run psql $DATABASE_URL -f backend/migrations/008_add_timeline_events_to_summaries.sql
+railway run python3 run_migration_008.py
 ```
 
 ### Step 2: Deploy Backend
