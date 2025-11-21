@@ -44,33 +44,32 @@ def run_migration():
         print(f'📊 Found {len(statements)} SQL statements to execute')
         print('=' * 60)
         
-        # Execute migration
-        with engine.connect() as conn:
+        # Execute migration with proper transaction handling
+        with engine.begin() as conn:  # Use begin() for automatic commit
             for i, statement in enumerate(statements, 1):
                 try:
                     # Skip comments
                     if statement.startswith('--') or statement.startswith('/*'):
                         continue
-                    
+
                     print(f'\n[{i}/{len(statements)}] Executing statement...')
                     # Show first 100 chars of statement
                     preview = statement[:100].replace('\n', ' ')
                     print(f'   {preview}...')
-                    
+
                     conn.execute(text(statement))
-                    conn.commit()
                     print(f'   ✅ Success')
-                    
+
                 except Exception as e:
                     error_msg = str(e)
                     # Check if it's a "column already exists" error (safe to ignore)
                     if 'already exists' in error_msg.lower():
                         print(f'   ⚠️  Column already exists (skipping)')
-                        conn.rollback()
+                        # Don't raise, continue with other statements
                     else:
                         print(f'   ❌ Error: {error_msg}')
-                        conn.rollback()
                         raise
+            # Transaction will auto-commit when exiting the 'with' block
         
         print('\n' + '=' * 60)
         print('✅ Migration 006 completed successfully!')
