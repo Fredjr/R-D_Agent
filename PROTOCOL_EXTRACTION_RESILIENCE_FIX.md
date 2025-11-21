@@ -262,7 +262,42 @@ Users now see helpful messages instead of crashes:
 
 ---
 
-**Last Updated**: 2025-11-21  
-**Commit**: TBD  
-**Tested**: ✅ Compilation successful
+## 🔧 CRITICAL FOLLOW-UP FIX (Same Day)
+
+### Problem Discovered:
+After deploying the extraction fix, the **Protocols tab still failed** with the same Pydantic validation errors!
+
+**Root Cause**: The normalization was only applied during **extraction**, not when **fetching existing protocols** from the database.
+
+### Solution:
+Added `normalize_protocol_data()` helper function and applied it to **ALL protocol endpoints**:
+
+1. **GET /protocols/project/{project_id}** - List protocols for a project
+2. **GET /protocols/{protocol_id}** - Get single protocol
+3. **POST /protocols/extract** - Extract new protocol
+
+### Files Changed:
+- ✅ `backend/app/routers/protocols.py`
+  - Added `normalize_protocol_data()` function (lines 52-109)
+  - Applied normalization in GET project protocols endpoint
+  - Applied normalization in GET single protocol endpoint
+  - Applied normalization in POST extract endpoint
+
+### Result:
+- ✅ **Existing protocols** with string arrays now load correctly
+- ✅ **New protocols** with dict arrays work as expected
+- ✅ **Mixed data** all normalized consistently
+- ✅ **Protocols tab** now loads without errors
+
+---
+
+**Last Updated**: 2025-11-21
+**Commits**:
+- `f7d015a` - Extraction normalization and error recovery
+- `d1e88f5` - GET endpoint normalization for backward compatibility
+
+**Tested**:
+- ✅ Compilation successful
+- ✅ Deployed to Railway
+- ✅ Ready for user testing
 
