@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { updateExperimentPlan, deleteExperimentPlan, ExperimentPlan, UpdateExperimentPlanRequest } from '../../lib/api';
 import { QuestionBadge, HypothesisBadge } from './shared';
+import LinkResearchContextModal from './LinkResearchContextModal';
 
 interface ExperimentPlanDetailModalProps {
   plan: ExperimentPlan;
@@ -33,6 +34,7 @@ export default function ExperimentPlanDetailModal({
 }: ExperimentPlanDetailModalProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showLinkModal, setShowLinkModal] = useState(false);
   const [editedStatus, setEditedStatus] = useState(plan.status);
   const [editedNotes, setEditedNotes] = useState(plan.execution_notes || '');
   const [editedResults, setEditedResults] = useState(plan.results_summary || '');
@@ -43,6 +45,7 @@ export default function ExperimentPlanDetailModal({
   const [showProcedure, setShowProcedure] = useState(true);
   const [showRisks, setShowRisks] = useState(true);
   const [showTroubleshooting, setShowTroubleshooting] = useState(false);
+  const [localPlan, setLocalPlan] = useState(plan);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -101,6 +104,17 @@ export default function ExperimentPlanDetailModal({
     }
   };
 
+  const handleSaveResearchLinks = (linkedQuestions: string[], linkedHypotheses: string[]) => {
+    // Update local state with new links
+    const updatedPlan = {
+      ...localPlan,
+      linked_questions: linkedQuestions,
+      linked_hypotheses: linkedHypotheses
+    };
+    setLocalPlan(updatedPlan);
+    onUpdate(updatedPlan);
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-gray-900 rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden border border-gray-800 flex flex-col">
@@ -133,13 +147,22 @@ export default function ExperimentPlanDetailModal({
 
           <div className="flex items-center gap-2 ml-4">
             {!isEditing && (
-              <button
-                onClick={() => setIsEditing(true)}
-                className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
-                title="Edit plan"
-              >
-                <Edit2 className="w-5 h-5 text-gray-400" />
-              </button>
+              <>
+                <button
+                  onClick={() => setShowLinkModal(true)}
+                  className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                  title="Link to research context"
+                >
+                  <Link className="w-5 h-5 text-green-400" />
+                </button>
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                  title="Edit plan"
+                >
+                  <Edit2 className="w-5 h-5 text-gray-400" />
+                </button>
+              </>
             )}
             {isEditing && (
               <>
@@ -300,7 +323,7 @@ export default function ExperimentPlanDetailModal({
           )}
 
           {/* Research Context */}
-          {(plan.linked_questions.length > 0 || plan.linked_hypotheses.length > 0) && (
+          {(localPlan.linked_questions.length > 0 || localPlan.linked_hypotheses.length > 0) && (
             <div className="bg-gray-800/50 rounded-lg border border-gray-700">
               <button
                 onClick={() => setShowResearchContext(!showResearchContext)}
@@ -308,40 +331,40 @@ export default function ExperimentPlanDetailModal({
               >
                 <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                   <Link className="w-5 h-5 text-green-400" />
-                  🔗 Research Context ({plan.linked_questions.length + plan.linked_hypotheses.length})
+                  🔗 Research Context ({localPlan.linked_questions.length + localPlan.linked_hypotheses.length})
                 </h3>
                 {showResearchContext ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
               </button>
               {showResearchContext && (
                 <div className="p-4 pt-0 space-y-4">
-                  {plan.linked_questions.length > 0 && (
+                  {localPlan.linked_questions.length > 0 && (
                     <div>
                       <h4 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
-                        ❓ Research Questions ({plan.linked_questions.length})
+                        ❓ Research Questions ({localPlan.linked_questions.length})
                       </h4>
                       <div className="space-y-2">
-                        {plan.linked_questions.map((questionId) => (
+                        {localPlan.linked_questions.map((questionId) => (
                           <QuestionBadge
                             key={questionId}
                             questionId={questionId}
-                            projectId={plan.project_id}
+                            projectId={localPlan.project_id}
                           />
                         ))}
                       </div>
                     </div>
                   )}
 
-                  {plan.linked_hypotheses.length > 0 && (
+                  {localPlan.linked_hypotheses.length > 0 && (
                     <div>
                       <h4 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
-                        💡 Hypotheses ({plan.linked_hypotheses.length})
+                        💡 Hypotheses ({localPlan.linked_hypotheses.length})
                       </h4>
                       <div className="space-y-2">
-                        {plan.linked_hypotheses.map((hypothesisId) => (
+                        {localPlan.linked_hypotheses.map((hypothesisId) => (
                           <HypothesisBadge
                             key={hypothesisId}
                             hypothesisId={hypothesisId}
-                            projectId={plan.project_id}
+                            projectId={localPlan.project_id}
                           />
                         ))}
                       </div>
@@ -597,7 +620,19 @@ export default function ExperimentPlanDetailModal({
           </button>
         </div>
       </div>
+
+      {/* Link Research Context Modal */}
+      {showLinkModal && (
+        <LinkResearchContextModal
+          planId={localPlan.plan_id}
+          projectId={localPlan.project_id}
+          currentQuestions={localPlan.linked_questions}
+          currentHypotheses={localPlan.linked_hypotheses}
+          userId={userId}
+          onSave={handleSaveResearchLinks}
+          onClose={() => setShowLinkModal(false)}
+        />
+      )}
     </div>
   );
 }
-
