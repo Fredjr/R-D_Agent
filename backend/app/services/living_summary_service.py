@@ -325,8 +325,11 @@ class LivingSummaryService:
                     narrative += f"   → Addresses question\n"
             elif event['type'] == 'paper':
                 triage_status = event.get('triage_status', 'unknown')
-                score = event.get('score', 0)
-                narrative += f"📄 {event['content']} ({triage_status}, Score: {score}/100)\n"
+                score = event.get('score')
+                if score is not None:
+                    narrative += f"📄 {event['content']} ({triage_status}, Score: {score}/100)\n"
+                else:
+                    narrative += f"📄 {event['content']} ({triage_status})\n"
                 if event.get('rationale'):
                     # Truncate long rationales
                     rationale = event['rationale'][:150] + "..." if len(event['rationale']) > 150 else event['rationale']
@@ -334,12 +337,15 @@ class LivingSummaryService:
                 if event.get('linked_questions') or event.get('linked_hypotheses'):
                     narrative += f"   → Relevant to {len(event.get('linked_questions', []))} questions, {len(event.get('linked_hypotheses', []))} hypotheses\n"
             elif event['type'] == 'protocol':
-                confidence = event.get('confidence', 0)
+                confidence = event.get('confidence')
                 # Handle confidence as either float (0.0-1.0) or int (0-100)
-                if confidence and confidence <= 1.0:
-                    narrative += f"🔬 {event['content']} (Confidence: {confidence:.0%})\n"
+                if confidence is not None:
+                    if confidence <= 1.0:
+                        narrative += f"🔬 {event['content']} (Confidence: {confidence:.0%})\n"
+                    else:
+                        narrative += f"🔬 {event['content']} (Confidence: {confidence}%)\n"
                 else:
-                    narrative += f"🔬 {event['content']} (Confidence: {confidence}%)\n"
+                    narrative += f"🔬 {event['content']}\n"
                 if event.get('source_paper'):
                     narrative += f"   → Extracted from paper\n"
             elif event['type'] == 'experiment':
