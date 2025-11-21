@@ -42,7 +42,7 @@ export function QuestionBadge({ questionId, projectId, onClick, compact = false 
     const fetchQuestion = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`/api/research-questions/${questionId}`, {
+        const response = await fetch(`/api/proxy/questions/${questionId}`, {
           headers: {
             'Content-Type': 'application/json',
           },

@@ -243,6 +243,35 @@ async def get_question_hypotheses(
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
+@router.get("/{hypothesis_id}", response_model=HypothesisResponse)
+async def get_hypothesis(
+    hypothesis_id: str,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get a specific hypothesis by ID
+    """
+    logger.info(f"📊 Fetching hypothesis: {hypothesis_id}")
+
+    try:
+        hypothesis = db.query(Hypothesis).filter(
+            Hypothesis.hypothesis_id == hypothesis_id
+        ).first()
+
+        if not hypothesis:
+            raise HTTPException(status_code=404, detail="Hypothesis not found")
+
+        logger.info(f"✅ Found hypothesis: {hypothesis_id}")
+        return hypothesis
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error fetching hypothesis: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
 @router.put("/{hypothesis_id}", response_model=HypothesisResponse)
 async def update_hypothesis(
     hypothesis_id: str,

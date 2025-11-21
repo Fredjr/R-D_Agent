@@ -44,7 +44,7 @@ export function HypothesisBadge({ hypothesisId, projectId, onClick, compact = fa
     const fetchHypothesis = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`/api/hypotheses/${hypothesisId}`, {
+        const response = await fetch(`/api/proxy/hypotheses/${hypothesisId}`, {
           headers: {
             'Content-Type': 'application/json',
           },

@@ -38,17 +38,17 @@ export default function LinkResearchContextModal({
     const fetchData = async () => {
       try {
         setLoading(true);
-        
+
         // Fetch all questions for the project
-        const questionsResponse = await fetch(`/api/research-questions/project/${projectId}`, {
+        const questionsResponse = await fetch(`/api/proxy/questions/project/${projectId}`, {
           headers: { 'Content-Type': 'application/json' }
         });
         if (!questionsResponse.ok) throw new Error('Failed to fetch questions');
         const questionsData = await questionsResponse.json();
         setQuestions(questionsData);
-        
+
         // Fetch all hypotheses for the project
-        const hypothesesResponse = await fetch(`/api/hypotheses/project/${projectId}`, {
+        const hypothesesResponse = await fetch(`/api/proxy/hypotheses/project/${projectId}`, {
           headers: { 'Content-Type': 'application/json' }
         });
         if (!hypothesesResponse.ok) throw new Error('Failed to fetch hypotheses');
@@ -69,8 +69,8 @@ export default function LinkResearchContextModal({
   const handleSave = async () => {
     try {
       setSaving(true);
-      
-      const response = await fetch(`/api/experiment-plans/${planId}/research-links`, {
+
+      const response = await fetch(`/api/proxy/experiment-plans/${planId}/research-links`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
