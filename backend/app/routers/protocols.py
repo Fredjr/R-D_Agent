@@ -295,48 +295,123 @@ async def get_project_protocols(
         
         # Get protocols created by user
         # TODO: Filter by project papers once we have project-paper relationship
-        protocols = db.query(Protocol).filter(
-            Protocol.created_by == user_id
-        ).order_by(Protocol.created_at.desc()).all()
+        # Use with_entities to only select existing columns (backward compatible)
+        from sqlalchemy import inspect
+        inspector = inspect(db.bind)
+        existing_columns = {col['name'] for col in inspector.get_columns('protocols')}
+
+        # Check if new columns exist
+        has_new_columns = 'key_parameters' in existing_columns
+
+        if has_new_columns:
+            # New schema - query all columns
+            protocols = db.query(Protocol).filter(
+                Protocol.created_by == user_id
+            ).order_by(Protocol.created_at.desc()).all()
+        else:
+            # Old schema - only query basic columns
+            protocols = db.query(
+                Protocol.protocol_id,
+                Protocol.project_id,
+                Protocol.source_pmid,
+                Protocol.protocol_name,
+                Protocol.protocol_type,
+                Protocol.description,
+                Protocol.materials,
+                Protocol.steps,
+                Protocol.equipment,
+                Protocol.duration_estimate,
+                Protocol.difficulty_level,
+                Protocol.extracted_by,
+                Protocol.created_by,
+                Protocol.created_at,
+                Protocol.updated_at
+            ).filter(
+                Protocol.created_by == user_id
+            ).order_by(Protocol.created_at.desc()).all()
         
         # Build responses with article details
         responses = []
         for protocol in protocols:
-            article = db.query(Article).filter(Article.pmid == protocol.source_pmid).first()
-            responses.append(ProtocolResponse(
-                protocol_id=protocol.protocol_id,
-                source_pmid=protocol.source_pmid,
-                protocol_name=protocol.protocol_name,
-                protocol_type=protocol.protocol_type,
-                materials=protocol.materials,
-                steps=protocol.steps,
-                equipment=protocol.equipment,
-                duration_estimate=protocol.duration_estimate,
-                difficulty_level=protocol.difficulty_level,
-                extracted_by=protocol.extracted_by,
-                created_by=protocol.created_by,
-                created_at=protocol.created_at.isoformat() if protocol.created_at else None,
-                updated_at=protocol.updated_at.isoformat() if protocol.updated_at else None,
-                article_title=article.title if article else None,
-                article_authors=format_authors(article.authors) if article else None,
-                article_journal=article.journal if article else None,
-                article_year=article.publication_year if article else None,
-                # Enhanced fields (Week 19)
-                key_parameters=getattr(protocol, 'key_parameters', []),
-                expected_outcomes=getattr(protocol, 'expected_outcomes', []),
-                troubleshooting_tips=getattr(protocol, 'troubleshooting_tips', []),
-                # Context-aware fields (Week 19)
-                relevance_score=getattr(protocol, 'relevance_score', 50),
-                affected_questions=getattr(protocol, 'affected_questions', []),
-                affected_hypotheses=getattr(protocol, 'affected_hypotheses', []),
-                relevance_reasoning=getattr(protocol, 'relevance_reasoning', None),
-                key_insights=getattr(protocol, 'key_insights', []),
-                potential_applications=getattr(protocol, 'potential_applications', []),
-                recommendations=getattr(protocol, 'recommendations', []),
-                context_relevance=getattr(protocol, 'context_relevance', None),
-                extraction_method=getattr(protocol, 'extraction_method', 'basic'),
-                context_aware=getattr(protocol, 'context_aware', False)
-            ))
+            # Handle both old schema (tuple) and new schema (Protocol object)
+            if isinstance(protocol, tuple):
+                # Old schema - unpack tuple
+                (protocol_id, project_id, source_pmid, protocol_name, protocol_type,
+                 description, materials, steps, equipment, duration_estimate,
+                 difficulty_level, extracted_by, created_by, created_at, updated_at) = protocol
+
+                article = db.query(Article).filter(Article.pmid == source_pmid).first()
+
+                responses.append(ProtocolResponse(
+                    protocol_id=protocol_id,
+                    source_pmid=source_pmid,
+                    protocol_name=protocol_name,
+                    protocol_type=protocol_type,
+                    materials=materials,
+                    steps=steps,
+                    equipment=equipment,
+                    duration_estimate=duration_estimate,
+                    difficulty_level=difficulty_level,
+                    extracted_by=extracted_by,
+                    created_by=created_by,
+                    created_at=created_at.isoformat() if created_at else None,
+                    updated_at=updated_at.isoformat() if updated_at else None,
+                    article_title=article.title if article else None,
+                    article_authors=format_authors(article.authors) if article else None,
+                    article_journal=article.journal if article else None,
+                    article_year=article.publication_year if article else None,
+                    # Default values for new fields
+                    key_parameters=[],
+                    expected_outcomes=[],
+                    troubleshooting_tips=[],
+                    relevance_score=50,
+                    affected_questions=[],
+                    affected_hypotheses=[],
+                    relevance_reasoning=None,
+                    key_insights=[],
+                    potential_applications=[],
+                    recommendations=[],
+                    context_relevance=None,
+                    extraction_method='basic',
+                    context_aware=False
+                ))
+            else:
+                # New schema - Protocol object with all fields
+                article = db.query(Article).filter(Article.pmid == protocol.source_pmid).first()
+                responses.append(ProtocolResponse(
+                    protocol_id=protocol.protocol_id,
+                    source_pmid=protocol.source_pmid,
+                    protocol_name=protocol.protocol_name,
+                    protocol_type=protocol.protocol_type,
+                    materials=protocol.materials,
+                    steps=protocol.steps,
+                    equipment=protocol.equipment,
+                    duration_estimate=protocol.duration_estimate,
+                    difficulty_level=protocol.difficulty_level,
+                    extracted_by=protocol.extracted_by,
+                    created_by=protocol.created_by,
+                    created_at=protocol.created_at.isoformat() if protocol.created_at else None,
+                    updated_at=protocol.updated_at.isoformat() if protocol.updated_at else None,
+                    article_title=article.title if article else None,
+                    article_authors=format_authors(article.authors) if article else None,
+                    article_journal=article.journal if article else None,
+                    article_year=article.publication_year if article else None,
+                    # Enhanced fields (Week 19)
+                    key_parameters=getattr(protocol, 'key_parameters', []),
+                    expected_outcomes=getattr(protocol, 'expected_outcomes', []),
+                    troubleshooting_tips=getattr(protocol, 'troubleshooting_tips', []),
+                    # Context-aware fields (Week 19)
+                    relevance_score=getattr(protocol, 'relevance_score', 50),
+                    affected_questions=getattr(protocol, 'affected_questions', []),
+                    affected_hypotheses=getattr(protocol, 'affected_hypotheses', []),
+                    relevance_reasoning=getattr(protocol, 'relevance_reasoning', None),
+                    key_insights=getattr(protocol, 'key_insights', []),
+                    potential_applications=getattr(protocol, 'potential_applications', []),
+                    recommendations=getattr(protocol, 'recommendations', []),
+                    context_relevance=getattr(protocol, 'context_relevance', None),
+                    extraction_method=getattr(protocol, 'extraction_method', 'basic'),
+                    context_aware=getattr(protocol, 'context_aware', False)
+                ))
         
         logger.info(f"✅ Retrieved {len(responses)} protocols for project {project_id}")
         return responses
