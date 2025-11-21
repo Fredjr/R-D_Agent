@@ -54,57 +54,122 @@ class IntelligentProtocolExtractor:
     ) -> Dict:
         """
         Extract protocol with full project context awareness.
-        
+
         Returns enhanced protocol with:
         - relevance_score: 0-100 score for project relevance
         - affected_questions: List of relevant research questions
         - affected_hypotheses: List of relevant hypotheses
         - recommendations: Actionable suggestions for using protocol
         - key_insights: Key insights for the project
+
+        This method is resilient and will always return valid data,
+        even if individual steps fail.
         """
         logger.info(f"🧠 Starting intelligent protocol extraction for PMID {article_pmid}")
-        
-        # Step 1: Gather project context
-        context = await self._analyze_project_context(project_id, db)
-        
-        # Step 2: Get article
-        article = db.query(Article).filter(Article.pmid == article_pmid).first()
-        if not article:
-            raise ValueError(f"Article {article_pmid} not found")
-        
-        # Step 3: Extract protocol with context
-        protocol_data = await self._extract_protocol_with_context(
-            article=article,
-            context=context,
-            protocol_type=protocol_type
-        )
-        
-        # Step 4: Score relevance to project
-        relevance_data = await self._score_protocol_relevance(
-            protocol_data=protocol_data,
-            context=context,
-            article=article
-        )
-        
-        # Step 5: Generate recommendations
-        recommendations = await self._generate_recommendations(
-            protocol_data=protocol_data,
-            relevance_data=relevance_data,
-            context=context
-        )
-        
-        # Step 6: Combine all data
-        enhanced_protocol = {
-            **protocol_data,
-            **relevance_data,
-            "recommendations": recommendations,
-            "extraction_method": "intelligent_multi_agent",
-            "context_aware": True
-        }
-        
-        logger.info(f"✅ Intelligent extraction complete: relevance={relevance_data.get('relevance_score', 0)}/100")
-        
-        return enhanced_protocol
+
+        try:
+            # Step 1: Gather project context
+            try:
+                context = await self._analyze_project_context(project_id, db)
+            except Exception as e:
+                logger.warning(f"⚠️ Context analysis failed: {e}, using empty context")
+                context = {"questions": [], "hypotheses": [], "project_description": ""}
+
+            # Step 2: Get article
+            article = db.query(Article).filter(Article.pmid == article_pmid).first()
+            if not article:
+                raise ValueError(f"Article {article_pmid} not found")
+
+            # Step 3: Extract protocol with context (with timeout protection)
+            try:
+                protocol_data = await self._extract_protocol_with_context(
+                    article=article,
+                    context=context,
+                    protocol_type=protocol_type
+                )
+            except Exception as e:
+                logger.error(f"❌ Protocol extraction failed: {e}, using fallback")
+                protocol_data = {
+                    "protocol_name": "Extraction failed - please try again",
+                    "protocol_type": protocol_type or "other",
+                    "materials": [],
+                    "steps": [],
+                    "equipment": [],
+                    "duration_estimate": None,
+                    "difficulty_level": "moderate",
+                    "key_parameters": [],
+                    "expected_outcomes": [],
+                    "troubleshooting_tips": [],
+                    "context_relevance": f"Extraction error: {str(e)}"
+                }
+
+            # Step 4: Score relevance to project
+            try:
+                relevance_data = await self._score_protocol_relevance(
+                    protocol_data=protocol_data,
+                    context=context,
+                    article=article
+                )
+            except Exception as e:
+                logger.warning(f"⚠️ Relevance scoring failed: {e}, using defaults")
+                relevance_data = {
+                    "relevance_score": 50,
+                    "affected_questions": [],
+                    "affected_hypotheses": [],
+                    "relevance_reasoning": "Relevance scoring unavailable",
+                    "key_insights": [],
+                    "potential_applications": []
+                }
+
+            # Step 5: Generate recommendations
+            try:
+                recommendations = await self._generate_recommendations(
+                    protocol_data=protocol_data,
+                    relevance_data=relevance_data,
+                    context=context
+                )
+            except Exception as e:
+                logger.warning(f"⚠️ Recommendation generation failed: {e}, using empty list")
+                recommendations = []
+
+            # Step 6: Combine all data
+            enhanced_protocol = {
+                **protocol_data,
+                **relevance_data,
+                "recommendations": recommendations,
+                "extraction_method": "intelligent_multi_agent",
+                "context_aware": True
+            }
+
+            logger.info(f"✅ Intelligent extraction complete: relevance={relevance_data.get('relevance_score', 0)}/100")
+
+            return enhanced_protocol
+
+        except Exception as e:
+            logger.error(f"❌ Critical error in intelligent extraction: {e}")
+            # Return minimal valid protocol
+            return {
+                "protocol_name": "Extraction failed",
+                "protocol_type": protocol_type or "other",
+                "materials": [],
+                "steps": [],
+                "equipment": [],
+                "duration_estimate": None,
+                "difficulty_level": "moderate",
+                "key_parameters": [],
+                "expected_outcomes": [],
+                "troubleshooting_tips": [],
+                "context_relevance": f"Critical error: {str(e)}",
+                "relevance_score": 50,
+                "affected_questions": [],
+                "affected_hypotheses": [],
+                "relevance_reasoning": "Extraction failed",
+                "key_insights": [],
+                "potential_applications": [],
+                "recommendations": [],
+                "extraction_method": "intelligent_multi_agent",
+                "context_aware": False
+            }
     
     async def _analyze_project_context(self, project_id: str, db: Session) -> Dict:
         """
@@ -156,6 +221,58 @@ class IntelligentProtocolExtractor:
 
         return context
 
+    def _normalize_protocol_data(self, protocol_data: Dict) -> Dict:
+        """
+        Normalize protocol data to ensure consistent format.
+
+        Handles both string arrays and dict arrays for materials/steps.
+        Makes the system resilient to different AI response formats.
+        """
+        normalized = protocol_data.copy()
+
+        # Normalize materials: convert strings to dicts
+        materials = normalized.get("materials", [])
+        if materials and isinstance(materials[0], str):
+            normalized["materials"] = [
+                {"name": material, "catalog_number": None, "supplier": None, "amount": None, "notes": None}
+                for material in materials
+            ]
+        elif not materials:
+            normalized["materials"] = []
+
+        # Normalize steps: convert strings to dicts
+        steps = normalized.get("steps", [])
+        if steps and isinstance(steps[0], str):
+            normalized["steps"] = [
+                {
+                    "step_number": idx + 1,
+                    "instruction": step,
+                    "duration": None,
+                    "temperature": None,
+                    "notes": None
+                }
+                for idx, step in enumerate(steps)
+            ]
+        elif not steps:
+            normalized["steps"] = []
+
+        # Ensure equipment is a list of strings
+        equipment = normalized.get("equipment", [])
+        if not isinstance(equipment, list):
+            normalized["equipment"] = []
+
+        # Ensure all required fields exist with defaults
+        normalized.setdefault("protocol_name", "Unknown Protocol")
+        normalized.setdefault("protocol_type", "other")
+        normalized.setdefault("duration_estimate", None)
+        normalized.setdefault("difficulty_level", "moderate")
+        normalized.setdefault("key_parameters", [])
+        normalized.setdefault("expected_outcomes", [])
+        normalized.setdefault("troubleshooting_tips", [])
+        normalized.setdefault("context_relevance", None)
+
+        return normalized
+
     async def _extract_protocol_with_context(
         self,
         article: Article,
@@ -186,38 +303,49 @@ PAPER ABSTRACT:
 
 Extract the protocol with special attention to how it relates to the project's research questions and hypotheses.
 
-Return a JSON object with:
+IMPORTANT: Return materials and steps as DICTIONARIES, not strings.
+
+Return a JSON object with this EXACT structure:
 {{
     "protocol_name": "Clear, descriptive name",
-    "protocol_type": "delivery|editing|screening|analysis|other",
-    "materials": ["List of materials/reagents"],
-    "steps": ["Step-by-step procedure"],
-    "equipment": ["Required equipment"],
+    "protocol_type": "delivery|editing|screening|analysis|synthesis|imaging|other",
+    "materials": [
+        {{"name": "Material name", "catalog_number": "optional", "supplier": "optional", "amount": "optional", "notes": "optional"}}
+    ],
+    "steps": [
+        {{"step_number": 1, "instruction": "Step description", "duration": "optional", "temperature": "optional", "notes": "optional"}}
+    ],
+    "equipment": ["Equipment 1", "Equipment 2"],
     "duration_estimate": "Estimated time (e.g., '2-3 days')",
-    "difficulty_level": "beginner|intermediate|advanced",
-    "key_parameters": ["Critical parameters to control"],
-    "expected_outcomes": ["What results to expect"],
-    "troubleshooting_tips": ["Common issues and solutions"],
+    "difficulty_level": "beginner|moderate|advanced",
+    "key_parameters": ["Critical parameter 1", "Critical parameter 2"],
+    "expected_outcomes": ["Expected outcome 1", "Expected outcome 2"],
+    "troubleshooting_tips": ["Tip 1", "Tip 2"],
     "context_relevance": "How this protocol relates to the project context"
 }}
 
-If no clear protocol is found, return protocol_name as "No clear protocol found" with empty arrays."""
+If no clear protocol is found, return protocol_name as "No clear protocol found" with empty arrays for materials, steps, equipment."""
 
         try:
             response = await client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a scientific protocol extraction expert."},
+                    {"role": "system", "content": "You are a scientific protocol extraction expert. Always return materials and steps as dictionaries with proper structure."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=self.temperature,
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"},
+                timeout=45.0  # 45 second timeout to prevent 502 errors
             )
 
             protocol_data = json.loads(response.choices[0].message.content)
             logger.info(f"✅ Extracted protocol: {protocol_data.get('protocol_name', 'Unknown')}")
 
-            return protocol_data
+            # Normalize the data to handle any format inconsistencies
+            normalized_data = self._normalize_protocol_data(protocol_data)
+            logger.info(f"✅ Normalized protocol data")
+
+            return normalized_data
 
         except Exception as e:
             logger.error(f"❌ Error extracting protocol: {e}")
@@ -228,7 +356,11 @@ If no clear protocol is found, return protocol_name as "No clear protocol found"
                 "steps": [],
                 "equipment": [],
                 "duration_estimate": None,
-                "difficulty_level": "intermediate"
+                "difficulty_level": "moderate",
+                "key_parameters": [],
+                "expected_outcomes": [],
+                "troubleshooting_tips": [],
+                "context_relevance": None
             }
 
     async def _score_protocol_relevance(
@@ -282,7 +414,8 @@ Scoring criteria:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=self.temperature,
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"},
+                timeout=30.0  # 30 second timeout
             )
 
             relevance_data = json.loads(response.choices[0].message.content)
@@ -351,7 +484,8 @@ Return a JSON object with:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.3,  # Slightly higher for creativity
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"},
+                timeout=30.0  # 30 second timeout
             )
 
             result = json.loads(response.choices[0].message.content)
