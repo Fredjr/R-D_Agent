@@ -933,6 +933,14 @@ except ImportError as e:
     print(f"   Error details: {type(e).__name__}")
     traceback.print_exc()
 
+# Week 19-20: Admin migration endpoint (temporary for debugging)
+try:
+    from backend.app.routers.admin_migration import router as admin_migration_router
+    app.include_router(admin_migration_router)
+    print("✅ Admin migration endpoints registered successfully")
+except ImportError as e:
+    print(f"⚠️ Failed to import admin migration router: {e}")
+
 # Week 19-20: Experiment Planning endpoints
 try:
     from backend.app.routers.experiment_plans import router as experiment_plans_router
