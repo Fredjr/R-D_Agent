@@ -453,62 +453,99 @@ class IntelligentProtocolExtractor:
         Agent 2: Protocol Extractor
 
         Extracts protocol with awareness of project context.
+        Uses full PDF text if available, falls back to abstract.
         """
         logger.info(f"🔬 Extracting protocol with context awareness")
 
-        # Truncate abstract to 400 words for cost optimization
-        abstract_words = article.abstract.split()[:400] if article.abstract else []
-        truncated_abstract = " ".join(abstract_words)
+        # Week 19-20: Use PDF text if available, fallback to abstract
+        paper_text = None
+        text_source = "abstract"
+
+        if article.pdf_text and len(article.pdf_text) > 100:
+            # Use PDF text (truncate to ~8000 words for cost optimization)
+            # Focus on Methods section if possible
+            pdf_words = article.pdf_text.split()
+
+            # Try to find Methods section
+            methods_start = -1
+            methods_keywords = ["methods", "materials and methods", "experimental procedures", "methodology"]
+            lower_text = article.pdf_text.lower()
+
+            for keyword in methods_keywords:
+                idx = lower_text.find(keyword)
+                if idx != -1:
+                    methods_start = len(article.pdf_text[:idx].split())
+                    logger.info(f"📄 Found Methods section at word {methods_start}")
+                    break
+
+            if methods_start != -1:
+                # Extract Methods section + some context (up to 8000 words)
+                paper_text = " ".join(pdf_words[max(0, methods_start-100):methods_start+8000])
+                text_source = "full_paper_methods"
+                logger.info(f"📄 Using Methods section from PDF ({len(paper_text)} chars)")
+            else:
+                # Use first 8000 words of PDF
+                paper_text = " ".join(pdf_words[:8000])
+                text_source = "full_paper"
+                logger.info(f"📄 Using full PDF text ({len(paper_text)} chars)")
+        else:
+            # Fallback to abstract
+            abstract_words = article.abstract.split()[:400] if article.abstract else []
+            paper_text = " ".join(abstract_words)
+            text_source = "abstract"
+            logger.info(f"📄 Using abstract only ({len(paper_text)} chars)")
 
         # Build context-aware prompt
         context_summary = self._build_context_summary(context)
 
-        prompt = f"""You are a scientific protocol extraction expert. Your job is to extract ONLY the specific experimental details that are EXPLICITLY stated in this paper's abstract, WITH SOURCE CITATIONS.
+        prompt = f"""You are a scientific protocol extraction expert. Your job is to extract ONLY the specific experimental details that are EXPLICITLY stated in this paper's text, WITH SOURCE CITATIONS.
 
 PROJECT CONTEXT:
 {context_summary}
 
-PAPER ABSTRACT:
-{truncated_abstract}
+PAPER TEXT (Source: {text_source}):
+{paper_text}
 
 CRITICAL RULES - READ CAREFULLY:
-1. ⚠️ ONLY extract information that is EXPLICITLY stated in the abstract above
+1. ⚠️ ONLY extract information that is EXPLICITLY stated in the paper text above
 2. ⚠️ DO NOT use general textbook knowledge or common lab procedures
 3. ⚠️ DO NOT invent or assume materials, steps, or equipment not mentioned
 4. ⚠️ If the paper is a review/perspective/commentary with no experimental methods, return "No clear protocol found"
 5. ⚠️ Include specific quantitative details when mentioned (concentrations, times, temperatures, doses)
-6. ⚠️ For materials: Include specific names, variants, concentrations if mentioned
-7. ⚠️ For steps: Only include steps explicitly described in the abstract
-8. ⚠️ For equipment: Only include equipment explicitly mentioned
+6. ⚠️ For materials: Include specific names, variants, concentrations, catalog numbers if mentioned
+7. ⚠️ For steps: Include ALL steps explicitly described in the Methods section
+8. ⚠️ For equipment: Include ALL equipment explicitly mentioned
+9. ⚠️ Extract detailed protocols from Methods/Materials sections when available
 
 PAPER TYPE DETECTION:
-- If the abstract contains words like "review", "perspective", "overview", "landscape", "current state", "future directions" → Return "No clear protocol found"
-- If the abstract describes specific experimental procedures, measurements, or methods → Extract the protocol
+- If the text contains words like "review", "perspective", "overview" WITHOUT experimental methods → Return "No clear protocol found"
+- If the text describes specific experimental procedures, measurements, or methods → Extract the COMPLETE protocol
 
 SPECIFICITY REQUIREMENTS:
-- Materials: Must include specific details (e.g., "10 μM doxorubicin" not just "doxorubicin")
-- Steps: Must be specific actions from the paper (e.g., "Cells were treated with 10 μM drug for 24h at 37°C" not "Treat cells with drug")
-- Equipment: Only if explicitly mentioned (e.g., "flow cytometry", "confocal microscopy")
+- Materials: Must include specific details (e.g., "10 μM doxorubicin (Sigma-Aldrich, Cat# D1515)" not just "doxorubicin")
+- Steps: Must be specific actions from the paper (e.g., "Cells were treated with 10 μM drug for 24h at 37°C in a humidified incubator" not "Treat cells with drug")
+- Equipment: Include ALL equipment mentioned (e.g., "BD FACSAria III flow cytometer", "Zeiss LSM 880 confocal microscope")
+- Protocols: Extract COMPLETE protocols with all steps, not just summaries
 
 Return a JSON object with this EXACT structure:
 {{
     "protocol_name": "Specific name from paper (or 'No clear protocol found')",
     "protocol_type": "delivery|editing|screening|analysis|synthesis|imaging|other",
     "materials": [
-        {{"name": "Specific material with details", "catalog_number": "if mentioned", "supplier": "if mentioned", "amount": "concentration/dose if mentioned", "notes": "any specific details", "source_text": "EXACT quote from abstract where this material is mentioned"}}
+        {{"name": "Specific material with details", "catalog_number": "if mentioned", "supplier": "if mentioned", "amount": "concentration/dose if mentioned", "notes": "any specific details", "source_text": "EXACT quote from paper where this material is mentioned"}}
     ],
     "steps": [
-        {{"step_number": 1, "instruction": "Specific step from paper with quantitative details", "duration": "if mentioned", "temperature": "if mentioned", "notes": "any specific conditions", "source_text": "EXACT quote from abstract where this step is described"}}
+        {{"step_number": 1, "instruction": "Specific step from paper with quantitative details", "duration": "if mentioned", "temperature": "if mentioned", "notes": "any specific conditions", "source_text": "EXACT quote from paper where this step is described"}}
     ],
-    "equipment": ["Only equipment explicitly mentioned in abstract"],
+    "equipment": ["ALL equipment explicitly mentioned in the paper"],
     "duration_estimate": "Only if explicitly stated",
     "difficulty_level": "beginner|moderate|advanced",
-    "key_parameters": ["Only critical parameters explicitly mentioned with values"],
-    "expected_outcomes": ["Only outcomes explicitly stated in abstract"],
-    "troubleshooting_tips": ["Only if troubleshooting is discussed"],
+    "key_parameters": ["ALL critical parameters explicitly mentioned with values"],
+    "expected_outcomes": ["Outcomes explicitly stated in paper"],
+    "troubleshooting_tips": ["If troubleshooting is discussed"],
     "context_relevance": "How this specific protocol relates to the project context",
-    "material_sources": {{"material_name": {{"source_text": "exact quote from abstract", "has_quantitative_details": true/false}}}},
-    "step_sources": {{"step_instruction": {{"source_text": "exact quote from abstract", "has_quantitative_details": true/false}}}}
+    "material_sources": {{"material_name": {{"source_text": "exact quote from paper", "has_quantitative_details": true/false}}}},
+    "step_sources": {{"step_instruction": {{"source_text": "exact quote from paper", "has_quantitative_details": true/false}}}}
 }}
 
 EXAMPLES OF GOOD vs BAD EXTRACTION:

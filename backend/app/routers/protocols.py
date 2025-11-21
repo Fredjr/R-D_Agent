@@ -220,6 +220,23 @@ async def extract_protocol(
         logger.info(f"📥 Protocol extraction request for PMID {request.article_pmid} by user {user_id}")
         logger.info(f"🧠 Intelligent extraction: {request.use_intelligent_extraction and USE_INTELLIGENT_EXTRACTION}")
 
+        # Week 19-20: Extract PDF text BEFORE protocol extraction
+        try:
+            from backend.app.services.pdf_text_extractor import PDFTextExtractor
+            pdf_extractor = PDFTextExtractor()
+            logger.info(f"📄 Extracting PDF text for PMID {request.article_pmid}...")
+            pdf_result = await pdf_extractor.extract_and_store(
+                pmid=request.article_pmid,
+                db=db,
+                force_refresh=request.force_refresh
+            )
+            if pdf_result.get("pdf_text"):
+                logger.info(f"✅ PDF text extracted: {pdf_result.get('character_count')} chars from {pdf_result.get('pdf_source')}")
+            else:
+                logger.warning(f"⚠️ No PDF text available, will use abstract")
+        except Exception as e:
+            logger.warning(f"⚠️ PDF text extraction failed: {e}, will use abstract")
+
         # Determine project_id
         project_id = request.project_id
         if not project_id:
