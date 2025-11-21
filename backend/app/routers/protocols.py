@@ -225,13 +225,13 @@ async def extract_protocol(
             from backend.app.services.pdf_text_extractor import PDFTextExtractor
             pdf_extractor = PDFTextExtractor()
             logger.info(f"📄 Extracting PDF text for PMID {request.article_pmid}...")
-            pdf_result = await pdf_extractor.extract_and_store(
+            pdf_text = await pdf_extractor.extract_and_store(
                 pmid=request.article_pmid,
                 db=db,
                 force_refresh=request.force_refresh
             )
-            if pdf_result.get("pdf_text"):
-                logger.info(f"✅ PDF text extracted: {pdf_result.get('character_count')} chars from {pdf_result.get('pdf_source')}")
+            if pdf_text:
+                logger.info(f"✅ PDF text extracted: {len(pdf_text)} chars")
             else:
                 logger.warning(f"⚠️ No PDF text available, will use abstract")
         except Exception as e:
