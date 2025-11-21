@@ -948,6 +948,14 @@ try:
     print("✅ Experiment planning endpoints registered successfully")
 except ImportError as e:
     print(f"⚠️ Failed to import experiment plans router: {e}")
+
+# Week 21-22: Living Summaries endpoints
+try:
+    from backend.app.routers.summaries import router as summaries_router
+    app.include_router(summaries_router)
+    print("✅ Living summaries endpoints registered successfully")
+except ImportError as e:
+    print(f"⚠️ Failed to import summaries router: {e}")
     print(f"   Error details: {type(e).__name__}")
     import traceback
     traceback.print_exc()

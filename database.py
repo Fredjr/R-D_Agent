@@ -1046,6 +1046,38 @@ class ExperimentPlan(Base):
     )
 
 
+class ProjectSummary(Base):
+    """Auto-generated project summaries with 24-hour cache (Week 21-22)"""
+    __tablename__ = "project_summaries"
+
+    summary_id = Column(String, primary_key=True)  # UUID
+    project_id = Column(String, ForeignKey("projects.project_id", ondelete="CASCADE"), nullable=False, unique=True)
+
+    # Summary content
+    summary_text = Column(Text, nullable=True)
+    key_findings = Column(JSON, default=list)  # Array of strings
+    protocol_insights = Column(JSON, default=list)  # Array of strings
+    experiment_status = Column(Text, nullable=True)
+    next_steps = Column(JSON, default=list)  # Array of {action, priority, estimated_effort}
+
+    # Cache management
+    last_updated = Column(DateTime(timezone=True), server_default=func.now())
+    cache_valid_until = Column(DateTime(timezone=True), nullable=True)
+
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    project = relationship("Project")
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_project_summaries_project', 'project_id'),
+        Index('idx_project_summaries_cache', 'cache_valid_until'),
+    )
+
+
 class FieldSummary(Base):
     """Living literature reviews that auto-update with new papers"""
     __tablename__ = "field_summaries"
