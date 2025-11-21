@@ -395,10 +395,10 @@ class LivingSummaryService:
         # Build lookup dictionaries for faster access
         protocols_by_pmid = {}
         for protocol in project_data['protocols']:
-            if protocol.article_pmid:
-                if protocol.article_pmid not in protocols_by_pmid:
-                    protocols_by_pmid[protocol.article_pmid] = []
-                protocols_by_pmid[protocol.article_pmid].append(protocol)
+            if protocol.source_pmid:
+                if protocol.source_pmid not in protocols_by_pmid:
+                    protocols_by_pmid[protocol.source_pmid] = []
+                protocols_by_pmid[protocol.source_pmid].append(protocol)
 
         plans_by_protocol = {}
         for plan in project_data['plans']:
