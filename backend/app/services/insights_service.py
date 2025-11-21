@@ -168,30 +168,47 @@ class InsightsService:
         context = self._build_context(project_data, metrics)
 
         # Generate insights
-        response = await client.chat.completions.create(
-            model="gpt-4o-mini",
-            temperature=0.4,
-            messages=[
-                {
-                    "role": "system",
-                    "content": self._get_system_prompt()
-                },
-                {
-                    "role": "user",
-                    "content": context
-                }
-            ]
-        )
+        try:
+            response = await client.chat.completions.create(
+                model="gpt-4o-mini",
+                temperature=0.4,
+                response_format={"type": "json_object"},  # Force JSON response
+                messages=[
+                    {
+                        "role": "system",
+                        "content": self._get_system_prompt()
+                    },
+                    {
+                        "role": "user",
+                        "content": context
+                    }
+                ]
+            )
 
-        # Parse response
-        import json
-        insights = json.loads(response.choices[0].message.content)
+            # Parse response
+            import json
+            ai_response = response.choices[0].message.content
 
-        # Add metrics to response
-        insights['metrics'] = metrics
+            if not ai_response or ai_response.strip() == "":
+                logger.error("❌ AI returned empty response")
+                raise ValueError("AI returned empty response")
 
-        logger.info(f"✅ AI insights generated")
-        return insights
+            logger.info(f"📝 AI response (first 200 chars): {ai_response[:200]}")
+            insights = json.loads(ai_response)
+
+            # Add metrics to response
+            insights['metrics'] = metrics
+
+            logger.info(f"✅ AI insights generated successfully")
+            return insights
+
+        except json.JSONDecodeError as e:
+            logger.error(f"❌ Failed to parse AI response as JSON: {e}")
+            logger.error(f"📝 Raw AI response: {ai_response[:500] if 'ai_response' in locals() else 'No response'}")
+            raise ValueError(f"AI returned invalid JSON: {str(e)}")
+        except Exception as e:
+            logger.error(f"❌ Error generating insights: {e}")
+            raise
 
     def _build_context(self, project_data: Dict, metrics: Dict) -> str:
         """Build context string for AI"""
@@ -244,8 +261,11 @@ class InsightsService:
         """Get system prompt for AI"""
         return """You are a research strategy advisor analyzing a scientific research project.
 
-Analyze the provided project data and generate actionable insights in JSON format:
+Analyze the provided project data and generate actionable insights.
 
+IMPORTANT: You MUST respond with ONLY valid JSON. Do not include any text before or after the JSON.
+
+Required JSON structure:
 {
   "progress_insights": [
     {"title": "insight title", "description": "detailed observation", "impact": "high|medium|low"}
@@ -270,5 +290,6 @@ Guidelines:
 - Identify both strengths and opportunities
 - Prioritize by impact
 - Provide clear rationale for recommendations
-- Limit to 3-5 items per category"""
+- Limit to 3-5 items per category
+- Return ONLY valid JSON, no markdown formatting or extra text"""
 

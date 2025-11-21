@@ -143,32 +143,49 @@ class LivingSummaryService:
     async def _generate_ai_summary(self, project_data: Dict) -> Dict:
         """Generate summary using AI"""
         logger.info(f"🤖 Generating AI summary...")
-        
+
         # Build context for AI
         context = self._build_context(project_data)
-        
+
         # Generate summary
-        response = await client.chat.completions.create(
-            model="gpt-4o-mini",
-            temperature=0.3,
-            messages=[
-                {
-                    "role": "system",
-                    "content": self._get_system_prompt()
-                },
-                {
-                    "role": "user",
-                    "content": context
-                }
-            ]
-        )
-        
-        # Parse response (expecting JSON)
-        import json
-        summary_data = json.loads(response.choices[0].message.content)
-        
-        logger.info(f"✅ AI summary generated")
-        return summary_data
+        try:
+            response = await client.chat.completions.create(
+                model="gpt-4o-mini",
+                temperature=0.3,
+                response_format={"type": "json_object"},  # Force JSON response
+                messages=[
+                    {
+                        "role": "system",
+                        "content": self._get_system_prompt()
+                    },
+                    {
+                        "role": "user",
+                        "content": context
+                    }
+                ]
+            )
+
+            # Parse response (expecting JSON)
+            import json
+            ai_response = response.choices[0].message.content
+
+            if not ai_response or ai_response.strip() == "":
+                logger.error("❌ AI returned empty response")
+                raise ValueError("AI returned empty response")
+
+            logger.info(f"📝 AI response (first 200 chars): {ai_response[:200]}")
+            summary_data = json.loads(ai_response)
+
+            logger.info(f"✅ AI summary generated successfully")
+            return summary_data
+
+        except json.JSONDecodeError as e:
+            logger.error(f"❌ Failed to parse AI response as JSON: {e}")
+            logger.error(f"📝 Raw AI response: {ai_response[:500] if 'ai_response' in locals() else 'No response'}")
+            raise ValueError(f"AI returned invalid JSON: {str(e)}")
+        except Exception as e:
+            logger.error(f"❌ Error generating summary: {e}")
+            raise
 
     def _build_context(self, project_data: Dict) -> str:
         """Build context string for AI"""
@@ -211,17 +228,17 @@ class LivingSummaryService:
         """Get system prompt for AI"""
         return """You are a research assistant generating a comprehensive project summary.
 
-Analyze the provided project data and generate a JSON response with:
+IMPORTANT: You MUST respond with ONLY valid JSON. Do not include any text before or after the JSON.
 
+Required JSON structure:
 {
   "summary_text": "2-3 paragraph overview of the project",
-  "key_findings": ["finding 1", "finding 2", ...],  // 5-7 key findings from papers
-  "protocol_insights": ["insight 1", "insight 2", ...],  // 3-5 insights from protocols
+  "key_findings": ["finding 1", "finding 2"],
+  "protocol_insights": ["insight 1", "insight 2"],
   "experiment_status": "1-2 sentence summary of experiment progress",
   "next_steps": [
-    {"action": "action description", "priority": "high|medium|low", "estimated_effort": "time estimate"},
-    ...
-  ]  // 3-5 recommended next steps
+    {"action": "action description", "priority": "high", "estimated_effort": "time estimate"}
+  ]
 }
 
 Guidelines:
@@ -229,7 +246,11 @@ Guidelines:
 - Focus on insights, not just facts
 - Identify gaps and opportunities
 - Prioritize next steps by impact
-- Use clear, professional language"""
+- Use clear, professional language
+- Return ONLY valid JSON, no markdown formatting or extra text
+- Include 5-7 key findings from papers
+- Include 3-5 protocol insights
+- Include 3-5 recommended next steps"""
 
     def _save_summary(self, project_id: str, summary_data: Dict, db: Session) -> ProjectSummary:
         """Save summary to database"""
