@@ -28,7 +28,83 @@ PDF_DOWNLOAD_TIMEOUT = 60.0
 
 def register_pdf_endpoints(app):
     """Register all PDF-related endpoints with the FastAPI app"""
-    
+
+    @app.get("/articles/{pmid}/pdf-text")
+    async def get_pdf_text(
+        pmid: str,
+        user_id: str = Header(..., alias="User-ID"),
+        force_refresh: bool = Query(False, description="Force re-extraction even if cached"),
+        db: Session = Depends(get_db)
+    ):
+        """
+        Extract full text from PDF and cache in database.
+
+        This endpoint:
+        1. Checks if PDF text already extracted (unless force_refresh)
+        2. Gets PDF URL using existing infrastructure
+        3. Downloads and extracts text using PyPDF2
+        4. Caches in database for future use
+        5. Returns extracted text
+
+        Used by:
+        - Protocol extraction (to get full methods section)
+        - AI triage (to analyze full paper content)
+        - Any feature needing full paper text
+
+        Returns:
+        - pmid: Article PMID
+        - pdf_text: Extracted text from PDF
+        - pdf_source: Source of PDF (pmc, europepmc, etc.)
+        - pdf_extracted_at: When extraction occurred
+        - character_count: Length of extracted text
+        - extraction_method: Method used (pypdf2, pdfplumber)
+        """
+        try:
+            logger.info(f"📄 Extracting PDF text for PMID: {pmid}")
+
+            # Use the PDFTextExtractor service
+            from backend.app.services.pdf_text_extractor import PDFTextExtractor
+            extractor = PDFTextExtractor()
+
+            pdf_text = await extractor.extract_and_store(pmid, db, force_refresh)
+
+            if not pdf_text:
+                # Get article to check if it exists
+                article = db.query(Article).filter(Article.pmid == pmid).first()
+                if not article:
+                    raise HTTPException(status_code=404, detail=f"Article {pmid} not found")
+
+                return {
+                    "pmid": pmid,
+                    "pdf_text": None,
+                    "pdf_source": None,
+                    "pdf_extracted_at": None,
+                    "character_count": 0,
+                    "extraction_method": None,
+                    "error": "PDF not available or extraction failed",
+                    "fallback_to_abstract": True,
+                    "abstract": article.abstract
+                }
+
+            # Get article to return metadata
+            article = db.query(Article).filter(Article.pmid == pmid).first()
+
+            return {
+                "pmid": pmid,
+                "pdf_text": pdf_text,
+                "pdf_source": article.pdf_source,
+                "pdf_extracted_at": article.pdf_extracted_at.isoformat() if article.pdf_extracted_at else None,
+                "character_count": len(pdf_text),
+                "extraction_method": article.pdf_extraction_method,
+                "fallback_to_abstract": False
+            }
+
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            logger.error(f"❌ PDF text extraction failed for {pmid}: {e}")
+            raise HTTPException(status_code=500, detail=f"PDF text extraction failed: {str(e)}")
+
     @app.get("/articles/{pmid}/pdf-url")
     async def get_pdf_url(
         pmid: str,

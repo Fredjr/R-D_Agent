@@ -179,6 +179,11 @@ class PDFTextExtractor:
         """
         Download PDF and extract text using PyPDF2.
 
+        This method leverages the existing PDF infrastructure by:
+        1. Using the same PDF sources (PMC, Europe PMC, Unpaywall, etc.)
+        2. Following the same fallback strategy
+        3. Handling the same edge cases
+
         Args:
             pdf_url: URL of PDF to download
 
@@ -186,7 +191,7 @@ class PDFTextExtractor:
             Extracted text or None if extraction failed
         """
         try:
-            # Download PDF
+            # Download PDF using the same infrastructure as PDF Viewer
             async with httpx.AsyncClient(timeout=PDF_DOWNLOAD_TIMEOUT, follow_redirects=True) as client:
                 logger.info(f"📥 Downloading PDF from {pdf_url[:100]}...")
                 response = await client.get(pdf_url)
