@@ -49,6 +49,64 @@ def format_authors(authors) -> Optional[str]:
     return authors
 
 
+def normalize_protocol_data(materials: List, steps: List) -> tuple:
+    """
+    Normalize protocol materials and steps to ensure they're in dict format.
+
+    Handles backward compatibility with old string-based protocols.
+    Converts strings to dicts if needed.
+
+    Returns: (normalized_materials, normalized_steps)
+    """
+    # Normalize materials
+    normalized_materials = []
+    if materials:
+        for material in materials:
+            if isinstance(material, str):
+                # Convert string to dict
+                normalized_materials.append({
+                    "name": material,
+                    "catalog_number": None,
+                    "supplier": None,
+                    "amount": None,
+                    "notes": None
+                })
+            elif isinstance(material, dict):
+                # Already a dict, ensure all fields exist
+                normalized_materials.append({
+                    "name": material.get("name", "Unknown"),
+                    "catalog_number": material.get("catalog_number"),
+                    "supplier": material.get("supplier"),
+                    "amount": material.get("amount"),
+                    "notes": material.get("notes")
+                })
+
+    # Normalize steps
+    normalized_steps = []
+    if steps:
+        for idx, step in enumerate(steps):
+            if isinstance(step, str):
+                # Convert string to dict
+                normalized_steps.append({
+                    "step_number": idx + 1,
+                    "instruction": step,
+                    "duration": None,
+                    "temperature": None,
+                    "notes": None
+                })
+            elif isinstance(step, dict):
+                # Already a dict, ensure all fields exist
+                normalized_steps.append({
+                    "step_number": step.get("step_number", idx + 1),
+                    "instruction": step.get("instruction", ""),
+                    "duration": step.get("duration"),
+                    "temperature": step.get("temperature"),
+                    "notes": step.get("notes")
+                })
+
+    return normalized_materials, normalized_steps
+
+
 # Pydantic Models
 
 class MaterialItem(BaseModel):
@@ -232,13 +290,19 @@ async def extract_protocol(
         # Get article details for response
         article = db.query(Article).filter(Article.pmid == request.article_pmid).first()
 
+        # Normalize materials and steps for backward compatibility
+        normalized_materials, normalized_steps = normalize_protocol_data(
+            protocol.materials or [],
+            protocol.steps or []
+        )
+
         return ProtocolResponse(
             protocol_id=protocol.protocol_id,
             source_pmid=protocol.source_pmid,
             protocol_name=protocol.protocol_name,
             protocol_type=protocol.protocol_type,
-            materials=protocol.materials,
-            steps=protocol.steps,
+            materials=normalized_materials,
+            steps=normalized_steps,
             equipment=protocol.equipment,
             duration_estimate=protocol.duration_estimate,
             difficulty_level=protocol.difficulty_level,
@@ -342,13 +406,16 @@ async def get_project_protocols(
 
                 article = db.query(Article).filter(Article.pmid == source_pmid).first()
 
+                # Normalize materials and steps for backward compatibility
+                normalized_materials, normalized_steps = normalize_protocol_data(materials or [], steps or [])
+
                 responses.append(ProtocolResponse(
                     protocol_id=protocol_id,
                     source_pmid=source_pmid,
                     protocol_name=protocol_name,
                     protocol_type=protocol_type,
-                    materials=materials,
-                    steps=steps,
+                    materials=normalized_materials,
+                    steps=normalized_steps,
                     equipment=equipment,
                     duration_estimate=duration_estimate,
                     difficulty_level=difficulty_level,
@@ -378,13 +445,20 @@ async def get_project_protocols(
             else:
                 # New schema - Protocol object with all fields
                 article = db.query(Article).filter(Article.pmid == protocol.source_pmid).first()
+
+                # Normalize materials and steps for backward compatibility
+                normalized_materials, normalized_steps = normalize_protocol_data(
+                    protocol.materials or [],
+                    protocol.steps or []
+                )
+
                 responses.append(ProtocolResponse(
                     protocol_id=protocol.protocol_id,
                     source_pmid=protocol.source_pmid,
                     protocol_name=protocol.protocol_name,
                     protocol_type=protocol.protocol_type,
-                    materials=protocol.materials,
-                    steps=protocol.steps,
+                    materials=normalized_materials,
+                    steps=normalized_steps,
                     equipment=protocol.equipment,
                     duration_estimate=protocol.duration_estimate,
                     difficulty_level=protocol.difficulty_level,
@@ -443,13 +517,19 @@ async def get_protocol(
         # Get article details
         article = db.query(Article).filter(Article.pmid == protocol.source_pmid).first()
 
+        # Normalize materials and steps for backward compatibility
+        normalized_materials, normalized_steps = normalize_protocol_data(
+            protocol.materials or [],
+            protocol.steps or []
+        )
+
         return ProtocolResponse(
             protocol_id=protocol.protocol_id,
             source_pmid=protocol.source_pmid,
             protocol_name=protocol.protocol_name,
             protocol_type=protocol.protocol_type,
-            materials=protocol.materials,
-            steps=protocol.steps,
+            materials=normalized_materials,
+            steps=normalized_steps,
             equipment=protocol.equipment,
             duration_estimate=protocol.duration_estimate,
             difficulty_level=protocol.difficulty_level,
