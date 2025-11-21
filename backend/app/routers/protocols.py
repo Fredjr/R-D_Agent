@@ -320,7 +320,22 @@ async def get_project_protocols(
                 article_title=article.title if article else None,
                 article_authors=format_authors(article.authors) if article else None,
                 article_journal=article.journal if article else None,
-                article_year=article.publication_year if article else None
+                article_year=article.publication_year if article else None,
+                # Enhanced fields (Week 19)
+                key_parameters=getattr(protocol, 'key_parameters', []),
+                expected_outcomes=getattr(protocol, 'expected_outcomes', []),
+                troubleshooting_tips=getattr(protocol, 'troubleshooting_tips', []),
+                # Context-aware fields (Week 19)
+                relevance_score=getattr(protocol, 'relevance_score', 50),
+                affected_questions=getattr(protocol, 'affected_questions', []),
+                affected_hypotheses=getattr(protocol, 'affected_hypotheses', []),
+                relevance_reasoning=getattr(protocol, 'relevance_reasoning', None),
+                key_insights=getattr(protocol, 'key_insights', []),
+                potential_applications=getattr(protocol, 'potential_applications', []),
+                recommendations=getattr(protocol, 'recommendations', []),
+                context_relevance=getattr(protocol, 'context_relevance', None),
+                extraction_method=getattr(protocol, 'extraction_method', 'basic'),
+                context_aware=getattr(protocol, 'context_aware', False)
             ))
         
         logger.info(f"✅ Retrieved {len(responses)} protocols for project {project_id}")
