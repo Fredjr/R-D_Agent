@@ -410,9 +410,15 @@ export default function ProtocolsTab({ projectId, userId }: ProtocolsTabProps) {
       {selectedProtocol && (
         <ProtocolDetailModal
           protocol={selectedProtocol}
+          projectId={projectId}
+          userId={userId}
           onClose={() => setSelectedProtocol(null)}
           onUpdate={handleUpdateProtocol}
           onDelete={handleDeleteProtocol}
+          onPlanCreated={(plan) => {
+            console.log('Experiment plan created:', plan);
+            // Optionally show a success message or navigate to plans tab
+          }}
         />
       )}
     </div>

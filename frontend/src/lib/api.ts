@@ -1194,3 +1194,237 @@ export async function deleteAlert(
     throw error;
   }
 }
+
+// ============================================================================
+// EXPERIMENT PLANNING API (Week 19-20)
+// ============================================================================
+
+export interface ExperimentPlan {
+  plan_id: string;
+  project_id: string;
+  protocol_id: string | null;
+  plan_name: string;
+  objective: string;
+  linked_questions: string[];
+  linked_hypotheses: string[];
+  materials: ExperimentMaterial[];
+  procedure: ExperimentStep[];
+  expected_outcomes: string[];
+  success_criteria: SuccessCriterion[];
+  timeline_estimate: string | null;
+  estimated_cost: string | null;
+  difficulty_level: string;
+  risk_assessment: RiskAssessment;
+  troubleshooting_guide: TroubleshootingItem[];
+  safety_considerations: string[];
+  required_expertise: string[];
+  notes: string | null;
+  generated_by: string;
+  generation_confidence: number | null;
+  generation_model: string | null;
+  status: 'draft' | 'approved' | 'in_progress' | 'completed' | 'cancelled';
+  execution_notes: string | null;
+  actual_duration: string | null;
+  actual_cost: string | null;
+  results_summary: string | null;
+  outcome: 'success' | 'partial_success' | 'failure' | null;
+  lessons_learned: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  approved_by: string | null;
+  approved_at: string | null;
+  executed_at: string | null;
+  completed_at: string | null;
+}
+
+export interface ExperimentMaterial {
+  name: string;
+  amount: string;
+  source?: string;
+  notes?: string;
+}
+
+export interface ExperimentStep {
+  step_number: number;
+  description: string;
+  duration?: string;
+  critical_notes?: string;
+}
+
+export interface SuccessCriterion {
+  criterion: string;
+  measurement_method: string;
+  target_value?: string;
+}
+
+export interface RiskAssessment {
+  risks: string[];
+  mitigation_strategies: string[];
+}
+
+export interface TroubleshootingItem {
+  issue: string;
+  solution: string;
+  prevention?: string;
+}
+
+export interface CreateExperimentPlanRequest {
+  protocol_id: string;
+  project_id: string;
+  custom_objective?: string;
+  custom_notes?: string;
+}
+
+export interface UpdateExperimentPlanRequest {
+  plan_name?: string;
+  objective?: string;
+  status?: 'draft' | 'approved' | 'in_progress' | 'completed' | 'cancelled';
+  execution_notes?: string;
+  actual_duration?: string;
+  actual_cost?: string;
+  results_summary?: string;
+  outcome?: 'success' | 'partial_success' | 'failure';
+  lessons_learned?: string;
+  notes?: string;
+}
+
+/**
+ * Generate a new experiment plan from a protocol
+ */
+export async function createExperimentPlan(
+  request: CreateExperimentPlanRequest,
+  userId: string
+): Promise<ExperimentPlan> {
+  try {
+    const response = await fetch('/api/proxy/experiment-plans', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId,
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Failed to create experiment plan: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error creating experiment plan:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get all experiment plans for a project
+ */
+export async function getProjectExperimentPlans(
+  projectId: string,
+  userId: string
+): Promise<ExperimentPlan[]> {
+  try {
+    const response = await fetch(`/api/proxy/experiment-plans/project/${projectId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch experiment plans: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching experiment plans:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get a specific experiment plan
+ */
+export async function getExperimentPlan(
+  planId: string,
+  userId: string
+): Promise<ExperimentPlan> {
+  try {
+    const response = await fetch(`/api/proxy/experiment-plans/${planId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch experiment plan: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching experiment plan:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update an experiment plan
+ */
+export async function updateExperimentPlan(
+  planId: string,
+  userId: string,
+  update: UpdateExperimentPlanRequest
+): Promise<ExperimentPlan> {
+  try {
+    const response = await fetch(`/api/proxy/experiment-plans/${planId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId,
+      },
+      body: JSON.stringify(update),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Failed to update experiment plan: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating experiment plan:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete an experiment plan
+ */
+export async function deleteExperimentPlan(
+  planId: string,
+  userId: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const response = await fetch(`/api/proxy/experiment-plans/${planId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-ID': userId,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to delete experiment plan: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error deleting experiment plan:', error);
+    throw error;
+  }
+}

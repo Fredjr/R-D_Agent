@@ -8,7 +8,9 @@
  */
 
 import React, { useState } from 'react';
-import { X, Copy, Download, Edit2, Save, XCircle, Clock, AlertTriangle, Shield, ChevronDown, ChevronUp, FileText } from 'lucide-react';
+import { X, Copy, Download, Edit2, Save, XCircle, Clock, AlertTriangle, Shield, ChevronDown, ChevronUp, FileText, Beaker } from 'lucide-react';
+import ExperimentPlanningModal from './ExperimentPlanningModal';
+import { ExperimentPlan } from '../../lib/api';
 
 interface Material {
   name: string;
@@ -59,20 +61,27 @@ interface Protocol {
 
 interface ProtocolDetailModalProps {
   protocol: Protocol;
+  projectId: string;
+  userId: string;
   onClose: () => void;
   onUpdate?: (protocol: Protocol) => void;
   onDelete?: (protocolId: string) => void;
+  onPlanCreated?: (plan: ExperimentPlan) => void;
 }
 
 export default function ProtocolDetailModal({
   protocol,
+  projectId,
+  userId,
   onClose,
   onUpdate,
-  onDelete
+  onDelete,
+  onPlanCreated
 }: ProtocolDetailModalProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedProtocol, setEditedProtocol] = useState<Protocol>(protocol);
   const [showConfidenceDetails, setShowConfidenceDetails] = useState(false);
+  const [showPlanningModal, setShowPlanningModal] = useState(false);
 
   const handleSave = () => {
     if (onUpdate) {
@@ -182,6 +191,14 @@ export default function ProtocolDetailModal({
           <div className="flex items-center gap-2 ml-4">
             {!isEditing && (
               <>
+                <button
+                  onClick={() => setShowPlanningModal(true)}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                  title="Generate experiment plan from this protocol"
+                >
+                  <Beaker className="w-4 h-4" />
+                  Plan Experiment
+                </button>
                 <button
                   onClick={handleCopyToClipboard}
                   className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
@@ -475,6 +492,23 @@ export default function ProtocolDetailModal({
           )}
         </div>
       </div>
+
+      {/* Experiment Planning Modal */}
+      {showPlanningModal && (
+        <ExperimentPlanningModal
+          protocolId={protocol.protocol_id}
+          protocolName={protocol.protocol_name}
+          projectId={projectId}
+          userId={userId}
+          onClose={() => setShowPlanningModal(false)}
+          onPlanCreated={(plan) => {
+            setShowPlanningModal(false);
+            if (onPlanCreated) {
+              onPlanCreated(plan);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
