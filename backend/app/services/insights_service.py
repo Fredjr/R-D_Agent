@@ -324,38 +324,68 @@ class InsightsService:
             date_str = event['date'].strftime('%Y-%m-%d')
             context += f"[{date_str}] {event['text']}\n"
 
-        context += "\n## 🔗 Evidence Chains:\n\n"
+        context += "\n## 🔗 Complete Evidence Chains (Question → Hypothesis → Paper → Protocol → Experiment):\n\n"
 
-        # Show Q → H → Paper connections
+        # Build complete evidence chains showing full research loop
         for q in questions[:5]:  # Top 5 questions
-            context += f"Question: {q.question_text}\n"
+            context += f"### Question: {q.question_text} [{q.status}]\n"
             linked_hyps = [h for h in hypotheses if h.question_id == q.question_id]
+
             if linked_hyps:
                 for h in linked_hyps:
-                    context += f"  ↓ Hypothesis: {h.hypothesis_text} ({h.confidence_level}%)\n"
+                    context += f"  ↓ Hypothesis: {h.hypothesis_text}\n"
+                    context += f"    Status: {h.status}, Confidence: {h.confidence_level}%\n"
+
                     # Find papers supporting this hypothesis
                     supporting_papers = [
                         (a, t) for a, t in papers
                         if h.hypothesis_id in (t.affected_hypotheses or [])
                     ]
+
                     if supporting_papers:
-                        context += f"     ↓ {len(supporting_papers)} supporting papers\n"
+                        context += f"    ↓ Supporting Papers ({len(supporting_papers)}):\n"
+                        for a, t in supporting_papers[:3]:  # Top 3
+                            context += f"      • {a.title} (Score: {t.relevance_score}/100)\n"
+                            if t.ai_reasoning:
+                                context += f"        Reasoning: {t.ai_reasoning[:100]}...\n"
+
+                        # Find protocols extracted from these papers
+                        paper_pmids = [a.pmid for a, _ in supporting_papers]
+                        related_protocols = [
+                            p for p in protocols
+                            if p.source_pmid in paper_pmids or h.hypothesis_id in (p.affected_hypotheses or [])
+                        ]
+
+                        if related_protocols:
+                            context += f"      ↓ Extracted Protocols ({len(related_protocols)}):\n"
+                            for protocol in related_protocols[:2]:  # Top 2
+                                context += f"        • {protocol.protocol_name}\n"
+
+                                # Find experiments using this protocol
+                                protocol_plans = [p for p in plans if p.protocol_id == protocol.protocol_id]
+                                if protocol_plans:
+                                    context += f"          ↓ Experiments ({len(protocol_plans)}):\n"
+                                    for plan in protocol_plans:
+                                        context += f"            • {plan.plan_name} [{plan.status}]\n"
+                                else:
+                                    context += f"          ⚠️ No experiments planned for this protocol\n"
+                        else:
+                            context += f"      ⚠️ No protocols extracted from these papers\n"
                     else:
-                        context += f"     ⚠️ No papers linked yet\n"
+                        context += f"    ⚠️ No papers linked to this hypothesis\n"
             else:
-                context += f"  ⚠️ No hypotheses yet\n"
+                context += f"  ⚠️ No hypotheses formulated for this question\n"
             context += "\n"
 
-        # Show Protocol → Experiment connections
-        context += "## 🔬 Protocol → Experiment Chains:\n\n"
-        for protocol in protocols[:5]:
-            context += f"Protocol: {protocol.protocol_name}\n"
-            linked_plans = [p for p in plans if p.protocol_id == protocol.protocol_id]
-            if linked_plans:
-                for plan in linked_plans:
-                    context += f"  ↓ Experiment: {plan.plan_name} [{plan.status}]\n"
-            else:
-                context += f"  ⚠️ No experiments planned yet\n"
+        # Show orphaned protocols (not linked to any hypothesis)
+        orphaned_protocols = [p for p in protocols if not any(h.hypothesis_id in (p.affected_hypotheses or []) for h in hypotheses)]
+        if orphaned_protocols:
+            context += "## ⚠️ Orphaned Protocols (not linked to hypotheses):\n\n"
+            for protocol in orphaned_protocols[:3]:
+                context += f"- {protocol.protocol_name}\n"
+                linked_plans = [p for p in plans if p.protocol_id == protocol.protocol_id]
+                if linked_plans:
+                    context += f"  ↓ Experiments: {len(linked_plans)}\n"
             context += "\n"
 
         # Add recent decisions context
@@ -371,41 +401,48 @@ class InsightsService:
 
     def _get_system_prompt(self) -> str:
         """Get context-aware system prompt for AI"""
-        return """You are an AI research analyst that tracks research progress through the full iterative loop.
+        return """You are an AI research analyst that deeply understands the iterative scientific research process.
 
-Your role is to analyze the research journey and provide insights on:
+You track the complete research journey: Question → Hypothesis → Evidence → Method → Experiment → Result → Answer → New Question
 
-1. **Progress Insights**:
-   - Which questions are well-supported by evidence?
-   - Which hypotheses have strong experimental validation?
-   - Where is the research journey stuck or blocked?
-   - How has confidence in hypotheses changed over time?
+Your role is to analyze the COMPLETE EVIDENCE CHAINS and provide insights on:
 
-2. **Connection Insights**:
-   - Which papers connect multiple hypotheses?
-   - Which protocols could address multiple questions?
-   - What cross-cutting themes emerge across the research?
-   - How do different parts of the research reinforce each other?
+1. **Progress Insights** - Track research loop completion:
+   - Which questions have complete evidence chains (Q → H → Papers → Protocol → Experiment)?
+   - Which hypotheses are well-supported by papers AND have experimental validation?
+   - Where is the research journey STUCK (broken chains)?
+   - How has hypothesis confidence evolved based on evidence?
+   - Which questions are ready to be answered based on completed experiments?
 
-3. **Gap Insights**:
-   - Which questions lack hypotheses?
-   - Which hypotheses lack supporting papers?
-   - Which protocols lack experiment plans?
-   - Which experiments lack results?
-   - Where are the breaks in the evidence chain?
+2. **Connection Insights** - Find cross-cutting patterns:
+   - Which papers support MULTIPLE hypotheses (high-value papers)?
+   - Which protocols could address MULTIPLE questions (versatile methods)?
+   - What cross-cutting themes emerge across different hypotheses?
+   - How do different research threads reinforce each other?
+   - Which decisions had the biggest impact on research direction?
 
-4. **Trend Insights**:
-   - What patterns emerge in paper triage decisions?
-   - Are certain types of protocols more successful?
-   - How is the research evolving over time?
-   - What methodological trends are emerging?
+3. **Gap Insights** - Identify broken loops:
+   - Questions WITHOUT hypotheses (can't progress)
+   - Hypotheses WITHOUT supporting papers (no evidence)
+   - Papers WITHOUT extracted protocols (can't test)
+   - Protocols WITHOUT experiment plans (methods not used)
+   - Experiments WITHOUT results (incomplete loop)
+   - Show the EXACT break point in each evidence chain
 
-5. **Recommendations**:
-   - Prioritize actions that close open research loops
-   - Suggest papers to fill evidence gaps
-   - Recommend experiments for untested protocols
-   - Identify questions ready to be answered
-   - Focus on the ITERATIVE nature: Question → Hypothesis → Evidence → Method → Experiment → Result → Answer
+4. **Trend Insights** - Temporal patterns:
+   - How has research focus shifted over time?
+   - Are hypothesis confidence levels increasing or decreasing?
+   - What patterns emerge in paper triage decisions (what gets prioritized)?
+   - Are certain protocol types more successful?
+   - Is the research converging or diverging?
+
+5. **Recommendations** - Close open loops:
+   - PRIORITIZE actions that complete broken evidence chains
+   - Suggest specific papers to fill evidence gaps for specific hypotheses
+   - Recommend experiments for untested protocols linked to high-priority questions
+   - Identify questions ready to be answered (complete chains)
+   - Suggest new hypotheses for questions that lack them
+   - Each recommendation MUST reference the specific Q/H/Paper/Protocol it addresses
 
 IMPORTANT: You MUST respond with ONLY valid JSON. Do not include any text before or after the JSON.
 
