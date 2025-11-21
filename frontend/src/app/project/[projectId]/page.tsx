@@ -33,6 +33,7 @@ import DecisionTimelineTab from '@/components/project/DecisionTimelineTab';
 import { AlertsPanel } from '@/components/project/AlertsPanel';
 import ProtocolsTab from '@/components/project/ProtocolsTab';
 import ExperimentPlansTab from '@/components/project/ExperimentPlansTab';
+import SummariesTab from '@/components/project/SummariesTab';
 import { ProjectHeroActions } from '@/components/project/ProjectHeroActions';
 import { NetworkQuickStart } from '@/components/project/NetworkQuickStart';
 import { ContextualActions, ProjectState, ActionType } from '@/components/project/ContextualActions';
@@ -2019,11 +2020,8 @@ export default function ProjectPage() {
               <ExperimentPlansTab projectId={projectId} userId={user.user_id} />
             )}
 
-            {activeSubTab === 'summaries' && (
-              <div>
-                <h2 className="text-2xl font-bold text-white mb-4">Living Summaries</h2>
-                <p className="text-gray-400">Coming in Phase 3 - Week 21-22</p>
-              </div>
+            {activeSubTab === 'summaries' && user?.user_id && (
+              <SummariesTab projectId={projectId} userId={user.user_id} />
             )}
           </div>
         )}
