@@ -298,7 +298,8 @@ class LivingSummaryService:
                 event['linked_hypotheses'] = decision.affected_hypotheses
             journey_events.append(event)
 
-        # Sort chronologically
+        # Filter out events with None timestamps and sort chronologically
+        journey_events = [e for e in journey_events if e.get('timestamp') is not None]
         journey_events.sort(key=lambda x: x['timestamp'])
 
         # Format as narrative
@@ -306,18 +307,26 @@ class LivingSummaryService:
         narrative += "This shows how your research evolved over time:\n\n"
 
         for i, event in enumerate(journey_events, 1):
+            # Skip if timestamp is None (safety check)
+            if event.get('timestamp') is None:
+                continue
+
             date_str = event['timestamp'].strftime('%Y-%m-%d')
             narrative += f"**{date_str}** - "
 
             # Type-specific formatting
             if event['type'] == 'question':
-                narrative += f"❓ {event['content']} [Status: {event['status']}]\n"
+                status = event.get('status', 'unknown')
+                narrative += f"❓ {event['content']} [Status: {status}]\n"
             elif event['type'] == 'hypothesis':
-                narrative += f"💡 {event['content']} (Confidence: {event['confidence']}%)\n"
+                confidence = event.get('confidence', 0)
+                narrative += f"💡 {event['content']} (Confidence: {confidence}%)\n"
                 if event.get('linked_question'):
                     narrative += f"   → Addresses question\n"
             elif event['type'] == 'paper':
-                narrative += f"📄 {event['content']} ({event['triage_status']}, Score: {event['score']}/100)\n"
+                triage_status = event.get('triage_status', 'unknown')
+                score = event.get('score', 0)
+                narrative += f"📄 {event['content']} ({triage_status}, Score: {score}/100)\n"
                 if event.get('rationale'):
                     # Truncate long rationales
                     rationale = event['rationale'][:150] + "..." if len(event['rationale']) > 150 else event['rationale']
@@ -325,15 +334,22 @@ class LivingSummaryService:
                 if event.get('linked_questions') or event.get('linked_hypotheses'):
                     narrative += f"   → Relevant to {len(event.get('linked_questions', []))} questions, {len(event.get('linked_hypotheses', []))} hypotheses\n"
             elif event['type'] == 'protocol':
-                narrative += f"🔬 {event['content']} (Confidence: {event['confidence']:.0%})\n"
+                confidence = event.get('confidence', 0)
+                # Handle confidence as either float (0.0-1.0) or int (0-100)
+                if confidence and confidence <= 1.0:
+                    narrative += f"🔬 {event['content']} (Confidence: {confidence:.0%})\n"
+                else:
+                    narrative += f"🔬 {event['content']} (Confidence: {confidence}%)\n"
                 if event.get('source_paper'):
                     narrative += f"   → Extracted from paper\n"
             elif event['type'] == 'experiment':
-                narrative += f"🧪 {event['content']} [Status: {event['status']}]\n"
+                status = event.get('status', 'unknown')
+                narrative += f"🧪 {event['content']} [Status: {status}]\n"
                 if event.get('linked_protocol'):
                     narrative += f"   → Uses protocol\n"
             elif event['type'] == 'decision':
-                narrative += f"⚡ {event['content']} (Type: {event['decision_type']})\n"
+                decision_type = event.get('decision_type', 'unknown')
+                narrative += f"⚡ {event['content']} (Type: {decision_type})\n"
                 if event.get('rationale'):
                     rationale = event['rationale'][:150] + "..." if len(event['rationale']) > 150 else event['rationale']
                     narrative += f"   → Rationale: {rationale}\n"
