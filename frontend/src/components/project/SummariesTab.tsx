@@ -1,12 +1,26 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Sparkles, Target, Beaker, Lightbulb, Clock } from 'lucide-react';
+import { RefreshCw, Sparkles, Target, Beaker, Lightbulb, Clock, Calendar } from 'lucide-react';
+import ResearchJourneyTimeline from './ResearchJourneyTimeline';
 
 interface NextStep {
   action: string;
   priority: 'high' | 'medium' | 'low';
   estimated_effort: string;
+}
+
+interface TimelineEvent {
+  id: string;
+  timestamp: string;
+  type: 'question' | 'hypothesis' | 'paper' | 'protocol' | 'experiment' | 'decision';
+  title: string;
+  description?: string;
+  status?: string;
+  rationale?: string;
+  score?: number;
+  confidence?: number;
+  metadata?: Record<string, any>;
 }
 
 interface ProjectSummary {
@@ -17,6 +31,7 @@ interface ProjectSummary {
   protocol_insights: string[];
   experiment_status: string;
   next_steps: NextStep[];
+  timeline_events?: TimelineEvent[];
   last_updated: string;
   cache_valid_until: string;
 }
@@ -151,6 +166,20 @@ export default function SummariesTab({ projectId, userId }: SummariesTabProps) {
         </h3>
         <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">{summary.summary_text}</p>
       </div>
+
+      {/* Research Journey Timeline */}
+      {summary.timeline_events && summary.timeline_events.length > 0 && (
+        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-blue-400" />
+            Research Journey Timeline
+          </h3>
+          <p className="text-sm text-gray-400 mb-4">
+            Chronological view of your research progression showing how questions, hypotheses, papers, protocols, and experiments connect over time.
+          </p>
+          <ResearchJourneyTimeline events={summary.timeline_events} />
+        </div>
+      )}
 
       {/* Key Findings */}
       {summary.key_findings && summary.key_findings.length > 0 && (

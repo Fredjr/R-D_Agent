@@ -153,8 +153,8 @@ class LivingSummaryService:
         """Generate summary using AI"""
         logger.info(f"🤖 Generating AI summary...")
 
-        # Build context for AI
-        context = self._build_context(project_data)
+        # Build context for AI (now returns tuple with timeline events)
+        context, timeline_events = self._build_context(project_data)
 
         # Generate summary
         try:
@@ -185,7 +185,10 @@ class LivingSummaryService:
             logger.info(f"📝 AI response (first 200 chars): {ai_response[:200]}")
             summary_data = json.loads(ai_response)
 
-            logger.info(f"✅ AI summary generated successfully")
+            # Add timeline events to the summary data
+            summary_data['timeline_events'] = timeline_events
+
+            logger.info(f"✅ AI summary generated successfully with {len(timeline_events)} timeline events")
             return summary_data
 
         except json.JSONDecodeError as e:
@@ -196,8 +199,12 @@ class LivingSummaryService:
             logger.error(f"❌ Error generating summary: {e}")
             raise
 
-    def _build_research_journey(self, project_data: Dict) -> str:
-        """Build chronological research journey narrative"""
+    def _build_research_journey(self, project_data: Dict) -> tuple[str, list]:
+        """Build chronological research journey narrative and structured timeline data
+
+        Returns:
+            tuple: (narrative_text, timeline_events_list)
+        """
         logger.info(f"🗺️ Building research journey timeline...")
 
         journey_events = []
@@ -208,6 +215,7 @@ class LivingSummaryService:
                 'timestamp': q.created_at,
                 'type': 'question',
                 'content': f"Research Question: {q.question_text}",
+                'title': q.question_text,
                 'status': q.status,
                 'id': q.question_id
             })
@@ -218,6 +226,7 @@ class LivingSummaryService:
                 'timestamp': h.created_at,
                 'type': 'hypothesis',
                 'content': f"Hypothesis: {h.hypothesis_text}",
+                'title': h.hypothesis_text,
                 'confidence': h.confidence_level,
                 'status': h.status,
                 'linked_question': h.question_id,
@@ -228,8 +237,9 @@ class LivingSummaryService:
         for article, triage in project_data['papers']:
             event = {
                 'timestamp': triage.triaged_at,
-                'type': 'paper_triage',
+                'type': 'paper',
                 'content': f"Triaged Paper: {article.title}",
+                'title': article.title,
                 'triage_status': triage.triage_status,
                 'score': triage.relevance_score,
                 'pmid': article.pmid
@@ -250,19 +260,21 @@ class LivingSummaryService:
                 'timestamp': protocol.created_at,
                 'type': 'protocol',
                 'content': f"Extracted Protocol: {protocol.protocol_name}",
+                'title': protocol.protocol_name,
                 'confidence': protocol.confidence_score,
                 'id': protocol.protocol_id
             }
-            if protocol.article_pmid:
-                event['source_paper'] = protocol.article_pmid
+            if protocol.source_pmid:
+                event['source_paper'] = protocol.source_pmid
             journey_events.append(event)
 
         # 5. Experiment Plans (action)
         for plan in project_data['plans']:
             event = {
                 'timestamp': plan.created_at,
-                'type': 'experiment_plan',
+                'type': 'experiment',
                 'content': f"Planned Experiment: {plan.plan_name}",
+                'title': plan.plan_name,
                 'status': plan.status,
                 'id': plan.plan_id
             }
@@ -276,6 +288,7 @@ class LivingSummaryService:
                 'timestamp': decision.decided_at,
                 'type': 'decision',
                 'content': f"Decision: {decision.title}",
+                'title': decision.title,
                 'decision_type': decision.decision_type,
                 'rationale': decision.rationale
             }
@@ -303,7 +316,7 @@ class LivingSummaryService:
                 narrative += f"💡 {event['content']} (Confidence: {event['confidence']}%)\n"
                 if event.get('linked_question'):
                     narrative += f"   → Addresses question\n"
-            elif event['type'] == 'paper_triage':
+            elif event['type'] == 'paper':
                 narrative += f"📄 {event['content']} ({event['triage_status']}, Score: {event['score']}/100)\n"
                 if event.get('rationale'):
                     # Truncate long rationales
@@ -315,7 +328,7 @@ class LivingSummaryService:
                 narrative += f"🔬 {event['content']} (Confidence: {event['confidence']:.0%})\n"
                 if event.get('source_paper'):
                     narrative += f"   → Extracted from paper\n"
-            elif event['type'] == 'experiment_plan':
+            elif event['type'] == 'experiment':
                 narrative += f"🧪 {event['content']} [Status: {event['status']}]\n"
                 if event.get('linked_protocol'):
                     narrative += f"   → Uses protocol\n"
@@ -327,8 +340,28 @@ class LivingSummaryService:
 
             narrative += "\n"
 
+        # Prepare structured timeline data for frontend
+        timeline_events = []
+        for event in journey_events:
+            timeline_event = {
+                'id': event.get('id', str(event['timestamp'])),
+                'timestamp': event['timestamp'].isoformat(),
+                'type': event['type'],
+                'title': event.get('title', event['content']),
+                'description': event.get('content'),
+                'status': event.get('status'),
+                'rationale': event.get('rationale'),
+                'score': event.get('score'),
+                'confidence': event.get('confidence'),
+                'metadata': {
+                    k: v for k, v in event.items()
+                    if k not in ['timestamp', 'type', 'content', 'title', 'status', 'rationale', 'score', 'confidence', 'id']
+                }
+            }
+            timeline_events.append(timeline_event)
+
         logger.info(f"✅ Built journey with {len(journey_events)} events")
-        return narrative
+        return narrative, timeline_events
 
     def _build_correlation_map(self, project_data: Dict) -> str:
         """Build map showing how everything connects"""
@@ -415,8 +448,12 @@ class LivingSummaryService:
         logger.info(f"✅ Built correlation map")
         return correlations
 
-    def _build_context(self, project_data: Dict) -> str:
-        """Build rich context for AI with research journey"""
+    def _build_context(self, project_data: Dict) -> tuple[str, list]:
+        """Build rich context for AI with research journey
+
+        Returns:
+            tuple: (context_text, timeline_events_list)
+        """
         project = project_data['project']
         questions = project_data['questions']
         hypotheses = project_data['hypotheses']
@@ -430,8 +467,9 @@ class LivingSummaryService:
 
 """
 
-        # Add research journey timeline
-        context += self._build_research_journey(project_data)
+        # Add research journey timeline (now returns tuple)
+        journey_narrative, timeline_events = self._build_research_journey(project_data)
+        context += journey_narrative
         context += "\n---\n\n"
 
         # Add correlation map
@@ -481,7 +519,7 @@ class LivingSummaryService:
                 context += "\n"
             context += "---\n\n"
 
-        return context
+        return context, timeline_events
 
     def _get_system_prompt(self) -> str:
         """Get context-aware system prompt for AI"""
