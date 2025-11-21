@@ -956,6 +956,14 @@ try:
     print("✅ Living summaries endpoints registered successfully")
 except ImportError as e:
     print(f"⚠️ Failed to import summaries router: {e}")
+
+# Week 21-22: AI Insights endpoints
+try:
+    from backend.app.routers.insights import router as insights_router
+    app.include_router(insights_router)
+    print("✅ AI insights endpoints registered successfully")
+except ImportError as e:
+    print(f"⚠️ Failed to import insights router: {e}")
     print(f"   Error details: {type(e).__name__}")
     import traceback
     traceback.print_exc()
