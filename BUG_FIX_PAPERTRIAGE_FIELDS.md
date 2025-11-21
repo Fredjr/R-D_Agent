@@ -148,9 +148,19 @@ interface Metrics {
 
 ## 📦 **Deployment Status**
 
-✅ **Code Fixed**: Commit `98292bd` pushed to `main` branch  
-⏳ **Railway Backend**: Awaiting automatic redeployment  
-⏳ **Vercel Frontend**: Awaiting automatic redeployment  
+✅ **Code Fixed**: Commits `98292bd`, `bad52fd` pushed to `main` branch
+⏳ **Railway Backend**: Awaiting automatic redeployment
+⏳ **Vercel Frontend**: Awaiting automatic redeployment
+
+### **Additional Fix (bad52fd)**
+Found one more reference to `final_score` in `living_summary_service.py` line 195:
+```python
+# BEFORE (❌ Wrong)
+context += f"- {article.title} (Score: {triage.final_score})\n"
+
+# AFTER (✅ Fixed)
+context += f"- {article.title} (Relevance: {triage.relevance_score}/100)\n"
+```
 
 ### **Expected Timeline**
 - Railway typically redeploys within **2-5 minutes** of push
@@ -182,5 +192,16 @@ Once deployed, test both features:
 
 ---
 
-**Status**: Waiting for Railway/Vercel to redeploy. Should be live within 5 minutes! 🚀
+**Status**: ✅ **ALL FIXES COMPLETE** - Waiting for Railway/Vercel to redeploy. Should be live within 5 minutes! 🚀
+
+---
+
+## 🔍 **Verification**
+
+All references to old field names have been removed:
+- ✅ No more `PaperTriage.pmid` references
+- ✅ No more `PaperTriage.decision` references
+- ✅ No more `PaperTriage.final_score` references
+
+Verified with: `grep -r "\.final_score\|\.decision\|PaperTriage\.pmid" backend/app`
 
