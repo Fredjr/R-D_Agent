@@ -252,14 +252,16 @@ Description: {project.description if project and project.description else 'Not p
         if questions:
             questions_section = "\nRESEARCH QUESTIONS:\n"
             for i, q in enumerate(questions[:5], 1):  # Top 5 questions
-                questions_section += f"{i}. {q.question_text}\n"
+                questions_section += f"{i}. [ID: {q.question_id}] {q.question_text}\n"
+                questions_section += f"   Type: {q.question_type}, Status: {q.status}, Priority: {q.priority}\n"
 
         # Hypotheses
         hypotheses_section = ""
         if hypotheses:
             hypotheses_section = "\nHYPOTHESES:\n"
             for i, h in enumerate(hypotheses[:5], 1):  # Top 5 hypotheses
-                hypotheses_section += f"{i}. {h.hypothesis_text} (Status: {h.status})\n"
+                hypotheses_section += f"{i}. [ID: {h.hypothesis_id}] {h.hypothesis_text}\n"
+                hypotheses_section += f"   Type: {h.hypothesis_type}, Status: {h.status}, Confidence: {h.confidence_level}%\n"
 
         # Source article context
         article_section = ""
@@ -367,7 +369,9 @@ Generate a comprehensive experiment plan with the following structure (return as
 IMPORTANT:
 - Be specific and practical
 - Include actual amounts, times, and measurements
-- Link to specific research questions and hypotheses by ID
+- Link to specific research questions and hypotheses by their IDs (use the [ID: ...] values provided above)
+- Include question_id values in the linked_questions array
+- Include hypothesis_id values in the linked_hypotheses array
 - Consider real-world constraints (cost, time, expertise)
 - Provide actionable troubleshooting guidance
 - Include safety considerations
