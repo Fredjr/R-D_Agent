@@ -932,6 +932,17 @@ except ImportError as e:
     print(f"⚠️ Failed to import admin router: {e}")
     print(f"   Error details: {type(e).__name__}")
     traceback.print_exc()
+
+# Week 19-20: Experiment Planning endpoints
+try:
+    from backend.app.routers.experiment_plans import router as experiment_plans_router
+    app.include_router(experiment_plans_router)
+    print("✅ Experiment planning endpoints registered successfully")
+except ImportError as e:
+    print(f"⚠️ Failed to import experiment plans router: {e}")
+    print(f"   Error details: {type(e).__name__}")
+    import traceback
+    traceback.print_exc()
     import traceback
     traceback.print_exc()
     print("   Project alerts feature will not be available")

@@ -958,7 +958,84 @@ class Experiment(Base):
         Index('idx_experiment_project', 'project_id'),
         Index('idx_experiment_hypothesis', 'hypothesis_id'),
         Index('idx_experiment_protocol', 'protocol_id'),
-        Index('idx_experiment_status', 'status'),
+        Index('idx_experiment_status', 'status')
+
+
+class ExperimentPlan(Base):
+    """AI-generated detailed experiment plans based on protocols and research context (Week 19-20)"""
+    __tablename__ = "experiment_plans"
+
+    plan_id = Column(String, primary_key=True)  # UUID
+    project_id = Column(String, ForeignKey("projects.project_id", ondelete="CASCADE"), nullable=False)
+    protocol_id = Column(String, ForeignKey("protocols.protocol_id", ondelete="SET NULL"), nullable=True)
+
+    # Plan identification
+    plan_name = Column(String(500), nullable=False)
+    objective = Column(Text, nullable=False)
+
+    # Context linkage
+    linked_questions = Column(JSON, default=list)  # Array of question IDs
+    linked_hypotheses = Column(JSON, default=list)  # Array of hypothesis IDs
+
+    # Plan content
+    materials = Column(JSON, default=list)  # Array of {name, amount, source, notes}
+    procedure = Column(JSON, default=list)  # Array of {step_number, description, duration, critical_notes}
+    expected_outcomes = Column(JSON, default=list)  # Array of outcome descriptions
+    success_criteria = Column(JSON, default=list)  # Array of {criterion, measurement_method, target_value}
+
+    # Planning details
+    timeline_estimate = Column(String(200), nullable=True)  # e.g., "5-7 days", "2 weeks"
+    estimated_cost = Column(String(200), nullable=True)  # e.g., "$500-1000"
+    difficulty_level = Column(String(50), default='moderate')  # easy, moderate, difficult, expert
+
+    # Risk management
+    risk_assessment = Column(JSON, default=dict)  # {risks: [], mitigation_strategies: []}
+    troubleshooting_guide = Column(JSON, default=list)  # Array of {issue, solution, prevention}
+
+    # Additional notes
+    notes = Column(Text, nullable=True)
+    safety_considerations = Column(JSON, default=list)  # Array of safety notes
+    required_expertise = Column(JSON, default=list)  # Array of required skills/knowledge
+
+    # AI generation metadata
+    generated_by = Column(String(50), default='ai')  # 'ai' or 'manual'
+    generation_confidence = Column(Float, nullable=True)  # 0.0-1.0 confidence in AI generation
+    generation_model = Column(String(100), nullable=True)  # Model used for generation
+
+    # Execution tracking
+    status = Column(String(50), default='draft')  # draft, approved, in_progress, completed, cancelled
+    execution_notes = Column(Text, nullable=True)  # Notes during execution
+    actual_duration = Column(String(200), nullable=True)  # Actual time taken
+    actual_cost = Column(String(200), nullable=True)  # Actual cost incurred
+
+    # Results (after execution)
+    results_summary = Column(Text, nullable=True)
+    outcome = Column(String(50), nullable=True)  # success, partial_success, failure, inconclusive
+    lessons_learned = Column(Text, nullable=True)
+
+    # Metadata
+    created_by = Column(String, ForeignKey("users.user_id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    approved_by = Column(String, ForeignKey("users.user_id"), nullable=True)
+    approved_at = Column(DateTime(timezone=True), nullable=True)
+    executed_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    project = relationship("Project")
+    protocol = relationship("Protocol")
+    creator = relationship("User", foreign_keys=[created_by])
+    approver = relationship("User", foreign_keys=[approved_by])
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_experiment_plans_project', 'project_id'),
+        Index('idx_experiment_plans_protocol', 'protocol_id'),
+        Index('idx_experiment_plans_status', 'status'),
+        Index('idx_experiment_plans_created_by', 'created_by'),
+        Index('idx_experiment_plans_created_at', 'created_at'),
+    ),
     )
 
 
