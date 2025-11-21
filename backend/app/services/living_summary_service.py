@@ -590,6 +590,7 @@ Guidelines for Context-Aware Summaries:
             summary.protocol_insights = summary_data.get('protocol_insights', [])
             summary.experiment_status = summary_data.get('experiment_status')
             summary.next_steps = summary_data.get('next_steps', [])
+            summary.timeline_events = summary_data.get('timeline_events', [])
             summary.last_updated = now
             summary.cache_valid_until = cache_valid_until
             summary.updated_at = now
@@ -603,6 +604,7 @@ Guidelines for Context-Aware Summaries:
                 protocol_insights=summary_data.get('protocol_insights', []),
                 experiment_status=summary_data.get('experiment_status'),
                 next_steps=summary_data.get('next_steps', []),
+                timeline_events=summary_data.get('timeline_events', []),
                 last_updated=datetime.utcnow(),
                 cache_valid_until=cache_valid_until
             )
@@ -622,6 +624,7 @@ Guidelines for Context-Aware Summaries:
             'protocol_insights': summary.protocol_insights or [],
             'experiment_status': summary.experiment_status,
             'next_steps': summary.next_steps or [],
+            'timeline_events': summary.timeline_events or [],
             'last_updated': summary.last_updated.isoformat() if summary.last_updated else None,
             'cache_valid_until': summary.cache_valid_until.isoformat() if summary.cache_valid_until else None
         }

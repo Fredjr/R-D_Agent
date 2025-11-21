@@ -1059,6 +1059,7 @@ class ProjectSummary(Base):
     protocol_insights = Column(JSON, default=list)  # Array of strings
     experiment_status = Column(Text, nullable=True)
     next_steps = Column(JSON, default=list)  # Array of {action, priority, estimated_effort}
+    timeline_events = Column(JSON, default=list)  # Array of timeline event objects with id, timestamp, type, title, etc.
 
     # Cache management
     last_updated = Column(DateTime(timezone=True), server_default=func.now())
