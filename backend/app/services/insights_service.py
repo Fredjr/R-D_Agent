@@ -72,7 +72,7 @@ class InsightsService:
         
         # Get papers with triage data
         papers = db.query(Article, PaperTriage).join(
-            PaperTriage, Article.pmid == PaperTriage.pmid
+            PaperTriage, Article.pmid == PaperTriage.article_pmid
         ).filter(
             PaperTriage.project_id == project_id
         ).all()
@@ -137,8 +137,8 @@ class InsightsService:
                 hypothesis_confidence.append(h.confidence_level)
         
         # Paper metrics
-        accepted_papers = [p for a, p in papers if p.decision == 'accept']
-        avg_score = sum(p.final_score for a, p in papers if p.final_score) / len(papers) if papers else 0
+        must_read_papers = [p for a, p in papers if p.triage_status == 'must_read']
+        avg_score = sum(p.relevance_score for a, p in papers if p.relevance_score) / len(papers) if papers else 0
         
         # Experiment metrics
         plan_status = {}
@@ -153,7 +153,7 @@ class InsightsService:
             'hypothesis_status': hypothesis_status,
             'avg_hypothesis_confidence': sum(hypothesis_confidence) / len(hypothesis_confidence) if hypothesis_confidence else 0,
             'total_papers': len(papers),
-            'accepted_papers': len(accepted_papers),
+            'must_read_papers': len(must_read_papers),
             'avg_paper_score': avg_score,
             'total_protocols': len(project_data['protocols']),
             'total_plans': len(plans),
@@ -208,7 +208,7 @@ class InsightsService:
 - Questions: {metrics['total_questions']} ({metrics['question_status']})
 - Hypotheses: {metrics['total_hypotheses']} ({metrics['hypothesis_status']})
 - Average Hypothesis Confidence: {metrics['avg_hypothesis_confidence']:.1f}%
-- Papers: {metrics['accepted_papers']}/{metrics['total_papers']} accepted
+- Papers: {metrics['must_read_papers']}/{metrics['total_papers']} must-read
 - Average Paper Score: {metrics['avg_paper_score']:.1f}
 - Protocols: {metrics['total_protocols']}
 - Experiment Plans: {metrics['total_plans']} ({metrics['plan_status']})
@@ -225,8 +225,8 @@ class InsightsService:
             context += f"  Confidence: {h.confidence_level}%, Evidence: {h.supporting_evidence_count or 0} supporting, {h.contradicting_evidence_count or 0} contradicting\n"
 
         context += f"\n## Top Papers:\n"
-        for article, triage in sorted(papers, key=lambda x: x[1].final_score or 0, reverse=True)[:5]:
-            context += f"- {article.title} (Score: {triage.final_score})\n"
+        for article, triage in sorted(papers, key=lambda x: x[1].relevance_score or 0, reverse=True)[:5]:
+            context += f"- {article.title} (Relevance: {triage.relevance_score}/100)\n"
 
         context += f"\n## Protocols:\n"
         for p in protocols[:5]:

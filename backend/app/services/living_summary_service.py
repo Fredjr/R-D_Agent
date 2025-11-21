@@ -110,12 +110,12 @@ class LivingSummaryService:
             Hypothesis.project_id == project_id
         ).all()
         
-        # Get triaged papers (accepted only)
+        # Get triaged papers (must_read and nice_to_know)
         papers = db.query(Article, PaperTriage).join(
-            PaperTriage, Article.pmid == PaperTriage.pmid
+            PaperTriage, Article.pmid == PaperTriage.article_pmid
         ).filter(
             PaperTriage.project_id == project_id,
-            PaperTriage.decision == 'accept'
+            PaperTriage.triage_status.in_(['must_read', 'nice_to_know'])
         ).all()
         
         # Get protocols

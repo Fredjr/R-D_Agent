@@ -27,7 +27,7 @@ interface Metrics {
   hypothesis_status: Record<string, number>;
   avg_hypothesis_confidence: number;
   total_papers: number;
-  accepted_papers: number;
+  must_read_papers: number;
   avg_paper_score: number;
   total_protocols: number;
   total_plans: number;
@@ -172,8 +172,8 @@ export default function InsightsTab({ projectId, userId }: InsightsTabProps) {
             <div className="text-sm text-gray-400">Hypotheses</div>
           </div>
           <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
-            <div className="text-2xl font-bold text-green-400">{insights.metrics.accepted_papers}/{insights.metrics.total_papers}</div>
-            <div className="text-sm text-gray-400">Papers Accepted</div>
+            <div className="text-2xl font-bold text-green-400">{insights.metrics.must_read_papers}/{insights.metrics.total_papers}</div>
+            <div className="text-sm text-gray-400">Must-Read Papers</div>
           </div>
           <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4">
             <div className="text-2xl font-bold text-orange-400">{insights.metrics.total_plans}</div>
