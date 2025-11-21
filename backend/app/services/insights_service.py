@@ -14,7 +14,7 @@ from openai import AsyncOpenAI
 from database import (
     Project, ResearchQuestion, Hypothesis, Article, PaperTriage,
     Protocol, ExperimentPlan, QuestionEvidence, HypothesisEvidence,
-    ProjectInsights
+    ProjectInsights, ProjectDecision
 )
 
 logger = logging.getLogger(__name__)
@@ -77,55 +77,61 @@ class InsightsService:
         return self._format_insights(cached_insights)
     
     async def _gather_project_data(self, project_id: str, db: Session) -> Dict:
-        """Gather all relevant project data for insights"""
-        logger.info(f"📦 Gathering project data for insights...")
-        
+        """Gather all relevant project data for insights with full context"""
+        logger.info(f"📦 Gathering project data for insights with context...")
+
         # Get project
         project = db.query(Project).filter(Project.project_id == project_id).first()
-        
-        # Get research questions with status breakdown
+
+        # Get research questions (ordered by creation)
         questions = db.query(ResearchQuestion).filter(
             ResearchQuestion.project_id == project_id
-        ).all()
-        
-        # Get hypotheses with status breakdown
+        ).order_by(ResearchQuestion.created_at.asc()).all()
+
+        # Get hypotheses (ordered by creation)
         hypotheses = db.query(Hypothesis).filter(
             Hypothesis.project_id == project_id
-        ).all()
-        
-        # Get papers with triage data
+        ).order_by(Hypothesis.created_at.asc()).all()
+
+        # Get papers with triage data (ordered by triage date)
         papers = db.query(Article, PaperTriage).join(
             PaperTriage, Article.pmid == PaperTriage.article_pmid
         ).filter(
             PaperTriage.project_id == project_id
-        ).all()
-        
-        # Get protocols
+        ).order_by(PaperTriage.triaged_at.desc()).all()
+
+        # Get protocols (ordered by creation)
         protocols = db.query(Protocol).filter(
             Protocol.project_id == project_id
-        ).all()
-        
-        # Get experiment plans
+        ).order_by(Protocol.created_at.desc()).all()
+
+        # Get experiment plans (ordered by creation)
         plans = db.query(ExperimentPlan).filter(
             ExperimentPlan.project_id == project_id
-        ).all()
-        
+        ).order_by(ExperimentPlan.created_at.desc()).all()
+
         # Get evidence links
         question_evidence = db.query(QuestionEvidence).join(
             ResearchQuestion
         ).filter(
             ResearchQuestion.project_id == project_id
         ).all()
-        
+
         hypothesis_evidence = db.query(HypothesisEvidence).join(
             Hypothesis
         ).filter(
             Hypothesis.project_id == project_id
         ).all()
-        
+
+        # Get project decisions for context
+        decisions = db.query(ProjectDecision).filter(
+            ProjectDecision.project_id == project_id
+        ).order_by(ProjectDecision.decided_at.desc()).all()
+
         logger.info(f"📊 Data gathered: {len(questions)} questions, {len(hypotheses)} hypotheses, "
-                   f"{len(papers)} papers, {len(protocols)} protocols, {len(plans)} plans")
-        
+                   f"{len(papers)} papers, {len(protocols)} protocols, {len(plans)} plans, "
+                   f"{len(decisions)} decisions")
+
         return {
             'project': project,
             'questions': questions,
@@ -134,7 +140,8 @@ class InsightsService:
             'protocols': protocols,
             'plans': plans,
             'question_evidence': question_evidence,
-            'hypothesis_evidence': hypothesis_evidence
+            'hypothesis_evidence': hypothesis_evidence,
+            'decisions': decisions
         }
     
     def _calculate_metrics(self, project_data: Dict) -> Dict:
@@ -234,17 +241,18 @@ class InsightsService:
             raise
 
     def _build_context(self, project_data: Dict, metrics: Dict) -> str:
-        """Build context string for AI"""
+        """Build rich context for AI with research journey insights"""
         project = project_data['project']
         questions = project_data['questions']
         hypotheses = project_data['hypotheses']
         papers = project_data['papers']
         protocols = project_data['protocols']
         plans = project_data['plans']
+        decisions = project_data['decisions']
 
-        context = f"""# Project: {project.project_name}
+        context = f"""# 🔬 Project: {project.project_name}
 
-## Metrics:
+## 📊 Key Metrics:
 - Questions: {metrics['total_questions']} ({metrics['question_status']})
 - Hypotheses: {metrics['total_hypotheses']} ({metrics['hypothesis_status']})
 - Average Hypothesis Confidence: {metrics['avg_hypothesis_confidence']:.1f}%
@@ -253,66 +261,207 @@ class InsightsService:
 - Protocols: {metrics['total_protocols']}
 - Experiment Plans: {metrics['total_plans']} ({metrics['plan_status']})
 
-## Research Questions:
+## 🗺️ Research Journey Timeline:
+
 """
-        for q in questions[:10]:  # Limit to top 10
-            context += f"- [{q.status}] {q.question_text}\n"
-            context += f"  Priority: {q.priority}, Evidence: {q.evidence_count or 0} papers\n"
+        # Build chronological timeline
+        timeline_events = []
 
-        context += f"\n## Hypotheses:\n"
-        for h in hypotheses[:10]:
-            context += f"- [{h.status}] {h.hypothesis_text}\n"
-            context += f"  Confidence: {h.confidence_level}%, Evidence: {h.supporting_evidence_count or 0} supporting, {h.contradicting_evidence_count or 0} contradicting\n"
+        for q in questions:
+            timeline_events.append({
+                'date': q.created_at,
+                'type': 'question',
+                'text': f"Question: {q.question_text} [{q.status}]"
+            })
 
-        context += f"\n## Top Papers:\n"
-        for article, triage in sorted(papers, key=lambda x: x[1].relevance_score or 0, reverse=True)[:5]:
-            context += f"- {article.title} (Relevance: {triage.relevance_score}/100)\n"
+        for h in hypotheses:
+            timeline_events.append({
+                'date': h.created_at,
+                'type': 'hypothesis',
+                'text': f"Hypothesis: {h.hypothesis_text} (Confidence: {h.confidence_level}%)"
+            })
 
-        context += f"\n## Protocols:\n"
-        for p in protocols[:5]:
-            context += f"- {p.protocol_name} ({p.protocol_type})\n"
+        for article, triage in papers[:20]:  # Top 20 papers
+            text = f"Paper: {article.title} (Score: {triage.relevance_score}/100)"
+            if triage.ai_reasoning:
+                text += f" - Reasoning: {triage.ai_reasoning[:100]}..."
+            timeline_events.append({
+                'date': triage.triaged_at,
+                'type': 'paper',
+                'text': text
+            })
 
-        context += f"\n## Experiment Plans:\n"
-        for plan in plans[:5]:
-            context += f"- {plan.plan_name} [{plan.status}]\n"
-            if plan.linked_questions:
-                context += f"  Linked to {len(plan.linked_questions)} questions\n"
+        for protocol in protocols:
+            timeline_events.append({
+                'date': protocol.created_at,
+                'type': 'protocol',
+                'text': f"Protocol: {protocol.protocol_name} (Confidence: {protocol.confidence_score:.0%})"
+            })
+
+        for plan in plans:
+            timeline_events.append({
+                'date': plan.created_at,
+                'type': 'plan',
+                'text': f"Experiment: {plan.plan_name} [{plan.status}]"
+            })
+
+        for decision in decisions:
+            text = f"Decision: {decision.title} ({decision.decision_type})"
+            if decision.rationale:
+                text += f" - Rationale: {decision.rationale[:100]}..."
+            timeline_events.append({
+                'date': decision.decided_at,
+                'type': 'decision',
+                'text': text
+            })
+
+        # Sort chronologically
+        timeline_events.sort(key=lambda x: x['date'])
+
+        # Add to context (limit to most recent 30 events)
+        for event in timeline_events[-30:]:
+            date_str = event['date'].strftime('%Y-%m-%d')
+            context += f"[{date_str}] {event['text']}\n"
+
+        context += "\n## 🔗 Evidence Chains:\n\n"
+
+        # Show Q → H → Paper connections
+        for q in questions[:5]:  # Top 5 questions
+            context += f"Question: {q.question_text}\n"
+            linked_hyps = [h for h in hypotheses if h.question_id == q.question_id]
+            if linked_hyps:
+                for h in linked_hyps:
+                    context += f"  ↓ Hypothesis: {h.hypothesis_text} ({h.confidence_level}%)\n"
+                    # Find papers supporting this hypothesis
+                    supporting_papers = [
+                        (a, t) for a, t in papers
+                        if h.hypothesis_id in (t.affected_hypotheses or [])
+                    ]
+                    if supporting_papers:
+                        context += f"     ↓ {len(supporting_papers)} supporting papers\n"
+                    else:
+                        context += f"     ⚠️ No papers linked yet\n"
+            else:
+                context += f"  ⚠️ No hypotheses yet\n"
+            context += "\n"
+
+        # Show Protocol → Experiment connections
+        context += "## 🔬 Protocol → Experiment Chains:\n\n"
+        for protocol in protocols[:5]:
+            context += f"Protocol: {protocol.protocol_name}\n"
+            linked_plans = [p for p in plans if p.protocol_id == protocol.protocol_id]
+            if linked_plans:
+                for plan in linked_plans:
+                    context += f"  ↓ Experiment: {plan.plan_name} [{plan.status}]\n"
+            else:
+                context += f"  ⚠️ No experiments planned yet\n"
+            context += "\n"
+
+        # Add recent decisions context
+        if decisions:
+            context += "## ⚡ Recent Key Decisions:\n\n"
+            for decision in decisions[:5]:
+                context += f"- {decision.title} ({decision.decision_type})\n"
+                if decision.rationale:
+                    context += f"  Rationale: {decision.rationale[:150]}...\n"
+                context += "\n"
 
         return context
 
     def _get_system_prompt(self) -> str:
-        """Get system prompt for AI"""
-        return """You are a research strategy advisor analyzing a scientific research project.
+        """Get context-aware system prompt for AI"""
+        return """You are an AI research analyst that tracks research progress through the full iterative loop.
 
-Analyze the provided project data and generate actionable insights.
+Your role is to analyze the research journey and provide insights on:
+
+1. **Progress Insights**:
+   - Which questions are well-supported by evidence?
+   - Which hypotheses have strong experimental validation?
+   - Where is the research journey stuck or blocked?
+   - How has confidence in hypotheses changed over time?
+
+2. **Connection Insights**:
+   - Which papers connect multiple hypotheses?
+   - Which protocols could address multiple questions?
+   - What cross-cutting themes emerge across the research?
+   - How do different parts of the research reinforce each other?
+
+3. **Gap Insights**:
+   - Which questions lack hypotheses?
+   - Which hypotheses lack supporting papers?
+   - Which protocols lack experiment plans?
+   - Which experiments lack results?
+   - Where are the breaks in the evidence chain?
+
+4. **Trend Insights**:
+   - What patterns emerge in paper triage decisions?
+   - Are certain types of protocols more successful?
+   - How is the research evolving over time?
+   - What methodological trends are emerging?
+
+5. **Recommendations**:
+   - Prioritize actions that close open research loops
+   - Suggest papers to fill evidence gaps
+   - Recommend experiments for untested protocols
+   - Identify questions ready to be answered
+   - Focus on the ITERATIVE nature: Question → Hypothesis → Evidence → Method → Experiment → Result → Answer
 
 IMPORTANT: You MUST respond with ONLY valid JSON. Do not include any text before or after the JSON.
 
 Required JSON structure:
 {
   "progress_insights": [
-    {"title": "insight title", "description": "detailed observation", "impact": "high|medium|low"}
+    {
+      "title": "insight title",
+      "description": "detailed observation about research progress",
+      "impact": "high|medium|low",
+      "evidence_chain": "which Q/H/Papers this relates to"
+    }
   ],
   "connection_insights": [
-    {"title": "connection title", "description": "cross-cutting theme or pattern", "entities": ["entity1", "entity2"]}
+    {
+      "title": "connection title",
+      "description": "cross-cutting theme showing how elements connect",
+      "entities": ["entity1", "entity2"],
+      "strengthens": "what this connection strengthens"
+    }
   ],
   "gap_insights": [
-    {"title": "gap title", "description": "missing evidence or unanswered question", "priority": "high|medium|low", "suggestion": "how to address"}
+    {
+      "title": "gap title",
+      "description": "missing link in the research loop",
+      "priority": "high|medium|low",
+      "suggestion": "specific action to close this gap",
+      "blocks": "what this gap is blocking"
+    }
   ],
   "trend_insights": [
-    {"title": "trend title", "description": "emerging pattern or methodology", "confidence": "high|medium|low"}
+    {
+      "title": "trend title",
+      "description": "emerging pattern in the research journey",
+      "confidence": "high|medium|low",
+      "implications": "what this trend means for the research"
+    }
   ],
   "recommendations": [
-    {"action": "specific action", "rationale": "why this matters", "priority": "high|medium|low", "estimated_effort": "time estimate"}
+    {
+      "action": "specific action that closes a research loop",
+      "rationale": "why this matters in the research journey",
+      "priority": "high|medium|low",
+      "estimated_effort": "time estimate",
+      "closes_loop": "which Q/H/gap this addresses"
+    }
   ]
 }
 
 Guidelines:
+- Focus on the ITERATIVE research journey: Question → Hypothesis → Evidence → Method → Experiment → Result → Answer
+- Identify where the research loop is broken or incomplete
+- Highlight decisions and rationales that shaped the research direction
+- Show evidence chains and their strength
+- Prioritize recommendations that close open loops
 - Be specific and actionable
-- Focus on insights that drive research forward
-- Identify both strengths and opportunities
-- Prioritize by impact
-- Provide clear rationale for recommendations
+- Reference specific questions, hypotheses, papers, protocols by name
 - Limit to 3-5 items per category
 - Return ONLY valid JSON, no markdown formatting or extra text"""
 

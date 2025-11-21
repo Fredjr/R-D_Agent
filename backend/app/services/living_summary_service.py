@@ -13,7 +13,7 @@ from openai import AsyncOpenAI
 
 from database import (
     ProjectSummary, Project, ResearchQuestion, Hypothesis,
-    Article, PaperTriage, Protocol, ExperimentPlan
+    Article, PaperTriage, Protocol, ExperimentPlan, ProjectDecision
 )
 
 logger = logging.getLogger(__name__)
@@ -95,50 +95,58 @@ class LivingSummaryService:
         return None
     
     async def _gather_project_data(self, project_id: str, db: Session) -> Dict:
-        """Gather all relevant project data"""
-        logger.info(f"📦 Gathering project data...")
-        
+        """Gather all relevant project data with full context"""
+        logger.info(f"📦 Gathering project data with context...")
+
         # Get project
         project = db.query(Project).filter(Project.project_id == project_id).first()
-        
-        # Get research questions
+
+        # Get research questions (ordered by creation)
         questions = db.query(ResearchQuestion).filter(
             ResearchQuestion.project_id == project_id
-        ).all()
-        
-        # Get hypotheses
+        ).order_by(ResearchQuestion.created_at.asc()).all()
+
+        # Get hypotheses (ordered by creation)
         hypotheses = db.query(Hypothesis).filter(
             Hypothesis.project_id == project_id
-        ).all()
-        
-        # Get triaged papers (must_read and nice_to_know)
+        ).order_by(Hypothesis.created_at.asc()).all()
+
+        # Get triaged papers WITH context (ordered by triage date)
+        # Include ai_reasoning which contains the WHY
         papers = db.query(Article, PaperTriage).join(
             PaperTriage, Article.pmid == PaperTriage.article_pmid
         ).filter(
             PaperTriage.project_id == project_id,
             PaperTriage.triage_status.in_(['must_read', 'nice_to_know'])
-        ).all()
-        
-        # Get protocols
+        ).order_by(PaperTriage.triaged_at.desc()).all()
+
+        # Get protocols WITH source paper info (ordered by creation)
         protocols = db.query(Protocol).filter(
             Protocol.project_id == project_id
-        ).all()
-        
-        # Get experiment plans
+        ).order_by(Protocol.created_at.desc()).all()
+
+        # Get experiment plans (ordered by creation)
         plans = db.query(ExperimentPlan).filter(
             ExperimentPlan.project_id == project_id
-        ).all()
-        
+        ).order_by(ExperimentPlan.created_at.desc()).all()
+
+        # Get project decisions for additional context
+        decisions = db.query(ProjectDecision).filter(
+            ProjectDecision.project_id == project_id
+        ).order_by(ProjectDecision.decided_at.desc()).all()
+
         logger.info(f"📊 Found: {len(questions)} questions, {len(hypotheses)} hypotheses, "
-                   f"{len(papers)} papers, {len(protocols)} protocols, {len(plans)} plans")
-        
+                   f"{len(papers)} papers, {len(protocols)} protocols, {len(plans)} plans, "
+                   f"{len(decisions)} decisions")
+
         return {
             'project': project,
             'questions': questions,
             'hypotheses': hypotheses,
             'papers': papers,
             'protocols': protocols,
-            'plans': plans
+            'plans': plans,
+            'decisions': decisions
         }
     
     async def _generate_ai_summary(self, project_data: Dict) -> Dict:
@@ -188,70 +196,343 @@ class LivingSummaryService:
             logger.error(f"❌ Error generating summary: {e}")
             raise
 
+    def _build_research_journey(self, project_data: Dict) -> str:
+        """Build chronological research journey narrative"""
+        logger.info(f"🗺️ Building research journey timeline...")
+
+        journey_events = []
+
+        # 1. Research Questions (starting point)
+        for q in project_data['questions']:
+            journey_events.append({
+                'timestamp': q.created_at,
+                'type': 'question',
+                'content': f"Research Question: {q.question_text}",
+                'status': q.status,
+                'id': q.question_id
+            })
+
+        # 2. Hypotheses (what we think)
+        for h in project_data['hypotheses']:
+            journey_events.append({
+                'timestamp': h.created_at,
+                'type': 'hypothesis',
+                'content': f"Hypothesis: {h.hypothesis_text}",
+                'confidence': h.confidence_level,
+                'status': h.status,
+                'linked_question': h.question_id,
+                'id': h.hypothesis_id
+            })
+
+        # 3. Paper Triage (evidence gathering)
+        for article, triage in project_data['papers']:
+            event = {
+                'timestamp': triage.triaged_at,
+                'type': 'paper_triage',
+                'content': f"Triaged Paper: {article.title}",
+                'triage_status': triage.triage_status,
+                'score': triage.relevance_score,
+                'pmid': article.pmid
+            }
+            # Add AI reasoning if available
+            if triage.ai_reasoning:
+                event['rationale'] = triage.ai_reasoning
+            # Add affected questions/hypotheses
+            if triage.affected_questions:
+                event['linked_questions'] = triage.affected_questions
+            if triage.affected_hypotheses:
+                event['linked_hypotheses'] = triage.affected_hypotheses
+            journey_events.append(event)
+
+        # 4. Protocol Extraction (methods)
+        for protocol in project_data['protocols']:
+            event = {
+                'timestamp': protocol.created_at,
+                'type': 'protocol',
+                'content': f"Extracted Protocol: {protocol.protocol_name}",
+                'confidence': protocol.confidence_score,
+                'id': protocol.protocol_id
+            }
+            if protocol.article_pmid:
+                event['source_paper'] = protocol.article_pmid
+            journey_events.append(event)
+
+        # 5. Experiment Plans (action)
+        for plan in project_data['plans']:
+            event = {
+                'timestamp': plan.created_at,
+                'type': 'experiment_plan',
+                'content': f"Planned Experiment: {plan.plan_name}",
+                'status': plan.status,
+                'id': plan.plan_id
+            }
+            if plan.protocol_id:
+                event['linked_protocol'] = plan.protocol_id
+            journey_events.append(event)
+
+        # 6. Project Decisions (pivots and changes)
+        for decision in project_data['decisions']:
+            event = {
+                'timestamp': decision.decided_at,
+                'type': 'decision',
+                'content': f"Decision: {decision.title}",
+                'decision_type': decision.decision_type,
+                'rationale': decision.rationale
+            }
+            if decision.affected_questions:
+                event['linked_questions'] = decision.affected_questions
+            if decision.affected_hypotheses:
+                event['linked_hypotheses'] = decision.affected_hypotheses
+            journey_events.append(event)
+
+        # Sort chronologically
+        journey_events.sort(key=lambda x: x['timestamp'])
+
+        # Format as narrative
+        narrative = "## 🗺️ Research Journey (Chronological)\n\n"
+        narrative += "This shows how your research evolved over time:\n\n"
+
+        for i, event in enumerate(journey_events, 1):
+            date_str = event['timestamp'].strftime('%Y-%m-%d')
+            narrative += f"**{date_str}** - "
+
+            # Type-specific formatting
+            if event['type'] == 'question':
+                narrative += f"❓ {event['content']} [Status: {event['status']}]\n"
+            elif event['type'] == 'hypothesis':
+                narrative += f"💡 {event['content']} (Confidence: {event['confidence']}%)\n"
+                if event.get('linked_question'):
+                    narrative += f"   → Addresses question\n"
+            elif event['type'] == 'paper_triage':
+                narrative += f"📄 {event['content']} ({event['triage_status']}, Score: {event['score']}/100)\n"
+                if event.get('rationale'):
+                    # Truncate long rationales
+                    rationale = event['rationale'][:150] + "..." if len(event['rationale']) > 150 else event['rationale']
+                    narrative += f"   → Why: {rationale}\n"
+                if event.get('linked_questions') or event.get('linked_hypotheses'):
+                    narrative += f"   → Relevant to {len(event.get('linked_questions', []))} questions, {len(event.get('linked_hypotheses', []))} hypotheses\n"
+            elif event['type'] == 'protocol':
+                narrative += f"🔬 {event['content']} (Confidence: {event['confidence']:.0%})\n"
+                if event.get('source_paper'):
+                    narrative += f"   → Extracted from paper\n"
+            elif event['type'] == 'experiment_plan':
+                narrative += f"🧪 {event['content']} [Status: {event['status']}]\n"
+                if event.get('linked_protocol'):
+                    narrative += f"   → Uses protocol\n"
+            elif event['type'] == 'decision':
+                narrative += f"⚡ {event['content']} (Type: {event['decision_type']})\n"
+                if event.get('rationale'):
+                    rationale = event['rationale'][:150] + "..." if len(event['rationale']) > 150 else event['rationale']
+                    narrative += f"   → Rationale: {rationale}\n"
+
+            narrative += "\n"
+
+        logger.info(f"✅ Built journey with {len(journey_events)} events")
+        return narrative
+
+    def _build_correlation_map(self, project_data: Dict) -> str:
+        """Build map showing how everything connects"""
+        logger.info(f"🔗 Building correlation map...")
+
+        correlations = "## 🔗 Research Correlation Map\n\n"
+        correlations += "This shows how your questions, hypotheses, papers, protocols, and experiments connect:\n\n"
+
+        # Build lookup dictionaries for faster access
+        protocols_by_pmid = {}
+        for protocol in project_data['protocols']:
+            if protocol.article_pmid:
+                if protocol.article_pmid not in protocols_by_pmid:
+                    protocols_by_pmid[protocol.article_pmid] = []
+                protocols_by_pmid[protocol.article_pmid].append(protocol)
+
+        plans_by_protocol = {}
+        for plan in project_data['plans']:
+            if plan.protocol_id:
+                if plan.protocol_id not in plans_by_protocol:
+                    plans_by_protocol[plan.protocol_id] = []
+                plans_by_protocol[plan.protocol_id].append(plan)
+
+        # Question → Hypothesis → Papers → Protocols → Plans
+        for question in project_data['questions']:
+            correlations += f"### ❓ Question: {question.question_text}\n"
+            correlations += f"   Status: {question.status}\n\n"
+
+            # Find linked hypotheses
+            linked_hypotheses = [h for h in project_data['hypotheses']
+                                if h.question_id == question.question_id]
+
+            if linked_hypotheses:
+                for hypothesis in linked_hypotheses:
+                    correlations += f"   ↓ 💡 Hypothesis: {hypothesis.hypothesis_text}\n"
+                    correlations += f"      Confidence: {hypothesis.confidence_level}% | Status: {hypothesis.status}\n\n"
+
+                    # Find papers that support this hypothesis
+                    relevant_papers = [
+                        (article, triage)
+                        for article, triage in project_data['papers']
+                        if hypothesis.hypothesis_id in (triage.affected_hypotheses or [])
+                    ]
+
+                    if relevant_papers:
+                        correlations += f"      ↓ 📄 Evidence Papers ({len(relevant_papers)}):\n"
+                        for article, triage in relevant_papers[:5]:  # Top 5
+                            correlations += f"         • {article.title} (Score: {triage.relevance_score}/100)\n"
+
+                            # Find protocols from these papers
+                            if article.pmid in protocols_by_pmid:
+                                protocols = protocols_by_pmid[article.pmid]
+                                correlations += f"            ↓ 🔬 Extracted Protocols ({len(protocols)}):\n"
+                                for protocol in protocols:
+                                    correlations += f"               • {protocol.protocol_name}\n"
+
+                                    # Find experiments using these protocols
+                                    if protocol.protocol_id in plans_by_protocol:
+                                        plans = plans_by_protocol[protocol.protocol_id]
+                                        correlations += f"                  ↓ 🧪 Experiments ({len(plans)}):\n"
+                                        for plan in plans:
+                                            correlations += f"                     • {plan.plan_name} [{plan.status}]\n"
+                        correlations += "\n"
+                    else:
+                        correlations += f"      ⚠️ No papers linked to this hypothesis yet\n\n"
+            else:
+                correlations += f"   ⚠️ No hypotheses for this question yet\n\n"
+
+            correlations += "---\n\n"
+
+        # Orphaned papers (not linked to any hypothesis)
+        orphaned_papers = [
+            (article, triage)
+            for article, triage in project_data['papers']
+            if not triage.affected_hypotheses or len(triage.affected_hypotheses) == 0
+        ]
+
+        if orphaned_papers:
+            correlations += f"### 📄 Papers Not Yet Linked to Hypotheses ({len(orphaned_papers)}):\n"
+            for article, triage in orphaned_papers[:5]:
+                correlations += f"   • {article.title} (Score: {triage.relevance_score}/100)\n"
+            correlations += "\n"
+
+        logger.info(f"✅ Built correlation map")
+        return correlations
+
     def _build_context(self, project_data: Dict) -> str:
-        """Build context string for AI"""
+        """Build rich context for AI with research journey"""
         project = project_data['project']
         questions = project_data['questions']
         hypotheses = project_data['hypotheses']
         papers = project_data['papers']
         protocols = project_data['protocols']
         plans = project_data['plans']
+        decisions = project_data['decisions']
 
-        context = f"""# Project: {project.project_name}
+        # Start with project overview
+        context = f"""# 🔬 Project: {project.project_name}
 
-## Research Questions ({len(questions)}):
 """
-        for q in questions:
-            context += f"- [{q.status}] {q.question_text}\n"
 
-        context += f"\n## Hypotheses ({len(hypotheses)}):\n"
-        for h in hypotheses:
-            context += f"- [{h.status}] {h.hypothesis_text} (Confidence: {h.confidence_level}%)\n"
+        # Add research journey timeline
+        context += self._build_research_journey(project_data)
+        context += "\n---\n\n"
 
-        context += f"\n## Papers ({len(papers)}):\n"
-        for article, triage in papers[:10]:  # Limit to top 10
-            context += f"- {article.title} (Relevance: {triage.relevance_score}/100)\n"
-            if triage.evidence_excerpts:
-                for excerpt in triage.evidence_excerpts[:2]:
-                    context += f"  • {excerpt.get('text', '')}\n"
+        # Add correlation map
+        context += self._build_correlation_map(project_data)
+        context += "\n---\n\n"
 
-        context += f"\n## Protocols ({len(protocols)}):\n"
-        for p in protocols:
-            context += f"- {p.protocol_name} ({p.protocol_type})\n"
+        # Add current state summary
+        context += "## 📊 Current State Summary\n\n"
 
-        context += f"\n## Experiment Plans ({len(plans)}):\n"
-        for plan in plans:
-            context += f"- {plan.plan_name} [{plan.status}]\n"
+        # Questions summary
+        answered_questions = sum(1 for q in questions if q.status == 'answered')
+        context += f"**Research Questions**: {len(questions)} total ({answered_questions} answered, {len(questions) - answered_questions} in progress)\n"
+
+        # Hypotheses summary
+        if hypotheses:
+            avg_confidence = sum(h.confidence_level for h in hypotheses) / len(hypotheses)
+            validated = sum(1 for h in hypotheses if h.status == 'validated')
+            context += f"**Hypotheses**: {len(hypotheses)} total ({validated} validated, avg confidence: {avg_confidence:.0f}%)\n"
+        else:
+            context += f"**Hypotheses**: None yet\n"
+
+        # Papers summary
+        must_read = sum(1 for _, t in papers if t.triage_status == 'must_read')
+        context += f"**Papers**: {len(papers)} triaged ({must_read} must-read)\n"
+
+        # Protocols summary
+        context += f"**Protocols**: {len(protocols)} extracted\n"
+
+        # Experiments summary
+        completed_plans = sum(1 for p in plans if p.status == 'completed')
+        context += f"**Experiment Plans**: {len(plans)} total ({completed_plans} completed)\n"
+
+        # Decisions summary
+        if decisions:
+            context += f"**Key Decisions**: {len(decisions)} recorded\n"
+
+        context += "\n---\n\n"
+
+        # Add key decision rationales (top 5 most recent)
+        if decisions:
+            context += "## ⚡ Recent Key Decisions & Rationales\n\n"
+            for decision in decisions[:5]:
+                context += f"**{decision.title}** ({decision.decision_type})\n"
+                if decision.rationale:
+                    rationale = decision.rationale[:200] + "..." if len(decision.rationale) > 200 else decision.rationale
+                    context += f"   → {rationale}\n"
+                context += "\n"
+            context += "---\n\n"
 
         return context
 
     def _get_system_prompt(self) -> str:
-        """Get system prompt for AI"""
-        return """You are a research assistant generating a comprehensive project summary.
+        """Get context-aware system prompt for AI"""
+        return """You are an AI research assistant that understands the iterative research process.
+
+Your role is to:
+1. Understand the user's research journey from question to answer
+2. Track how hypotheses evolved based on evidence
+3. Identify which papers led to which protocols
+4. Show how experiments connect back to original questions
+5. Provide context-aware recommendations for next steps
 
 IMPORTANT: You MUST respond with ONLY valid JSON. Do not include any text before or after the JSON.
 
 Required JSON structure:
 {
-  "summary_text": "2-3 paragraph overview of the project",
-  "key_findings": ["finding 1", "finding 2"],
-  "protocol_insights": ["insight 1", "insight 2"],
-  "experiment_status": "1-2 sentence summary of experiment progress",
+  "summary_text": "2-3 paragraph narrative that follows the research journey chronologically, highlighting key decisions and pivots",
+  "key_findings": [
+    "Finding 1 with source paper and relevance to hypothesis",
+    "Finding 2 with source paper and relevance to hypothesis"
+  ],
+  "protocol_insights": [
+    "Protocol insight 1 with source paper and application to research question",
+    "Protocol insight 2 with source paper and application to research question"
+  ],
+  "experiment_status": "1-2 sentence summary showing how experiments address the research questions",
   "next_steps": [
-    {"action": "action description", "priority": "high", "estimated_effort": "time estimate"}
+    {
+      "action": "Specific action that closes a research loop",
+      "priority": "high|medium|low",
+      "estimated_effort": "time estimate",
+      "rationale": "Why this step makes sense in the research journey",
+      "closes_loop": "Which question/hypothesis this addresses"
+    }
   ]
 }
 
-Guidelines:
-- Be concise and actionable
-- Focus on insights, not just facts
-- Identify gaps and opportunities
-- Prioritize next steps by impact
-- Use clear, professional language
+Guidelines for Context-Aware Summaries:
+- Follow the research journey chronologically (Question → Hypothesis → Evidence → Method → Experiment)
+- Highlight key decision points and rationales provided by the user
+- Show evidence chains: which papers support which hypotheses
+- Identify gaps in the research loop (e.g., hypotheses without evidence, protocols without experiments)
+- Suggest next steps that close open research loops
+- Reference specific papers, protocols, and experiments by name
+- Acknowledge when the user changed direction and why (based on decisions)
+- Focus on the ITERATIVE nature: how each step builds on previous work
+- Be concise but insightful
 - Return ONLY valid JSON, no markdown formatting or extra text
-- Include 5-7 key findings from papers
-- Include 3-5 protocol insights
-- Include 3-5 recommended next steps"""
+- Include 5-7 key findings with sources
+- Include 3-5 protocol insights with sources
+- Include 3-5 recommended next steps that close research loops"""
 
     def _save_summary(self, project_id: str, summary_data: Dict, db: Session) -> ProjectSummary:
         """Save summary to database"""
