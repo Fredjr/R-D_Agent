@@ -50,6 +50,11 @@ class UpdateExperimentPlanRequest(BaseModel):
     lessons_learned: Optional[str] = None
 
 
+class UpdateResearchLinksRequest(BaseModel):
+    linked_questions: List[str] = Field(..., description="List of question IDs to link")
+    linked_hypotheses: List[str] = Field(..., description="List of hypothesis IDs to link")
+
+
 class ExperimentPlanResponse(BaseModel):
     plan_id: str
     project_id: str
@@ -226,3 +231,89 @@ async def delete_experiment_plan(
         logger.error(f"❌ Error deleting experiment plan: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to delete experiment plan: {str(e)}")
 
+
+@router.put("/{plan_id}/research-links")
+async def update_research_links(
+    plan_id: str,
+    request: UpdateResearchLinksRequest,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Update the research context links (questions and hypotheses) for an experiment plan.
+
+    This endpoint allows manual linking/unlinking of research questions and hypotheses
+    to experiment plans, enabling full traceability in the research loop.
+
+    Args:
+        plan_id: ID of the experiment plan to update
+        request: New lists of linked question and hypothesis IDs
+        user_id: User making the update
+        db: Database session
+
+    Returns:
+        Updated experiment plan with new research links
+    """
+    try:
+        from database import ExperimentPlan, ResearchQuestion, Hypothesis
+
+        logger.info(f"🔗 Updating research links for experiment plan {plan_id}")
+        logger.info(f"   Questions: {request.linked_questions}")
+        logger.info(f"   Hypotheses: {request.linked_hypotheses}")
+
+        # Get the experiment plan
+        plan = db.query(ExperimentPlan).filter(ExperimentPlan.plan_id == plan_id).first()
+        if not plan:
+            raise HTTPException(status_code=404, detail=f"Experiment plan {plan_id} not found")
+
+        # Validate that all question IDs exist in the project
+        if request.linked_questions:
+            valid_questions = db.query(ResearchQuestion).filter(
+                ResearchQuestion.project_id == plan.project_id,
+                ResearchQuestion.question_id.in_(request.linked_questions)
+            ).all()
+            valid_question_ids = [q.question_id for q in valid_questions]
+
+            invalid_questions = set(request.linked_questions) - set(valid_question_ids)
+            if invalid_questions:
+                logger.warning(f"⚠️ Invalid question IDs: {invalid_questions}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid question IDs: {', '.join(invalid_questions)}"
+                )
+
+        # Validate that all hypothesis IDs exist in the project
+        if request.linked_hypotheses:
+            valid_hypotheses = db.query(Hypothesis).filter(
+                Hypothesis.project_id == plan.project_id,
+                Hypothesis.hypothesis_id.in_(request.linked_hypotheses)
+            ).all()
+            valid_hypothesis_ids = [h.hypothesis_id for h in valid_hypotheses]
+
+            invalid_hypotheses = set(request.linked_hypotheses) - set(valid_hypothesis_ids)
+            if invalid_hypotheses:
+                logger.warning(f"⚠️ Invalid hypothesis IDs: {invalid_hypotheses}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid hypothesis IDs: {', '.join(invalid_hypotheses)}"
+                )
+
+        # Update the links
+        plan.linked_questions = request.linked_questions
+        plan.linked_hypotheses = request.linked_hypotheses
+
+        db.commit()
+        db.refresh(plan)
+
+        logger.info(f"✅ Research links updated successfully")
+        logger.info(f"   Linked {len(request.linked_questions)} questions")
+        logger.info(f"   Linked {len(request.linked_hypotheses)} hypotheses")
+
+        return plan
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error updating research links: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update research links: {str(e)}")
