@@ -192,7 +192,7 @@ class LivingSummaryService:
 
         context += f"\n## Papers ({len(papers)}):\n"
         for article, triage in papers[:10]:  # Limit to top 10
-            context += f"- {article.title} (Score: {triage.final_score})\n"
+            context += f"- {article.title} (Relevance: {triage.relevance_score}/100)\n"
             if triage.evidence_excerpts:
                 for excerpt in triage.evidence_excerpts[:2]:
                     context += f"  • {excerpt.get('text', '')}\n"
