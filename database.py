@@ -1078,6 +1078,43 @@ class ProjectSummary(Base):
     )
 
 
+class ProjectInsights(Base):
+    """Cached AI-generated project insights (Week 21-22)"""
+    __tablename__ = "project_insights"
+
+    insight_id = Column(String, primary_key=True)  # UUID
+    project_id = Column(String, ForeignKey("projects.project_id", ondelete="CASCADE"), nullable=False, unique=True)
+
+    # Insights content (JSON arrays)
+    progress_insights = Column(JSON, default=list)
+    connection_insights = Column(JSON, default=list)
+    gap_insights = Column(JSON, default=list)
+    trend_insights = Column(JSON, default=list)
+    recommendations = Column(JSON, default=list)
+
+    # Metrics
+    total_papers = Column(Integer, default=0)
+    must_read_papers = Column(Integer, default=0)
+    avg_paper_score = Column(Float, default=0.0)
+
+    # Cache management
+    last_updated = Column(DateTime(timezone=True), server_default=func.now())
+    cache_valid_until = Column(DateTime(timezone=True), nullable=True)
+
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    project = relationship("Project")
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_project_insights_project', 'project_id'),
+        Index('idx_project_insights_cache', 'cache_valid_until'),
+    )
+
+
 class FieldSummary(Base):
     """Living literature reviews that auto-update with new papers"""
     __tablename__ = "field_summaries"

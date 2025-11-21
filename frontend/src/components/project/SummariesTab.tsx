@@ -138,8 +138,8 @@ export default function SummariesTab({ projectId, userId }: SummariesTabProps) {
           disabled={refreshing}
           className="flex items-center gap-2 px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          {refreshing ? 'Refreshing...' : 'Refresh'}
+          <Sparkles className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          {refreshing ? 'Regenerating...' : 'Regenerate'}
         </button>
       </div>
 

@@ -4,14 +4,17 @@ Week 21-22: AI Insights Feature
 """
 
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
+from datetime import datetime, timedelta, timezone
+import uuid
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from openai import AsyncOpenAI
 
 from database import (
     Project, ResearchQuestion, Hypothesis, Article, PaperTriage,
-    Protocol, ExperimentPlan, QuestionEvidence, HypothesisEvidence
+    Protocol, ExperimentPlan, QuestionEvidence, HypothesisEvidence,
+    ProjectInsights
 )
 
 logger = logging.getLogger(__name__)
@@ -22,15 +25,24 @@ client = AsyncOpenAI()
 
 class InsightsService:
     """Service for generating AI-powered project insights"""
-    
+
+    # Cache TTL: 24 hours
+    CACHE_TTL_HOURS = 24
+
     async def generate_insights(
         self,
         project_id: str,
-        db: Session
+        db: Session,
+        force_regenerate: bool = False
     ) -> Dict:
         """
         Generate AI insights from project data
-        
+
+        Args:
+            project_id: Project ID
+            db: Database session
+            force_regenerate: If True, bypass cache and regenerate
+
         Returns:
             Dict with insights categories:
             - progress_insights: Research progress observations
@@ -38,20 +50,31 @@ class InsightsService:
             - gap_insights: Missing evidence or unanswered questions
             - trend_insights: Emerging patterns
             - recommendations: Actionable next steps
+            - metrics: Project metrics
         """
-        logger.info(f"💡 Generating insights for project: {project_id}")
-        
+        logger.info(f"💡 Generating insights for project: {project_id} (force={force_regenerate})")
+
+        # Check cache first (unless force regenerate)
+        if not force_regenerate:
+            cached = self._get_cached_insights(project_id, db)
+            if cached:
+                logger.info(f"✅ Returning cached insights (valid until {cached.cache_valid_until})")
+                return self._format_insights(cached)
+
         # Gather project data
         project_data = await self._gather_project_data(project_id, db)
-        
+
         # Calculate metrics
         metrics = self._calculate_metrics(project_data)
-        
+
         # Generate AI insights
         insights = await self._generate_ai_insights(project_data, metrics)
-        
-        logger.info(f"✅ Insights generated successfully")
-        return insights
+
+        # Save to database
+        cached_insights = self._save_insights(project_id, insights, db)
+
+        logger.info(f"✅ Insights generated and cached until {cached_insights.cache_valid_until}")
+        return self._format_insights(cached_insights)
     
     async def _gather_project_data(self, project_id: str, db: Session) -> Dict:
         """Gather all relevant project data for insights"""
@@ -292,4 +315,96 @@ Guidelines:
 - Provide clear rationale for recommendations
 - Limit to 3-5 items per category
 - Return ONLY valid JSON, no markdown formatting or extra text"""
+
+    def _get_cached_insights(self, project_id: str, db: Session) -> Optional[ProjectInsights]:
+        """Get cached insights if still valid"""
+        insights = db.query(ProjectInsights).filter(
+            ProjectInsights.project_id == project_id
+        ).first()
+
+        if not insights:
+            return None
+
+        # Check if cache is still valid
+        now = datetime.now(timezone.utc)
+        if insights.cache_valid_until and insights.cache_valid_until > now:
+            return insights
+
+        return None
+
+    def _save_insights(self, project_id: str, insights_data: Dict, db: Session) -> ProjectInsights:
+        """Save insights to database"""
+        # Check if insights exist
+        insights = db.query(ProjectInsights).filter(
+            ProjectInsights.project_id == project_id
+        ).first()
+
+        # Calculate cache expiration
+        now = datetime.now(timezone.utc)
+        cache_valid_until = now + timedelta(hours=self.CACHE_TTL_HOURS)
+
+        if insights:
+            # Update existing
+            insights.progress_insights = insights_data.get('progress_insights', [])
+            insights.connection_insights = insights_data.get('connection_insights', [])
+            insights.gap_insights = insights_data.get('gap_insights', [])
+            insights.trend_insights = insights_data.get('trend_insights', [])
+            insights.recommendations = insights_data.get('recommendations', [])
+            insights.total_papers = insights_data['metrics']['total_papers']
+            insights.must_read_papers = insights_data['metrics']['must_read_papers']
+            insights.avg_paper_score = insights_data['metrics']['avg_paper_score']
+            insights.last_updated = now
+            insights.cache_valid_until = cache_valid_until
+            insights.updated_at = now
+        else:
+            # Create new
+            insights = ProjectInsights(
+                insight_id=str(uuid.uuid4()),
+                project_id=project_id,
+                progress_insights=insights_data.get('progress_insights', []),
+                connection_insights=insights_data.get('connection_insights', []),
+                gap_insights=insights_data.get('gap_insights', []),
+                trend_insights=insights_data.get('trend_insights', []),
+                recommendations=insights_data.get('recommendations', []),
+                total_papers=insights_data['metrics']['total_papers'],
+                must_read_papers=insights_data['metrics']['must_read_papers'],
+                avg_paper_score=insights_data['metrics']['avg_paper_score'],
+                last_updated=now,
+                cache_valid_until=cache_valid_until
+            )
+            db.add(insights)
+
+        db.commit()
+        db.refresh(insights)
+        return insights
+
+    def _format_insights(self, insights: ProjectInsights) -> Dict:
+        """Format insights for API response"""
+        return {
+            'progress_insights': insights.progress_insights or [],
+            'connection_insights': insights.connection_insights or [],
+            'gap_insights': insights.gap_insights or [],
+            'trend_insights': insights.trend_insights or [],
+            'recommendations': insights.recommendations or [],
+            'metrics': {
+                'total_papers': insights.total_papers,
+                'must_read_papers': insights.must_read_papers,
+                'avg_paper_score': insights.avg_paper_score
+            },
+            'last_updated': insights.last_updated.isoformat() if insights.last_updated else None,
+            'cache_valid_until': insights.cache_valid_until.isoformat() if insights.cache_valid_until else None
+        }
+
+    async def invalidate_cache(self, project_id: str, db: Session):
+        """Invalidate cache when project content changes"""
+        logger.info(f"🔄 Invalidating insights cache for project: {project_id}")
+
+        insights = db.query(ProjectInsights).filter(
+            ProjectInsights.project_id == project_id
+        ).first()
+
+        if insights:
+            insights.cache_valid_until = datetime.now(timezone.utc)
+            db.commit()
+            logger.info(f"✅ Cache invalidated")
 

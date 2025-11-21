@@ -4,7 +4,7 @@ Week 21-22: Living Summaries Feature
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 import uuid
 
@@ -74,7 +74,7 @@ class LivingSummaryService:
         ).first()
         
         if summary:
-            summary.cache_valid_until = datetime.utcnow()
+            summary.cache_valid_until = datetime.now(timezone.utc)
             db.commit()
             logger.info(f"✅ Cache invalidated")
     
@@ -88,9 +88,10 @@ class LivingSummaryService:
             return None
         
         # Check if cache is still valid
-        if summary.cache_valid_until and summary.cache_valid_until > datetime.utcnow():
+        now = datetime.now(timezone.utc)
+        if summary.cache_valid_until and summary.cache_valid_until > now:
             return summary
-        
+
         return None
     
     async def _gather_project_data(self, project_id: str, db: Session) -> Dict:
@@ -260,7 +261,8 @@ Guidelines:
         ).first()
 
         # Calculate cache expiration
-        cache_valid_until = datetime.utcnow() + timedelta(hours=self.CACHE_TTL_HOURS)
+        now = datetime.now(timezone.utc)
+        cache_valid_until = now + timedelta(hours=self.CACHE_TTL_HOURS)
 
         if summary:
             # Update existing
@@ -269,9 +271,9 @@ Guidelines:
             summary.protocol_insights = summary_data.get('protocol_insights', [])
             summary.experiment_status = summary_data.get('experiment_status')
             summary.next_steps = summary_data.get('next_steps', [])
-            summary.last_updated = datetime.utcnow()
+            summary.last_updated = now
             summary.cache_valid_until = cache_valid_until
-            summary.updated_at = datetime.utcnow()
+            summary.updated_at = now
         else:
             # Create new
             summary = ProjectSummary(

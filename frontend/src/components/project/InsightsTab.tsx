@@ -51,6 +51,7 @@ interface InsightsTabProps {
 export default function InsightsTab({ projectId, userId }: InsightsTabProps) {
   const [insights, setInsights] = useState<ProjectInsights | null>(null);
   const [loading, setLoading] = useState(true);
+  const [regenerating, setRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -80,6 +81,33 @@ export default function InsightsTab({ projectId, userId }: InsightsTabProps) {
       setError(err instanceof Error ? err.message : 'Failed to load insights');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const regenerateInsights = async () => {
+    try {
+      setRegenerating(true);
+      setError(null);
+
+      const response = await fetch(`/api/proxy/insights/projects/${projectId}/insights/regenerate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': userId
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to regenerate insights: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      setInsights(data);
+    } catch (err) {
+      console.error('Error regenerating insights:', err);
+      setError(err instanceof Error ? err.message : 'Failed to regenerate insights');
+    } finally {
+      setRegenerating(false);
     }
   };
 
@@ -149,15 +177,31 @@ export default function InsightsTab({ projectId, userId }: InsightsTabProps) {
           </h2>
           <p className="text-sm text-gray-400 mt-1">
             AI-powered analysis of your research project
+            {insights.last_updated && (
+              <span className="ml-2">
+                • Last updated: {new Date(insights.last_updated).toLocaleString()}
+              </span>
+            )}
           </p>
         </div>
-        <button
-          onClick={fetchInsights}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg transition-colors"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={fetchInsights}
+            disabled={loading || regenerating}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-700/50 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+          <button
+            onClick={regenerateInsights}
+            disabled={loading || regenerating}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Sparkles className={`w-4 h-4 ${regenerating ? 'animate-spin' : ''}`} />
+            {regenerating ? 'Regenerating...' : 'Regenerate'}
+          </button>
+        </div>
       </div>
 
       {/* Key Metrics */}

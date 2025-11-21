@@ -62,3 +62,48 @@ async def get_project_insights(
         logger.error(f"❌ Error generating insights: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to generate insights: {str(e)}")
 
+
+@router.post("/projects/{project_id}/insights/regenerate")
+async def regenerate_project_insights(
+    project_id: str,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+) -> Dict:
+    """
+    Force regenerate AI insights for a project (bypasses cache)
+
+    Returns:
+        - progress_insights: Research progress observations
+        - connection_insights: Cross-cutting themes and connections
+        - gap_insights: Missing evidence or unanswered questions
+        - trend_insights: Emerging patterns
+        - recommendations: Actionable next steps
+        - metrics: Key project metrics
+    """
+    logger.info(f"🔄 POST /insights/projects/{project_id}/insights/regenerate")
+
+    try:
+        # Verify project exists and user has access
+        project = db.query(Project).filter(
+            Project.project_id == project_id
+        ).first()
+
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        # Force regenerate insights
+        insights = await insights_service.generate_insights(
+            project_id=project_id,
+            db=db,
+            force_regenerate=True
+        )
+
+        logger.info(f"✅ Insights regenerated successfully")
+        return insights
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error regenerating insights: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to regenerate insights: {str(e)}")
+
