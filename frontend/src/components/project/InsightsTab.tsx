@@ -41,6 +41,8 @@ interface ProjectInsights {
   trend_insights: Insight[];
   recommendations: Recommendation[];
   metrics: Metrics;
+  last_updated?: string;
+  cache_valid_until?: string;
 }
 
 interface InsightsTabProps {
