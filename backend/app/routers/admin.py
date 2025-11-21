@@ -150,6 +150,53 @@ async def run_migration_004(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/migrate/005-add-experiment-plans")
+async def run_migration_005(
+    admin_key: str = Header(..., alias="X-Admin-Key"),
+    db: Session = Depends(get_db)
+):
+    """
+    Apply migration 005: Add experiment_plans table.
+    Week 19-20: Experiment Planning Feature
+    """
+    # Verify admin key
+    expected_key = os.getenv("ADMIN_KEY", "super-secret-admin-key-change-this")
+    if admin_key != expected_key:
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+
+    logger.info("🔧 Starting migration 005: Add experiment_plans table")
+
+    try:
+        # Read migration file
+        migration_path = "backend/migrations/005_add_experiment_plans.sql"
+        with open(migration_path, 'r') as f:
+            migration_sql = f.read()
+
+        logger.info(f"📄 Read migration file: {migration_path}")
+
+        # Execute migration
+        db.execute(text(migration_sql))
+        db.commit()
+
+        logger.info("✅ Migration 005 applied successfully")
+
+        return {
+            "status": "success",
+            "message": "Migration 005 applied successfully",
+            "migration": "005_add_experiment_plans",
+            "changes": [
+                "Created experiment_plans table",
+                "Added indexes for performance",
+                "Added trigger for updated_at timestamp"
+            ]
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Migration 005 failed: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/migrate/status")
 async def check_migration_status(
     db: Session = Depends(get_db)
