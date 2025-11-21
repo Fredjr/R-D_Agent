@@ -34,6 +34,7 @@ import { AlertsPanel } from '@/components/project/AlertsPanel';
 import ProtocolsTab from '@/components/project/ProtocolsTab';
 import ExperimentPlansTab from '@/components/project/ExperimentPlansTab';
 import SummariesTab from '@/components/project/SummariesTab';
+import InsightsTab from '@/components/project/InsightsTab';
 import { ProjectHeroActions } from '@/components/project/ProjectHeroActions';
 import { NetworkQuickStart } from '@/components/project/NetworkQuickStart';
 import { ContextualActions, ProjectState, ActionType } from '@/components/project/ContextualActions';
@@ -2063,11 +2064,8 @@ export default function ProjectPage() {
               />
             )}
 
-            {activeSubTab === 'insights' && (
-              <div className="p-6">
-                <h2 className="text-2xl font-bold text-white mb-4">Insights</h2>
-                <p className="text-gray-400">Coming in Phase 2 - AI-powered insights</p>
-              </div>
+            {activeSubTab === 'insights' && user?.user_id && (
+              <InsightsTab projectId={projectId} userId={user.user_id} />
             )}
 
             {activeSubTab === 'timeline' && (
