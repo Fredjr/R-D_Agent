@@ -23,9 +23,6 @@ from database import (
 
 logger = logging.getLogger(__name__)
 
-# Initialize OpenAI client
-client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
 
 class ExperimentPlannerService:
     """
@@ -41,7 +38,17 @@ class ExperimentPlannerService:
     def __init__(self):
         self.model = "gpt-4o-mini"  # Cost-effective model
         self.temperature = 0.2  # Low temperature for practical, actionable plans
+        self.client = None  # Lazy initialization
         logger.info(f"✅ ExperimentPlannerService initialized with model: {self.model}")
+
+    def _get_client(self) -> AsyncOpenAI:
+        """Lazy initialization of OpenAI client."""
+        if self.client is None:
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                raise ValueError("OPENAI_API_KEY environment variable is not set")
+            self.client = AsyncOpenAI(api_key=api_key)
+        return self.client
     
     async def generate_experiment_plan(
         self,
@@ -160,6 +167,9 @@ class ExperimentPlannerService:
         prompt = self._build_plan_prompt(context, custom_objective, custom_notes)
         
         try:
+            # Get OpenAI client
+            client = self._get_client()
+
             # Call OpenAI
             response = await client.chat.completions.create(
                 model=self.model,

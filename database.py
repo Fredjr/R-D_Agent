@@ -958,7 +958,8 @@ class Experiment(Base):
         Index('idx_experiment_project', 'project_id'),
         Index('idx_experiment_hypothesis', 'hypothesis_id'),
         Index('idx_experiment_protocol', 'protocol_id'),
-        Index('idx_experiment_status', 'status')
+        Index('idx_experiment_status', 'status'),
+    )
 
 
 class ExperimentPlan(Base):
@@ -1035,7 +1036,6 @@ class ExperimentPlan(Base):
         Index('idx_experiment_plans_status', 'status'),
         Index('idx_experiment_plans_created_by', 'created_by'),
         Index('idx_experiment_plans_created_at', 'created_at'),
-    ),
     )
 
 
