@@ -94,7 +94,7 @@ class ExperimentPlannerService:
             )
             
             # Step 3: Validate and structure output
-            validated_plan = self._validate_and_structure_plan(plan_data, context)
+            validated_plan = self._validate_and_structure_plan(plan_data, context, db)
             
             # Step 4: Save to database
             experiment_plan = await self._save_plan_to_db(
@@ -130,7 +130,10 @@ class ExperimentPlannerService:
         
         # Get project
         project = db.query(Project).filter(Project.project_id == project_id).first()
-        
+
+        if not project:
+            raise ValueError(f"Project {project_id} not found")
+
         # Get source article if available
         article = None
         if protocol.source_pmid:
@@ -372,7 +375,7 @@ IMPORTANT:
 
         return prompt
 
-    def _validate_and_structure_plan(self, plan_data: Dict, context: Dict) -> Dict:
+    def _validate_and_structure_plan(self, plan_data: Dict, context: Dict, db: Session) -> Dict:
         """Validate and structure the AI-generated plan."""
         logger.info(f"✅ Validating and structuring plan")
 
@@ -396,23 +399,61 @@ IMPORTANT:
             "notes": plan_data.get("notes")
         }
 
-        # Validate linked questions exist
+        # Validate linked questions exist (query ALL questions, not just top 10)
         if validated["linked_questions"]:
-            valid_question_ids = [q.question_id for q in context["questions"]]
+            from database import ResearchQuestion
+            all_questions = db.query(ResearchQuestion).filter(
+                ResearchQuestion.project_id == context["project"].project_id
+            ).all()
+            valid_question_ids = [q.question_id for q in all_questions]
             validated["linked_questions"] = [
                 qid for qid in validated["linked_questions"]
                 if qid in valid_question_ids
             ]
 
-        # Validate linked hypotheses exist
+        # Validate linked hypotheses exist (query ALL hypotheses, not just top 10)
         if validated["linked_hypotheses"]:
-            valid_hypothesis_ids = [h.hypothesis_id for h in context["hypotheses"]]
+            from database import Hypothesis
+            all_hypotheses = db.query(Hypothesis).filter(
+                Hypothesis.project_id == context["project"].project_id
+            ).all()
+            valid_hypothesis_ids = [h.hypothesis_id for h in all_hypotheses]
             validated["linked_hypotheses"] = [
                 hid for hid in validated["linked_hypotheses"]
                 if hid in valid_hypothesis_ids
             ]
 
+        # Calculate generation confidence based on completeness
+        confidence = self._calculate_confidence(validated)
+        validated["generation_confidence"] = confidence
+
         return validated
+
+    def _calculate_confidence(self, plan_data: Dict) -> float:
+        """Calculate confidence score based on plan completeness."""
+        score = 0.0
+        max_score = 10.0
+
+        # Check required fields (5 points)
+        if plan_data.get("plan_name"): score += 0.5
+        if plan_data.get("objective"): score += 0.5
+        if plan_data.get("materials") and len(plan_data["materials"]) > 0: score += 1.0
+        if plan_data.get("procedure") and len(plan_data["procedure"]) > 0: score += 1.0
+        if plan_data.get("expected_outcomes") and len(plan_data["expected_outcomes"]) > 0: score += 1.0
+        if plan_data.get("success_criteria") and len(plan_data["success_criteria"]) > 0: score += 1.0
+
+        # Check optional but important fields (3 points)
+        if plan_data.get("timeline_estimate"): score += 0.5
+        if plan_data.get("estimated_cost"): score += 0.5
+        if plan_data.get("risk_assessment") and plan_data["risk_assessment"].get("risks"): score += 1.0
+        if plan_data.get("troubleshooting_guide") and len(plan_data["troubleshooting_guide"]) > 0: score += 0.5
+        if plan_data.get("safety_considerations") and len(plan_data["safety_considerations"]) > 0: score += 0.5
+
+        # Check context linkage (2 points)
+        if plan_data.get("linked_questions") and len(plan_data["linked_questions"]) > 0: score += 1.0
+        if plan_data.get("linked_hypotheses") and len(plan_data["linked_hypotheses"]) > 0: score += 1.0
+
+        return round(score / max_score, 2)
 
     async def _save_plan_to_db(
         self,
@@ -448,6 +489,7 @@ IMPORTANT:
             required_expertise=plan_data["required_expertise"],
             notes=plan_data["notes"],
             generated_by='ai',
+            generation_confidence=plan_data.get("generation_confidence", 0.85),
             generation_model=self.model,
             status='draft',
             created_by=user_id
@@ -483,6 +525,7 @@ IMPORTANT:
             "required_expertise": plan.required_expertise,
             "notes": plan.notes,
             "generated_by": plan.generated_by,
+            "generation_confidence": plan.generation_confidence,
             "generation_model": plan.generation_model,
             "status": plan.status,
             "created_by": plan.created_by,

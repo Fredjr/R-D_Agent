@@ -943,9 +943,7 @@ except ImportError as e:
     print(f"   Error details: {type(e).__name__}")
     import traceback
     traceback.print_exc()
-    import traceback
-    traceback.print_exc()
-    print("   Project alerts feature will not be available")
+    print("   Experiment planning feature will not be available")
 
 # Database migration endpoint for Phase 5
 @app.post("/admin/migrate-citation-schema")
