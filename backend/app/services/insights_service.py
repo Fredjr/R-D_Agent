@@ -292,10 +292,11 @@ class InsightsService:
             })
 
         for protocol in protocols:
+            confidence = protocol.extraction_confidence if protocol.extraction_confidence else 0
             timeline_events.append({
                 'date': protocol.created_at,
                 'type': 'protocol',
-                'text': f"Protocol: {protocol.protocol_name} (Confidence: {protocol.confidence_score:.0%})"
+                'text': f"Protocol: {protocol.protocol_name} (Confidence: {confidence}%)"
             })
 
         for plan in plans:

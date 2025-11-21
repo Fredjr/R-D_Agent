@@ -261,7 +261,7 @@ class LivingSummaryService:
                 'type': 'protocol',
                 'content': f"Extracted Protocol: {protocol.protocol_name}",
                 'title': protocol.protocol_name,
-                'confidence': protocol.confidence_score,
+                'confidence': protocol.extraction_confidence,
                 'id': protocol.protocol_id
             }
             if protocol.source_pmid:
