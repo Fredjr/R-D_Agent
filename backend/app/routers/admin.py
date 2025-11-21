@@ -259,10 +259,10 @@ async def reextract_protocols(
                     continue
 
                 # Re-extract protocol
-                new_protocol_data = await extractor.extract_protocol(
-                    abstract=article.abstract or "",
+                new_protocol_data = await extractor.extract_protocol_with_context(
+                    article_pmid=protocol.source_pmid,
                     project_id=protocol.project_id,
-                    pmid=protocol.source_pmid,
+                    user_id=protocol.created_by,
                     db=db
                 )
 
