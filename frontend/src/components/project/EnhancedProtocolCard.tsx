@@ -11,7 +11,7 @@
  */
 
 import React from 'react';
-import { Beaker, Lightbulb, Target, TrendingUp, AlertCircle } from 'lucide-react';
+import { Beaker, Lightbulb, Target, TrendingUp, AlertCircle, Shield, CheckCircle, XCircle } from 'lucide-react';
 
 interface Recommendation {
   title: string;
@@ -36,6 +36,11 @@ interface EnhancedProtocol {
   extraction_method?: string;
   difficulty_level: string;
   duration_estimate?: string;
+  extraction_confidence?: number;
+  confidence_explanation?: {
+    confidence_level: string;
+    explanation: string;
+  };
 }
 
 interface EnhancedProtocolCardProps {
@@ -85,6 +90,43 @@ export default function EnhancedProtocolCard({
         return null;
     }
   };
+
+  const getConfidenceBadge = () => {
+    if (!protocol.extraction_confidence) return null;
+
+    const confidence = protocol.extraction_confidence;
+    const level = protocol.confidence_explanation?.confidence_level ||
+                  (confidence >= 80 ? 'High' : confidence >= 50 ? 'Medium' : 'Low');
+
+    let icon, bgColor, textColor, borderColor;
+
+    if (confidence >= 80) {
+      icon = <CheckCircle className="w-3 h-3" />;
+      bgColor = 'bg-green-500/20';
+      textColor = 'text-green-400';
+      borderColor = 'border-green-500/30';
+    } else if (confidence >= 50) {
+      icon = <AlertCircle className="w-3 h-3" />;
+      bgColor = 'bg-yellow-500/20';
+      textColor = 'text-yellow-400';
+      borderColor = 'border-yellow-500/30';
+    } else {
+      icon = <XCircle className="w-3 h-3" />;
+      bgColor = 'bg-red-500/20';
+      textColor = 'text-red-400';
+      borderColor = 'border-red-500/30';
+    }
+
+    return (
+      <span
+        className={`px-2 py-1 rounded-full text-xs font-medium ${bgColor} ${textColor} border ${borderColor} flex items-center gap-1`}
+        title={protocol.confidence_explanation?.explanation || `Confidence: ${confidence}/100`}
+      >
+        <Shield className="w-3 h-3" />
+        {level} ({confidence})
+      </span>
+    );
+  };
   
   return (
     <div className="bg-gray-800/50 rounded-lg border border-gray-700 p-6 hover:border-blue-500/50 transition-all">
@@ -98,6 +140,7 @@ export default function EnhancedProtocolCard({
           
           <div className="flex items-center gap-2 flex-wrap">
             {getRelevanceBadge()}
+            {getConfidenceBadge()}
             <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30">
               {protocol.protocol_type}
             </span>

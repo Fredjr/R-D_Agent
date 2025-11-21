@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Beaker, Clock, AlertTriangle, Eye, Trash2, Download } from 'lucide-react';
+import { Beaker, Clock, AlertTriangle, Eye, Trash2, Download, Shield, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
 import ProtocolDetailModal from './ProtocolDetailModal';
 import EnhancedProtocolCard from './EnhancedProtocolCard';
 
@@ -18,6 +18,7 @@ interface Material {
   supplier?: string;
   amount?: string;
   notes?: string;
+  source_text?: string; // Week 19: Evidence-based extraction
 }
 
 interface ProtocolStep {
@@ -26,6 +27,30 @@ interface ProtocolStep {
   duration?: string;
   temperature?: string;
   notes?: string;
+  source_text?: string; // Week 19: Evidence-based extraction
+}
+
+interface ConfidenceExplanation {
+  overall_score: number;
+  confidence_level: string;
+  criteria: {
+    materials_with_amounts?: number;
+    total_materials?: number;
+    steps_with_timing?: number;
+    total_steps?: number;
+    materials_with_sources?: number;
+    steps_with_sources?: number;
+    specificity_score?: number;
+    evidence_score?: number;
+    completeness_score?: number;
+  };
+  explanation: string;
+}
+
+interface SourceCitation {
+  source_text: string;
+  has_quantitative_details?: boolean;
+  confidence?: string;
 }
 
 interface Protocol {
@@ -71,6 +96,12 @@ interface Protocol {
   context_relevance?: string;
   extraction_method?: string;
   context_aware?: boolean;
+
+  // Confidence and source tracking (Week 19: Evidence-based)
+  extraction_confidence?: number;
+  confidence_explanation?: ConfidenceExplanation;
+  material_sources?: Record<string, SourceCitation>;
+  step_sources?: Record<string, SourceCitation>;
 }
 
 interface ProtocolsTabProps {
@@ -174,6 +205,42 @@ export default function ProtocolsTab({ projectId, userId }: ProtocolsTabProps) {
       case 'difficult': return 'text-red-400 bg-red-500/20';
       default: return 'text-gray-400 bg-gray-500/20';
     }
+  };
+
+  const getConfidenceBadge = (confidence?: number, confidenceLevel?: string) => {
+    if (confidence === undefined || confidence === null) {
+      return null;
+    }
+
+    let icon, bgColor, textColor, borderColor;
+    const level = confidenceLevel || (confidence >= 80 ? 'High' : confidence >= 50 ? 'Medium' : 'Low');
+
+    if (confidence >= 80) {
+      icon = <CheckCircle className="w-3 h-3" />;
+      bgColor = 'bg-green-500/20';
+      textColor = 'text-green-400';
+      borderColor = 'border-green-500/30';
+    } else if (confidence >= 50) {
+      icon = <AlertCircle className="w-3 h-3" />;
+      bgColor = 'bg-yellow-500/20';
+      textColor = 'text-yellow-400';
+      borderColor = 'border-yellow-500/30';
+    } else {
+      icon = <XCircle className="w-3 h-3" />;
+      bgColor = 'bg-red-500/20';
+      textColor = 'text-red-400';
+      borderColor = 'border-red-500/30';
+    }
+
+    return (
+      <span
+        className={`px-2 py-1 rounded text-xs flex items-center gap-1 ${bgColor} ${textColor} border ${borderColor}`}
+        title={`Confidence: ${confidence}/100 - ${level}`}
+      >
+        <Shield className="w-3 h-3" />
+        {level} ({confidence})
+      </span>
+    );
   };
 
   const filteredProtocols = filterType === 'all'
@@ -292,6 +359,7 @@ export default function ProtocolsTab({ projectId, userId }: ProtocolsTabProps) {
                       {protocol.duration_estimate}
                     </span>
                   )}
+                  {getConfidenceBadge(protocol.extraction_confidence, protocol.confidence_explanation?.confidence_level)}
                 </div>
 
                 {/* Stats */}

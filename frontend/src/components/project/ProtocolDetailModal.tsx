@@ -8,7 +8,7 @@
  */
 
 import React, { useState } from 'react';
-import { X, Copy, Download, Edit2, Save, XCircle, Clock, AlertTriangle } from 'lucide-react';
+import { X, Copy, Download, Edit2, Save, XCircle, Clock, AlertTriangle, Shield, ChevronDown, ChevronUp, FileText } from 'lucide-react';
 
 interface Material {
   name: string;
@@ -16,6 +16,7 @@ interface Material {
   supplier?: string;
   amount?: string;
   notes?: string;
+  source_text?: string;
 }
 
 interface ProtocolStep {
@@ -24,6 +25,7 @@ interface ProtocolStep {
   duration?: string;
   temperature?: string;
   notes?: string;
+  source_text?: string;
 }
 
 interface Protocol {
@@ -44,6 +46,15 @@ interface Protocol {
   article_authors?: string;
   article_journal?: string;
   article_year?: number;
+  extraction_confidence?: number;
+  confidence_explanation?: {
+    overall_score: number;
+    confidence_level: string;
+    criteria: any;
+    explanation: string;
+  };
+  material_sources?: Record<string, any>;
+  step_sources?: Record<string, any>;
 }
 
 interface ProtocolDetailModalProps {
@@ -61,6 +72,7 @@ export default function ProtocolDetailModal({
 }: ProtocolDetailModalProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedProtocol, setEditedProtocol] = useState<Protocol>(protocol);
+  const [showConfidenceDetails, setShowConfidenceDetails] = useState(false);
 
   const handleSave = () => {
     if (onUpdate) {
@@ -223,7 +235,7 @@ export default function ProtocolDetailModal({
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Metadata */}
-          <div className="flex items-center gap-4 text-sm">
+          <div className="flex items-center gap-4 text-sm flex-wrap">
             <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full">
               {protocol.protocol_type}
             </span>
@@ -237,7 +249,78 @@ export default function ProtocolDetailModal({
                 {protocol.duration_estimate}
               </span>
             )}
+            {protocol.extraction_confidence !== undefined && protocol.extraction_confidence !== null && (
+              <span className={`flex items-center gap-1 px-3 py-1 rounded-full ${
+                protocol.extraction_confidence >= 80 ? 'bg-green-500/20 text-green-400' :
+                protocol.extraction_confidence >= 50 ? 'bg-yellow-500/20 text-yellow-400' :
+                'bg-red-500/20 text-red-400'
+              }`}>
+                <Shield className="w-4 h-4" />
+                Confidence: {protocol.extraction_confidence}/100
+              </span>
+            )}
           </div>
+
+          {/* Confidence Explanation */}
+          {protocol.confidence_explanation && (
+            <div className="bg-gray-800/30 rounded-lg p-4 border border-gray-700">
+              <button
+                onClick={() => setShowConfidenceDetails(!showConfidenceDetails)}
+                className="w-full flex items-center justify-between text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-blue-400" />
+                  <h3 className="text-lg font-semibold text-white">
+                    Extraction Confidence: {protocol.confidence_explanation.confidence_level}
+                  </h3>
+                </div>
+                {showConfidenceDetails ? (
+                  <ChevronUp className="w-5 h-5 text-gray-400" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-gray-400" />
+                )}
+              </button>
+
+              {showConfidenceDetails && (
+                <div className="mt-4 space-y-3">
+                  <p className="text-sm text-gray-300">{protocol.confidence_explanation.explanation}</p>
+
+                  {protocol.confidence_explanation.criteria && (
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      {protocol.confidence_explanation.criteria.materials_with_amounts !== undefined && (
+                        <div className="bg-gray-800/50 rounded p-2">
+                          <div className="text-gray-500">Materials with amounts</div>
+                          <div className="text-white font-semibold">
+                            {protocol.confidence_explanation.criteria.materials_with_amounts}/{protocol.confidence_explanation.criteria.total_materials || 0}
+                          </div>
+                        </div>
+                      )}
+                      {protocol.confidence_explanation.criteria.steps_with_timing !== undefined && (
+                        <div className="bg-gray-800/50 rounded p-2">
+                          <div className="text-gray-500">Steps with timing</div>
+                          <div className="text-white font-semibold">
+                            {protocol.confidence_explanation.criteria.steps_with_timing}/{protocol.confidence_explanation.criteria.total_steps || 0}
+                          </div>
+                        </div>
+                      )}
+                      {protocol.confidence_explanation.criteria.specificity_score !== undefined && (
+                        <div className="bg-gray-800/50 rounded p-2">
+                          <div className="text-gray-500">Specificity Score</div>
+                          <div className="text-white font-semibold">{protocol.confidence_explanation.criteria.specificity_score}/40</div>
+                        </div>
+                      )}
+                      {protocol.confidence_explanation.criteria.evidence_score !== undefined && (
+                        <div className="bg-gray-800/50 rounded p-2">
+                          <div className="text-gray-500">Evidence Score</div>
+                          <div className="text-white font-semibold">{protocol.confidence_explanation.criteria.evidence_score}/40</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Materials */}
           {protocol.materials.length > 0 && (
@@ -245,8 +328,15 @@ export default function ProtocolDetailModal({
               <h3 className="text-lg font-semibold text-white mb-3">Materials</h3>
               <div className="space-y-3">
                 {protocol.materials.map((material, index) => (
-                  <div key={index} className="bg-gray-800/50 rounded-lg p-4">
-                    <div className="font-medium text-white mb-2">{material.name}</div>
+                  <div key={index} className="bg-gray-800/50 rounded-lg p-4 relative group">
+                    <div className="font-medium text-white mb-2 flex items-center gap-2">
+                      {material.name}
+                      {material.source_text && (
+                        <span className="text-xs text-blue-400 flex items-center gap-1" title="Source citation available">
+                          <FileText className="w-3 h-3" />
+                        </span>
+                      )}
+                    </div>
                     <div className="grid grid-cols-2 gap-2 text-sm text-gray-400">
                       {material.catalog_number && (
                         <div>
@@ -264,6 +354,17 @@ export default function ProtocolDetailModal({
                         </div>
                       )}
                     </div>
+                    {material.source_text && (
+                      <div className="mt-2 p-2 bg-blue-500/10 border border-blue-500/20 rounded text-xs text-blue-300">
+                        <div className="flex items-start gap-1">
+                          <FileText className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <span className="font-semibold">Source: </span>
+                            <span className="italic">"{material.source_text}"</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     {material.notes && (
                       <div className="mt-2 text-sm text-yellow-400 flex items-start gap-2">
                         <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
@@ -302,7 +403,14 @@ export default function ProtocolDetailModal({
                       {step.step_number}
                     </div>
                     <div className="flex-1">
-                      <p className="text-gray-300 mb-2">{step.instruction}</p>
+                      <div className="flex items-start gap-2 mb-2">
+                        <p className="text-gray-300 flex-1">{step.instruction}</p>
+                        {step.source_text && (
+                          <span className="text-xs text-blue-400 flex items-center gap-1 flex-shrink-0" title="Source citation available">
+                            <FileText className="w-3 h-3" />
+                          </span>
+                        )}
+                      </div>
                       <div className="flex flex-wrap gap-3 text-sm text-gray-400">
                         {step.duration && (
                           <span className="flex items-center gap-1">
@@ -314,6 +422,17 @@ export default function ProtocolDetailModal({
                           <span>🌡️ {step.temperature}</span>
                         )}
                       </div>
+                      {step.source_text && (
+                        <div className="mt-2 p-2 bg-blue-500/10 border border-blue-500/20 rounded text-xs text-blue-300">
+                          <div className="flex items-start gap-1">
+                            <FileText className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <span className="font-semibold">Source: </span>
+                              <span className="italic">"{step.source_text}"</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       {step.notes && (
                         <div className="mt-2 text-sm text-yellow-400 flex items-start gap-2 bg-yellow-500/10 rounded p-2">
                           <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
