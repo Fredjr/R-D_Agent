@@ -440,6 +440,13 @@ class Article(Base):
     doi = Column(String, nullable=True)
     abstract = Column(Text, nullable=True)
 
+    # PDF full text extraction (Week 19-20: Critical fix for protocol extraction)
+    pdf_text = Column(Text, nullable=True)  # Full text extracted from PDF
+    pdf_extracted_at = Column(DateTime(timezone=True), nullable=True)  # When extracted
+    pdf_extraction_method = Column(String(50), nullable=True)  # pypdf2, pdfplumber, ocr
+    pdf_url = Column(Text, nullable=True)  # URL where PDF was fetched
+    pdf_source = Column(String(50), nullable=True)  # pmc, europepmc, unpaywall, etc.
+
     # Citation relationships for network analysis
     cited_by_pmids = Column(JSON, default=list)  # Articles that cite this paper
     references_pmids = Column(JSON, default=list)  # Articles this paper references

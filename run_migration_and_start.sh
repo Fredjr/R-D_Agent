@@ -15,6 +15,10 @@ python3 migrations/001_add_pivot_tables.py
 echo "🎯 Running migration: enhance_paper_triage (Phase 1, Week 9+)..."
 python3 backend/migrations/002_enhance_paper_triage.py upgrade
 
+# Run PDF text extraction migration (Week 19-20: Critical Fix)
+echo "📄 Running migration: add_pdf_text_fields (Week 19-20)..."
+python3 run_migration_006.py
+
 echo "✅ All migrations completed successfully!"
 
 # Start the FastAPI server

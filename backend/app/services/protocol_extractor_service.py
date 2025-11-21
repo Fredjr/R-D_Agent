@@ -103,13 +103,28 @@ class ProtocolExtractorService:
             else:
                 raise ValueError(f"No project_id provided and no triage record found for PMID {article_pmid}")
 
-        # Step 4: Extract protocol using AI
+        # Step 4: Extract PDF text first (Week 19-20 Critical Fix)
+        from backend.app.services.pdf_text_extractor import PDFTextExtractor
+        pdf_extractor = PDFTextExtractor()
+
+        try:
+            pdf_text = await pdf_extractor.extract_and_store(article_pmid, db, force_refresh=force_refresh)
+            if pdf_text:
+                logger.info(f"✅ Using PDF text for protocol extraction ({len(pdf_text)} chars)")
+            else:
+                logger.warning(f"⚠️ No PDF text available, falling back to abstract")
+        except Exception as e:
+            logger.warning(f"⚠️ PDF extraction failed: {e}, falling back to abstract")
+            pdf_text = None
+
+        # Step 5: Extract protocol using AI (with PDF text if available)
         protocol_data = await self._extract_with_ai(
             article=article,
-            protocol_type=protocol_type
+            protocol_type=protocol_type,
+            pdf_text=pdf_text
         )
 
-        # Step 5: Save to database
+        # Step 6: Save to database
         import uuid
         protocol = Protocol(
             protocol_id=str(uuid.uuid4()),
@@ -172,26 +187,31 @@ class ProtocolExtractorService:
     async def _extract_with_ai(
         self,
         article: Article,
-        protocol_type: Optional[str]
+        protocol_type: Optional[str],
+        pdf_text: Optional[str] = None
     ) -> Dict:
         """
-        Use AI to extract protocol from article abstract.
-        
+        Use AI to extract protocol from article (PDF text or abstract).
+
+        Week 19-20 Critical Fix: Now uses full PDF text when available!
+
         Optimizations:
-        - Use abstract only (methods section if available in future)
+        - Use PDF full text when available (preferred)
+        - Fall back to abstract if PDF not available
         - Structured JSON output with schema
         - Low temperature for consistency
         - Specialized prompt for protocols
-        
+
         Args:
             article: Article object
             protocol_type: Optional type hint
-            
+            pdf_text: Full PDF text (if available)
+
         Returns:
             Dictionary with protocol data
         """
-        # Build specialized prompt
-        prompt = self._build_protocol_prompt(article, protocol_type)
+        # Build specialized prompt (with PDF text if available)
+        prompt = self._build_protocol_prompt(article, protocol_type, pdf_text)
         
         try:
             # Call OpenAI with structured output
@@ -233,25 +253,40 @@ Be precise and include all relevant details like catalog numbers, durations, and
     def _build_protocol_prompt(
         self,
         article: Article,
-        protocol_type: Optional[str]
+        protocol_type: Optional[str],
+        pdf_text: Optional[str] = None
     ) -> str:
         """
         Build specialized prompt for protocol extraction.
 
+        Week 19-20 Critical Fix: Now uses PDF text when available!
+
         Args:
             article: Article object
             protocol_type: Optional type hint
+            pdf_text: Full PDF text (if available)
 
         Returns:
             Formatted prompt string
         """
         type_hint = f" Focus on {protocol_type} protocols." if protocol_type else ""
 
-        # Truncate long abstract to reduce token usage
-        abstract = article.abstract or "No abstract available"
-        words = abstract.split()
-        if len(words) > 400:
-            abstract = " ".join(words[:400]) + "... [truncated]"
+        # Use PDF text if available, otherwise fall back to abstract
+        if pdf_text:
+            # Extract methods section from PDF
+            from backend.app.services.pdf_text_extractor import PDFTextExtractor
+            extractor = PDFTextExtractor()
+            methods_text = extractor.extract_methods_section(pdf_text, max_length=8000)
+            content_source = "Full Paper (Methods Section)"
+            content = methods_text
+        else:
+            # Fall back to abstract
+            abstract = article.abstract or "No abstract available"
+            words = abstract.split()
+            if len(words) > 400:
+                abstract = " ".join(words[:400]) + "... [truncated]"
+            content_source = "Abstract Only (PDF not available)"
+            content = abstract
 
         return f"""Extract the experimental protocol from this scientific paper.{type_hint}
 
@@ -261,8 +296,10 @@ Authors: {article.authors}
 Journal: {article.journal or 'Unknown'}
 Year: {article.publication_year or 'Unknown'}
 
-**Abstract:**
-{abstract}
+**Content Source:** {content_source}
+
+**Paper Content:**
+{content}
 
 **Instructions:**
 1. Extract the main experimental protocol described in the paper

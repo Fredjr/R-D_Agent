@@ -74,16 +74,31 @@ class AITriageService:
             Hypothesis.project_id == project_id
         ).all()
 
-        # 3. Build context for AI
+        # 3. Extract PDF text first (Week 19-20 Critical Fix)
+        from backend.app.services.pdf_text_extractor import PDFTextExtractor
+        pdf_extractor = PDFTextExtractor()
+
+        try:
+            pdf_text = await pdf_extractor.extract_and_store(article_pmid, db, force_refresh=False)
+            if pdf_text:
+                logger.info(f"✅ Using PDF text for triage ({len(pdf_text)} chars)")
+            else:
+                logger.warning(f"⚠️ No PDF text available, falling back to abstract")
+        except Exception as e:
+            logger.warning(f"⚠️ PDF extraction failed: {e}, falling back to abstract")
+            pdf_text = None
+
+        # 4. Build context for AI
         context = self._build_project_context(project, questions, hypotheses)
 
-        # 4. Call OpenAI for triage analysis
+        # 5. Call OpenAI for triage analysis (with PDF text if available)
         triage_result = await self._analyze_paper_relevance(
             article=article,
-            context=context
+            context=context,
+            pdf_text=pdf_text
         )
 
-        # 5. Create or update triage record
+        # 6. Create or update triage record
         existing_triage = db.query(PaperTriage).filter(
             PaperTriage.project_id == project_id,
             PaperTriage.article_pmid == article_pmid
@@ -163,17 +178,25 @@ class AITriageService:
     async def _analyze_paper_relevance(
         self,
         article: Article,
-        context: Dict
+        context: Dict,
+        pdf_text: Optional[str] = None
     ) -> Dict:
         """
         Use OpenAI to analyze paper relevance to project.
+
+        Week 19-20 Critical Fix: Now uses PDF text when available!
+
+        Args:
+            article: Article object
+            context: Project context
+            pdf_text: Full PDF text (if available)
 
         Returns:
             Dict with triage_status, relevance_score, impact_assessment,
             affected_questions, affected_hypotheses, ai_reasoning
         """
-        # Build prompt for AI
-        prompt = self._build_triage_prompt(article, context)
+        # Build prompt for AI (with PDF text if available)
+        prompt = self._build_triage_prompt(article, context, pdf_text)
 
         try:
             # Call OpenAI
@@ -211,8 +234,17 @@ class AITriageService:
                 "ai_reasoning": f"Error during AI analysis: {str(e)}"
             }
 
-    def _build_triage_prompt(self, article: Article, context: Dict) -> str:
-        """Build prompt for AI triage"""
+    def _build_triage_prompt(
+        self,
+        article: Article,
+        context: Dict,
+        pdf_text: Optional[str] = None
+    ) -> str:
+        """
+        Build prompt for AI triage.
+
+        Week 19-20 Critical Fix: Now uses PDF text when available!
+        """
         questions_text = "\n".join([
             f"- [{q['type']}] {q['text']} (Status: {q['status']})"
             for q in context["questions"]
@@ -222,6 +254,17 @@ class AITriageService:
             f"- [{h['type']}] {h['text']} (Status: {h['status']})"
             for h in context["hypotheses"]
         ]) if context["hypotheses"] else "No hypotheses defined yet."
+
+        # Use PDF text if available, otherwise fall back to abstract
+        if pdf_text:
+            # Truncate PDF text to avoid token limits (keep first 6000 chars)
+            content = pdf_text[:6000]
+            if len(pdf_text) > 6000:
+                content += "\n\n[... truncated for length ...]"
+            content_source = "Full Paper Text (PDF)"
+        else:
+            content = article.abstract or 'No abstract available'
+            content_source = "Abstract Only (PDF not available)"
 
         prompt = f"""Analyze this scientific paper for relevance to the research project.
 
@@ -238,9 +281,13 @@ Description: {context['project_description']}
 **Paper to Analyze:**
 Title: {article.title}
 Authors: {article.authors}
-Abstract: {article.abstract or 'No abstract available'}
 Journal: {article.journal or 'Unknown'}
 Year: {article.publication_year or 'Unknown'}
+
+**Content Source:** {content_source}
+
+**Paper Content:**
+{content}
 
 **Task:**
 Analyze this paper and provide a JSON response with:

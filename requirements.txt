@@ -28,6 +28,8 @@ httpx>=0.25.2
 
 # Document processing - Python 3.12 compatible
 pdfminer.six>=20231228
+PyPDF2>=3.0.0  # PDF text extraction for protocol extraction
+pdfplumber>=0.10.0  # Fallback PDF extraction
 
 # Utilities - Python 3.12 compatible
 jsonschema>=4.20.0
