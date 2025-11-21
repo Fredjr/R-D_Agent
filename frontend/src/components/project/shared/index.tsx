@@ -32,3 +32,6 @@ export {
   SpotifyTabLoading
 } from './SpotifyTabSection';
 
+// Research context badge components
+export { QuestionBadge } from './QuestionBadge';
+export { HypothesisBadge } from './HypothesisBadge';

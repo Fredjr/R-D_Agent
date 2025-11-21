@@ -8,12 +8,13 @@
  */
 
 import React, { useState } from 'react';
-import { 
-  X, Edit2, Save, XCircle, Clock, DollarSign, AlertTriangle, 
-  CheckCircle, Target, Beaker, Shield, Wrench, BookOpen, 
-  ChevronDown, ChevronUp, Trash2, Calendar
+import {
+  X, Edit2, Save, XCircle, Clock, DollarSign, AlertTriangle,
+  CheckCircle, Target, Beaker, Shield, Wrench, BookOpen,
+  ChevronDown, ChevronUp, Trash2, Calendar, Link
 } from 'lucide-react';
 import { updateExperimentPlan, deleteExperimentPlan, ExperimentPlan, UpdateExperimentPlanRequest } from '../../lib/api';
+import { QuestionBadge, HypothesisBadge } from './shared';
 
 interface ExperimentPlanDetailModalProps {
   plan: ExperimentPlan;
@@ -37,6 +38,7 @@ export default function ExperimentPlanDetailModal({
   const [editedResults, setEditedResults] = useState(plan.results_summary || '');
   const [editedOutcome, setEditedOutcome] = useState(plan.outcome || '');
   const [editedLessons, setEditedLessons] = useState(plan.lessons_learned || '');
+  const [showResearchContext, setShowResearchContext] = useState(true);
   const [showMaterials, setShowMaterials] = useState(true);
   const [showProcedure, setShowProcedure] = useState(true);
   const [showRisks, setShowRisks] = useState(true);
@@ -292,6 +294,59 @@ export default function ExperimentPlanDetailModal({
                 <div>
                   <div className="text-sm font-medium text-gray-400 mb-1">Lessons Learned</div>
                   <div className="text-gray-300">{plan.lessons_learned}</div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Research Context */}
+          {(plan.linked_questions.length > 0 || plan.linked_hypotheses.length > 0) && (
+            <div className="bg-gray-800/50 rounded-lg border border-gray-700">
+              <button
+                onClick={() => setShowResearchContext(!showResearchContext)}
+                className="w-full p-4 flex items-center justify-between hover:bg-gray-800/70 transition-colors"
+              >
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <Link className="w-5 h-5 text-green-400" />
+                  🔗 Research Context ({plan.linked_questions.length + plan.linked_hypotheses.length})
+                </h3>
+                {showResearchContext ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+              </button>
+              {showResearchContext && (
+                <div className="p-4 pt-0 space-y-4">
+                  {plan.linked_questions.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
+                        ❓ Research Questions ({plan.linked_questions.length})
+                      </h4>
+                      <div className="space-y-2">
+                        {plan.linked_questions.map((questionId) => (
+                          <QuestionBadge
+                            key={questionId}
+                            questionId={questionId}
+                            projectId={plan.project_id}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {plan.linked_hypotheses.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
+                        💡 Hypotheses ({plan.linked_hypotheses.length})
+                      </h4>
+                      <div className="space-y-2">
+                        {plan.linked_hypotheses.map((hypothesisId) => (
+                          <HypothesisBadge
+                            key={hypothesisId}
+                            hypothesisId={hypothesisId}
+                            projectId={plan.project_id}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
