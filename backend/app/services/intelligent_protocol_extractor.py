@@ -221,6 +221,46 @@ class IntelligentProtocolExtractor:
 
         return context
 
+    def _is_protocol_too_generic(self, protocol_data: Dict) -> bool:
+        """
+        Check if the extracted protocol is too generic and likely hallucinated.
+
+        Returns True if the protocol appears to be generic textbook knowledge
+        rather than specific details from the paper.
+        """
+        # Check for generic material names (red flags)
+        generic_materials = [
+            "crispr/cas9 plasmids", "cas9 variants", "guide rnas", "cell culture media",
+            "transfection reagents", "selection antibiotics", "plasmid dna",
+            "culture medium", "growth medium", "buffer", "reagents"
+        ]
+
+        materials = protocol_data.get("materials", [])
+        if materials:
+            material_names = [m.get("name", "").lower() for m in materials if isinstance(m, dict)]
+            # If more than 50% of materials are generic, it's likely hallucinated
+            generic_count = sum(1 for name in material_names if any(gen in name for gen in generic_materials))
+            if generic_count > len(material_names) * 0.5:
+                logger.warning(f"⚠️ Protocol appears too generic: {generic_count}/{len(material_names)} materials are generic")
+                return True
+
+        # Check for generic step patterns (red flags)
+        generic_step_patterns = [
+            "design and synthesize", "clone the", "transfect the", "allow cells to recover",
+            "select successfully", "validate", "prepare", "incubate", "wash"
+        ]
+
+        steps = protocol_data.get("steps", [])
+        if steps:
+            step_instructions = [s.get("instruction", "").lower() for s in steps if isinstance(s, dict)]
+            # If steps lack specific quantitative details, they're likely generic
+            has_numbers = sum(1 for inst in step_instructions if any(char.isdigit() for char in inst))
+            if has_numbers < len(step_instructions) * 0.3:  # Less than 30% have numbers
+                logger.warning(f"⚠️ Protocol appears too generic: Only {has_numbers}/{len(step_instructions)} steps have quantitative details")
+                return True
+
+        return False
+
     def _normalize_protocol_data(self, protocol_data: Dict) -> Dict:
         """
         Normalize protocol data to ensure consistent format.
@@ -293,7 +333,7 @@ class IntelligentProtocolExtractor:
         # Build context-aware prompt
         context_summary = self._build_context_summary(context)
 
-        prompt = f"""You are a scientific protocol extraction expert. Extract the experimental protocol from this paper's abstract.
+        prompt = f"""You are a scientific protocol extraction expert. Your job is to extract ONLY the specific experimental details that are EXPLICITLY stated in this paper's abstract.
 
 PROJECT CONTEXT:
 {context_summary}
@@ -301,45 +341,100 @@ PROJECT CONTEXT:
 PAPER ABSTRACT:
 {truncated_abstract}
 
-Extract the protocol with special attention to how it relates to the project's research questions and hypotheses.
+CRITICAL RULES - READ CAREFULLY:
+1. ⚠️ ONLY extract information that is EXPLICITLY stated in the abstract above
+2. ⚠️ DO NOT use general textbook knowledge or common lab procedures
+3. ⚠️ DO NOT invent or assume materials, steps, or equipment not mentioned
+4. ⚠️ If the paper is a review/perspective/commentary with no experimental methods, return "No clear protocol found"
+5. ⚠️ Include specific quantitative details when mentioned (concentrations, times, temperatures, doses)
+6. ⚠️ For materials: Include specific names, variants, concentrations if mentioned
+7. ⚠️ For steps: Only include steps explicitly described in the abstract
+8. ⚠️ For equipment: Only include equipment explicitly mentioned
 
-IMPORTANT: Return materials and steps as DICTIONARIES, not strings.
+PAPER TYPE DETECTION:
+- If the abstract contains words like "review", "perspective", "overview", "landscape", "current state", "future directions" → Return "No clear protocol found"
+- If the abstract describes specific experimental procedures, measurements, or methods → Extract the protocol
+
+SPECIFICITY REQUIREMENTS:
+- Materials: Must include specific details (e.g., "10 μM doxorubicin" not just "doxorubicin")
+- Steps: Must be specific actions from the paper (e.g., "Cells were treated with 10 μM drug for 24h at 37°C" not "Treat cells with drug")
+- Equipment: Only if explicitly mentioned (e.g., "flow cytometry", "confocal microscopy")
 
 Return a JSON object with this EXACT structure:
 {{
-    "protocol_name": "Clear, descriptive name",
+    "protocol_name": "Specific name from paper (or 'No clear protocol found')",
     "protocol_type": "delivery|editing|screening|analysis|synthesis|imaging|other",
     "materials": [
-        {{"name": "Material name", "catalog_number": "optional", "supplier": "optional", "amount": "optional", "notes": "optional"}}
+        {{"name": "Specific material with details", "catalog_number": "if mentioned", "supplier": "if mentioned", "amount": "concentration/dose if mentioned", "notes": "any specific details"}}
     ],
     "steps": [
-        {{"step_number": 1, "instruction": "Step description", "duration": "optional", "temperature": "optional", "notes": "optional"}}
+        {{"step_number": 1, "instruction": "Specific step from paper with quantitative details", "duration": "if mentioned", "temperature": "if mentioned", "notes": "any specific conditions"}}
     ],
-    "equipment": ["Equipment 1", "Equipment 2"],
-    "duration_estimate": "Estimated time (e.g., '2-3 days')",
+    "equipment": ["Only equipment explicitly mentioned in abstract"],
+    "duration_estimate": "Only if explicitly stated",
     "difficulty_level": "beginner|moderate|advanced",
-    "key_parameters": ["Critical parameter 1", "Critical parameter 2"],
-    "expected_outcomes": ["Expected outcome 1", "Expected outcome 2"],
-    "troubleshooting_tips": ["Tip 1", "Tip 2"],
-    "context_relevance": "How this protocol relates to the project context"
+    "key_parameters": ["Only critical parameters explicitly mentioned with values"],
+    "expected_outcomes": ["Only outcomes explicitly stated in abstract"],
+    "troubleshooting_tips": ["Only if troubleshooting is discussed"],
+    "context_relevance": "How this specific protocol relates to the project context"
 }}
 
-If no clear protocol is found, return protocol_name as "No clear protocol found" with empty arrays for materials, steps, equipment."""
+EXAMPLES OF GOOD vs BAD EXTRACTION:
+
+❌ BAD (too generic):
+- Materials: "CRISPR/Cas9 plasmids", "Guide RNAs"
+- Steps: "Design guide RNAs", "Transfect cells"
+
+✅ GOOD (specific from paper):
+- Materials: "SpCas9 with sgRNA targeting INSR exon 3", "Lipofectamine 3000 transfection reagent (2 μL per well)"
+- Steps: "HEK293T cells were transfected with 500 ng plasmid DNA and incubated for 48h at 37°C"
+
+If the abstract does not contain specific experimental methods, return:
+{{
+    "protocol_name": "No clear protocol found",
+    "protocol_type": "other",
+    "materials": [],
+    "steps": [],
+    "equipment": [],
+    "duration_estimate": null,
+    "difficulty_level": "moderate",
+    "key_parameters": [],
+    "expected_outcomes": [],
+    "troubleshooting_tips": [],
+    "context_relevance": "This paper does not contain a specific experimental protocol."
+}}"""
 
         try:
             response = await client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a scientific protocol extraction expert. Always return materials and steps as dictionaries with proper structure."},
+                    {"role": "system", "content": "You are a scientific protocol extraction expert. You ONLY extract information explicitly stated in papers. You NEVER use general knowledge or invent details. You distinguish between review papers (no protocol) and methods papers (has protocol). Always return materials and steps as dictionaries with specific quantitative details."},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=self.temperature,
+                temperature=0.1,  # Lower temperature for more factual, less creative responses
                 response_format={"type": "json_object"},
                 timeout=45.0  # 45 second timeout to prevent 502 errors
             )
 
             protocol_data = json.loads(response.choices[0].message.content)
             logger.info(f"✅ Extracted protocol: {protocol_data.get('protocol_name', 'Unknown')}")
+
+            # Check if protocol is too generic (likely hallucinated)
+            if self._is_protocol_too_generic(protocol_data):
+                logger.warning(f"⚠️ Protocol appears too generic, returning 'No clear protocol found'")
+                return {
+                    "protocol_name": "No clear protocol found",
+                    "protocol_type": "other",
+                    "materials": [],
+                    "steps": [],
+                    "equipment": [],
+                    "duration_estimate": None,
+                    "difficulty_level": "moderate",
+                    "key_parameters": [],
+                    "expected_outcomes": [],
+                    "troubleshooting_tips": [],
+                    "context_relevance": "The paper does not contain sufficient specific experimental details to extract a reliable protocol."
+                }
 
             # Normalize the data to handle any format inconsistencies
             normalized_data = self._normalize_protocol_data(protocol_data)
