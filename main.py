@@ -922,6 +922,15 @@ except ImportError as e:
     print(f"⚠️ Failed to import protocols router: {e}")
     print(f"   Error details: {type(e).__name__}")
     import traceback
+
+# Week 19: Admin endpoints for migrations
+try:
+    from backend.app.routers.admin import router as admin_router
+    app.include_router(admin_router)
+    print("✅ Admin endpoints registered successfully")
+except ImportError as e:
+    print(f"⚠️ Failed to import admin router: {e}")
+    print(f"   Error details: {type(e).__name__}")
     traceback.print_exc()
     import traceback
     traceback.print_exc()
