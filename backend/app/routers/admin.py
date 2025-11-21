@@ -2,12 +2,14 @@
 Admin endpoints for database migrations and maintenance
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import text, inspect
-from database import get_db
+from database import get_db, Protocol, Article
 import logging
+import os
 from typing import Dict, List
+from backend.app.services.intelligent_protocol_extractor import IntelligentProtocolExtractor
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 logger = logging.getLogger(__name__)
@@ -189,4 +191,155 @@ async def check_migration_status(
     except Exception as e:
         logger.error(f"❌ Status check failed: {e}")
         raise HTTPException(status_code=500, detail=f"Status check failed: {str(e)}")
+
+
+@router.post("/protocols/reextract")
+async def reextract_protocols(
+    admin_key: str = Header(..., alias="X-Admin-Key"),
+    project_id: str = None,
+    limit: int = None,
+    dry_run: bool = False,
+    db: Session = Depends(get_db)
+):
+    """
+    Re-extract existing protocols with new evidence-based logic.
+
+    This endpoint:
+    1. Fetches existing protocols (optionally filtered by project_id)
+    2. Re-extracts each protocol using the new intelligent extractor
+    3. Updates protocols with confidence scores and source citations
+
+    Args:
+        admin_key: Admin authentication key
+        project_id: Optional project ID to filter protocols
+        limit: Optional limit on number of protocols to process
+        dry_run: If True, shows what would be done without making changes
+    """
+    # Verify admin key
+    expected_key = os.getenv("ADMIN_KEY", "your-secret-admin-key-change-this")
+    if admin_key != expected_key:
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+
+    try:
+        # Fetch protocols
+        query = db.query(Protocol)
+        if project_id:
+            query = query.filter(Protocol.project_id == project_id)
+
+        if limit:
+            query = query.limit(limit)
+
+        protocols = query.all()
+
+        logger.info(f"🔄 Re-extracting {len(protocols)} protocols (dry_run={dry_run})")
+
+        results = {
+            "total": len(protocols),
+            "success": 0,
+            "skipped": 0,
+            "errors": 0,
+            "protocols": []
+        }
+
+        extractor = IntelligentProtocolExtractor()
+
+        for protocol in protocols:
+            try:
+                # Fetch article
+                article = db.query(Article).filter(Article.pmid == protocol.source_pmid).first()
+
+                if not article:
+                    logger.warning(f"⚠️  Article not found for PMID {protocol.source_pmid}")
+                    results["skipped"] += 1
+                    results["protocols"].append({
+                        "protocol_id": protocol.protocol_id,
+                        "status": "skipped",
+                        "reason": "Article not found"
+                    })
+                    continue
+
+                # Re-extract protocol
+                new_protocol_data = await extractor.extract_protocol(
+                    abstract=article.abstract or "",
+                    project_id=protocol.project_id,
+                    pmid=protocol.source_pmid,
+                    db=db
+                )
+
+                if not new_protocol_data:
+                    logger.warning(f"⚠️  No protocol extracted for {protocol.protocol_name}")
+                    results["skipped"] += 1
+                    results["protocols"].append({
+                        "protocol_id": protocol.protocol_id,
+                        "status": "skipped",
+                        "reason": "No protocol found (likely review paper)"
+                    })
+                    continue
+
+                confidence = new_protocol_data.get('extraction_confidence', 0)
+                confidence_level = new_protocol_data.get('confidence_explanation', {}).get('confidence_level', 'Unknown')
+
+                if not dry_run:
+                    # Update protocol in database
+                    protocol.materials = new_protocol_data.get('materials', [])
+                    protocol.steps = new_protocol_data.get('steps', [])
+                    protocol.equipment = new_protocol_data.get('equipment', [])
+                    protocol.key_parameters = new_protocol_data.get('key_parameters', [])
+                    protocol.expected_outcomes = new_protocol_data.get('expected_outcomes', [])
+                    protocol.troubleshooting_tips = new_protocol_data.get('troubleshooting_tips', [])
+
+                    # Update context-aware fields
+                    protocol.relevance_score = new_protocol_data.get('relevance_score', 50)
+                    protocol.affected_questions = new_protocol_data.get('affected_questions', [])
+                    protocol.affected_hypotheses = new_protocol_data.get('affected_hypotheses', [])
+                    protocol.relevance_reasoning = new_protocol_data.get('relevance_reasoning')
+                    protocol.key_insights = new_protocol_data.get('key_insights', [])
+                    protocol.potential_applications = new_protocol_data.get('potential_applications', [])
+                    protocol.recommendations = new_protocol_data.get('recommendations', [])
+                    protocol.context_relevance = new_protocol_data.get('context_relevance')
+
+                    # Update confidence and sources
+                    protocol.extraction_confidence = confidence
+                    protocol.confidence_explanation = new_protocol_data.get('confidence_explanation', {})
+                    protocol.material_sources = new_protocol_data.get('material_sources', {})
+                    protocol.step_sources = new_protocol_data.get('step_sources', {})
+
+                    # Update extraction metadata
+                    protocol.extraction_method = 'intelligent_multi_agent'
+                    protocol.context_aware = True
+
+                    db.commit()
+
+                results["success"] += 1
+                results["protocols"].append({
+                    "protocol_id": protocol.protocol_id,
+                    "protocol_name": protocol.protocol_name,
+                    "status": "success" if not dry_run else "would_update",
+                    "confidence": confidence,
+                    "confidence_level": confidence_level,
+                    "materials_count": len(new_protocol_data.get('materials', [])),
+                    "steps_count": len(new_protocol_data.get('steps', []))
+                })
+
+                logger.info(f"✅ {'Would update' if dry_run else 'Updated'} {protocol.protocol_name} (confidence: {confidence})")
+
+            except Exception as e:
+                logger.error(f"❌ Error processing protocol {protocol.protocol_id}: {e}")
+                results["errors"] += 1
+                results["protocols"].append({
+                    "protocol_id": protocol.protocol_id,
+                    "status": "error",
+                    "error": str(e)
+                })
+                db.rollback()
+
+        return {
+            "message": f"Re-extraction {'simulation' if dry_run else 'complete'}",
+            "dry_run": dry_run,
+            "results": results
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Re-extraction failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Re-extraction failed: {str(e)}")
 
