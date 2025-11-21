@@ -132,16 +132,31 @@ class IntelligentProtocolExtractor:
                 logger.warning(f"⚠️ Recommendation generation failed: {e}, using empty list")
                 recommendations = []
 
-            # Step 6: Combine all data
+            # Step 6: Calculate confidence score
+            try:
+                confidence_data = self._calculate_confidence_score(protocol_data)
+                logger.info(f"📊 Confidence score: {confidence_data['overall_score']}/100 ({confidence_data['confidence_level']})")
+            except Exception as e:
+                logger.warning(f"⚠️ Confidence calculation failed: {e}, using default")
+                confidence_data = {
+                    "overall_score": 50,
+                    "confidence_level": "Unknown",
+                    "criteria": {},
+                    "explanation": "Confidence calculation unavailable"
+                }
+
+            # Step 7: Combine all data
             enhanced_protocol = {
                 **protocol_data,
                 **relevance_data,
                 "recommendations": recommendations,
                 "extraction_method": "intelligent_multi_agent",
-                "context_aware": True
+                "context_aware": True,
+                "extraction_confidence": confidence_data["overall_score"],
+                "confidence_explanation": confidence_data
             }
 
-            logger.info(f"✅ Intelligent extraction complete: relevance={relevance_data.get('relevance_score', 0)}/100")
+            logger.info(f"✅ Intelligent extraction complete: relevance={relevance_data.get('relevance_score', 0)}/100, confidence={confidence_data['overall_score']}/100")
 
             return enhanced_protocol
 
@@ -220,6 +235,121 @@ class IntelligentProtocolExtractor:
         logger.info(f"📊 Context: {len(context['questions'])} questions, {len(context['hypotheses'])} hypotheses")
 
         return context
+
+    def _calculate_confidence_score(self, protocol_data: Dict) -> Dict:
+        """
+        Calculate explainable confidence score for extracted protocol.
+
+        Returns a dict with:
+        - overall_score (0-100)
+        - criteria breakdown
+        - explanation text
+
+        Scoring criteria:
+        - Specificity: Do materials/steps have quantitative details?
+        - Evidence: Are source citations provided?
+        - Completeness: Are all fields populated?
+        """
+        criteria = {
+            "has_quantitative_details": False,
+            "has_specific_materials": False,
+            "has_specific_steps": False,
+            "materials_with_amounts": 0,
+            "materials_with_sources": 0,
+            "steps_with_timing": 0,
+            "steps_with_sources": 0,
+            "total_materials": 0,
+            "total_steps": 0,
+            "specificity_score": 0,
+            "evidence_score": 0,
+            "completeness_score": 0
+        }
+
+        # Check materials
+        materials = protocol_data.get("materials", [])
+        criteria["total_materials"] = len(materials)
+
+        for material in materials:
+            if isinstance(material, dict):
+                # Check for quantitative details (amounts, concentrations)
+                if material.get("amount"):
+                    criteria["materials_with_amounts"] += 1
+                # Check for source citations
+                if material.get("source_text"):
+                    criteria["materials_with_sources"] += 1
+
+        if criteria["total_materials"] > 0:
+            criteria["has_specific_materials"] = criteria["materials_with_amounts"] > 0
+
+        # Check steps
+        steps = protocol_data.get("steps", [])
+        criteria["total_steps"] = len(steps)
+
+        for step in steps:
+            if isinstance(step, dict):
+                # Check for timing/temperature details
+                if step.get("duration") or step.get("temperature"):
+                    criteria["steps_with_timing"] += 1
+                # Check for source citations
+                if step.get("source_text"):
+                    criteria["steps_with_sources"] += 1
+
+        if criteria["total_steps"] > 0:
+            criteria["has_specific_steps"] = criteria["steps_with_timing"] > 0
+
+        # Calculate specificity score (0-40 points)
+        specificity_score = 0
+        if criteria["total_materials"] > 0:
+            material_specificity = (criteria["materials_with_amounts"] / criteria["total_materials"]) * 20
+            specificity_score += material_specificity
+        if criteria["total_steps"] > 0:
+            step_specificity = (criteria["steps_with_timing"] / criteria["total_steps"]) * 20
+            specificity_score += step_specificity
+        criteria["specificity_score"] = int(specificity_score)
+
+        # Calculate evidence score (0-40 points)
+        evidence_score = 0
+        if criteria["total_materials"] > 0:
+            material_evidence = (criteria["materials_with_sources"] / criteria["total_materials"]) * 20
+            evidence_score += material_evidence
+        if criteria["total_steps"] > 0:
+            step_evidence = (criteria["steps_with_sources"] / criteria["total_steps"]) * 20
+            evidence_score += step_evidence
+        criteria["evidence_score"] = int(evidence_score)
+
+        # Calculate completeness score (0-20 points)
+        completeness_score = 0
+        if protocol_data.get("protocol_name") and protocol_data["protocol_name"] != "No clear protocol found":
+            completeness_score += 5
+        if criteria["total_materials"] > 0:
+            completeness_score += 5
+        if criteria["total_steps"] > 0:
+            completeness_score += 5
+        if protocol_data.get("equipment"):
+            completeness_score += 5
+        criteria["completeness_score"] = completeness_score
+
+        # Overall score
+        overall_score = criteria["specificity_score"] + criteria["evidence_score"] + criteria["completeness_score"]
+        criteria["has_quantitative_details"] = (criteria["materials_with_amounts"] + criteria["steps_with_timing"]) > 0
+
+        # Generate explanation
+        if overall_score >= 80:
+            confidence_level = "High"
+            explanation = f"High confidence: Protocol contains specific quantitative details ({criteria['materials_with_amounts']}/{criteria['total_materials']} materials have amounts, {criteria['steps_with_timing']}/{criteria['total_steps']} steps have timing). Source citations provided for {criteria['materials_with_sources'] + criteria['steps_with_sources']} items."
+        elif overall_score >= 50:
+            confidence_level = "Medium"
+            explanation = f"Medium confidence: Protocol has some specific details ({criteria['materials_with_amounts']}/{criteria['total_materials']} materials have amounts, {criteria['steps_with_timing']}/{criteria['total_steps']} steps have timing). Limited source citations."
+        else:
+            confidence_level = "Low"
+            explanation = f"Low confidence: Protocol lacks specific quantitative details. Only {criteria['materials_with_amounts']}/{criteria['total_materials']} materials have amounts, {criteria['steps_with_timing']}/{criteria['total_steps']} steps have timing."
+
+        return {
+            "overall_score": overall_score,
+            "confidence_level": confidence_level,
+            "criteria": criteria,
+            "explanation": explanation
+        }
 
     def _is_protocol_too_generic(self, protocol_data: Dict) -> bool:
         """
@@ -333,7 +463,7 @@ class IntelligentProtocolExtractor:
         # Build context-aware prompt
         context_summary = self._build_context_summary(context)
 
-        prompt = f"""You are a scientific protocol extraction expert. Your job is to extract ONLY the specific experimental details that are EXPLICITLY stated in this paper's abstract.
+        prompt = f"""You are a scientific protocol extraction expert. Your job is to extract ONLY the specific experimental details that are EXPLICITLY stated in this paper's abstract, WITH SOURCE CITATIONS.
 
 PROJECT CONTEXT:
 {context_summary}
@@ -365,10 +495,10 @@ Return a JSON object with this EXACT structure:
     "protocol_name": "Specific name from paper (or 'No clear protocol found')",
     "protocol_type": "delivery|editing|screening|analysis|synthesis|imaging|other",
     "materials": [
-        {{"name": "Specific material with details", "catalog_number": "if mentioned", "supplier": "if mentioned", "amount": "concentration/dose if mentioned", "notes": "any specific details"}}
+        {{"name": "Specific material with details", "catalog_number": "if mentioned", "supplier": "if mentioned", "amount": "concentration/dose if mentioned", "notes": "any specific details", "source_text": "EXACT quote from abstract where this material is mentioned"}}
     ],
     "steps": [
-        {{"step_number": 1, "instruction": "Specific step from paper with quantitative details", "duration": "if mentioned", "temperature": "if mentioned", "notes": "any specific conditions"}}
+        {{"step_number": 1, "instruction": "Specific step from paper with quantitative details", "duration": "if mentioned", "temperature": "if mentioned", "notes": "any specific conditions", "source_text": "EXACT quote from abstract where this step is described"}}
     ],
     "equipment": ["Only equipment explicitly mentioned in abstract"],
     "duration_estimate": "Only if explicitly stated",
@@ -376,7 +506,9 @@ Return a JSON object with this EXACT structure:
     "key_parameters": ["Only critical parameters explicitly mentioned with values"],
     "expected_outcomes": ["Only outcomes explicitly stated in abstract"],
     "troubleshooting_tips": ["Only if troubleshooting is discussed"],
-    "context_relevance": "How this specific protocol relates to the project context"
+    "context_relevance": "How this specific protocol relates to the project context",
+    "material_sources": {{"material_name": {{"source_text": "exact quote from abstract", "has_quantitative_details": true/false}}}},
+    "step_sources": {{"step_instruction": {{"source_text": "exact quote from abstract", "has_quantitative_details": true/false}}}}
 }}
 
 EXAMPLES OF GOOD vs BAD EXTRACTION:

@@ -180,6 +180,12 @@ class ProtocolResponse(BaseModel):
     extraction_method: Optional[str] = "basic"
     context_aware: Optional[bool] = False
 
+    # Confidence and source tracking (Week 19: Evidence-based)
+    extraction_confidence: Optional[int] = None
+    confidence_explanation: Optional[dict] = None
+    material_sources: Optional[dict] = None
+    step_sources: Optional[dict] = None
+
     # Article details (for display)
     article_title: Optional[str] = None
     article_authors: Optional[str] = None
@@ -325,6 +331,11 @@ async def extract_protocol(
             context_relevance=getattr(protocol, 'context_relevance', None),
             extraction_method=getattr(protocol, 'extraction_method', 'basic'),
             context_aware=getattr(protocol, 'context_aware', False),
+            # Confidence and sources (Week 19)
+            extraction_confidence=getattr(protocol, 'extraction_confidence', None),
+            confidence_explanation=getattr(protocol, 'confidence_explanation', None),
+            material_sources=getattr(protocol, 'material_sources', None),
+            step_sources=getattr(protocol, 'step_sources', None),
             # Article details
             article_title=article.title if article else None,
             article_authors=format_authors(article.authors) if article else None,
@@ -440,7 +451,12 @@ async def get_project_protocols(
                     recommendations=[],
                     context_relevance=None,
                     extraction_method='basic',
-                    context_aware=False
+                    context_aware=False,
+                    # Confidence and sources (Week 19)
+                    extraction_confidence=None,
+                    confidence_explanation=None,
+                    material_sources=None,
+                    step_sources=None
                 ))
             else:
                 # New schema - Protocol object with all fields
@@ -484,7 +500,12 @@ async def get_project_protocols(
                     recommendations=getattr(protocol, 'recommendations', []),
                     context_relevance=getattr(protocol, 'context_relevance', None),
                     extraction_method=getattr(protocol, 'extraction_method', 'basic'),
-                    context_aware=getattr(protocol, 'context_aware', False)
+                    context_aware=getattr(protocol, 'context_aware', False),
+                    # Confidence and sources (Week 19)
+                    extraction_confidence=getattr(protocol, 'extraction_confidence', None),
+                    confidence_explanation=getattr(protocol, 'confidence_explanation', None),
+                    material_sources=getattr(protocol, 'material_sources', None),
+                    step_sources=getattr(protocol, 'step_sources', None)
                 ))
         
         logger.info(f"✅ Retrieved {len(responses)} protocols for project {project_id}")
@@ -537,6 +558,27 @@ async def get_protocol(
             created_by=protocol.created_by,
             created_at=protocol.created_at.isoformat() if protocol.created_at else None,
             updated_at=protocol.updated_at.isoformat() if protocol.updated_at else None,
+            # Enhanced fields
+            key_parameters=getattr(protocol, 'key_parameters', []),
+            expected_outcomes=getattr(protocol, 'expected_outcomes', []),
+            troubleshooting_tips=getattr(protocol, 'troubleshooting_tips', []),
+            # Context-aware fields
+            relevance_score=getattr(protocol, 'relevance_score', 50),
+            affected_questions=getattr(protocol, 'affected_questions', []),
+            affected_hypotheses=getattr(protocol, 'affected_hypotheses', []),
+            relevance_reasoning=getattr(protocol, 'relevance_reasoning', None),
+            key_insights=getattr(protocol, 'key_insights', []),
+            potential_applications=getattr(protocol, 'potential_applications', []),
+            recommendations=getattr(protocol, 'recommendations', []),
+            context_relevance=getattr(protocol, 'context_relevance', None),
+            extraction_method=getattr(protocol, 'extraction_method', 'basic'),
+            context_aware=getattr(protocol, 'context_aware', False),
+            # Confidence and sources
+            extraction_confidence=getattr(protocol, 'extraction_confidence', None),
+            confidence_explanation=getattr(protocol, 'confidence_explanation', None),
+            material_sources=getattr(protocol, 'material_sources', None),
+            step_sources=getattr(protocol, 'step_sources', None),
+            # Article details
             article_title=article.title if article else None,
             article_authors=format_authors(article.authors) if article else None,
             article_journal=article.journal if article else None,

@@ -895,6 +895,12 @@ class Protocol(Base):
     context_aware = Column(Boolean, default=False)  # Whether extraction used project context
     extracted_by = Column(String, default='ai')  # 'ai' or 'manual'
 
+    # Confidence and source tracking (Week 19: Evidence-based extraction)
+    extraction_confidence = Column(Integer, default=None)  # 0-100 confidence score
+    confidence_explanation = Column(JSON, default=dict)  # Explainable confidence breakdown
+    material_sources = Column(JSON, default=dict)  # Source citations for materials
+    step_sources = Column(JSON, default=dict)  # Source citations for steps
+
     # Metadata
     created_by = Column(String, ForeignKey("users.user_id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
