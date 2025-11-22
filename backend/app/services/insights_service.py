@@ -266,8 +266,22 @@ class InsightsService:
         results = project_data.get('results', [])  # Get results, default to empty list
         decisions = project_data['decisions']
 
-        context = f"""# 🔬 Project: {project.project_name}
+        # Check if we have results - this is CRITICAL information
+        has_results = len(results) > 0
+        results_summary = ""
+        if has_results:
+            results_summary = f"\n⚠️ CRITICAL: {len(results)} EXPERIMENT RESULT(S) AVAILABLE - MUST BE ANALYZED!\n"
+            for result in results:
+                plan = next((p for p in plans if p.plan_id == result.plan_id), None)
+                plan_name = plan.plan_name if plan else "Unknown"
+                support = "SUPPORTS" if result.supports_hypothesis else "REFUTES" if result.supports_hypothesis is not None else "INCONCLUSIVE"
+                results_summary += f"  - {plan_name}: {support} hypothesis"
+                if result.confidence_change:
+                    results_summary += f" ({result.confidence_change:+.0f}% confidence change)"
+                results_summary += "\n"
 
+        context = f"""# 🔬 Project: {project.project_name}
+{results_summary}
 ## 📊 Key Metrics:
 - Questions: {metrics['total_questions']} ({metrics['question_status']})
 - Hypotheses: {metrics['total_hypotheses']} ({metrics['hypothesis_status']})
@@ -276,6 +290,7 @@ class InsightsService:
 - Average Paper Score: {metrics['avg_paper_score']:.1f}
 - Protocols: {metrics['total_protocols']}
 - Experiment Plans: {metrics['total_plans']} ({metrics['plan_status']})
+- 🎯 Experiment Results: {len(results)} {"✅ AVAILABLE" if has_results else "⚠️ None yet"}
 
 ## ❓ All Research Questions:
 """
@@ -340,6 +355,30 @@ class InsightsService:
             timeline_events.append({
                 'date': decision.decided_at,
                 'type': 'decision',
+                'text': text
+            })
+
+        # Add experiment results to timeline
+        for result in results:
+            # Find the plan name for this result
+            plan = next((p for p in plans if p.plan_id == result.plan_id), None)
+            plan_name = plan.plan_name if plan else "Unknown Experiment"
+
+            support_text = ""
+            if result.supports_hypothesis is not None:
+                support_text = " - SUPPORTS hypothesis" if result.supports_hypothesis else " - REFUTES hypothesis"
+
+            confidence_text = ""
+            if result.confidence_change:
+                confidence_text = f" (Confidence change: {result.confidence_change:+.0f}%)"
+
+            text = f"🎯 RESULT: {plan_name}{support_text}{confidence_text}"
+            if result.outcome:
+                text += f" - Outcome: {result.outcome[:100]}..."
+
+            timeline_events.append({
+                'date': result.completed_at or result.created_at,
+                'type': 'result',
                 'text': text
             })
 
