@@ -705,10 +705,9 @@ Required JSON structure:
   ],
   "recommendations": [
     {{
-      "action": "specific action that closes a research loop",
-      "rationale": "why this matters in the research journey",
+      "title": "specific action that closes a research loop",
+      "description": "why this matters in the research journey - include estimated effort and rationale",
       "priority": "high|medium|low",
-      "estimated_effort": "time estimate",
       "closes_loop": "which Q/H/gap this addresses"
     }}
   ]
