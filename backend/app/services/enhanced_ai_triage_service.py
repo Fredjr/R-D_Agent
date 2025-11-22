@@ -330,7 +330,7 @@ class EnhancedAITriageService:
                     "type": h.hypothesis_type,
                     "status": h.status,
                     "confidence": h.confidence_level,
-                    "linked_question": h.linked_question_id
+                    "linked_question": h.question_id  # Fixed: Database uses question_id, not linked_question_id
                 }
                 for h in sorted_hypotheses
             ],
