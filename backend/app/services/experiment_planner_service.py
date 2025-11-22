@@ -222,10 +222,15 @@ class ExperimentPlannerService:
         ).order_by(Hypothesis.created_at.desc()).limit(10).all()
 
         # Phase 1.3: Get decision history
-        from database import ProjectDecision
+        from database import ProjectDecision, ExperimentResult
         decisions = db.query(ProjectDecision).filter(
             ProjectDecision.project_id == project_id
         ).order_by(ProjectDecision.decided_at.desc()).limit(5).all()
+
+        # Phase 3.2: Get existing experiment results (cross-service learning)
+        experiment_results = db.query(ExperimentResult).filter(
+            ExperimentResult.project_id == project_id
+        ).order_by(ExperimentResult.created_at.desc()).limit(3).all()
 
         return {
             "protocol": protocol,
@@ -233,7 +238,8 @@ class ExperimentPlannerService:
             "article": article,
             "questions": questions,
             "hypotheses": hypotheses,
-            "decisions": decisions  # Phase 1.3
+            "decisions": decisions,  # Phase 1.3
+            "experiment_results": experiment_results  # Phase 3.2
         }
     
     async def _generate_plan_with_ai(
@@ -312,13 +318,14 @@ If previous experiment context is provided, learn from past plans to improve qua
         custom_objective: Optional[str],
         custom_notes: Optional[str]
     ) -> str:
-        """Build the prompt for AI plan generation (Phase 1.3: Now includes decision history)."""
+        """Build the prompt for AI plan generation (Phase 1.3: Now includes decision history, Phase 3.2: Now includes experiment results)."""
         protocol = context["protocol"]
         project = context["project"]
         questions = context["questions"]
         hypotheses = context["hypotheses"]
         article = context["article"]
         decisions = context.get("decisions", [])  # Phase 1.3
+        experiment_results = context.get("experiment_results", [])  # Phase 3.2
 
         # Build context sections
         protocol_section = f"""
@@ -388,6 +395,20 @@ Abstract: {abstract_text}
                     decisions_section += f"\n   Rationale: {d.rationale}"
                 decisions_section += "\n"
 
+        # Phase 3.2: Experiment results (cross-service learning)
+        results_section = ""
+        if experiment_results:
+            results_section = "\nPREVIOUS EXPERIMENT RESULTS (learn from these):\n"
+            for i, result in enumerate(experiment_results[:3], 1):  # Top 3 recent results
+                results_section += f"{i}. **{result.result_title or 'Experiment Result'}**\n"
+                results_section += f"   Status: {result.status}, Outcome: {result.outcome or 'N/A'}\n"
+                if result.key_findings:
+                    results_section += f"   Key Findings: {result.key_findings[:200]}...\n"
+                if result.lessons_learned:
+                    results_section += f"   Lessons Learned: {result.lessons_learned[:200]}...\n"
+                results_section += "\n"
+            results_section += "**LEARN FROM THESE:** Avoid past mistakes and build on successful approaches.\n\n"
+
         # Custom objective or default
         objective_section = f"""
 OBJECTIVE:
@@ -402,7 +423,7 @@ ADDITIONAL REQUIREMENTS:
 {custom_notes}
 """
 
-        # Full prompt (Phase 1.3: Now includes decisions)
+        # Full prompt (Phase 1.3: Now includes decisions, Phase 3.2: Now includes results)
         prompt = f"""{protocol_section}
 
 {project_section}
@@ -413,13 +434,15 @@ ADDITIONAL REQUIREMENTS:
 
 {decisions_section}
 
+{results_section}
+
 {article_section}
 
 {objective_section}
 
 {notes_section}
 
-**IMPORTANT:** Prioritize based on user decisions and focus areas listed above.
+**IMPORTANT:** Prioritize based on user decisions and focus areas listed above. Learn from previous experiment results.
 
 Generate a comprehensive experiment plan with the following structure (return as JSON):
 

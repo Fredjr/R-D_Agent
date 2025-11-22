@@ -104,7 +104,7 @@ class ProtocolExtractorService:
                 raise ValueError(f"No project_id provided and no triage record found for PMID {article_pmid}")
 
         # Step 4: Get research context (Phase 1 Enhancement)
-        from database import Project, ResearchQuestion, Hypothesis, ProjectDecision, Protocol
+        from database import Project, ResearchQuestion, Hypothesis, ProjectDecision, Protocol, PaperTriage
 
         project = db.query(Project).filter(Project.project_id == project_id).first()
 
@@ -125,7 +125,13 @@ class ProtocolExtractorService:
             Protocol.project_id == project_id
         ).order_by(Protocol.created_at.desc()).limit(3).all()
 
-        logger.info(f"📋 Research context: {len(questions)} questions, {len(hypotheses)} hypotheses, {len(decisions)} decisions, {len(existing_protocols)} existing protocols")
+        # Phase 3.1: Get triage result for this paper (cross-service learning)
+        triage_result = db.query(PaperTriage).filter(
+            PaperTriage.project_id == project_id,
+            PaperTriage.article_pmid == article_pmid
+        ).first()
+
+        logger.info(f"📋 Research context: {len(questions)} questions, {len(hypotheses)} hypotheses, {len(decisions)} decisions, {len(existing_protocols)} existing protocols, triage: {triage_result.triage_status if triage_result else 'N/A'}")
 
         # Step 5: Extract PDF text first (Week 19-20 Critical Fix)
         from backend.app.services.pdf_text_extractor import PDFTextExtractor
@@ -150,7 +156,8 @@ class ProtocolExtractorService:
             questions=questions,
             hypotheses=hypotheses,
             decisions=decisions,
-            existing_protocols=existing_protocols  # Phase 2.2
+            existing_protocols=existing_protocols,  # Phase 2.2
+            triage_result=triage_result  # Phase 3.1
         )
 
         # Step 6: Save to database (Phase 1: Enhanced with research context)
@@ -257,11 +264,13 @@ class ProtocolExtractorService:
         questions: List = None,
         hypotheses: List = None,
         decisions: List = None,
-        existing_protocols: List = None  # Phase 2.2
+        existing_protocols: List = None,  # Phase 2.2
+        triage_result = None  # Phase 3.1
     ) -> Dict:
         """
         Use AI to extract protocol from article (PDF text or abstract).
         Phase 2.2: Now compares with existing protocols.
+        Phase 3.1: Now uses triage insights (cross-service learning).
 
         Week 19-20 Critical Fix: Now uses full PDF text when available!
         Phase 1 Enhancement: Now uses research context (questions, hypotheses, decisions)!
@@ -283,6 +292,7 @@ class ProtocolExtractorService:
             hypotheses: List of Hypothesis objects (Phase 1)
             decisions: List of ProjectDecision objects (Phase 1)
             existing_protocols: List of Protocol objects (Phase 2.2)
+            triage_result: PaperTriage object (Phase 3.1)
 
         Returns:
             Dictionary with protocol data
@@ -296,7 +306,8 @@ class ProtocolExtractorService:
             questions,
             hypotheses,
             decisions,
-            existing_protocols  # Phase 2.2
+            existing_protocols,  # Phase 2.2
+            triage_result  # Phase 3.1
         )
         
         try:
@@ -345,7 +356,8 @@ Be precise and include all relevant details like catalog numbers, durations, and
         questions: List = None,
         hypotheses: List = None,
         decisions: List = None,
-        existing_protocols: List = None  # Phase 2.2
+        existing_protocols: List = None,  # Phase 2.2
+        triage_result = None  # Phase 3.1
     ) -> str:
         """
         Build specialized prompt for protocol extraction.
@@ -353,6 +365,7 @@ Be precise and include all relevant details like catalog numbers, durations, and
         Week 19-20 Critical Fix: Now uses PDF text when available!
         Phase 1 Enhancement: Now includes research context!
         Phase 2.2 Enhancement: Now compares with existing protocols!
+        Phase 3.1 Enhancement: Now uses triage insights (cross-service learning)!
 
         Args:
             article: Article object
@@ -363,6 +376,7 @@ Be precise and include all relevant details like catalog numbers, durations, and
             hypotheses: List of Hypothesis objects (Phase 1)
             decisions: List of ProjectDecision objects (Phase 1)
             existing_protocols: List of Protocol objects (Phase 2.2)
+            triage_result: PaperTriage object (Phase 3.1)
 
         Returns:
             Formatted prompt string
@@ -421,6 +435,19 @@ Be precise and include all relevant details like catalog numbers, durations, and
                     existing_protocols_context += f"   Tests Hypotheses: {len(p.affected_hypotheses)} hypotheses\n"
                 existing_protocols_context += "\n"
 
+        # Phase 3.1: Add triage insights (cross-service learning)
+        triage_context = ""
+        if triage_result:
+            triage_context = "\n**TRIAGE INSIGHTS (from previous analysis):**\n"
+            triage_context += f"Relevance Score: {triage_result.relevance_score}/100 ({triage_result.triage_status})\n"
+            triage_context += f"Impact Assessment: {triage_result.impact_assessment}\n"
+            if triage_result.evidence_excerpts:
+                triage_context += "\n**Evidence Quotes:**\n"
+                for i, evidence in enumerate(triage_result.evidence_excerpts[:3], 1):
+                    triage_context += f"{i}. \"{evidence.get('quote', 'N/A')[:200]}...\" ({evidence.get('support_type', 'N/A')})\n"
+            triage_context += f"\nAI Reasoning: {triage_result.ai_reasoning}\n"
+            triage_context += "\n**USE THESE INSIGHTS:** Focus protocol extraction on the aspects highlighted in triage.\n\n"
+
         # Use PDF text if available, otherwise fall back to abstract
         # Phase 1.2: Expand from 8000 to 15000 chars
         if pdf_text:
@@ -444,6 +471,8 @@ Be precise and include all relevant details like catalog numbers, durations, and
 {research_context}
 
 {existing_protocols_context}
+
+{triage_context}
 
 **Paper Information:**
 Title: {article.title}
