@@ -28,10 +28,10 @@ interface Insight {
 }
 
 interface Recommendation {
-  action: string;
-  rationale: string;
+  title: string;  // Changed from 'action' to match backend
+  description: string;  // Changed from 'rationale' to match backend
   priority: 'high' | 'medium' | 'low';
-  estimated_effort: string;
+  estimated_effort?: string;
   closes_loop?: string;
 }
 

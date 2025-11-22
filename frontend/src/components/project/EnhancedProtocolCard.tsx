@@ -41,6 +41,7 @@ interface EnhancedProtocol {
     confidence_level: string;
     explanation: string;
   };
+  context_relevance?: string;  // Phase 2.2: Protocol comparison
 }
 
 interface EnhancedProtocolCardProps {
@@ -153,6 +154,17 @@ export default function EnhancedProtocolCard({
         </div>
       </div>
       
+      {/* Protocol Comparison (Phase 2.2) */}
+      {protocol.context_relevance && (
+        <div className="mb-4 p-3 bg-purple-500/5 border border-purple-500/20 rounded">
+          <div className="flex items-center gap-2 mb-2">
+            <Target className="w-4 h-4 text-purple-400" />
+            <span className="text-sm font-medium text-purple-300">Protocol Comparison</span>
+          </div>
+          <p className="text-xs text-gray-400 whitespace-pre-wrap">{protocol.context_relevance}</p>
+        </div>
+      )}
+
       {/* Key Insights */}
       {protocol.key_insights && protocol.key_insights.length > 0 && (
         <div className="mb-4">
@@ -170,7 +182,7 @@ export default function EnhancedProtocolCard({
           </ul>
         </div>
       )}
-      
+
       {/* Affected Questions/Hypotheses */}
       {((protocol.affected_questions && protocol.affected_questions.length > 0) ||
         (protocol.affected_hypotheses && protocol.affected_hypotheses.length > 0)) && (
