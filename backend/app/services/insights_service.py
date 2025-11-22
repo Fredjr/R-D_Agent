@@ -261,9 +261,20 @@ class InsightsService:
 - Protocols: {metrics['total_protocols']}
 - Experiment Plans: {metrics['total_plans']} ({metrics['plan_status']})
 
-## 🗺️ Research Journey Timeline:
-
+## ❓ All Research Questions:
 """
+        for q in questions:
+            context += f"- [{q.status}] {q.question_text}\n"
+            if q.description:
+                context += f"  Description: {q.description[:150]}...\n" if len(q.description) > 150 else f"  Description: {q.description}\n"
+
+        context += "\n## 💡 All Hypotheses:\n"
+        for h in hypotheses:
+            context += f"- [{h.status}] {h.hypothesis_text} (Confidence: {h.confidence_level}%)\n"
+            if h.description:
+                context += f"  Description: {h.description[:150]}...\n" if len(h.description) > 150 else f"  Description: {h.description}\n"
+
+        context += "\n## 🗺️ Research Journey Timeline:\n\n"
         # Build chronological timeline
         timeline_events = []
 
@@ -345,9 +356,11 @@ class InsightsService:
                     if supporting_papers:
                         context += f"    ↓ Supporting Papers ({len(supporting_papers)}):\n"
                         for a, t in supporting_papers[:3]:  # Top 3
-                            context += f"      • {a.title} (Score: {t.relevance_score}/100)\n"
+                            context += f"      • [{a.pmid}] {a.title} (Score: {t.relevance_score}/100, Status: {t.triage_status})\n"
                             if t.ai_reasoning:
-                                context += f"        Reasoning: {t.ai_reasoning[:100]}...\n"
+                                context += f"        AI Reasoning: {t.ai_reasoning[:150]}...\n"
+                            if a.abstract:
+                                context += f"        Abstract: {a.abstract[:200]}...\n"
 
                         # Find protocols extracted from these papers
                         paper_pmids = [a.pmid for a, _ in supporting_papers]
