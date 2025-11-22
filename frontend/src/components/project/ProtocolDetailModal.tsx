@@ -30,6 +30,24 @@ interface ProtocolStep {
   source_text?: string;
 }
 
+interface TableData {
+  table_number: number;
+  page: number;
+  headers: string[];
+  rows: string[][];
+  row_count: number;
+  col_count: number;
+}
+
+interface FigureData {
+  figure_number: number;
+  page: number;
+  width: number;
+  height: number;
+  size_bytes: number;
+  image_data: string;
+}
+
 interface Protocol {
   protocol_id: string;
   source_pmid: string;
@@ -57,6 +75,10 @@ interface Protocol {
   };
   material_sources?: Record<string, any>;
   step_sources?: Record<string, any>;
+  // Week 22: Rich content
+  tables_data?: TableData[];
+  figures_data?: FigureData[];
+  figures_analysis?: string;
 }
 
 interface ProtocolDetailModalProps {
@@ -406,6 +428,92 @@ export default function ProtocolDetailModal({
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {/* Tables (Week 22) */}
+          {protocol.tables_data && protocol.tables_data.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-3">📊 Tables from Paper</h3>
+              <div className="space-y-6">
+                {protocol.tables_data.map((table) => (
+                  <div key={table.table_number} className="bg-gray-800/30 rounded-lg p-4 border border-gray-700">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm text-gray-400">
+                        Table {table.table_number} (Page {table.page})
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {table.row_count} rows × {table.col_count} columns
+                      </p>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full border border-gray-700 text-sm">
+                        {table.headers && table.headers.length > 0 && (
+                          <thead className="bg-gray-800">
+                            <tr>
+                              {table.headers.map((header, i) => (
+                                <th key={i} className="border border-gray-700 px-3 py-2 text-left text-gray-300 font-semibold">
+                                  {header || '—'}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                        )}
+                        <tbody>
+                          {table.rows.map((row, i) => (
+                            <tr key={i} className={i % 2 === 0 ? 'bg-gray-900/30' : 'bg-gray-900/10'}>
+                              {row.map((cell, j) => (
+                                <td key={j} className="border border-gray-700 px-3 py-2 text-gray-300">
+                                  {cell || '—'}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Figures (Week 22) */}
+          {protocol.figures_data && protocol.figures_data.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-3">🖼️ Figures from Paper</h3>
+              <div className="space-y-6">
+                {protocol.figures_data.map((figure) => (
+                  <div key={figure.figure_number} className="bg-gray-800/30 rounded-lg p-4 border border-gray-700">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm text-gray-400">
+                        Figure {figure.figure_number} (Page {figure.page})
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {figure.width}×{figure.height}px
+                      </p>
+                    </div>
+                    <div className="mb-3 rounded border border-gray-700 overflow-hidden bg-white">
+                      <img
+                        src={`data:image/jpeg;base64,${figure.image_data}`}
+                        alt={`Figure ${figure.figure_number}`}
+                        className="max-w-full h-auto"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Figures Analysis */}
+              {protocol.figures_analysis && (
+                <div className="mt-4 bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                  <div className="flex items-start gap-2 mb-2">
+                    <Beaker className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <h4 className="text-sm font-semibold text-blue-400">AI Analysis of Figures</h4>
+                  </div>
+                  <p className="text-sm text-gray-300 whitespace-pre-wrap">{protocol.figures_analysis}</p>
+                </div>
+              )}
             </div>
           )}
 

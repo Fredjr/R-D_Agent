@@ -447,6 +447,10 @@ class Article(Base):
     pdf_url = Column(Text, nullable=True)  # URL where PDF was fetched
     pdf_source = Column(String(50), nullable=True)  # pmc, europepmc, unpaywall, etc.
 
+    # Week 22: Rich content extraction (tables + figures)
+    pdf_tables = Column(JSON, default=list)  # Extracted tables from PDF
+    pdf_figures = Column(JSON, default=list)  # Extracted figures from PDF
+
     # Citation relationships for network analysis
     cited_by_pmids = Column(JSON, default=list)  # Articles that cite this paper
     references_pmids = Column(JSON, default=list)  # Articles this paper references
@@ -907,6 +911,11 @@ class Protocol(Base):
     confidence_explanation = Column(JSON, default=dict)  # Explainable confidence breakdown
     material_sources = Column(JSON, default=dict)  # Source citations for materials
     step_sources = Column(JSON, default=dict)  # Source citations for steps
+
+    # Week 22: Rich content extraction (tables + figures)
+    tables_data = Column(JSON, default=list)  # Extracted tables from PDF
+    figures_data = Column(JSON, default=list)  # Extracted figures from PDF
+    figures_analysis = Column(Text, nullable=True)  # GPT-4 Vision analysis of figures
 
     # Metadata
     created_by = Column(String, ForeignKey("users.user_id"), nullable=False)

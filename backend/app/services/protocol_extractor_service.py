@@ -133,21 +133,35 @@ class ProtocolExtractorService:
 
         logger.info(f"📋 Research context: {len(questions)} questions, {len(hypotheses)} hypotheses, {len(decisions)} decisions, {len(existing_protocols)} existing protocols, triage: {triage_result.triage_status if triage_result else 'N/A'}")
 
-        # Step 5: Extract PDF text first (Week 19-20 Critical Fix)
+        # Step 5: Extract PDF text, tables, and figures (Week 22 Enhancement)
         from backend.app.services.pdf_text_extractor import PDFTextExtractor
         pdf_extractor = PDFTextExtractor()
 
+        pdf_data = None
         try:
-            pdf_text = await pdf_extractor.extract_and_store(article_pmid, db, force_refresh=force_refresh)
-            if pdf_text:
-                logger.info(f"✅ Using PDF text for protocol extraction ({len(pdf_text)} chars)")
+            pdf_data = await pdf_extractor.extract_and_store(article_pmid, db, force_refresh=force_refresh)
+            if pdf_data:
+                pdf_text = pdf_data.get('text') if isinstance(pdf_data, dict) else pdf_data
+                tables = pdf_data.get('tables', []) if isinstance(pdf_data, dict) else []
+                figures = pdf_data.get('figures', []) if isinstance(pdf_data, dict) else []
+                logger.info(f"✅ Using PDF data: {len(pdf_text) if pdf_text else 0} chars, {len(tables)} tables, {len(figures)} figures")
             else:
-                logger.warning(f"⚠️ No PDF text available, falling back to abstract")
+                logger.warning(f"⚠️ No PDF data available, falling back to abstract")
+                pdf_text, tables, figures = None, [], []
         except Exception as e:
             logger.warning(f"⚠️ PDF extraction failed: {e}, falling back to abstract")
-            pdf_text = None
+            pdf_text, tables, figures = None, [], []
 
-        # Step 6: Extract protocol using AI (with PDF text AND research context)
+        # Step 5.5: Analyze figures with GPT-4 Vision (Week 22)
+        figures_analysis = None
+        if figures and len(figures) > 0:
+            try:
+                figures_analysis = await self._analyze_figures_with_vision(figures, article)
+                logger.info(f"✅ Analyzed {len(figures)} figures with GPT-4 Vision")
+            except Exception as e:
+                logger.warning(f"⚠️ Figure analysis failed: {e}")
+
+        # Step 6: Extract protocol using AI (with PDF text, tables, figures AND research context)
         protocol_data = await self._extract_with_ai(
             article=article,
             protocol_type=protocol_type,
@@ -157,7 +171,9 @@ class ProtocolExtractorService:
             hypotheses=hypotheses,
             decisions=decisions,
             existing_protocols=existing_protocols,  # Phase 2.2
-            triage_result=triage_result  # Phase 3.1
+            triage_result=triage_result,  # Phase 3.1
+            tables=tables,  # Week 22
+            figures_analysis=figures_analysis  # Week 22
         )
 
         # Step 6: Save to database (Phase 1: Enhanced with research context)
@@ -207,9 +223,13 @@ class ProtocolExtractorService:
             recommendations=[suggested_modifications] if suggested_modifications else [],
             context_relevance=protocol_comparison,  # Phase 2.2: Store protocol comparison
             context_aware=True if (questions or hypotheses or existing_protocols) else False,
-            extraction_method='intelligent_context_aware_v2',  # Phase 2 marker
+            extraction_method='intelligent_context_aware_v3',  # Week 22: Now includes tables+figures
             extracted_by="ai",
-            created_by=user_id
+            created_by=user_id,
+            # Week 22: Store tables and figures
+            tables_data=tables if tables else [],
+            figures_data=figures if figures else [],
+            figures_analysis=figures_analysis
         )
 
         db.add(protocol)
@@ -265,12 +285,15 @@ class ProtocolExtractorService:
         hypotheses: List = None,
         decisions: List = None,
         existing_protocols: List = None,  # Phase 2.2
-        triage_result = None  # Phase 3.1
+        triage_result = None,  # Phase 3.1
+        tables: List = None,  # Week 22
+        figures_analysis: Optional[str] = None  # Week 22
     ) -> Dict:
         """
         Use AI to extract protocol from article (PDF text or abstract).
         Phase 2.2: Now compares with existing protocols.
         Phase 3.1: Now uses triage insights (cross-service learning).
+        Week 22: Now includes tables and figures analysis!
 
         Week 19-20 Critical Fix: Now uses full PDF text when available!
         Phase 1 Enhancement: Now uses research context (questions, hypotheses, decisions)!
@@ -282,6 +305,7 @@ class ProtocolExtractorService:
         - Low temperature for consistency
         - Specialized prompt for protocols
         - Research context awareness (Phase 1)
+        - Tables and figures analysis (Week 22)
 
         Args:
             article: Article object
@@ -293,11 +317,13 @@ class ProtocolExtractorService:
             decisions: List of ProjectDecision objects (Phase 1)
             existing_protocols: List of Protocol objects (Phase 2.2)
             triage_result: PaperTriage object (Phase 3.1)
+            tables: List of extracted tables (Week 22)
+            figures_analysis: GPT-4 Vision analysis of figures (Week 22)
 
         Returns:
             Dictionary with protocol data
         """
-        # Build specialized prompt (with PDF text AND research context)
+        # Build specialized prompt (with PDF text, tables, figures AND research context)
         prompt = self._build_protocol_prompt(
             article,
             protocol_type,
@@ -307,7 +333,9 @@ class ProtocolExtractorService:
             hypotheses,
             decisions,
             existing_protocols,  # Phase 2.2
-            triage_result  # Phase 3.1
+            triage_result,  # Phase 3.1
+            tables,  # Week 22
+            figures_analysis  # Week 22
         )
         
         try:
@@ -357,7 +385,9 @@ Be precise and include all relevant details like catalog numbers, durations, and
         hypotheses: List = None,
         decisions: List = None,
         existing_protocols: List = None,  # Phase 2.2
-        triage_result = None  # Phase 3.1
+        triage_result = None,  # Phase 3.1
+        tables: List = None,  # Week 22
+        figures_analysis: Optional[str] = None  # Week 22
     ) -> str:
         """
         Build specialized prompt for protocol extraction.
@@ -366,6 +396,7 @@ Be precise and include all relevant details like catalog numbers, durations, and
         Phase 1 Enhancement: Now includes research context!
         Phase 2.2 Enhancement: Now compares with existing protocols!
         Phase 3.1 Enhancement: Now uses triage insights (cross-service learning)!
+        Week 22 Enhancement: Now includes tables and figures analysis!
 
         Args:
             article: Article object
@@ -377,6 +408,8 @@ Be precise and include all relevant details like catalog numbers, durations, and
             decisions: List of ProjectDecision objects (Phase 1)
             existing_protocols: List of Protocol objects (Phase 2.2)
             triage_result: PaperTriage object (Phase 3.1)
+            tables: List of extracted tables (Week 22)
+            figures_analysis: GPT-4 Vision analysis of figures (Week 22)
 
         Returns:
             Formatted prompt string
@@ -486,6 +519,10 @@ Year: {article.publication_year or 'Unknown'}
 **Paper Content:**
 {content}
 
+{self._format_tables_section(tables) if tables else ""}
+
+{self._format_figures_section(figures_analysis) if figures_analysis else ""}
+
 **Instructions:**
 1. Extract the main experimental protocol described in the paper
 2. **CRITICAL (Phase 1):** Analyze which research questions [Q1, Q2, ...] this protocol addresses
@@ -552,4 +589,106 @@ If no clear protocol is found, return:
     "difficulty_level": "moderate",
     "notes": "This paper does not contain a detailed experimental protocol."
 }}"""
+
+    def _format_tables_section(self, tables: List[Dict]) -> str:
+        """Format extracted tables for prompt (Week 22)"""
+        if not tables or len(tables) == 0:
+            return ""
+
+        # Limit to first 3 tables to save tokens
+        tables_to_show = tables[:3]
+
+        section = "\n**EXTRACTED TABLES:**\n"
+        for table in tables_to_show:
+            section += f"\nTable {table.get('table_number', '?')} (Page {table.get('page', '?')}):\n"
+            section += f"Dimensions: {table.get('row_count', 0)} rows x {table.get('col_count', 0)} columns\n"
+
+            # Format table as markdown
+            headers = table.get('headers', [])
+            rows = table.get('rows', [])
+
+            if headers:
+                section += "| " + " | ".join(str(h) for h in headers) + " |\n"
+                section += "|" + "|".join(["---"] * len(headers)) + "|\n"
+
+            # Show first 5 rows to save tokens
+            for row in rows[:5]:
+                section += "| " + " | ".join(str(cell) if cell else "" for cell in row) + " |\n"
+
+            if len(rows) > 5:
+                section += f"... ({len(rows) - 5} more rows)\n"
+
+        if len(tables) > 3:
+            section += f"\n... ({len(tables) - 3} more tables not shown)\n"
+
+        return section
+
+    def _format_figures_section(self, figures_analysis: str) -> str:
+        """Format figures analysis for prompt (Week 22)"""
+        if not figures_analysis:
+            return ""
+
+        return f"\n**FIGURES ANALYSIS (GPT-4 Vision):**\n{figures_analysis}\n"
+
+    async def _analyze_figures_with_vision(self, figures: List[Dict], article) -> str:
+        """
+        Analyze figures using GPT-4 Vision (Week 22).
+
+        Token-efficient: Only analyzes first 2 figures to limit costs.
+
+        Args:
+            figures: List of extracted figures with base64 images
+            article: Article object for context
+
+        Returns:
+            Combined analysis text
+        """
+        if not figures or len(figures) == 0:
+            return ""
+
+        # Limit to first 2 figures to save tokens
+        figures_to_analyze = figures[:2]
+
+        analyses = []
+        for figure in figures_to_analyze:
+            try:
+                # Build vision prompt
+                vision_prompt = f"""Analyze this figure from a scientific paper titled "{article.title}".
+
+Focus on protocol-relevant information:
+1. What experimental methods or procedures are shown?
+2. What equipment or materials are depicted?
+3. What are the key steps or workflow shown?
+4. What parameters or measurements are indicated?
+5. Any dosing, timing, or quantitative details?
+
+Be concise and focus on actionable protocol details."""
+
+                # Call GPT-4 Vision
+                response = await client.chat.completions.create(
+                    model="gpt-4-vision-preview",
+                    messages=[{
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": vision_prompt},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{figure['image_data']}",
+                                    "detail": "low"  # Use low detail to save tokens
+                                }
+                            }
+                        ]
+                    }],
+                    max_tokens=200  # Limit response to save tokens
+                )
+
+                analysis = response.choices[0].message.content
+                analyses.append(f"Figure {figure['figure_number']} (Page {figure['page']}): {analysis}")
+
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to analyze figure {figure.get('figure_number', '?')}: {e}")
+                continue
+
+        return "\n\n".join(analyses)
 

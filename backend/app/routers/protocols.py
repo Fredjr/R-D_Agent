@@ -186,6 +186,11 @@ class ProtocolResponse(BaseModel):
     material_sources: Optional[dict] = None
     step_sources: Optional[dict] = None
 
+    # Week 22: Rich content (tables + figures)
+    tables_data: Optional[List[dict]] = []
+    figures_data: Optional[List[dict]] = []
+    figures_analysis: Optional[str] = None
+
     # Article details (for display)
     article_title: Optional[str] = None
     article_authors: Optional[str] = None

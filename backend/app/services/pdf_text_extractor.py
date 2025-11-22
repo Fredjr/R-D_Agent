@@ -1,20 +1,23 @@
 """
 PDF Text Extraction Service
 Week 19-20: Critical Fix for Protocol Extraction
+Week 22: Enhanced with Tables + Figures Extraction
 
-This service extracts full text from PDFs for:
+This service extracts full text, tables, and figures from PDFs for:
 1. Protocol extraction from complete paper (not just abstract)
 2. AI triage with full paper content
 3. Better relevance scoring and analysis
+4. Rich protocol rendering with tables and figures
 
 Author: R-D Agent Team
-Date: 2025-01-21
+Date: 2025-01-21 (Enhanced: 2025-11-22)
 """
 
 import logging
 import httpx
 import io
-from typing import Optional, Dict, Any
+import base64
+from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
 from datetime import datetime
 
@@ -36,38 +39,49 @@ class PDFTextExtractor:
         pmid: str,
         db: Session,
         force_refresh: bool = False
-    ) -> Optional[str]:
+    ) -> Optional[Dict[str, Any]]:
         """
-        Extract PDF text and store in database.
-        
+        Extract PDF text, tables, and figures, then store in database.
+
         Args:
             pmid: PubMed ID of article
             db: Database session
             force_refresh: Force re-extraction even if cached
-        
+
         Returns:
-            Extracted PDF text or None if extraction failed
-        
+            Dictionary with:
+            - text: Extracted PDF text
+            - tables: List of extracted tables
+            - figures: List of extracted figures with base64 images
+            Returns None if extraction failed
+
         Steps:
         1. Check if already extracted (unless force_refresh)
         2. Get PDF URL using existing pdf_endpoints logic
         3. Download PDF
         4. Extract text using PyPDF2
-        5. Store in database
-        6. Return extracted text
+        5. Extract tables using pdfplumber
+        6. Extract figures using pypdf
+        7. Store in database
+        8. Return extracted data
         """
         from database import Article
-        
+
         # Get article from database
         article = db.query(Article).filter(Article.pmid == pmid).first()
         if not article:
             logger.error(f"❌ Article {pmid} not found in database")
             raise ValueError(f"Article {pmid} not found")
-        
-        # Check cache
+
+        # Check cache (Week 22: Now returns dict with text, tables, figures)
         if article.pdf_text and not force_refresh:
-            logger.info(f"✅ Using cached PDF text for {pmid} ({len(article.pdf_text)} chars)")
-            return article.pdf_text
+            logger.info(f"✅ Using cached PDF data for {pmid} ({len(article.pdf_text)} chars)")
+            # Return cached data with tables/figures if available
+            return {
+                "text": article.pdf_text,
+                "tables": getattr(article, 'pdf_tables', []) or [],
+                "figures": getattr(article, 'pdf_figures', []) or []
+            }
         
         # Get PDF URL using existing infrastructure
         try:
@@ -79,25 +93,31 @@ class PDFTextExtractor:
             logger.error(f"❌ Failed to get PDF URL for {pmid}: {e}")
             return None
         
-        # Download and extract text
+        # Download and extract text, tables, and figures (Week 22 Enhancement)
         try:
-            pdf_text = await self._download_and_extract(pdf_info['url'])
-            
-            if not pdf_text or len(pdf_text.strip()) < 100:
-                logger.warning(f"⚠️ PDF text too short for {pmid}: {len(pdf_text) if pdf_text else 0} chars")
+            extraction_result = await self._download_and_extract(pdf_info['url'])
+
+            if not extraction_result or not extraction_result.get('text') or len(extraction_result['text'].strip()) < 100:
+                logger.warning(f"⚠️ PDF text too short for {pmid}: {len(extraction_result.get('text', '')) if extraction_result else 0} chars")
                 return None
-            
-            # Store in database
-            article.pdf_text = pdf_text
+
+            # Store in database (Week 22: Now includes tables and figures)
+            article.pdf_text = extraction_result['text']
             article.pdf_extracted_at = datetime.utcnow()
-            article.pdf_extraction_method = 'pypdf2'
+            article.pdf_extraction_method = 'pypdf2+pdfplumber'
             article.pdf_url = pdf_info['url']
             article.pdf_source = pdf_info['source']
-            
+
+            # Store tables and figures as JSON (if columns exist)
+            if hasattr(article, 'pdf_tables'):
+                article.pdf_tables = extraction_result.get('tables', [])
+            if hasattr(article, 'pdf_figures'):
+                article.pdf_figures = extraction_result.get('figures', [])
+
             db.commit()
-            logger.info(f"✅ Extracted {len(pdf_text)} characters from PDF {pmid} (source: {pdf_info['source']})")
-            return pdf_text
-            
+            logger.info(f"✅ Extracted {len(extraction_result['text'])} chars, {len(extraction_result.get('tables', []))} tables, {len(extraction_result.get('figures', []))} figures from PDF {pmid} (source: {pdf_info['source']})")
+            return extraction_result
+
         except Exception as e:
             logger.error(f"❌ PDF extraction failed for {pmid}: {e}")
             db.rollback()
@@ -175,9 +195,14 @@ class PDFTextExtractor:
         
         return None
 
-    async def _download_and_extract(self, pdf_url: str) -> Optional[str]:
+    async def _download_and_extract(self, pdf_url: str) -> Optional[Dict[str, Any]]:
         """
-        Download PDF and extract text using PyPDF2.
+        Download PDF and extract text, tables, and figures.
+
+        Week 22 Enhancement: Now extracts:
+        1. Text using PyPDF2
+        2. Tables using pdfplumber
+        3. Figures using pypdf (images)
 
         This method leverages the existing PDF infrastructure by:
         1. Using the same PDF sources (PMC, Europe PMC, Unpaywall, etc.)
@@ -188,7 +213,7 @@ class PDFTextExtractor:
             pdf_url: URL of PDF to download
 
         Returns:
-            Extracted text or None if extraction failed
+            Dictionary with text, tables, and figures, or None if extraction failed
         """
         try:
             # Download PDF using the same infrastructure as PDF Viewer
@@ -202,14 +227,16 @@ class PDFTextExtractor:
                 if 'pdf' not in content_type and not pdf_url.endswith('.pdf'):
                     logger.warning(f"⚠️ Response may not be PDF: {content_type}")
 
-                # Extract text using PyPDF2
+                # Week 22: Extract text, tables, and figures
                 try:
                     import PyPDF2
-                    pdf_file = io.BytesIO(response.content)
+                    pdf_bytes = response.content
+                    pdf_file = io.BytesIO(pdf_bytes)
                     pdf_reader = PyPDF2.PdfReader(pdf_file)
 
                     logger.info(f"📄 PDF has {len(pdf_reader.pages)} pages")
 
+                    # Extract text
                     text_parts = []
                     for i, page in enumerate(pdf_reader.pages):
                         try:
@@ -217,12 +244,25 @@ class PDFTextExtractor:
                             if page_text:
                                 text_parts.append(page_text)
                         except Exception as e:
-                            logger.warning(f"⚠️ Failed to extract page {i+1}: {e}")
+                            logger.warning(f"⚠️ Failed to extract text from page {i+1}: {e}")
                             continue
 
                     full_text = "\n\n".join(text_parts)
                     logger.info(f"✅ Extracted {len(full_text)} characters from {len(text_parts)} pages")
-                    return full_text
+
+                    # Extract tables using pdfplumber
+                    tables = await self._extract_tables(pdf_bytes)
+                    logger.info(f"✅ Extracted {len(tables)} tables")
+
+                    # Extract figures using pypdf
+                    figures = await self._extract_figures(pdf_reader)
+                    logger.info(f"✅ Extracted {len(figures)} figures")
+
+                    return {
+                        "text": full_text,
+                        "tables": tables,
+                        "figures": figures
+                    }
 
                 except ImportError:
                     logger.error("❌ PyPDF2 not installed. Install with: pip install PyPDF2")
@@ -330,4 +370,101 @@ class PDFTextExtractor:
         if len(pdf_text) > max_length:
             truncated += "\n\n[... truncated for length ...]"
         return truncated
+
+    async def _extract_tables(self, pdf_bytes: bytes) -> List[Dict[str, Any]]:
+        """
+        Extract tables from PDF using pdfplumber.
+
+        Args:
+            pdf_bytes: PDF file bytes
+
+        Returns:
+            List of tables with metadata
+        """
+        tables = []
+        try:
+            import pdfplumber
+            pdf_file = io.BytesIO(pdf_bytes)
+
+            with pdfplumber.open(pdf_file) as pdf:
+                for page_num, page in enumerate(pdf.pages, 1):
+                    try:
+                        page_tables = page.extract_tables()
+                        if page_tables:
+                            for table_num, table_data in enumerate(page_tables, 1):
+                                if table_data and len(table_data) > 0:
+                                    # Convert table to structured format
+                                    headers = table_data[0] if table_data else []
+                                    rows = table_data[1:] if len(table_data) > 1 else []
+
+                                    tables.append({
+                                        "page": page_num,
+                                        "table_number": table_num,
+                                        "headers": headers,
+                                        "rows": rows,
+                                        "row_count": len(rows),
+                                        "col_count": len(headers) if headers else 0
+                                    })
+                                    logger.info(f"📊 Extracted table {table_num} from page {page_num}: {len(rows)} rows x {len(headers)} cols")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed to extract tables from page {page_num}: {e}")
+                        continue
+        except ImportError:
+            logger.warning("⚠️ pdfplumber not installed, skipping table extraction")
+        except Exception as e:
+            logger.error(f"❌ Table extraction failed: {e}")
+
+        return tables
+
+    async def _extract_figures(self, pdf_reader) -> List[Dict[str, Any]]:
+        """
+        Extract figures/images from PDF using PyPDF2.
+
+        Args:
+            pdf_reader: PyPDF2 PdfReader object
+
+        Returns:
+            List of figures with base64-encoded images
+        """
+        figures = []
+        try:
+            for page_num, page in enumerate(pdf_reader.pages, 1):
+                try:
+                    if '/XObject' in page['/Resources']:
+                        xobjects = page['/Resources']['/XObject'].get_object()
+
+                        for obj_name in xobjects:
+                            obj = xobjects[obj_name]
+
+                            if obj['/Subtype'] == '/Image':
+                                try:
+                                    # Extract image data
+                                    size = (obj['/Width'], obj['/Height'])
+                                    data = obj.get_data()
+
+                                    # Convert to base64 for storage (limit size to avoid token bloat)
+                                    if len(data) < 500000:  # Limit to ~500KB per image
+                                        img_base64 = base64.b64encode(data).decode('utf-8')
+
+                                        figures.append({
+                                            "page": page_num,
+                                            "figure_number": len(figures) + 1,
+                                            "width": size[0],
+                                            "height": size[1],
+                                            "size_bytes": len(data),
+                                            "image_data": img_base64[:100000]  # Limit to 100KB base64 for token efficiency
+                                        })
+                                        logger.info(f"🖼️ Extracted figure {len(figures)} from page {page_num}: {size[0]}x{size[1]}px")
+                                    else:
+                                        logger.warning(f"⚠️ Skipping large image on page {page_num}: {len(data)} bytes")
+                                except Exception as e:
+                                    logger.warning(f"⚠️ Failed to extract image from page {page_num}: {e}")
+                                    continue
+                except Exception as e:
+                    logger.warning(f"⚠️ Failed to process images on page {page_num}: {e}")
+                    continue
+        except Exception as e:
+            logger.error(f"❌ Figure extraction failed: {e}")
+
+        return figures
 
