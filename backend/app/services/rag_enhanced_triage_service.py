@@ -15,7 +15,7 @@ import os
 import json
 import logging
 from typing import Dict, List, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 # LangChain imports
@@ -407,8 +407,8 @@ Provide your assessment following the exact format specified."""
                 if hasattr(existing_triage, key):
                     setattr(existing_triage, key, value)
             existing_triage.triaged_by = "ai_rag"
-            existing_triage.triaged_at = datetime.utcnow()
-            existing_triage.updated_at = datetime.utcnow()
+            existing_triage.triaged_at = datetime.now(timezone.utc)
+            existing_triage.updated_at = datetime.now(timezone.utc)
 
             db.commit()
             db.refresh(existing_triage)
@@ -421,7 +421,7 @@ Provide your assessment following the exact format specified."""
                 project_id=project_id,
                 article_pmid=article_pmid,
                 triaged_by="ai_rag",
-                triaged_at=datetime.utcnow(),
+                triaged_at=datetime.now(timezone.utc),
                 **triage_result
             )
             db.add(triage)

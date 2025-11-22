@@ -17,7 +17,7 @@ import os
 import json
 import logging
 from typing import Dict, List, Optional, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from openai import AsyncOpenAI
 
@@ -122,8 +122,8 @@ class EnhancedAITriageService:
             existing_triage.affected_hypotheses = triage_result["affected_hypotheses"]
             existing_triage.ai_reasoning = triage_result["ai_reasoning"]
             existing_triage.triaged_by = "ai_enhanced"
-            existing_triage.triaged_at = datetime.utcnow()
-            existing_triage.updated_at = datetime.utcnow()
+            existing_triage.triaged_at = datetime.now(timezone.utc)
+            existing_triage.updated_at = datetime.now(timezone.utc)
 
             # Enhanced fields (Week 9+)
             existing_triage.confidence_score = triage_result.get("confidence_score", 0.5)
@@ -151,7 +151,7 @@ class EnhancedAITriageService:
                 affected_hypotheses=triage_result["affected_hypotheses"],
                 ai_reasoning=triage_result["ai_reasoning"],
                 triaged_by="ai_enhanced",
-                triaged_at=datetime.utcnow(),
+                triaged_at=datetime.now(timezone.utc),
                 # Enhanced fields (Week 9+)
                 confidence_score=triage_result.get("confidence_score", 0.5),
                 metadata_score=metadata_score,
@@ -198,7 +198,7 @@ class EnhancedAITriageService:
             return None
 
         # Check if triage is recent enough
-        cache_cutoff = datetime.utcnow() - timedelta(days=self.cache_ttl_days)
+        cache_cutoff = datetime.now(timezone.utc) - timedelta(days=self.cache_ttl_days)
         if existing.triaged_at < cache_cutoff:
             logger.info(f"🔄 Triage for paper {article_pmid} is older than {self.cache_ttl_days} days, re-triaging")
             return None
@@ -208,7 +208,7 @@ class EnhancedAITriageService:
             logger.info(f"🔄 Triage for paper {article_pmid} is old format, re-triaging")
             return None
 
-        logger.info(f"✅ Using cached triage for paper {article_pmid} (age: {(datetime.utcnow() - existing.triaged_at).days} days)")
+        logger.info(f"✅ Using cached triage for paper {article_pmid} (age: {(datetime.now(timezone.utc) - existing.triaged_at).days} days)")
         return existing
 
     def _calculate_metadata_score(self, article: Article) -> int:

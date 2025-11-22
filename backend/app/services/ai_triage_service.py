@@ -17,7 +17,7 @@ import os
 import json
 import logging
 from typing import Dict, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from openai import AsyncOpenAI
 
@@ -181,7 +181,7 @@ class AITriageService:
             existing_triage.evidence_excerpts = evidence_excerpts  # Phase 2.1
             existing_triage.hypothesis_relevance_scores = hypothesis_relevance_scores  # Phase 2.1
             existing_triage.triaged_by = "ai_enhanced"  # Phase 2 marker
-            existing_triage.triaged_at = datetime.utcnow()
+            existing_triage.triaged_at = datetime.now(timezone.utc)
             existing_triage.updated_at = datetime.utcnow()
 
             db.commit()
@@ -205,7 +205,7 @@ class AITriageService:
                 evidence_excerpts=evidence_excerpts,  # Phase 2.1
                 hypothesis_relevance_scores=hypothesis_relevance_scores,  # Phase 2.1
                 triaged_by="ai_enhanced",  # Phase 2 marker
-                triaged_at=datetime.utcnow()
+                triaged_at=datetime.now(timezone.utc)
             )
 
             db.add(triage)
