@@ -295,7 +295,6 @@ class InsightsService:
             )
 
             # Parse response
-            import json
             ai_response = response.choices[0].message.content
 
             if not ai_response or ai_response.strip() == "":
