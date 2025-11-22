@@ -147,25 +147,46 @@ class AITriageService:
             PaperTriage.article_pmid == article_pmid
         ).first()
 
+        # Phase 2.1: Extract evidence quotes
+        evidence_quotes = triage_result.get("evidence_quotes", {})
+        evidence_excerpts = []
+        hypothesis_relevance_scores = {}
+
+        if evidence_quotes:
+            for hyp_id, evidence in evidence_quotes.items():
+                if isinstance(evidence, dict):
+                    evidence_excerpts.append({
+                        "hypothesis_id": hyp_id,
+                        "quote": evidence.get("quote", ""),
+                        "page_section": evidence.get("page_section", ""),
+                        "support_type": evidence.get("support_type", "neutral")
+                    })
+                    hypothesis_relevance_scores[hyp_id] = {
+                        "support_type": evidence.get("support_type", "neutral"),
+                        "evidence": evidence.get("quote", "")
+                    }
+
         if existing_triage:
-            # Update existing triage
+            # Update existing triage (Phase 2.1: Now includes evidence)
             existing_triage.triage_status = triage_result["triage_status"]
             existing_triage.relevance_score = triage_result["relevance_score"]
             existing_triage.impact_assessment = triage_result["impact_assessment"]
             existing_triage.affected_questions = triage_result["affected_questions"]
             existing_triage.affected_hypotheses = triage_result["affected_hypotheses"]
             existing_triage.ai_reasoning = triage_result["ai_reasoning"]
-            existing_triage.triaged_by = "ai"
+            existing_triage.evidence_excerpts = evidence_excerpts  # Phase 2.1
+            existing_triage.hypothesis_relevance_scores = hypothesis_relevance_scores  # Phase 2.1
+            existing_triage.triaged_by = "ai_enhanced"  # Phase 2 marker
             existing_triage.triaged_at = datetime.utcnow()
             existing_triage.updated_at = datetime.utcnow()
-            
+
             db.commit()
             db.refresh(existing_triage)
-            
-            logger.info(f"✅ Updated existing triage for paper {article_pmid}")
+
+            logger.info(f"✅ Updated existing triage for paper {article_pmid} with {len(evidence_excerpts)} evidence quotes")
             return existing_triage
         else:
-            # Create new triage
+            # Create new triage (Phase 2.1: Now includes evidence)
             import uuid
             triage = PaperTriage(
                 triage_id=str(uuid.uuid4()),
@@ -177,7 +198,9 @@ class AITriageService:
                 affected_questions=triage_result["affected_questions"],
                 affected_hypotheses=triage_result["affected_hypotheses"],
                 ai_reasoning=triage_result["ai_reasoning"],
-                triaged_by="ai",
+                evidence_excerpts=evidence_excerpts,  # Phase 2.1
+                hypothesis_relevance_scores=hypothesis_relevance_scores,  # Phase 2.1
+                triaged_by="ai_enhanced",  # Phase 2 marker
                 triaged_at=datetime.utcnow()
             )
 
@@ -433,6 +456,21 @@ Analyze this paper and provide a JSON response with:
 5. **affected_hypotheses**: Array of hypothesis_ids this paper supports/contradicts (empty array if none)
 
 6. **ai_reasoning**: Detailed reasoning for your triage decision (3-5 sentences)
+
+7. **evidence_quotes** (Phase 2.1): Object mapping hypothesis_ids to specific evidence quotes from the paper
+   Example: {{
+     "hypothesis_id_1": {{
+       "quote": "Exact quote from paper that supports/refutes this hypothesis",
+       "page_section": "Results/Discussion/Methods",
+       "support_type": "supports|refutes|neutral"
+     }}
+   }}
+   Extract SPECIFIC QUOTES that provide evidence for each hypothesis. Be precise and include page sections.
+
+**CRITICAL (Phase 2):**
+- Extract SPECIFIC EVIDENCE QUOTES for each hypothesis
+- Prioritize papers based on question priority and hypothesis confidence levels
+- Consider user decisions when scoring relevance
 
 Return ONLY valid JSON with these exact keys."""
 

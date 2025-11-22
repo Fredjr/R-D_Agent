@@ -483,6 +483,14 @@ Generate a comprehensive experiment plan with the following structure (return as
     "Required skill 1",
     "Required skill 2"
   ],
+  "confidence_predictions": {{
+    "hypothesis_id_1": {{
+      "current_confidence": 50,
+      "predicted_confidence_if_success": 85,
+      "predicted_confidence_if_failure": 30,
+      "reasoning": "Explain how this experiment will change confidence in this hypothesis"
+    }}
+  }},
   "notes": "Any additional notes or considerations"
 }}
 
@@ -492,6 +500,7 @@ IMPORTANT:
 - Link to specific research questions and hypotheses by their IDs (use the [ID: ...] values provided above)
 - Include question_id values in the linked_questions array
 - Include hypothesis_id values in the linked_hypotheses array
+- **NEW (Phase 2.3):** Predict how this experiment will change confidence in each hypothesis (success vs failure scenarios)
 - Consider real-world constraints (cost, time, expertise)
 - Provide actionable troubleshooting guidance
 - Include safety considerations
@@ -504,6 +513,15 @@ IMPORTANT:
         logger.info(f"✅ Validating and structuring plan")
 
         # Ensure all required fields exist with defaults
+        # Phase 2.3: Extract confidence predictions
+        confidence_predictions = plan_data.get("confidence_predictions", {})
+        notes_text = plan_data.get("notes", "")
+
+        # Append confidence predictions to notes if present
+        if confidence_predictions:
+            import json
+            notes_text = (notes_text or "") + f"\n\n**Confidence Predictions:**\n{json.dumps(confidence_predictions, indent=2)}"
+
         validated = {
             "plan_name": plan_data.get("plan_name", f"Experiment Plan for {context['protocol'].protocol_name}"),
             "objective": plan_data.get("objective", "Test protocol in research context"),
@@ -520,7 +538,8 @@ IMPORTANT:
             "troubleshooting_guide": plan_data.get("troubleshooting_guide", []),
             "safety_considerations": plan_data.get("safety_considerations", []),
             "required_expertise": plan_data.get("required_expertise", []),
-            "notes": plan_data.get("notes")
+            "notes": notes_text,
+            "confidence_predictions": confidence_predictions  # Phase 2.3: Store for response
         }
 
         # Validate linked questions exist (query ALL questions, not just top 10)

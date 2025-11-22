@@ -104,7 +104,7 @@ class ProtocolExtractorService:
                 raise ValueError(f"No project_id provided and no triage record found for PMID {article_pmid}")
 
         # Step 4: Get research context (Phase 1 Enhancement)
-        from database import Project, ResearchQuestion, Hypothesis, ProjectDecision
+        from database import Project, ResearchQuestion, Hypothesis, ProjectDecision, Protocol
 
         project = db.query(Project).filter(Project.project_id == project_id).first()
 
@@ -120,7 +120,12 @@ class ProtocolExtractorService:
             ProjectDecision.project_id == project_id
         ).order_by(ProjectDecision.decided_at.desc()).limit(5).all()
 
-        logger.info(f"📋 Research context: {len(questions)} questions, {len(hypotheses)} hypotheses, {len(decisions)} decisions")
+        # Phase 2.2: Get existing protocols for comparison
+        existing_protocols = db.query(Protocol).filter(
+            Protocol.project_id == project_id
+        ).order_by(Protocol.created_at.desc()).limit(3).all()
+
+        logger.info(f"📋 Research context: {len(questions)} questions, {len(hypotheses)} hypotheses, {len(decisions)} decisions, {len(existing_protocols)} existing protocols")
 
         # Step 5: Extract PDF text first (Week 19-20 Critical Fix)
         from backend.app.services.pdf_text_extractor import PDFTextExtractor
@@ -144,7 +149,8 @@ class ProtocolExtractorService:
             project=project,
             questions=questions,
             hypotheses=hypotheses,
-            decisions=decisions
+            decisions=decisions,
+            existing_protocols=existing_protocols  # Phase 2.2
         )
 
         # Step 6: Save to database (Phase 1: Enhanced with research context)
@@ -155,6 +161,7 @@ class ProtocolExtractorService:
         tests_hypotheses = protocol_data.get("tests_hypotheses", [])
         research_rationale = protocol_data.get("research_rationale")
         suggested_modifications = protocol_data.get("suggested_modifications")
+        protocol_comparison = protocol_data.get("protocol_comparison")  # Phase 2.2
 
         # Convert Q1, Q2, H1, H2 to actual IDs
         affected_question_ids = []
@@ -191,8 +198,9 @@ class ProtocolExtractorService:
             affected_hypotheses=affected_hypothesis_ids,
             relevance_reasoning=research_rationale,
             recommendations=[suggested_modifications] if suggested_modifications else [],
-            context_aware=True if (questions or hypotheses) else False,
-            extraction_method='intelligent_context_aware',  # Phase 1 marker
+            context_relevance=protocol_comparison,  # Phase 2.2: Store protocol comparison
+            context_aware=True if (questions or hypotheses or existing_protocols) else False,
+            extraction_method='intelligent_context_aware_v2',  # Phase 2 marker
             extracted_by="ai",
             created_by=user_id
         )
@@ -248,10 +256,12 @@ class ProtocolExtractorService:
         project = None,
         questions: List = None,
         hypotheses: List = None,
-        decisions: List = None
+        decisions: List = None,
+        existing_protocols: List = None  # Phase 2.2
     ) -> Dict:
         """
         Use AI to extract protocol from article (PDF text or abstract).
+        Phase 2.2: Now compares with existing protocols.
 
         Week 19-20 Critical Fix: Now uses full PDF text when available!
         Phase 1 Enhancement: Now uses research context (questions, hypotheses, decisions)!
@@ -272,6 +282,7 @@ class ProtocolExtractorService:
             questions: List of ResearchQuestion objects (Phase 1)
             hypotheses: List of Hypothesis objects (Phase 1)
             decisions: List of ProjectDecision objects (Phase 1)
+            existing_protocols: List of Protocol objects (Phase 2.2)
 
         Returns:
             Dictionary with protocol data
@@ -284,7 +295,8 @@ class ProtocolExtractorService:
             project,
             questions,
             hypotheses,
-            decisions
+            decisions,
+            existing_protocols  # Phase 2.2
         )
         
         try:
@@ -332,13 +344,15 @@ Be precise and include all relevant details like catalog numbers, durations, and
         project = None,
         questions: List = None,
         hypotheses: List = None,
-        decisions: List = None
+        decisions: List = None,
+        existing_protocols: List = None  # Phase 2.2
     ) -> str:
         """
         Build specialized prompt for protocol extraction.
 
         Week 19-20 Critical Fix: Now uses PDF text when available!
         Phase 1 Enhancement: Now includes research context!
+        Phase 2.2 Enhancement: Now compares with existing protocols!
 
         Args:
             article: Article object
@@ -348,6 +362,7 @@ Be precise and include all relevant details like catalog numbers, durations, and
             questions: List of ResearchQuestion objects (Phase 1)
             hypotheses: List of Hypothesis objects (Phase 1)
             decisions: List of ProjectDecision objects (Phase 1)
+            existing_protocols: List of Protocol objects (Phase 2.2)
 
         Returns:
             Formatted prompt string
@@ -391,6 +406,21 @@ Be precise and include all relevant details like catalog numbers, durations, and
                     research_context += "\n"
                 research_context += "\n"
 
+        # Phase 2.2: Add existing protocols for comparison
+        existing_protocols_context = ""
+        if existing_protocols:
+            existing_protocols_context = "\n**EXISTING PROTOCOLS IN PROJECT:**\n"
+            existing_protocols_context += "Compare this protocol with existing ones and highlight differences:\n\n"
+            for i, p in enumerate(existing_protocols[:3], 1):  # Top 3 recent protocols
+                existing_protocols_context += f"{i}. **{p.protocol_name}** ({p.protocol_type or 'Unknown type'})\n"
+                existing_protocols_context += f"   Description: {p.description[:150] if p.description else 'N/A'}...\n"
+                existing_protocols_context += f"   Duration: {p.duration_estimate or 'Unknown'}, Difficulty: {p.difficulty_level}\n"
+                if p.affected_questions:
+                    existing_protocols_context += f"   Addresses Questions: {len(p.affected_questions)} questions\n"
+                if p.affected_hypotheses:
+                    existing_protocols_context += f"   Tests Hypotheses: {len(p.affected_hypotheses)} hypotheses\n"
+                existing_protocols_context += "\n"
+
         # Use PDF text if available, otherwise fall back to abstract
         # Phase 1.2: Expand from 8000 to 15000 chars
         if pdf_text:
@@ -413,6 +443,8 @@ Be precise and include all relevant details like catalog numbers, durations, and
 
 {research_context}
 
+{existing_protocols_context}
+
 **Paper Information:**
 Title: {article.title}
 Authors: {article.authors}
@@ -429,12 +461,13 @@ Year: {article.publication_year or 'Unknown'}
 2. **CRITICAL (Phase 1):** Analyze which research questions [Q1, Q2, ...] this protocol addresses
 3. **CRITICAL (Phase 1):** Analyze which hypotheses [H1, H2, ...] this protocol could test
 4. **CRITICAL (Phase 1):** Explain HOW this protocol addresses the research goals
-5. List all materials with catalog numbers and suppliers (if mentioned)
-6. Break down the procedure into numbered steps with durations
-7. List required equipment
-8. Estimate total duration
-9. Assess difficulty level (easy, moderate, difficult)
-10. **NEW (Phase 1):** Suggest modifications to better address our research questions/hypotheses
+5. **NEW (Phase 2.2):** Compare with existing protocols and explain key differences/similarities
+6. List all materials with catalog numbers and suppliers (if mentioned)
+7. Break down the procedure into numbered steps with durations
+8. List required equipment
+9. Estimate total duration
+10. Assess difficulty level (easy, moderate, difficult)
+11. **NEW (Phase 1):** Suggest modifications to better address our research questions/hypotheses
 
 **Important:**
 - **RELIGIOUSLY follow the research context** - explain connections to questions and hypotheses
@@ -453,6 +486,7 @@ Year: {article.publication_year or 'Unknown'}
     "tests_hypotheses": ["H1", "H2", "..."] or [] if no research context,
     "research_rationale": "Detailed explanation of HOW this protocol addresses the research questions and tests the hypotheses. Include specific mechanisms and expected outcomes." or null if no research context,
     "suggested_modifications": "Modifications to better address our specific research goals" or null if no research context,
+    "protocol_comparison": "Comparison with existing protocols - highlight key differences, advantages, and disadvantages" or null if no existing protocols,
     "materials": [
         {{
             "name": "Material name",
