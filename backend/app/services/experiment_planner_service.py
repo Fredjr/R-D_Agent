@@ -100,10 +100,12 @@ class ExperimentPlannerService:
             try:
                 retrieval_engine = RetrievalEngine(db)
 
-                # Get entity IDs for retrieval
+                # Get entity IDs for retrieval (handle ORM objects)
                 entity_ids = {
-                    'questions': [q['question_id'] for q in context.get('questions', [])],
-                    'hypotheses': [h['hypothesis_id'] for h in context.get('hypotheses', [])],
+                    'questions': [q.question_id if hasattr(q, 'question_id') else q['question_id']
+                                 for q in context.get('questions', [])],
+                    'hypotheses': [h.hypothesis_id if hasattr(h, 'hypothesis_id') else h['hypothesis_id']
+                                  for h in context.get('hypotheses', [])],
                     'protocols': [protocol_id]
                 }
 
