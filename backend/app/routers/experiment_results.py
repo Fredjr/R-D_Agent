@@ -31,9 +31,10 @@ class CreateExperimentResultRequest(BaseModel):
     measurements: List[Dict[str, Any]] = Field(default_factory=list, description="Measurements with metric, value, unit")
     success_criteria_met: Dict[str, bool] = Field(default_factory=dict, description="Which success criteria were met")
     interpretation: Optional[str] = Field(None, description="Scientific interpretation of results")
-    hypothesis_support: Optional[str] = Field(None, description="supports, refutes, or inconclusive")
+    supports_hypothesis: Optional[bool] = Field(None, description="Does the result support the hypothesis?")
     confidence_change: Optional[float] = Field(None, description="Change in hypothesis confidence (-100 to +100)")
-    learnings: Optional[str] = Field(None, description="Key learnings from the experiment")
+    what_worked: Optional[str] = Field(None, description="What worked well in the experiment")
+    what_didnt_work: Optional[str] = Field(None, description="What didn't work or needs improvement")
     next_steps: Optional[str] = Field(None, description="Recommended next steps")
 
 
@@ -45,9 +46,10 @@ class UpdateExperimentResultRequest(BaseModel):
     measurements: Optional[List[Dict[str, Any]]] = None
     success_criteria_met: Optional[Dict[str, bool]] = None
     interpretation: Optional[str] = None
-    hypothesis_support: Optional[str] = None
+    supports_hypothesis: Optional[bool] = None
     confidence_change: Optional[float] = None
-    learnings: Optional[str] = None
+    what_worked: Optional[str] = None
+    what_didnt_work: Optional[str] = None
     next_steps: Optional[str] = None
 
 
@@ -62,10 +64,12 @@ class ExperimentResultResponse(BaseModel):
     measurements: List[Dict[str, Any]]
     success_criteria_met: Dict[str, bool]
     interpretation: Optional[str]
-    hypothesis_support: Optional[str]
+    supports_hypothesis: Optional[bool]
     confidence_change: Optional[float]
-    learnings: Optional[str]
+    what_worked: Optional[str]
+    what_didnt_work: Optional[str]
     next_steps: Optional[str]
+    started_at: Optional[datetime]
     completed_at: Optional[datetime]
     created_at: datetime
     updated_at: datetime
@@ -113,10 +117,12 @@ async def create_experiment_result(
             measurements=request.measurements,
             success_criteria_met=request.success_criteria_met,
             interpretation=request.interpretation,
-            hypothesis_support=request.hypothesis_support,
+            supports_hypothesis=request.supports_hypothesis,
             confidence_change=request.confidence_change,
-            learnings=request.learnings,
+            what_worked=request.what_worked,
+            what_didnt_work=request.what_didnt_work,
             next_steps=request.next_steps,
+            started_at=datetime.utcnow(),
             completed_at=datetime.utcnow(),
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
