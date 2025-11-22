@@ -28,20 +28,34 @@ def run_migration():
 
     print(f"📄 Running migration 011...")
 
-    # Execute migration
+    # Execute migration - run each column addition separately
     try:
         with engine.connect() as conn:
-            # Split by semicolon and execute each statement
-            statements = [s.strip() for s in migration_sql.split(';') if s.strip() and not s.strip().startswith('--')]
-            for stmt in statements:
-                if stmt:
-                    print(f"  ✅ Executing: {stmt[:60]}...")
+            # Add columns one by one
+            columns_to_add = [
+                ("articles", "pdf_tables", "ALTER TABLE articles ADD COLUMN IF NOT EXISTS pdf_tables JSONB DEFAULT '[]'::jsonb"),
+                ("articles", "pdf_figures", "ALTER TABLE articles ADD COLUMN IF NOT EXISTS pdf_figures JSONB DEFAULT '[]'::jsonb"),
+                ("protocols", "tables_data", "ALTER TABLE protocols ADD COLUMN IF NOT EXISTS tables_data JSONB DEFAULT '[]'::jsonb"),
+                ("protocols", "figures_data", "ALTER TABLE protocols ADD COLUMN IF NOT EXISTS figures_data JSONB DEFAULT '[]'::jsonb"),
+                ("protocols", "figures_analysis", "ALTER TABLE protocols ADD COLUMN IF NOT EXISTS figures_analysis TEXT"),
+            ]
+
+            for table, column, stmt in columns_to_add:
+                try:
+                    print(f"  📄 Adding {column} to {table}...")
                     conn.execute(text(stmt))
-            conn.commit()
+                    conn.commit()
+                    print(f"  ✅ Added {column}")
+                except Exception as e:
+                    if "already exists" in str(e).lower() or "duplicate" in str(e).lower():
+                        print(f"  ⚠️  {column} already exists, skipping")
+                    else:
+                        print(f"  ❌ Failed to add {column}: {e}")
+                        raise
+
         print('✅ Migration 011 completed successfully!')
         print('📊 Added columns: pdf_tables, pdf_figures to articles')
         print('📊 Added columns: tables_data, figures_data, figures_analysis to protocols')
-        print('🔍 Created GIN indexes for JSON columns')
     except Exception as e:
         print(f'❌ Migration failed: {e}')
         sys.exit(1)
