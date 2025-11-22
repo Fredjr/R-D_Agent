@@ -97,12 +97,25 @@ class TriageResponse(BaseModel):
 # ============================================================================
 
 class ProtocolResponse(BaseModel):
-    """Protocol extraction response"""
-    protocol_text: str = Field(..., min_length=50)
-    relevance_to_project: str = Field(..., min_length=10)
-    key_materials: List[str] = Field(default_factory=list)
-    key_steps: List[str] = Field(default_factory=list)
-    critical_parameters: List[str] = Field(default_factory=list)
+    """Protocol extraction response - matches intelligent extractor format"""
+    protocol_name: str = Field(..., min_length=5)
+    protocol_type: str = Field(default="other")
+    materials: List[Dict] = Field(default_factory=list)
+    steps: List[Dict] = Field(default_factory=list)
+    equipment: List[str] = Field(default_factory=list)
+    duration_estimate: Optional[str] = None
+    difficulty_level: str = Field(default="moderate")
+    key_parameters: List[str] = Field(default_factory=list)
+    expected_outcomes: List[str] = Field(default_factory=list)
+    troubleshooting_tips: List[str] = Field(default_factory=list)
+    context_relevance: Optional[str] = None
+
+    # Legacy fields (optional for backward compatibility)
+    protocol_text: Optional[str] = None
+    relevance_to_project: Optional[str] = None
+    key_materials: Optional[List[str]] = None
+    key_steps: Optional[List[str]] = None
+    critical_parameters: Optional[List[str]] = None
     feasibility_assessment: Optional[str] = None
     confidence_score: Optional[float] = Field(None, ge=0.0, le=1.0)
 

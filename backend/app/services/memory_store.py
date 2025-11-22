@@ -209,27 +209,32 @@ class MemoryStore:
         )
 
         # Build OR conditions for linked entities
+        # Use PostgreSQL's @> operator for JSON containment
+        from sqlalchemy import cast, String
+        import json as json_module
+
         conditions = []
 
         if question_ids:
             for qid in question_ids:
-                conditions.append(ConversationMemory.linked_question_ids.contains([qid]))
+                # Check if the JSON array contains the ID
+                conditions.append(cast(ConversationMemory.linked_question_ids, String).like(f'%"{qid}"%'))
 
         if hypothesis_ids:
             for hid in hypothesis_ids:
-                conditions.append(ConversationMemory.linked_hypothesis_ids.contains([hid]))
+                conditions.append(cast(ConversationMemory.linked_hypothesis_ids, String).like(f'%"{hid}"%'))
 
         if paper_ids:
             for pid in paper_ids:
-                conditions.append(ConversationMemory.linked_paper_ids.contains([pid]))
+                conditions.append(cast(ConversationMemory.linked_paper_ids, String).like(f'%"{pid}"%'))
 
         if protocol_ids:
             for pid in protocol_ids:
-                conditions.append(ConversationMemory.linked_protocol_ids.contains([pid]))
+                conditions.append(cast(ConversationMemory.linked_protocol_ids, String).like(f'%"{pid}"%'))
 
         if experiment_ids:
             for eid in experiment_ids:
-                conditions.append(ConversationMemory.linked_experiment_ids.contains([eid]))
+                conditions.append(cast(ConversationMemory.linked_experiment_ids, String).like(f'%"{eid}"%'))
 
         if conditions:
             query = query.filter(or_(*conditions))
