@@ -452,12 +452,15 @@ You track the complete research journey: Question → Hypothesis → Evidence �
 Your role is to analyze the COMPLETE EVIDENCE CHAINS and provide insights on:
 
 1. **Progress Insights** - Track research loop completion:
+   ⚠️ CRITICAL RULE: If experiment results exist in the context, you MUST create a progress insight about them!
+   - FIRST: Check if any experiments have results - if yes, this is your PRIMARY insight!
+   - If a result exists: Mention the outcome, whether it supports/refutes hypothesis, confidence change
    - Which questions have complete evidence chains (Q → H → Papers → Protocol → Experiment → Result)?
    - Which hypotheses are well-supported by papers AND have experimental validation with results?
    - Where is the research journey STUCK (broken chains)?
    - How has hypothesis confidence evolved based on evidence AND experimental results?
    - Which questions are ready to be answered based on completed experiments with results?
-   - IMPORTANT: Highlight completed research loops that include experiment results!
+   - MANDATORY: If results exist, DO NOT say "research is stuck" or "incomplete chain"!
 
 2. **Connection Insights** - Find cross-cutting patterns:
    - Which papers support MULTIPLE hypotheses (high-value papers)?
@@ -473,10 +476,13 @@ Your role is to analyze the COMPLETE EVIDENCE CHAINS and provide insights on:
    - Protocols WITHOUT experiment plans (methods not used)
    - Experiments WITHOUT results (incomplete loop)
    - Show the EXACT break point in each evidence chain
+   ⚠️ IMPORTANT: If an experiment HAS a result, do NOT list it as a gap!
 
 4. **Trend Insights** - Temporal patterns:
+   ⚠️ CRITICAL: If results show confidence changes, you MUST mention them here!
    - How has research focus shifted over time?
    - Are hypothesis confidence levels increasing or decreasing?
+   - If experiment results exist with confidence_change, this MUST be a trend insight!
    - What patterns emerge in paper triage decisions (what gets prioritized)?
    - Are certain protocol types more successful?
    - Is the research converging or diverging?
@@ -539,6 +545,8 @@ Required JSON structure:
 
 Guidelines:
 - Focus on the ITERATIVE research journey: Question → Hypothesis → Evidence → Method → Experiment → Result → Answer
+- ⚠️ RESULTS ARE THE MOST IMPORTANT DATA - if they exist, prioritize them above everything else!
+- If experiment results exist, they MUST appear in progress_insights and trend_insights
 - Identify where the research loop is broken or incomplete
 - Highlight decisions and rationales that shaped the research direction
 - Show evidence chains and their strength
@@ -546,7 +554,13 @@ Guidelines:
 - Be specific and actionable
 - Reference specific questions, hypotheses, papers, protocols by name
 - Limit to 3-5 items per category
-- Return ONLY valid JSON, no markdown formatting or extra text"""
+- Return ONLY valid JSON, no markdown formatting or extra text
+
+⚠️ FINAL CHECK BEFORE RESPONDING:
+- Did I check if experiment results exist in the context?
+- If yes, did I create a progress insight about the result?
+- If yes, did I mention the confidence change in trend insights?
+- If yes, did I NOT say the research is "stuck" or "incomplete"?"""
 
     def _get_cached_insights(self, project_id: str, db: Session) -> Optional[ProjectInsights]:
         """Get cached insights if still valid"""
