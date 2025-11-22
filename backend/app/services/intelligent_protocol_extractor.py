@@ -10,6 +10,7 @@ Architecture:
 4. Recommendation Generator Agent - Generates actionable recommendations
 
 Week 19: Enhanced Protocol Extraction with Multi-Agent System
+Week 1 Improvements: Strategic context, tool patterns, validation, orchestration rules
 """
 
 import logging
@@ -21,6 +22,10 @@ from sqlalchemy.orm import Session
 from openai import AsyncOpenAI
 
 from database import Protocol, Article, ResearchQuestion, Hypothesis, Project
+
+# Week 1 Improvements
+from backend.app.services.strategic_context import StrategicContext
+from backend.app.services.validation_service import ValidationService
 
 logger = logging.getLogger(__name__)
 
@@ -573,11 +578,16 @@ If the abstract does not contain specific experimental methods, return:
     "context_relevance": "This paper does not contain a specific experimental protocol."
 }}"""
 
+        # Week 1: Get strategic context
+        strategic_context = StrategicContext.get_context('protocol')
+
         try:
             response = await client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a scientific protocol extraction expert. You ONLY extract information explicitly stated in papers. You NEVER use general knowledge or invent details. You distinguish between review papers (no protocol) and methods papers (has protocol). Always return materials and steps as dictionaries with specific quantitative details."},
+                    {"role": "system", "content": f"""{strategic_context}
+
+You are a scientific protocol extraction expert. You ONLY extract information explicitly stated in papers. You NEVER use general knowledge or invent details. You distinguish between review papers (no protocol) and methods papers (has protocol). Always return materials and steps as dictionaries with specific quantitative details."""},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,  # Lower temperature for more factual, less creative responses
@@ -585,8 +595,13 @@ If the abstract does not contain specific experimental methods, return:
                 timeout=45.0  # 45 second timeout to prevent 502 errors
             )
 
-            protocol_data = json.loads(response.choices[0].message.content)
-            logger.info(f"✅ Extracted protocol: {protocol_data.get('protocol_name', 'Unknown')}")
+            raw_protocol_data = json.loads(response.choices[0].message.content)
+
+            # Week 1: Validate response
+            validator = ValidationService()
+            protocol_data = validator.validate_protocol(raw_protocol_data)
+
+            logger.info(f"✅ Extracted and validated protocol: {protocol_data.get('protocol_name', 'Unknown')}")
 
             # Check if protocol is too generic (likely hallucinated)
             if self._is_protocol_too_generic(protocol_data):

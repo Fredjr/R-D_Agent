@@ -1,6 +1,7 @@
 """
 Living Summary Service - Auto-generate and cache project summaries
 Week 21-22: Living Summaries Feature
+Week 1 Improvements: Strategic context, tool patterns, validation, orchestration rules
 """
 
 import logging
@@ -13,8 +14,13 @@ from openai import AsyncOpenAI
 
 from database import (
     ProjectSummary, Project, ResearchQuestion, Hypothesis,
-    Article, PaperTriage, Protocol, ExperimentPlan, ProjectDecision
+    Article, PaperTriage, Protocol, ExperimentPlan, ProjectDecision, ExperimentResult
 )
+
+# Week 1 Improvements
+from backend.app.services.strategic_context import StrategicContext
+from backend.app.services.tool_patterns import ToolPatterns
+from backend.app.services.orchestration_rules import OrchestrationRules
 
 logger = logging.getLogger(__name__)
 
@@ -157,8 +163,20 @@ class LivingSummaryService:
         }
     
     async def _generate_ai_summary(self, project_data: Dict) -> Dict:
-        """Generate summary using AI"""
-        logger.info(f"🤖 Generating AI summary...")
+        """
+        Generate summary using AI with Week 1 improvements:
+        - Strategic context (WHY)
+        - Tool usage patterns
+        - Orchestration rules (deterministic logic)
+        """
+        logger.info(f"🤖 Generating AI summary with Week 1 improvements...")
+
+        # Week 1: Use orchestration rules to decide what to focus on
+        orchestration_rules = OrchestrationRules()
+        priority_focus = orchestration_rules.get_priority_focus(project_data)
+        focus_guidance = orchestration_rules.get_focus_guidance(priority_focus)
+
+        logger.info(f"🎯 Priority focus: {priority_focus}")
 
         # Build context for AI (now returns tuple with timeline events)
         context, timeline_events = self._build_context(project_data)
@@ -172,7 +190,10 @@ class LivingSummaryService:
                 messages=[
                     {
                         "role": "system",
-                        "content": self._get_system_prompt()
+                        "content": self._get_system_prompt(
+                            priority_focus=priority_focus,
+                            focus_guidance=focus_guidance
+                        )
                     },
                     {
                         "role": "user",
@@ -588,9 +609,41 @@ class LivingSummaryService:
 
         return context, timeline_events
 
-    def _get_system_prompt(self) -> str:
-        """Get context-aware system prompt for AI"""
-        return """You are an AI research assistant that deeply understands the iterative scientific research process.
+    def _get_system_prompt(
+        self,
+        priority_focus: str = None,
+        focus_guidance: str = None
+    ) -> str:
+        """
+        Get context-aware system prompt for AI with Week 1 improvements.
+
+        Args:
+            priority_focus: Priority focus area (from orchestration rules)
+            focus_guidance: Guidance text for priority focus
+        """
+        # Week 1: Add strategic context (WHY)
+        strategic_context = StrategicContext.get_context('summary')
+
+        # Week 1: Add tool usage patterns (evidence chain + progress tracking)
+        evidence_chain_pattern = ToolPatterns.get_pattern('evidence_chain')
+        progress_tracking_pattern = ToolPatterns.get_pattern('progress_tracking')
+
+        # Week 1: Add focus guidance from orchestration rules
+        focus_section = ""
+        if focus_guidance:
+            focus_section = f"\n{focus_guidance}\n"
+
+        return f"""{strategic_context}
+
+{focus_section}
+
+{evidence_chain_pattern}
+
+{progress_tracking_pattern}
+
+## 🎯 YOUR SUMMARY TASK
+
+You are an AI research assistant that deeply understands the iterative scientific research process.
 
 You track the COMPLETE research journey: Question → Hypothesis → Evidence → Method → Experiment → Result → Answer
 

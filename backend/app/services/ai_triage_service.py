@@ -10,6 +10,7 @@ It analyzes paper abstracts against project questions and hypotheses to determin
 - AI reasoning
 
 Week 9: Smart Inbox Implementation
+Week 1 Improvements: Strategic context, tool patterns, validation, orchestration rules
 """
 
 import os
@@ -21,6 +22,10 @@ from sqlalchemy.orm import Session
 from openai import AsyncOpenAI
 
 from database import Article, ResearchQuestion, Hypothesis, PaperTriage, Project
+
+# Week 1 Improvements
+from backend.app.services.strategic_context import StrategicContext
+from backend.app.services.validation_service import ValidationService
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +190,7 @@ class AITriageService:
         Use OpenAI to analyze paper relevance to project.
 
         Week 19-20 Critical Fix: Now uses PDF text when available!
+        Week 1 Improvements: Strategic context, validation
 
         Args:
             article: Article object
@@ -198,14 +204,20 @@ class AITriageService:
         # Build prompt for AI (with PDF text if available)
         prompt = self._build_triage_prompt(article, context, pdf_text)
 
+        # Week 1: Get strategic context
+        strategic_context = StrategicContext.get_context('triage')
+
         try:
-            # Call OpenAI
+            # Call OpenAI with strategic context
             response = await client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are an expert research assistant helping to triage scientific papers. Analyze papers for relevance to research projects."
+                        "content": f"""{strategic_context}
+
+You are an expert research assistant helping to triage scientific papers.
+Analyze papers for relevance to research projects using the strategic context above."""
                     },
                     {
                         "role": "user",
@@ -219,8 +231,11 @@ class AITriageService:
             # Parse response
             result = json.loads(response.choices[0].message.content)
 
-            # Validate and normalize result
-            return self._normalize_triage_result(result)
+            # Week 1: Validate response before returning
+            validator = ValidationService()
+            validated_result = validator.validate_triage(result)
+
+            return validated_result
 
         except Exception as e:
             logger.error(f"❌ Error calling OpenAI for triage: {e}")

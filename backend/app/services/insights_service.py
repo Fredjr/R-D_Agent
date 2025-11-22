@@ -1,6 +1,7 @@
 """
 Insights Service - AI-powered project insights and recommendations
 Week 21-22: AI Insights Feature
+Week 1 Improvements: Strategic context, tool patterns, validation, orchestration rules
 """
 
 import logging
@@ -14,8 +15,14 @@ from openai import AsyncOpenAI
 from database import (
     Project, ResearchQuestion, Hypothesis, Article, PaperTriage,
     Protocol, ExperimentPlan, QuestionEvidence, HypothesisEvidence,
-    ProjectInsights, ProjectDecision
+    ProjectInsights, ProjectDecision, ExperimentResult
 )
+
+# Week 1 Improvements
+from backend.app.services.strategic_context import StrategicContext
+from backend.app.services.tool_patterns import ToolPatterns
+from backend.app.services.orchestration_rules import OrchestrationRules
+from backend.app.services.validation_service import ValidationService
 
 logger = logging.getLogger(__name__)
 
@@ -206,8 +213,23 @@ class InsightsService:
         }
 
     async def _generate_ai_insights(self, project_data: Dict, metrics: Dict) -> Dict:
-        """Generate insights using AI"""
-        logger.info(f"🤖 Generating AI insights...")
+        """
+        Generate insights using AI with Week 1 improvements:
+        - Strategic context (WHY)
+        - Tool usage patterns
+        - Orchestration rules (deterministic logic)
+        - Response validation
+        """
+        logger.info(f"🤖 Generating AI insights with Week 1 improvements...")
+
+        # Week 1: Use orchestration rules to decide what to analyze
+        orchestration_rules = OrchestrationRules()
+        required_insight_types = orchestration_rules.get_required_insight_types(project_data)
+        priority_focus = orchestration_rules.get_priority_focus(project_data)
+        focus_guidance = orchestration_rules.get_focus_guidance(priority_focus)
+
+        logger.info(f"📋 Required insight types: {required_insight_types}")
+        logger.info(f"🎯 Priority focus: {priority_focus}")
 
         # Build context
         context = self._build_context(project_data, metrics)
@@ -221,7 +243,11 @@ class InsightsService:
                 messages=[
                     {
                         "role": "system",
-                        "content": self._get_system_prompt()
+                        "content": self._get_system_prompt(
+                            required_insight_types=required_insight_types,
+                            priority_focus=priority_focus,
+                            focus_guidance=focus_guidance
+                        )
                     },
                     {
                         "role": "user",
@@ -239,13 +265,17 @@ class InsightsService:
                 raise ValueError("AI returned empty response")
 
             logger.info(f"📝 AI response (first 200 chars): {ai_response[:200]}")
-            insights = json.loads(ai_response)
+            raw_insights = json.loads(ai_response)
+
+            # Week 1: Validate response before returning
+            validator = ValidationService()
+            validated_insights = validator.validate_insights(raw_insights, project_data)
 
             # Add metrics to response
-            insights['metrics'] = metrics
+            validated_insights['metrics'] = metrics
 
-            logger.info(f"✅ AI insights generated successfully")
-            return insights
+            logger.info(f"✅ AI insights generated and validated successfully")
+            return validated_insights
 
         except json.JSONDecodeError as e:
             logger.error(f"❌ Failed to parse AI response as JSON: {e}")
@@ -482,9 +512,40 @@ class InsightsService:
 
         return context
 
-    def _get_system_prompt(self) -> str:
-        """Get context-aware system prompt for AI"""
-        return """You are an AI research analyst that deeply understands the iterative scientific research process.
+    def _get_system_prompt(
+        self,
+        required_insight_types: List[str] = None,
+        priority_focus: str = None,
+        focus_guidance: str = None
+    ) -> str:
+        """
+        Get context-aware system prompt for AI with Week 1 improvements.
+
+        Args:
+            required_insight_types: List of required insight types (from orchestration rules)
+            priority_focus: Priority focus area (from orchestration rules)
+            focus_guidance: Guidance text for priority focus
+        """
+        # Week 1: Add strategic context (WHY)
+        strategic_context = StrategicContext.get_context('insights')
+
+        # Week 1: Add tool usage patterns
+        tool_patterns = ToolPatterns.get_all_patterns()
+
+        # Week 1: Add focus guidance from orchestration rules
+        focus_section = ""
+        if focus_guidance:
+            focus_section = f"\n{focus_guidance}\n"
+
+        return f"""{strategic_context}
+
+{focus_section}
+
+{tool_patterns}
+
+## 🎯 YOUR ANALYSIS TASK
+
+You are an AI research analyst that deeply understands the iterative scientific research process.
 
 You track the complete research journey: Question → Hypothesis → Evidence → Method → Experiment → Result → Answer → New Question
 

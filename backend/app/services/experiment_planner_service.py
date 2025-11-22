@@ -5,6 +5,7 @@ AI-powered experiment planning service that generates detailed experiment plans
 based on protocols and research context (questions, hypotheses).
 
 Week 19-20: Experiment Planning Feature
+Week 1 Improvements: Strategic context, tool patterns, validation, orchestration rules
 """
 
 import os
@@ -20,6 +21,10 @@ from database import (
     ExperimentPlan, Protocol, Article, Project,
     ResearchQuestion, Hypothesis
 )
+
+# Week 1 Improvements
+from backend.app.services.strategic_context import StrategicContext
+from backend.app.services.validation_service import ValidationService
 
 logger = logging.getLogger(__name__)
 
@@ -163,23 +168,32 @@ class ExperimentPlannerService:
         custom_objective: Optional[str],
         custom_notes: Optional[str]
     ) -> Dict:
-        """Generate experiment plan using AI."""
-        logger.info(f"🤖 Generating plan with AI")
-        
+        """
+        Generate experiment plan using AI with Week 1 improvements.
+
+        Week 1 Improvements: Strategic context, validation
+        """
+        logger.info(f"🤖 Generating plan with AI (Week 1 improvements)")
+
+        # Week 1: Get strategic context
+        strategic_context = StrategicContext.get_context('experiment')
+
         # Build prompt
         prompt = self._build_plan_prompt(context, custom_objective, custom_notes)
-        
+
         try:
             # Get OpenAI client
             client = self._get_client()
 
-            # Call OpenAI
+            # Call OpenAI with strategic context
             response = await client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {
                         "role": "system",
-                        "content": """You are an expert research scientist and experiment planner.
+                        "content": f"""{strategic_context}
+
+You are an expert research scientist and experiment planner.
 Generate detailed, practical, and actionable experiment plans based on protocols and research context.
 Be specific about materials, procedures, timelines, and success criteria.
 Consider real-world constraints like cost, time, and expertise requirements.
@@ -193,13 +207,17 @@ Always provide risk assessments and troubleshooting guidance."""
                 response_format={"type": "json_object"},
                 temperature=self.temperature
             )
-            
+
             # Parse response
-            result = json.loads(response.choices[0].message.content)
-            
-            logger.info(f"✅ AI plan generation complete")
-            return result
-            
+            raw_result = json.loads(response.choices[0].message.content)
+
+            # Week 1: Validate response
+            validator = ValidationService()
+            validated_result = validator.validate_experiment_plan(raw_result)
+
+            logger.info(f"✅ AI plan generation and validation complete")
+            return validated_result
+
         except Exception as e:
             logger.error(f"❌ Error calling OpenAI: {e}")
             raise
