@@ -571,7 +571,7 @@ class IntelligentProtocolExtractor:
         # Build context-aware prompt
         context_summary = self._build_context_summary(context)
 
-        prompt = f"""You are a scientific protocol extraction expert. Your job is to extract ONLY the specific experimental details that are EXPLICITLY stated in this paper's text, WITH SOURCE CITATIONS.
+        prompt = f"""You are a scientific protocol extraction expert. Your job is to extract ALL specific experimental details that are EXPLICITLY stated in this paper's text, WITH MAXIMUM DETAIL AND SOURCE CITATIONS.
 
 PROJECT CONTEXT:
 {context_summary}
@@ -580,21 +580,30 @@ PAPER TEXT (Source: {text_source}):
 {paper_text}
 
 CRITICAL RULES - READ CAREFULLY:
-1. ⚠️ ONLY extract information that is EXPLICITLY stated in the paper text above
-2. ⚠️ DO NOT use general textbook knowledge or common lab procedures
-3. ⚠️ DO NOT invent or assume materials, steps, or equipment not mentioned
-4. ⚠️ If the paper is a review/perspective/commentary with no experimental methods, return "No clear protocol found"
-5. ⚠️ Include specific quantitative details when mentioned (concentrations, times, temperatures, doses)
-6. ⚠️ For materials: Include specific names, variants, concentrations, catalog numbers if mentioned
-7. ⚠️ For steps: Include ALL steps explicitly described in the Methods section
-8. ⚠️ For equipment: Include ALL equipment explicitly mentioned
-9. ⚠️ Extract detailed protocols from Methods/Materials sections when available
+1. ⚠️ EXTRACT ALL DETAILS: Include every specific detail mentioned in the Methods section
+2. ⚠️ BE COMPREHENSIVE: Extract ALL steps, materials, equipment, measurements, and parameters
+3. ⚠️ DO NOT SUMMARIZE: Extract the FULL protocol with all quantitative details
+4. ⚠️ DO NOT use general textbook knowledge or common lab procedures
+5. ⚠️ DO NOT invent or assume materials, steps, or equipment not mentioned
+6. ⚠️ If the paper is a review/perspective/commentary with no experimental methods, return "No clear protocol found"
+7. ⚠️ Include specific quantitative details when mentioned (concentrations, times, temperatures, doses, sample sizes, timepoints)
+8. ⚠️ For materials: Include specific names, variants, concentrations, catalog numbers if mentioned
+9. ⚠️ For steps: Include ALL steps explicitly described in the Methods section with FULL details
+10. ⚠️ For equipment: Include ALL equipment explicitly mentioned (models, manufacturers)
+11. ⚠️ Extract detailed protocols from Methods/Materials sections when available
 
 PAPER TYPE DETECTION:
 - If the text contains words like "review", "perspective", "overview" WITHOUT experimental methods → Return "No clear protocol found"
-- If the text describes specific experimental procedures, measurements, or methods → Extract the COMPLETE protocol
+- If the text describes specific experimental procedures, measurements, or methods → Extract the COMPLETE protocol with ALL details
 
-SPECIFICITY REQUIREMENTS:
+SPECIFICITY REQUIREMENTS FOR CLINICAL TRIALS:
+- Study Design: Extract randomization method, blinding, group assignments, sample sizes, duration
+- Interventions: Extract drug names, doses, routes of administration, frequency, duration
+- Measurements: Extract all outcome measures, assessment timepoints, measurement methods, equipment used
+- Procedures: Extract all procedures with full details (e.g., "low-dose whole-body CT at 6 months")
+- Timeline: Extract all timepoints for assessments, interventions, follow-ups
+
+SPECIFICITY REQUIREMENTS FOR LAB PROTOCOLS:
 - Materials: Must include specific details (e.g., "10 μM doxorubicin (Sigma-Aldrich, Cat# D1515)" not just "doxorubicin")
 - Steps: Must be specific actions from the paper (e.g., "Cells were treated with 10 μM drug for 24h at 37°C in a humidified incubator" not "Treat cells with drug")
 - Equipment: Include ALL equipment mentioned (e.g., "BD FACSAria III flow cytometer", "Zeiss LSM 880 confocal microscope")
@@ -603,7 +612,7 @@ SPECIFICITY REQUIREMENTS:
 Return a JSON object with this EXACT structure:
 {{
     "protocol_name": "Specific name from paper (or 'No clear protocol found')",
-    "protocol_type": "delivery|editing|screening|analysis|synthesis|imaging|other",
+    "protocol_type": "clinical_trial|delivery|editing|screening|analysis|synthesis|imaging|other",
     "materials": [
         {{"name": "Specific material with details", "catalog_number": "if mentioned", "supplier": "if mentioned", "amount": "concentration/dose if mentioned", "notes": "any specific details", "source_text": "EXACT quote from paper where this material is mentioned"}}
     ],
@@ -623,11 +632,21 @@ Return a JSON object with this EXACT structure:
 
 EXAMPLES OF GOOD vs BAD EXTRACTION:
 
-❌ BAD (too generic):
+❌ BAD (too generic - CLINICAL TRIAL):
+- Materials: "Study drug", "Placebo"
+- Steps: "Randomize participants", "Monitor safety"
+- Equipment: []
+
+✅ GOOD (specific from paper - CLINICAL TRIAL):
+- Materials: "AZD0530 (saracatinib) 100 mg once daily oral administration", "Matched placebo indistinguishable from AZD0530"
+- Steps: "Participants randomized 1:1 to AZD0530 or placebo using random number table stratified by site in blocks of two", "Evaluate primary endpoint of change in heterotopic bone volume measured by low-dose whole-body CT at 6 months", "Conduct safety assessments at 6, 12, and 18 months including adverse event monitoring"
+- Equipment: ["Low-dose whole-body CT scanner"]
+
+❌ BAD (too generic - LAB PROTOCOL):
 - Materials: "CRISPR/Cas9 plasmids", "Guide RNAs"
 - Steps: "Design guide RNAs", "Transfect cells"
 
-✅ GOOD (specific from paper):
+✅ GOOD (specific from paper - LAB PROTOCOL):
 - Materials: "SpCas9 with sgRNA targeting INSR exon 3", "Lipofectamine 3000 transfection reagent (2 μL per well)"
 - Steps: "HEK293T cells were transfected with 500 ng plasmid DNA and incubated for 48h at 37°C"
 
