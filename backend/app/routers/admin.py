@@ -197,6 +197,92 @@ async def run_migration_005(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/migrate/011-add-tables-and-figures")
+async def run_migration_011(
+    admin_key: str = Header(..., alias="X-Admin-Key"),
+    db: Session = Depends(get_db)
+):
+    """
+    Run migration 011: Add tables and figures support (Week 22)
+
+    Adds columns for rich PDF content extraction:
+    - articles.pdf_tables
+    - articles.pdf_figures
+    - protocols.tables_data
+    - protocols.figures_data
+    - protocols.figures_analysis
+
+    Requires X-Admin-Key header for security.
+    """
+    # Verify admin key
+    expected_key = os.getenv("ADMIN_KEY", "your-secret-admin-key-change-this")
+    if admin_key != expected_key:
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+
+    try:
+        logger.info("🔧 Starting migration 011...")
+
+        # Check if columns already exist
+        inspector = inspect(db.bind)
+        articles_columns = {col['name'] for col in inspector.get_columns('articles')}
+        protocols_columns = {col['name'] for col in inspector.get_columns('protocols')}
+
+        if 'pdf_tables' in articles_columns and 'tables_data' in protocols_columns:
+            return {
+                "status": "already_applied",
+                "message": "Migration 011 has already been applied",
+                "columns_exist": True
+            }
+
+        # Read migration SQL
+        migration_path = "backend/migrations/011_add_tables_and_figures.sql"
+        with open(migration_path, 'r') as f:
+            migration_sql = f.read()
+
+        # Split by semicolon and execute each statement
+        statements = [
+            s.strip()
+            for s in migration_sql.split(';')
+            if s.strip() and not s.strip().startswith('--')
+        ]
+
+        results = []
+        for stmt in statements:
+            if stmt:
+                try:
+                    db.execute(text(stmt))
+                    results.append({"statement": stmt[:100] + "...", "status": "success"})
+                    logger.info(f"✅ Executed: {stmt[:60]}...")
+                except Exception as e:
+                    error_msg = str(e)
+                    if "already exists" in error_msg or "duplicate" in error_msg.lower():
+                        results.append({"statement": stmt[:100] + "...", "status": "already_exists"})
+                        logger.info(f"⚠️ Already exists: {stmt[:60]}...")
+                    else:
+                        raise
+
+        db.commit()
+
+        logger.info("✅ Migration 011 completed successfully!")
+
+        return {
+            "status": "success",
+            "message": "Migration 011 completed successfully! Now uncomment the columns in database.py and redeploy.",
+            "statements_executed": len(results),
+            "details": results,
+            "next_steps": [
+                "1. Uncomment pdf_tables and pdf_figures in Article model (database.py line ~451)",
+                "2. Uncomment tables_data, figures_data, figures_analysis in Protocol model (database.py line ~917)",
+                "3. Commit and push to trigger redeployment"
+            ]
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Migration 011 failed: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")
+
+
 @router.get("/migrate/status")
 async def check_migration_status(
     db: Session = Depends(get_db)
@@ -207,7 +293,8 @@ async def check_migration_status(
     """
     try:
         inspector = inspect(db.bind)
-        existing_columns = {col['name'] for col in inspector.get_columns('protocols')}
+        protocols_columns = {col['name'] for col in inspector.get_columns('protocols')}
+        articles_columns = {col['name'] for col in inspector.get_columns('articles')}
 
         # Check for Week 19 columns
         week_19_columns = [
@@ -221,18 +308,33 @@ async def check_migration_status(
             'material_sources', 'step_sources'
         ]
 
-        has_week_19 = all(col in existing_columns for col in week_19_columns)
-        has_confidence = all(col in existing_columns for col in confidence_columns)
+        # Check for migration 011 columns (Week 22)
+        week_22_articles_columns = ['pdf_tables', 'pdf_figures']
+        week_22_protocols_columns = ['tables_data', 'figures_data', 'figures_analysis']
+
+        has_week_19 = all(col in protocols_columns for col in week_19_columns)
+        has_confidence = all(col in protocols_columns for col in confidence_columns)
+        has_week_22 = (
+            all(col in articles_columns for col in week_22_articles_columns) and
+            all(col in protocols_columns for col in week_22_protocols_columns)
+        )
 
         return {
             "migration_003_applied": has_week_19,
             "migration_004_applied": has_confidence,
-            "total_columns": len(existing_columns),
-            "week_19_columns_present": sum(1 for col in week_19_columns if col in existing_columns),
+            "migration_011_applied": has_week_22,
+            "total_protocols_columns": len(protocols_columns),
+            "total_articles_columns": len(articles_columns),
+            "week_19_columns_present": sum(1 for col in week_19_columns if col in protocols_columns),
             "week_19_columns_total": len(week_19_columns),
-            "confidence_columns_present": sum(1 for col in confidence_columns if col in existing_columns),
+            "confidence_columns_present": sum(1 for col in confidence_columns if col in protocols_columns),
             "confidence_columns_total": len(confidence_columns),
-            "status": "up_to_date" if (has_week_19 and has_confidence) else "migration_needed"
+            "week_22_columns_present": (
+                sum(1 for col in week_22_articles_columns if col in articles_columns) +
+                sum(1 for col in week_22_protocols_columns if col in protocols_columns)
+            ),
+            "week_22_columns_total": len(week_22_articles_columns) + len(week_22_protocols_columns),
+            "status": "up_to_date" if (has_week_19 and has_confidence and has_week_22) else "migration_needed"
         }
 
     except Exception as e:
