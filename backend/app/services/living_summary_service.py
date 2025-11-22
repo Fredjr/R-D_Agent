@@ -5,6 +5,7 @@ Week 1 Improvements: Strategic context, tool patterns, validation, orchestration
 """
 
 import logging
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 import uuid
