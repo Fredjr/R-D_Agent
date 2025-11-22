@@ -83,6 +83,12 @@ class AITriageService:
             Hypothesis.project_id == project_id
         ).all()
 
+        # Phase 1.3: Get decision history
+        from database import ProjectDecision
+        decisions = db.query(ProjectDecision).filter(
+            ProjectDecision.project_id == project_id
+        ).order_by(ProjectDecision.decided_at.desc()).limit(5).all()
+
         # 3. Extract PDF text first (Week 19-20 Critical Fix)
         from backend.app.services.pdf_text_extractor import PDFTextExtractor
         pdf_extractor = PDFTextExtractor()
@@ -97,8 +103,8 @@ class AITriageService:
             logger.warning(f"⚠️ PDF extraction failed: {e}, falling back to abstract")
             pdf_text = None
 
-        # 4. Build context for AI
-        context = self._build_project_context(project, questions, hypotheses)
+        # 4. Build context for AI (Phase 1.3: Now includes decisions)
+        context = self._build_project_context(project, questions, hypotheses, decisions)
 
         # Week 2: Retrieve relevant memories for context (past triages for consistency)
         memory_context = ""
@@ -221,10 +227,11 @@ class AITriageService:
         self,
         project: Project,
         questions: List[ResearchQuestion],
-        hypotheses: List[Hypothesis]
+        hypotheses: List[Hypothesis],
+        decisions: List = None  # Phase 1.3: Add decision history
     ) -> Dict:
-        """Build project context for AI analysis"""
-        return {
+        """Build project context for AI analysis (Phase 1.3: Now includes decision history)"""
+        context = {
             "project_name": project.project_name,
             "project_description": project.description or "",
             "questions": [
@@ -232,7 +239,8 @@ class AITriageService:
                     "question_id": q.question_id,
                     "text": q.question_text,
                     "type": q.question_type,
-                    "status": q.status
+                    "status": q.status,
+                    "priority": getattr(q, 'priority', None)  # Phase 1.3: Add priority
                 }
                 for q in questions
             ],
@@ -241,11 +249,25 @@ class AITriageService:
                     "hypothesis_id": h.hypothesis_id,
                     "text": h.hypothesis_text,
                     "type": h.hypothesis_type,
-                    "status": h.status
+                    "status": h.status,
+                    "confidence_level": getattr(h, 'confidence_level', None)  # Phase 1.3: Add confidence
                 }
                 for h in hypotheses
             ]
         }
+
+        # Phase 1.3: Add decision history
+        if decisions:
+            context["decisions"] = [
+                {
+                    "decision_text": d.decision_text,
+                    "rationale": getattr(d, 'rationale', None),
+                    "decided_at": str(d.decided_at) if hasattr(d, 'decided_at') else None
+                }
+                for d in decisions[:5]  # Top 5 recent decisions
+            ]
+
+        return context
 
     async def _analyze_paper_relevance(
         self,
@@ -337,22 +359,33 @@ If previous triage context is provided, maintain consistency with past decisions
         Build prompt for AI triage.
 
         Week 19-20 Critical Fix: Now uses PDF text when available!
+        Phase 1.3: Now includes decision history and priority/confidence!
         """
         questions_text = "\n".join([
-            f"- [{q['type']}] {q['text']} (Status: {q['status']})"
+            f"- [{q['type']}] {q['text']} (Status: {q['status']}, Priority: {q.get('priority', 'N/A')})"
             for q in context["questions"]
         ]) if context["questions"] else "No research questions defined yet."
 
         hypotheses_text = "\n".join([
-            f"- [{h['type']}] {h['text']} (Status: {h['status']})"
+            f"- [{h['type']}] {h['text']} (Status: {h['status']}, Confidence: {h.get('confidence_level', 'N/A')}%)"
             for h in context["hypotheses"]
         ]) if context["hypotheses"] else "No hypotheses defined yet."
 
+        # Phase 1.3: Add decision history
+        decisions_text = ""
+        if context.get("decisions"):
+            decisions_text = "\n**User Decisions & Priorities:**\n"
+            decisions_text += "\n".join([
+                f"- {d['decision_text']}" + (f" (Rationale: {d['rationale']})" if d.get('rationale') else "")
+                for d in context["decisions"]
+            ])
+            decisions_text += "\n"
+
         # Use PDF text if available, otherwise fall back to abstract
         if pdf_text:
-            # Truncate PDF text to avoid token limits (keep first 6000 chars)
-            content = pdf_text[:6000]
-            if len(pdf_text) > 6000:
+            # Phase 1.2: Increased from 6000 to 12000 chars for deeper analysis
+            content = pdf_text[:12000]
+            if len(pdf_text) > 12000:
                 content += "\n\n[... truncated for length ...]"
             content_source = "Full Paper Text (PDF)"
         else:
@@ -370,6 +403,8 @@ Description: {context['project_description']}
 
 **Hypotheses:**
 {hypotheses_text}
+
+{decisions_text}
 
 **Paper to Analyze:**
 Title: {article.title}

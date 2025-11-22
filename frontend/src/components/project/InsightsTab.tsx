@@ -19,10 +19,9 @@ interface Insight {
 }
 
 interface Recommendation {
-  action: string;
-  rationale: string;
+  title: string;  // Changed from 'action' to match backend
+  description: string;  // Changed from 'rationale' to match backend
   priority: 'high' | 'medium' | 'low';
-  estimated_effort: string;
   closes_loop?: string;
 }
 
@@ -339,9 +338,8 @@ export default function InsightsTab({ projectId, userId }: InsightsTabProps) {
               <div key={index} className="bg-gray-800/50 border border-gray-600 rounded-lg p-4 hover:border-purple-500/30 transition-colors">
                 <div className="flex items-start justify-between gap-4 mb-3">
                   <div className="flex-1">
-                    <h4 className="font-semibold text-white mb-2">{rec.action}</h4>
-                    <p className="text-gray-300 text-sm mb-2">{rec.rationale}</p>
-                    <p className="text-gray-400 text-xs mb-2">⏱️ Estimated effort: {rec.estimated_effort}</p>
+                    <h4 className="font-semibold text-white mb-2">{rec.title}</h4>
+                    <p className="text-gray-300 text-sm mb-2">{rec.description}</p>
                     {rec.closes_loop && (
                       <div className="mt-3 pt-3 border-t-2 border-purple-400/30 bg-purple-500/5 rounded-lg p-3">
                         <p className="text-sm text-purple-400 mb-1 font-bold flex items-center gap-2">

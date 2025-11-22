@@ -220,13 +220,20 @@ class ExperimentPlannerService:
         hypotheses = db.query(Hypothesis).filter(
             Hypothesis.project_id == project_id
         ).order_by(Hypothesis.created_at.desc()).limit(10).all()
-        
+
+        # Phase 1.3: Get decision history
+        from database import ProjectDecision
+        decisions = db.query(ProjectDecision).filter(
+            ProjectDecision.project_id == project_id
+        ).order_by(ProjectDecision.decided_at.desc()).limit(5).all()
+
         return {
             "protocol": protocol,
             "project": project,
             "article": article,
             "questions": questions,
-            "hypotheses": hypotheses
+            "hypotheses": hypotheses,
+            "decisions": decisions  # Phase 1.3
         }
     
     async def _generate_plan_with_ai(
@@ -305,12 +312,13 @@ If previous experiment context is provided, learn from past plans to improve qua
         custom_objective: Optional[str],
         custom_notes: Optional[str]
     ) -> str:
-        """Build the prompt for AI plan generation."""
+        """Build the prompt for AI plan generation (Phase 1.3: Now includes decision history)."""
         protocol = context["protocol"]
         project = context["project"]
         questions = context["questions"]
         hypotheses = context["hypotheses"]
         article = context["article"]
+        decisions = context.get("decisions", [])  # Phase 1.3
 
         # Build context sections
         protocol_section = f"""
@@ -358,14 +366,27 @@ Description: {project.description if project and project.description else 'Not p
                 hypotheses_section += f"{i}. [ID: {h.hypothesis_id}] {h.hypothesis_text}\n"
                 hypotheses_section += f"   Type: {h.hypothesis_type}, Status: {h.status}, Confidence: {h.confidence_level}%\n"
 
-        # Source article context
+        # Source article context (Phase 1.2: Expanded from 500 to 2000 chars)
         article_section = ""
         if article:
+            abstract_text = article.abstract[:2000] if article.abstract else 'Not available'
+            if article.abstract and len(article.abstract) > 2000:
+                abstract_text += "..."
             article_section = f"""
 SOURCE ARTICLE:
 Title: {article.title}
-Abstract: {article.abstract[:500] if article.abstract else 'Not available'}...
+Abstract: {abstract_text}
 """
+
+        # Phase 1.3: Decision history
+        decisions_section = ""
+        if decisions:
+            decisions_section = "\nUSER DECISIONS & PRIORITIES:\n"
+            for i, d in enumerate(decisions[:3], 1):  # Top 3 recent decisions
+                decisions_section += f"{i}. {d.decision_text}"
+                if hasattr(d, 'rationale') and d.rationale:
+                    decisions_section += f"\n   Rationale: {d.rationale}"
+                decisions_section += "\n"
 
         # Custom objective or default
         objective_section = f"""
@@ -381,7 +402,7 @@ ADDITIONAL REQUIREMENTS:
 {custom_notes}
 """
 
-        # Full prompt
+        # Full prompt (Phase 1.3: Now includes decisions)
         prompt = f"""{protocol_section}
 
 {project_section}
@@ -390,11 +411,15 @@ ADDITIONAL REQUIREMENTS:
 
 {hypotheses_section}
 
+{decisions_section}
+
 {article_section}
 
 {objective_section}
 
 {notes_section}
+
+**IMPORTANT:** Prioritize based on user decisions and focus areas listed above.
 
 Generate a comprehensive experiment plan with the following structure (return as JSON):
 

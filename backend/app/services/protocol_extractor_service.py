@@ -103,7 +103,26 @@ class ProtocolExtractorService:
             else:
                 raise ValueError(f"No project_id provided and no triage record found for PMID {article_pmid}")
 
-        # Step 4: Extract PDF text first (Week 19-20 Critical Fix)
+        # Step 4: Get research context (Phase 1 Enhancement)
+        from database import Project, ResearchQuestion, Hypothesis, ProjectDecision
+
+        project = db.query(Project).filter(Project.project_id == project_id).first()
+
+        questions = db.query(ResearchQuestion).filter(
+            ResearchQuestion.project_id == project_id
+        ).order_by(ResearchQuestion.priority.desc(), ResearchQuestion.created_at.desc()).limit(10).all()
+
+        hypotheses = db.query(Hypothesis).filter(
+            Hypothesis.project_id == project_id
+        ).order_by(Hypothesis.confidence_level.asc(), Hypothesis.created_at.desc()).limit(10).all()
+
+        decisions = db.query(ProjectDecision).filter(
+            ProjectDecision.project_id == project_id
+        ).order_by(ProjectDecision.decided_at.desc()).limit(5).all()
+
+        logger.info(f"📋 Research context: {len(questions)} questions, {len(hypotheses)} hypotheses, {len(decisions)} decisions")
+
+        # Step 5: Extract PDF text first (Week 19-20 Critical Fix)
         from backend.app.services.pdf_text_extractor import PDFTextExtractor
         pdf_extractor = PDFTextExtractor()
 
@@ -117,15 +136,45 @@ class ProtocolExtractorService:
             logger.warning(f"⚠️ PDF extraction failed: {e}, falling back to abstract")
             pdf_text = None
 
-        # Step 5: Extract protocol using AI (with PDF text if available)
+        # Step 6: Extract protocol using AI (with PDF text AND research context)
         protocol_data = await self._extract_with_ai(
             article=article,
             protocol_type=protocol_type,
-            pdf_text=pdf_text
+            pdf_text=pdf_text,
+            project=project,
+            questions=questions,
+            hypotheses=hypotheses,
+            decisions=decisions
         )
 
-        # Step 6: Save to database
+        # Step 6: Save to database (Phase 1: Enhanced with research context)
         import uuid
+
+        # Phase 1: Parse research context fields
+        addresses_questions = protocol_data.get("addresses_questions", [])
+        tests_hypotheses = protocol_data.get("tests_hypotheses", [])
+        research_rationale = protocol_data.get("research_rationale")
+        suggested_modifications = protocol_data.get("suggested_modifications")
+
+        # Convert Q1, Q2, H1, H2 to actual IDs
+        affected_question_ids = []
+        if addresses_questions and questions:
+            for q_ref in addresses_questions:
+                # Extract number from "Q1", "Q2", etc.
+                if q_ref.startswith("Q") and q_ref[1:].isdigit():
+                    idx = int(q_ref[1:]) - 1
+                    if 0 <= idx < len(questions):
+                        affected_question_ids.append(questions[idx].question_id)
+
+        affected_hypothesis_ids = []
+        if tests_hypotheses and hypotheses:
+            for h_ref in tests_hypotheses:
+                # Extract number from "H1", "H2", etc.
+                if h_ref.startswith("H") and h_ref[1:].isdigit():
+                    idx = int(h_ref[1:]) - 1
+                    if 0 <= idx < len(hypotheses):
+                        affected_hypothesis_ids.append(hypotheses[idx].hypothesis_id)
+
         protocol = Protocol(
             protocol_id=str(uuid.uuid4()),
             project_id=project_id,  # Now required!
@@ -137,6 +186,13 @@ class ProtocolExtractorService:
             equipment=protocol_data.get("equipment", []),
             duration_estimate=protocol_data.get("duration_estimate"),
             difficulty_level=protocol_data.get("difficulty_level", "moderate"),
+            # Phase 1: Research context fields
+            affected_questions=affected_question_ids,
+            affected_hypotheses=affected_hypothesis_ids,
+            relevance_reasoning=research_rationale,
+            recommendations=[suggested_modifications] if suggested_modifications else [],
+            context_aware=True if (questions or hypotheses) else False,
+            extraction_method='intelligent_context_aware',  # Phase 1 marker
             extracted_by="ai",
             created_by=user_id
         )
@@ -188,12 +244,17 @@ class ProtocolExtractorService:
         self,
         article: Article,
         protocol_type: Optional[str],
-        pdf_text: Optional[str] = None
+        pdf_text: Optional[str] = None,
+        project = None,
+        questions: List = None,
+        hypotheses: List = None,
+        decisions: List = None
     ) -> Dict:
         """
         Use AI to extract protocol from article (PDF text or abstract).
 
         Week 19-20 Critical Fix: Now uses full PDF text when available!
+        Phase 1 Enhancement: Now uses research context (questions, hypotheses, decisions)!
 
         Optimizations:
         - Use PDF full text when available (preferred)
@@ -201,17 +262,30 @@ class ProtocolExtractorService:
         - Structured JSON output with schema
         - Low temperature for consistency
         - Specialized prompt for protocols
+        - Research context awareness (Phase 1)
 
         Args:
             article: Article object
             protocol_type: Optional type hint
             pdf_text: Full PDF text (if available)
+            project: Project object (Phase 1)
+            questions: List of ResearchQuestion objects (Phase 1)
+            hypotheses: List of Hypothesis objects (Phase 1)
+            decisions: List of ProjectDecision objects (Phase 1)
 
         Returns:
             Dictionary with protocol data
         """
-        # Build specialized prompt (with PDF text if available)
-        prompt = self._build_protocol_prompt(article, protocol_type, pdf_text)
+        # Build specialized prompt (with PDF text AND research context)
+        prompt = self._build_protocol_prompt(
+            article,
+            protocol_type,
+            pdf_text,
+            project,
+            questions,
+            hypotheses,
+            decisions
+        )
         
         try:
             # Call OpenAI with structured output
@@ -254,29 +328,76 @@ Be precise and include all relevant details like catalog numbers, durations, and
         self,
         article: Article,
         protocol_type: Optional[str],
-        pdf_text: Optional[str] = None
+        pdf_text: Optional[str] = None,
+        project = None,
+        questions: List = None,
+        hypotheses: List = None,
+        decisions: List = None
     ) -> str:
         """
         Build specialized prompt for protocol extraction.
 
         Week 19-20 Critical Fix: Now uses PDF text when available!
+        Phase 1 Enhancement: Now includes research context!
 
         Args:
             article: Article object
             protocol_type: Optional type hint
             pdf_text: Full PDF text (if available)
+            project: Project object (Phase 1)
+            questions: List of ResearchQuestion objects (Phase 1)
+            hypotheses: List of Hypothesis objects (Phase 1)
+            decisions: List of ProjectDecision objects (Phase 1)
 
         Returns:
             Formatted prompt string
         """
         type_hint = f" Focus on {protocol_type} protocols." if protocol_type else ""
 
+        # Phase 1: Build research context section
+        research_context = ""
+        if project or questions or hypotheses or decisions:
+            research_context = "\n**RESEARCH CONTEXT:**\n"
+            research_context += "This protocol will be used to address the following research goals:\n\n"
+
+            if project:
+                research_context += f"**Project:** {project.name}\n"
+                if project.description:
+                    research_context += f"**Description:** {project.description}\n"
+                research_context += "\n"
+
+            if questions:
+                research_context += "**Research Questions:**\n"
+                for q in questions[:5]:  # Top 5 questions
+                    priority_str = f" (Priority: {q.priority})" if hasattr(q, 'priority') and q.priority else ""
+                    status_str = f" [Status: {q.status}]" if hasattr(q, 'status') and q.status else ""
+                    research_context += f"- [Q{questions.index(q)+1}] {q.question_text}{priority_str}{status_str}\n"
+                research_context += "\n"
+
+            if hypotheses:
+                research_context += "**Hypotheses to Test:**\n"
+                for h in hypotheses[:5]:  # Top 5 hypotheses
+                    confidence_str = f" (Confidence: {h.confidence_level}%)" if hasattr(h, 'confidence_level') and h.confidence_level else ""
+                    status_str = f" [Status: {h.status}]" if hasattr(h, 'status') and h.status else ""
+                    research_context += f"- [H{hypotheses.index(h)+1}] {h.hypothesis_text}{confidence_str}{status_str}\n"
+                research_context += "\n"
+
+            if decisions:
+                research_context += "**User Decisions & Priorities:**\n"
+                for d in decisions[:3]:  # Top 3 recent decisions
+                    research_context += f"- {d.decision_text}"
+                    if hasattr(d, 'rationale') and d.rationale:
+                        research_context += f" (Rationale: {d.rationale})"
+                    research_context += "\n"
+                research_context += "\n"
+
         # Use PDF text if available, otherwise fall back to abstract
+        # Phase 1.2: Expand from 8000 to 15000 chars
         if pdf_text:
             # Extract methods section from PDF
             from backend.app.services.pdf_text_extractor import PDFTextExtractor
             extractor = PDFTextExtractor()
-            methods_text = extractor.extract_methods_section(pdf_text, max_length=8000)
+            methods_text = extractor.extract_methods_section(pdf_text, max_length=15000)  # Phase 1.2: Increased from 8000
             content_source = "Full Paper (Methods Section)"
             content = methods_text
         else:
@@ -289,6 +410,8 @@ Be precise and include all relevant details like catalog numbers, durations, and
             content = abstract
 
         return f"""Extract the experimental protocol from this scientific paper.{type_hint}
+
+{research_context}
 
 **Paper Information:**
 Title: {article.title}
@@ -303,23 +426,33 @@ Year: {article.publication_year or 'Unknown'}
 
 **Instructions:**
 1. Extract the main experimental protocol described in the paper
-2. List all materials with catalog numbers and suppliers (if mentioned)
-3. Break down the procedure into numbered steps with durations
-4. List required equipment
-5. Estimate total duration
-6. Assess difficulty level (easy, moderate, difficult)
+2. **CRITICAL (Phase 1):** Analyze which research questions [Q1, Q2, ...] this protocol addresses
+3. **CRITICAL (Phase 1):** Analyze which hypotheses [H1, H2, ...] this protocol could test
+4. **CRITICAL (Phase 1):** Explain HOW this protocol addresses the research goals
+5. List all materials with catalog numbers and suppliers (if mentioned)
+6. Break down the procedure into numbered steps with durations
+7. List required equipment
+8. Estimate total duration
+9. Assess difficulty level (easy, moderate, difficult)
+10. **NEW (Phase 1):** Suggest modifications to better address our research questions/hypotheses
 
 **Important:**
+- **RELIGIOUSLY follow the research context** - explain connections to questions and hypotheses
 - If the paper doesn't contain a clear protocol, return empty materials/steps arrays
 - Include catalog numbers and suppliers when mentioned
 - Include durations for each step when mentioned
 - Include any warnings or critical notes
 - Be precise and detailed
+- **Explain the scientific rationale** for how this protocol tests the hypotheses
 
 **Return JSON format:**
 {{
     "protocol_name": "Brief descriptive name (e.g., 'CRISPR-Cas9 Gene Editing Protocol')",
     "protocol_type": "delivery|editing|screening|analysis|synthesis|imaging|other",
+    "addresses_questions": ["Q1", "Q2", "..."] or [] if no research context,
+    "tests_hypotheses": ["H1", "H2", "..."] or [] if no research context,
+    "research_rationale": "Detailed explanation of HOW this protocol addresses the research questions and tests the hypotheses. Include specific mechanisms and expected outcomes." or null if no research context,
+    "suggested_modifications": "Modifications to better address our specific research goals" or null if no research context,
     "materials": [
         {{
             "name": "Material name",
