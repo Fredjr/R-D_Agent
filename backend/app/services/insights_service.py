@@ -110,6 +110,12 @@ class InsightsService:
             ExperimentPlan.project_id == project_id
         ).order_by(ExperimentPlan.created_at.desc()).all()
 
+        # Get experiment results (ordered by completion)
+        from database import ExperimentResult
+        results = db.query(ExperimentResult).filter(
+            ExperimentResult.project_id == project_id
+        ).order_by(ExperimentResult.completed_at.desc().nullslast()).all()
+
         # Get evidence links
         question_evidence = db.query(QuestionEvidence).join(
             ResearchQuestion
@@ -130,7 +136,7 @@ class InsightsService:
 
         logger.info(f"📊 Data gathered: {len(questions)} questions, {len(hypotheses)} hypotheses, "
                    f"{len(papers)} papers, {len(protocols)} protocols, {len(plans)} plans, "
-                   f"{len(decisions)} decisions")
+                   f"{len(results)} results, {len(decisions)} decisions")
 
         return {
             'project': project,
@@ -139,6 +145,7 @@ class InsightsService:
             'papers': papers,
             'protocols': protocols,
             'plans': plans,
+            'results': results,
             'question_evidence': question_evidence,
             'hypothesis_evidence': hypothesis_evidence,
             'decisions': decisions
@@ -248,6 +255,7 @@ class InsightsService:
         papers = project_data['papers']
         protocols = project_data['protocols']
         plans = project_data['plans']
+        results = project_data.get('results', [])  # Get results, default to empty list
         decisions = project_data['decisions']
 
         context = f"""# 🔬 Project: {project.project_name}
@@ -380,6 +388,21 @@ class InsightsService:
                                     context += f"          ↓ Experiments ({len(protocol_plans)}):\n"
                                     for plan in protocol_plans:
                                         context += f"            • {plan.plan_name} [{plan.status}]\n"
+
+                                        # Find results for this experiment
+                                        plan_results = [r for r in results if r.plan_id == plan.plan_id]
+                                        if plan_results:
+                                            result = plan_results[0]
+                                            context += f"              ↓ Result: {result.status}\n"
+                                            if result.supports_hypothesis is not None:
+                                                support_text = "SUPPORTS" if result.supports_hypothesis else "REFUTES"
+                                                context += f"                {support_text} hypothesis\n"
+                                            if result.confidence_change:
+                                                context += f"                Confidence change: {result.confidence_change:+.0f}%\n"
+                                            if result.interpretation:
+                                                context += f"                Interpretation: {result.interpretation[:100]}...\n"
+                                        else:
+                                            context += f"              ⚠️ No results recorded yet\n"
                                 else:
                                     context += f"          ⚠️ No experiments planned for this protocol\n"
                         else:

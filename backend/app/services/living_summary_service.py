@@ -130,6 +130,12 @@ class LivingSummaryService:
             ExperimentPlan.project_id == project_id
         ).order_by(ExperimentPlan.created_at.desc()).all()
 
+        # Get experiment results (ordered by completion)
+        from database import ExperimentResult
+        results = db.query(ExperimentResult).filter(
+            ExperimentResult.project_id == project_id
+        ).order_by(ExperimentResult.completed_at.desc().nullslast()).all()
+
         # Get project decisions for additional context
         decisions = db.query(ProjectDecision).filter(
             ProjectDecision.project_id == project_id
@@ -137,7 +143,7 @@ class LivingSummaryService:
 
         logger.info(f"📊 Found: {len(questions)} questions, {len(hypotheses)} hypotheses, "
                    f"{len(papers)} papers, {len(protocols)} protocols, {len(plans)} plans, "
-                   f"{len(decisions)} decisions")
+                   f"{len(results)} results, {len(decisions)} decisions")
 
         return {
             'project': project,
@@ -146,6 +152,7 @@ class LivingSummaryService:
             'papers': papers,
             'protocols': protocols,
             'plans': plans,
+            'results': results,
             'decisions': decisions
         }
     
@@ -282,7 +289,23 @@ class LivingSummaryService:
                 event['linked_protocol'] = plan.protocol_id
             journey_events.append(event)
 
-        # 6. Project Decisions (pivots and changes)
+        # 6. Experiment Results (outcomes)
+        for result in project_data.get('results', []):
+            event = {
+                'timestamp': result.completed_at or result.created_at,
+                'type': 'result',
+                'content': f"Experiment Result: {result.outcome or 'Completed'}",
+                'title': f"Result for {result.plan_id}",
+                'status': result.status,
+                'supports_hypothesis': result.supports_hypothesis,
+                'confidence_change': result.confidence_change,
+                'interpretation': result.interpretation,
+                'id': result.result_id,
+                'linked_plan': result.plan_id
+            }
+            journey_events.append(event)
+
+        # 7. Project Decisions (pivots and changes)
         for decision in project_data['decisions']:
             event = {
                 'timestamp': decision.decided_at,
@@ -353,6 +376,17 @@ class LivingSummaryService:
                 narrative += f"🧪 {event['content']} [Status: {status}]\n"
                 if event.get('linked_protocol'):
                     narrative += f"   → Uses protocol\n"
+            elif event['type'] == 'result':
+                status = event.get('status', 'unknown')
+                narrative += f"📊 {event['content']} [Status: {status}]\n"
+                if event.get('supports_hypothesis') is not None:
+                    support_text = "SUPPORTS" if event['supports_hypothesis'] else "REFUTES"
+                    narrative += f"   → {support_text} hypothesis\n"
+                if event.get('confidence_change'):
+                    narrative += f"   → Confidence change: {event['confidence_change']:+.0f}%\n"
+                if event.get('interpretation'):
+                    interp = event['interpretation'][:150] + "..." if len(event['interpretation']) > 150 else event['interpretation']
+                    narrative += f"   → {interp}\n"
             elif event['type'] == 'decision':
                 decision_type = event.get('decision_type', 'unknown')
                 narrative += f"⚡ {event['content']} (Type: {decision_type})\n"

@@ -1046,6 +1046,51 @@ class ExperimentPlan(Base):
     )
 
 
+class ExperimentResult(Base):
+    """Results and outcomes from executed experiments, completing the research loop"""
+    __tablename__ = "experiment_results"
+
+    result_id = Column(String, primary_key=True)  # UUID
+    plan_id = Column(String, ForeignKey("experiment_plans.plan_id", ondelete="CASCADE"), nullable=False, unique=True)
+    project_id = Column(String, ForeignKey("projects.project_id", ondelete="CASCADE"), nullable=False)
+
+    # Status
+    status = Column(String(50), default='planned')  # planned, in_progress, completed, failed
+
+    # Results
+    outcome = Column(Text, nullable=True)  # What happened
+    observations = Column(JSON, default=list)  # Array of observations
+    measurements = Column(JSON, default=list)  # Array of {metric, value, unit}
+    success_criteria_met = Column(JSON, default=dict)  # {criterion: true/false}
+
+    # Analysis
+    interpretation = Column(Text, nullable=True)  # What it means
+    supports_hypothesis = Column(Boolean, nullable=True)  # Does it support the hypothesis?
+    confidence_change = Column(Float, nullable=True)  # How much did hypothesis confidence change?
+
+    # Learnings
+    what_worked = Column(Text, nullable=True)
+    what_didnt_work = Column(Text, nullable=True)
+    next_steps = Column(Text, nullable=True)
+
+    # Metadata
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    project = relationship("Project")
+    experiment_plan = relationship("ExperimentPlan", backref="result")
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_experiment_results_plan', 'plan_id'),
+        Index('idx_experiment_results_project', 'project_id'),
+        Index('idx_experiment_results_status', 'status'),
+    )
+
+
 class ProjectSummary(Base):
     """Auto-generated project summaries with 24-hour cache (Week 21-22)"""
     __tablename__ = "project_summaries"
