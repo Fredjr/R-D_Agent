@@ -19,7 +19,7 @@ from openai import AsyncOpenAI
 
 from database import (
     ExperimentPlan, Protocol, Article, Project,
-    ResearchQuestion, Hypothesis
+    ResearchQuestion, Hypothesis, ExperimentResult, ProjectDecision
 )
 
 # Week 1 Improvements
@@ -401,12 +401,24 @@ Abstract: {abstract_text}
         if experiment_results:
             results_section = "\nPREVIOUS EXPERIMENT RESULTS (learn from these):\n"
             for i, result in enumerate(experiment_results[:3], 1):  # Top 3 recent results
-                results_section += f"{i}. **{result.result_title or 'Experiment Result'}**\n"
-                results_section += f"   Status: {result.status}, Outcome: {result.outcome or 'N/A'}\n"
-                if result.key_findings:
-                    results_section += f"   Key Findings: {result.key_findings[:200]}...\n"
-                if result.lessons_learned:
-                    results_section += f"   Lessons Learned: {result.lessons_learned[:200]}...\n"
+                # Get plan name from related plan if available
+                plan_name = "Experiment Result"
+                try:
+                    if result.plan and hasattr(result.plan, 'plan_name'):
+                        plan_name = result.plan.plan_name
+                except:
+                    pass
+
+                results_section += f"{i}. **{plan_name}** (ID: {result.result_id[:8]}...)\n"
+                results_section += f"   Status: {result.status}, Outcome: {result.outcome[:100] if result.outcome else 'N/A'}...\n"
+
+                # Use what_worked and what_didnt_work instead of key_findings and lessons_learned
+                if result.what_worked:
+                    results_section += f"   What Worked: {result.what_worked[:200]}...\n"
+                if result.what_didnt_work:
+                    results_section += f"   What Didn't Work: {result.what_didnt_work[:200]}...\n"
+                if result.next_steps:
+                    results_section += f"   Next Steps: {result.next_steps[:200]}...\n"
                 results_section += "\n"
             results_section += "**LEARN FROM THESE:** Avoid past mistakes and build on successful approaches.\n\n"
 
