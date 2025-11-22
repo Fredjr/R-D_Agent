@@ -257,7 +257,7 @@ class InsightsService:
                 }
 
                 memory_context = retrieval_engine.retrieve_context_for_task(
-                    project_id=project_data['project_id'],
+                    project_id=project_data['project'].project_id,
                     task_type='insights',
                     current_entities=entity_ids,
                     limit=5
@@ -319,13 +319,13 @@ class InsightsService:
                     db.commit()
                     memory_store = MemoryStore(db)
                     memory_store.store_memory(
-                        project_id=project_data['project_id'],
+                        project_id=project_data['project'].project_id,
                         interaction_type='insights',
                         content=validated_insights,
                         user_id=user_id,
                         summary=f"Generated insights: {len(validated_insights.get('key_findings', []))} findings, {len(validated_insights.get('recommendations', []))} recommendations",
-                        linked_question_ids=[q['question_id'] for q in project_data.get('questions', [])],
-                        linked_hypothesis_ids=[h['hypothesis_id'] for h in project_data.get('hypotheses', [])],
+                        linked_question_ids=[q.question_id if hasattr(q, 'question_id') else q['question_id'] for q in project_data.get('questions', [])],
+                        linked_hypothesis_ids=[h.hypothesis_id if hasattr(h, 'hypothesis_id') else h['hypothesis_id'] for h in project_data.get('hypotheses', [])],
                         relevance_score=1.0
                     )
                     logger.info(f"💾 Stored insights as memory")

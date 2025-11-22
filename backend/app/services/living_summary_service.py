@@ -203,7 +203,7 @@ class LivingSummaryService:
                 }
 
                 memory_context = retrieval_engine.retrieve_context_for_task(
-                    project_id=project_data['project_id'],
+                    project_id=project_data['project'].project_id,
                     task_type='summary',
                     current_entities=entity_ids,
                     limit=3  # Fewer memories for summaries (focus on recent)
@@ -260,13 +260,13 @@ class LivingSummaryService:
                     db.commit()
                     memory_store = MemoryStore(db)
                     memory_store.store_memory(
-                        project_id=project_data['project_id'],
+                        project_id=project_data['project'].project_id,
                         interaction_type='summary',
                         content=summary_data,
                         user_id=user_id,
                         summary=f"Project summary: {summary_data.get('overall_progress', 'Progress update')}",
-                        linked_question_ids=[q['question_id'] for q in project_data.get('questions', [])],
-                        linked_hypothesis_ids=[h['hypothesis_id'] for h in project_data.get('hypotheses', [])],
+                        linked_question_ids=[q.question_id if hasattr(q, 'question_id') else q['question_id'] for q in project_data.get('questions', [])],
+                        linked_hypothesis_ids=[h.hypothesis_id if hasattr(h, 'hypothesis_id') else h['hypothesis_id'] for h in project_data.get('hypotheses', [])],
                         relevance_score=1.0
                     )
                     logger.info(f"💾 Stored summary as memory")
