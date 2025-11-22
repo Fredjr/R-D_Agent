@@ -1138,13 +1138,13 @@ class ProjectInsights(Base):
     trend_insights = Column(JSON, default=list)
     recommendations = Column(JSON, default=list)
 
-    # Metrics (legacy columns - kept for backward compatibility)
+    # Metrics
     total_papers = Column(Integer, default=0)
     must_read_papers = Column(Integer, default=0)
     avg_paper_score = Column(Float, default=0.0)
 
-    # All metrics stored as JSON (includes questions, hypotheses, plans, etc.)
-    metrics = Column(JSON, default=dict)
+    # TODO: Add metrics JSON column via migration 009
+    # metrics = Column(JSON, default=dict)
 
     # Cache management
     last_updated = Column(DateTime(timezone=True), server_default=func.now())
