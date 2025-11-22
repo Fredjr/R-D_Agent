@@ -253,9 +253,11 @@ export default function InsightsTab({ projectId, userId }: InsightsTabProps) {
                 </div>
                 <p className="text-gray-300 text-sm mb-3">{insight.description}</p>
                 {insight.evidence_chain && (
-                  <div className="mt-3 pt-3 border-t border-blue-500/20">
-                    <p className="text-xs text-gray-400 mb-1 font-semibold">🔗 Evidence Chain:</p>
-                    <p className="text-xs text-blue-300 leading-relaxed">{insight.evidence_chain}</p>
+                  <div className="mt-4 pt-4 border-t-2 border-blue-400/30 bg-blue-500/5 rounded-lg p-3">
+                    <p className="text-sm text-blue-400 mb-2 font-bold flex items-center gap-2">
+                      🔗 Evidence Chain
+                    </p>
+                    <p className="text-sm text-blue-200 leading-relaxed font-medium">{insight.evidence_chain}</p>
                   </div>
                 )}
               </div>
@@ -286,8 +288,11 @@ export default function InsightsTab({ projectId, userId }: InsightsTabProps) {
                   </div>
                 )}
                 {insight.strengthens && (
-                  <div className="mt-3 pt-3 border-t border-purple-500/20">
-                    <p className="text-xs text-green-400">✓ {insight.strengthens}</p>
+                  <div className="mt-4 pt-4 border-t-2 border-green-400/30 bg-green-500/5 rounded-lg p-3">
+                    <p className="text-sm text-green-400 mb-2 font-bold flex items-center gap-2">
+                      ✓ Strengthens Research
+                    </p>
+                    <p className="text-sm text-green-200 leading-relaxed">{insight.strengthens}</p>
                   </div>
                 )}
               </div>
@@ -322,8 +327,11 @@ export default function InsightsTab({ projectId, userId }: InsightsTabProps) {
                   </div>
                 )}
                 {insight.blocks && (
-                  <div className="mt-3 pt-3 border-t border-red-500/20">
-                    <p className="text-xs text-red-400">⚠️ Blocks: {insight.blocks}</p>
+                  <div className="mt-4 pt-4 border-t-2 border-red-400/30 bg-red-500/5 rounded-lg p-3">
+                    <p className="text-sm text-red-400 mb-2 font-bold flex items-center gap-2">
+                      ⚠️ Blocks Progress
+                    </p>
+                    <p className="text-sm text-red-200 leading-relaxed">{insight.blocks}</p>
                   </div>
                 )}
               </div>
@@ -352,9 +360,11 @@ export default function InsightsTab({ projectId, userId }: InsightsTabProps) {
                 </div>
                 <p className="text-gray-300 text-sm mb-3">{insight.description}</p>
                 {insight.implications && (
-                  <div className="mt-3 pt-3 border-t border-green-500/20">
-                    <p className="text-xs text-gray-400 mb-1 font-semibold">💡 Implications:</p>
-                    <p className="text-xs text-green-300">{insight.implications}</p>
+                  <div className="mt-4 pt-4 border-t-2 border-yellow-400/30 bg-yellow-500/5 rounded-lg p-3">
+                    <p className="text-sm text-yellow-400 mb-2 font-bold flex items-center gap-2">
+                      💡 Implications
+                    </p>
+                    <p className="text-sm text-yellow-200 leading-relaxed">{insight.implications}</p>
                   </div>
                 )}
               </div>
@@ -379,8 +389,11 @@ export default function InsightsTab({ projectId, userId }: InsightsTabProps) {
                     <p className="text-gray-300 text-sm mb-2">{rec.rationale}</p>
                     <p className="text-gray-400 text-xs mb-2">⏱️ Estimated effort: {rec.estimated_effort}</p>
                     {rec.closes_loop && (
-                      <div className="mt-2 pt-2 border-t border-gray-600">
-                        <p className="text-xs text-purple-400">🔄 Closes loop: {rec.closes_loop}</p>
+                      <div className="mt-3 pt-3 border-t-2 border-purple-400/30 bg-purple-500/5 rounded-lg p-3">
+                        <p className="text-sm text-purple-400 mb-1 font-bold flex items-center gap-2">
+                          🔄 Closes Research Loop
+                        </p>
+                        <p className="text-sm text-purple-200 leading-relaxed">{rec.closes_loop}</p>
                       </div>
                     )}
                   </div>
