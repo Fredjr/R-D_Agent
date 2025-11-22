@@ -573,9 +573,12 @@ Guidelines:
             insights.gap_insights = insights_data.get('gap_insights', [])
             insights.trend_insights = insights_data.get('trend_insights', [])
             insights.recommendations = insights_data.get('recommendations', [])
+            # Legacy columns (for backward compatibility)
             insights.total_papers = insights_data['metrics']['total_papers']
             insights.must_read_papers = insights_data['metrics']['must_read_papers']
             insights.avg_paper_score = insights_data['metrics']['avg_paper_score']
+            # Store ALL metrics in JSON column
+            insights.metrics = insights_data['metrics']
             insights.last_updated = now
             insights.cache_valid_until = cache_valid_until
             insights.updated_at = now
@@ -589,9 +592,12 @@ Guidelines:
                 gap_insights=insights_data.get('gap_insights', []),
                 trend_insights=insights_data.get('trend_insights', []),
                 recommendations=insights_data.get('recommendations', []),
+                # Legacy columns (for backward compatibility)
                 total_papers=insights_data['metrics']['total_papers'],
                 must_read_papers=insights_data['metrics']['must_read_papers'],
                 avg_paper_score=insights_data['metrics']['avg_paper_score'],
+                # Store ALL metrics in JSON column
+                metrics=insights_data['metrics'],
                 last_updated=now,
                 cache_valid_until=cache_valid_until
             )
@@ -603,17 +609,20 @@ Guidelines:
 
     def _format_insights(self, insights: ProjectInsights) -> Dict:
         """Format insights for API response"""
+        # Use the full metrics JSON if available, otherwise fall back to legacy columns
+        metrics = insights.metrics if insights.metrics else {
+            'total_papers': insights.total_papers,
+            'must_read_papers': insights.must_read_papers,
+            'avg_paper_score': insights.avg_paper_score
+        }
+
         return {
             'progress_insights': insights.progress_insights or [],
             'connection_insights': insights.connection_insights or [],
             'gap_insights': insights.gap_insights or [],
             'trend_insights': insights.trend_insights or [],
             'recommendations': insights.recommendations or [],
-            'metrics': {
-                'total_papers': insights.total_papers,
-                'must_read_papers': insights.must_read_papers,
-                'avg_paper_score': insights.avg_paper_score
-            },
+            'metrics': metrics,
             'last_updated': insights.last_updated.isoformat() if insights.last_updated else None,
             'cache_valid_until': insights.cache_valid_until.isoformat() if insights.cache_valid_until else None
         }
