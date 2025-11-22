@@ -11,6 +11,10 @@ interface Insight {
   confidence?: 'high' | 'medium' | 'low';
   entities?: string[];
   suggestion?: string;
+  evidence_chain?: string;
+  strengthens?: string;
+  blocks?: string;
+  implications?: string;
 }
 
 interface Recommendation {
@@ -18,6 +22,7 @@ interface Recommendation {
   rationale: string;
   priority: 'high' | 'medium' | 'low';
   estimated_effort: string;
+  closes_loop?: string;
 }
 
 interface Metrics {
@@ -246,7 +251,13 @@ export default function InsightsTab({ projectId, userId }: InsightsTabProps) {
                     </span>
                   )}
                 </div>
-                <p className="text-gray-300 text-sm">{insight.description}</p>
+                <p className="text-gray-300 text-sm mb-3">{insight.description}</p>
+                {insight.evidence_chain && (
+                  <div className="mt-3 pt-3 border-t border-blue-500/20">
+                    <p className="text-xs text-gray-400 mb-1 font-semibold">🔗 Evidence Chain:</p>
+                    <p className="text-xs text-blue-300 leading-relaxed">{insight.evidence_chain}</p>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -266,12 +277,17 @@ export default function InsightsTab({ projectId, userId }: InsightsTabProps) {
                 <h4 className="font-semibold text-purple-300 mb-2">{insight.title}</h4>
                 <p className="text-gray-300 text-sm mb-3">{insight.description}</p>
                 {insight.entities && insight.entities.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2 mb-3">
                     {insight.entities.map((entity, i) => (
                       <span key={i} className="px-2 py-1 bg-purple-500/20 text-purple-300 rounded text-xs">
                         {entity}
                       </span>
                     ))}
+                  </div>
+                )}
+                {insight.strengthens && (
+                  <div className="mt-3 pt-3 border-t border-purple-500/20">
+                    <p className="text-xs text-green-400">✓ {insight.strengthens}</p>
                   </div>
                 )}
               </div>
@@ -305,6 +321,11 @@ export default function InsightsTab({ projectId, userId }: InsightsTabProps) {
                     <p className="text-gray-300 text-sm mt-1">{insight.suggestion}</p>
                   </div>
                 )}
+                {insight.blocks && (
+                  <div className="mt-3 pt-3 border-t border-red-500/20">
+                    <p className="text-xs text-red-400">⚠️ Blocks: {insight.blocks}</p>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -329,7 +350,13 @@ export default function InsightsTab({ projectId, userId }: InsightsTabProps) {
                     </span>
                   )}
                 </div>
-                <p className="text-gray-300 text-sm">{insight.description}</p>
+                <p className="text-gray-300 text-sm mb-3">{insight.description}</p>
+                {insight.implications && (
+                  <div className="mt-3 pt-3 border-t border-green-500/20">
+                    <p className="text-xs text-gray-400 mb-1 font-semibold">💡 Implications:</p>
+                    <p className="text-xs text-green-300">{insight.implications}</p>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -350,7 +377,12 @@ export default function InsightsTab({ projectId, userId }: InsightsTabProps) {
                   <div className="flex-1">
                     <h4 className="font-semibold text-white mb-2">{rec.action}</h4>
                     <p className="text-gray-300 text-sm mb-2">{rec.rationale}</p>
-                    <p className="text-gray-400 text-xs">⏱️ Estimated effort: {rec.estimated_effort}</p>
+                    <p className="text-gray-400 text-xs mb-2">⏱️ Estimated effort: {rec.estimated_effort}</p>
+                    {rec.closes_loop && (
+                      <div className="mt-2 pt-2 border-t border-gray-600">
+                        <p className="text-xs text-purple-400">🔄 Closes loop: {rec.closes_loop}</p>
+                      </div>
+                    )}
                   </div>
                   <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getPriorityColor(rec.priority)}`}>
                     {rec.priority.toUpperCase()}
