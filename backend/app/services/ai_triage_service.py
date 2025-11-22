@@ -155,14 +155,18 @@ class AITriageService:
         if evidence_quotes:
             for hyp_id, evidence in evidence_quotes.items():
                 if isinstance(evidence, dict):
+                    # Frontend expects: quote, relevance (support_type), linked_to (hypothesis_id)
                     evidence_excerpts.append({
-                        "hypothesis_id": hyp_id,
                         "quote": evidence.get("quote", ""),
-                        "page_section": evidence.get("page_section", ""),
-                        "support_type": evidence.get("support_type", "neutral")
+                        "relevance": evidence.get("support_type", "neutral"),  # Frontend field name
+                        "linked_to": hyp_id,  # Frontend field name
+                        "page_section": evidence.get("page_section", "")  # Keep for reference
                     })
+                    # Frontend expects: score, support_type, reasoning, evidence
                     hypothesis_relevance_scores[hyp_id] = {
+                        "score": 0,  # Placeholder - not used in Phase 2.1
                         "support_type": evidence.get("support_type", "neutral"),
+                        "reasoning": f"Evidence {evidence.get('support_type', 'neutral')} this hypothesis",
                         "evidence": evidence.get("quote", "")
                     }
 

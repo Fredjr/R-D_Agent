@@ -536,8 +536,9 @@ export interface PaperTriageData {
   metadata_score?: number; // Score from citations, recency, journal (0-30)
   evidence_excerpts?: Array<{
     quote: string;
-    relevance: string;
-    linked_to: string;
+    relevance: string;  // support_type from AI (supports/refutes/neutral)
+    linked_to: string;  // hypothesis_id
+    page_section?: string;  // Optional: Methods/Results/Discussion
   }>;
   question_relevance_scores?: Record<string, {
     score: number;
@@ -545,10 +546,10 @@ export interface PaperTriageData {
     evidence: string;
   }>;
   hypothesis_relevance_scores?: Record<string, {
-    score: number;
-    support_type: string;
-    reasoning: string;
-    evidence: string;
+    score: number;  // Placeholder (0) - not used in Phase 2.1
+    support_type: string;  // supports/refutes/neutral
+    reasoning: string;  // Auto-generated from support_type
+    evidence: string;  // Quote from paper
   }>;
 
   article?: {
