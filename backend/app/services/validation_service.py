@@ -114,11 +114,11 @@ class ProtocolResponse(BaseModel):
 class ExperimentPlanResponse(BaseModel):
     """Experiment plan response"""
     objective: str = Field(..., min_length=10)
-    hypothesis_being_tested: str = Field(..., min_length=10)
+    hypothesis_being_tested: Optional[str] = Field(default=None, min_length=10)
     materials_needed: List[str] = Field(default_factory=list)
-    procedure_steps: List[str] = Field(..., min_items=1)
-    success_criteria: str = Field(..., min_length=10)
-    expected_outcomes: str = Field(..., min_length=10)
+    procedure_steps: Optional[List[str]] = Field(default_factory=list, min_items=1)
+    success_criteria: List[Dict] = Field(default_factory=list)  # Array of {criterion, measurement_method, target_value}
+    expected_outcomes: List[str] = Field(default_factory=list)  # Array of outcome descriptions
     timeline_estimate: Optional[str] = None
     budget_estimate: Optional[str] = None
     risks_and_mitigations: Optional[List[str]] = None
