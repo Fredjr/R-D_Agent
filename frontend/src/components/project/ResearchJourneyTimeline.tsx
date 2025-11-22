@@ -1,18 +1,21 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Calendar, HelpCircle, Lightbulb, FileText, TestTube, Beaker, Zap, ChevronDown, ChevronRight } from 'lucide-react';
+import { Calendar, HelpCircle, Lightbulb, FileText, TestTube, Beaker, Zap, ChevronDown, ChevronRight, BarChart3 } from 'lucide-react';
 
 interface TimelineEvent {
   id: string;
   timestamp: string;
-  type: 'question' | 'hypothesis' | 'paper' | 'protocol' | 'experiment' | 'decision';
+  type: 'question' | 'hypothesis' | 'paper' | 'protocol' | 'experiment' | 'decision' | 'result';
   title: string;
   description?: string;
   status?: string;
   rationale?: string;
   score?: number;
   confidence?: number;
+  supports_hypothesis?: boolean | null;
+  confidence_change?: number | null;
+  interpretation?: string;
   metadata?: Record<string, any>;
 }
 
@@ -56,6 +59,13 @@ const EVENT_CONFIG = {
     bgColor: 'bg-red-500/10',
     borderColor: 'border-red-500',
     label: 'Experiment'
+  },
+  result: {
+    icon: BarChart3,
+    color: 'text-cyan-500',
+    bgColor: 'bg-cyan-500/10',
+    borderColor: 'border-cyan-500',
+    label: 'Result'
   },
   decision: {
     icon: Zap,
@@ -187,6 +197,20 @@ export default function ResearchJourneyTimeline({ events, onEventClick }: Resear
                             {event.confidence}% confidence
                           </span>
                         )}
+                        {event.supports_hypothesis !== undefined && event.supports_hypothesis !== null && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            event.supports_hypothesis ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                          }`}>
+                            {event.supports_hypothesis ? '✓ Supports' : '✗ Refutes'}
+                          </span>
+                        )}
+                        {event.confidence_change !== undefined && event.confidence_change !== null && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            event.confidence_change > 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                          }`}>
+                            {event.confidence_change > 0 ? '+' : ''}{event.confidence_change}%
+                          </span>
+                        )}
                       </div>
                       <h4 className="text-sm font-medium text-white truncate">{event.title}</h4>
                     </div>
@@ -211,6 +235,12 @@ export default function ResearchJourneyTimeline({ events, onEventClick }: Resear
                         <div className="bg-gray-900/50 rounded p-2">
                           <p className="text-xs text-gray-400 mb-1">Rationale:</p>
                           <p className="text-sm text-gray-300">{event.rationale}</p>
+                        </div>
+                      )}
+                      {event.interpretation && (
+                        <div className="bg-gray-900/50 rounded p-2">
+                          <p className="text-xs text-gray-400 mb-1">Interpretation:</p>
+                          <p className="text-sm text-gray-300">{event.interpretation}</p>
                         </div>
                       )}
                     </div>
