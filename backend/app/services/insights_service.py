@@ -59,7 +59,12 @@ class InsightsService:
             cached = self._get_cached_insights(project_id, db)
             if cached:
                 logger.info(f"✅ Returning cached insights (valid until {cached.cache_valid_until})")
-                return self._format_insights(cached)
+                # Still need to calculate fresh metrics even for cached insights
+                project_data = await self._gather_project_data(project_id, db)
+                metrics = self._calculate_metrics(project_data)
+                result = self._format_insights(cached)
+                result['metrics'] = metrics  # Always use freshly calculated metrics
+                return result
 
         # Gather project data
         project_data = await self._gather_project_data(project_id, db)
@@ -74,7 +79,10 @@ class InsightsService:
         cached_insights = self._save_insights(project_id, insights, db)
 
         logger.info(f"✅ Insights generated and cached until {cached_insights.cache_valid_until}")
-        return self._format_insights(cached_insights)
+        # Format and add fresh metrics (not from cache)
+        result = self._format_insights(cached_insights)
+        result['metrics'] = metrics  # Always use freshly calculated metrics
+        return result
     
     async def _gather_project_data(self, project_id: str, db: Session) -> Dict:
         """Gather all relevant project data for insights with full context"""
@@ -577,30 +585,40 @@ Guidelines:
             insights.total_papers = insights_data['metrics']['total_papers']
             insights.must_read_papers = insights_data['metrics']['must_read_papers']
             insights.avg_paper_score = insights_data['metrics']['avg_paper_score']
-            # Store ALL metrics in JSON column
-            insights.metrics = insights_data['metrics']
+            # Store ALL metrics in JSON column (if column exists)
+            if hasattr(insights, 'metrics'):
+                insights.metrics = insights_data['metrics']
             insights.last_updated = now
             insights.cache_valid_until = cache_valid_until
             insights.updated_at = now
         else:
             # Create new
-            insights = ProjectInsights(
-                insight_id=str(uuid.uuid4()),
-                project_id=project_id,
-                progress_insights=insights_data.get('progress_insights', []),
-                connection_insights=insights_data.get('connection_insights', []),
-                gap_insights=insights_data.get('gap_insights', []),
-                trend_insights=insights_data.get('trend_insights', []),
-                recommendations=insights_data.get('recommendations', []),
+            new_insights_data = {
+                'insight_id': str(uuid.uuid4()),
+                'project_id': project_id,
+                'progress_insights': insights_data.get('progress_insights', []),
+                'connection_insights': insights_data.get('connection_insights', []),
+                'gap_insights': insights_data.get('gap_insights', []),
+                'trend_insights': insights_data.get('trend_insights', []),
+                'recommendations': insights_data.get('recommendations', []),
                 # Legacy columns (for backward compatibility)
-                total_papers=insights_data['metrics']['total_papers'],
-                must_read_papers=insights_data['metrics']['must_read_papers'],
-                avg_paper_score=insights_data['metrics']['avg_paper_score'],
-                # Store ALL metrics in JSON column
-                metrics=insights_data['metrics'],
-                last_updated=now,
-                cache_valid_until=cache_valid_until
-            )
+                'total_papers': insights_data['metrics']['total_papers'],
+                'must_read_papers': insights_data['metrics']['must_read_papers'],
+                'avg_paper_score': insights_data['metrics']['avg_paper_score'],
+                'last_updated': now,
+                'cache_valid_until': cache_valid_until
+            }
+
+            # Add metrics JSON column if it exists in the model
+            try:
+                # Try to create with metrics column
+                new_insights_data['metrics'] = insights_data['metrics']
+                insights = ProjectInsights(**new_insights_data)
+            except TypeError:
+                # Column doesn't exist yet, create without it
+                del new_insights_data['metrics']
+                insights = ProjectInsights(**new_insights_data)
+
             db.add(insights)
 
         db.commit()
@@ -610,11 +628,15 @@ Guidelines:
     def _format_insights(self, insights: ProjectInsights) -> Dict:
         """Format insights for API response"""
         # Use the full metrics JSON if available, otherwise fall back to legacy columns
-        metrics = insights.metrics if insights.metrics else {
-            'total_papers': insights.total_papers,
-            'must_read_papers': insights.must_read_papers,
-            'avg_paper_score': insights.avg_paper_score
-        }
+        if hasattr(insights, 'metrics') and insights.metrics:
+            metrics = insights.metrics
+        else:
+            # Fall back to legacy columns only
+            metrics = {
+                'total_papers': insights.total_papers,
+                'must_read_papers': insights.must_read_papers,
+                'avg_paper_score': insights.avg_paper_score
+            }
 
         return {
             'progress_insights': insights.progress_insights or [],
