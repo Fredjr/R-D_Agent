@@ -50,10 +50,11 @@ async def get_project_insights(
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
         
-        # Generate insights
+        # Generate insights (Week 2: pass user_id for memory system)
         insights = await insights_service.generate_insights(
             project_id=project_id,
-            db=db
+            db=db,
+            user_id=user_id
         )
         
         logger.info(f"✅ Insights generated successfully")
@@ -94,11 +95,12 @@ async def regenerate_project_insights(
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
 
-        # Force regenerate insights
+        # Force regenerate insights (Week 2: pass user_id for memory system)
         insights = await insights_service.generate_insights(
             project_id=project_id,
             db=db,
-            force_regenerate=True
+            force_regenerate=True,
+            user_id=user_id
         )
 
         logger.info(f"✅ Insights regenerated successfully")

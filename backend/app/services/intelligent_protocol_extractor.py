@@ -27,6 +27,10 @@ from database import Protocol, Article, ResearchQuestion, Hypothesis, Project
 from backend.app.services.strategic_context import StrategicContext
 from backend.app.services.validation_service import ValidationService
 
+# Week 2 Improvements: Memory System
+from backend.app.services.memory_store import MemoryStore
+from backend.app.services.retrieval_engine import RetrievalEngine
+
 logger = logging.getLogger(__name__)
 
 # Initialize OpenAI client
@@ -85,12 +89,40 @@ class IntelligentProtocolExtractor:
             if not article:
                 raise ValueError(f"Article {article_pmid} not found")
 
+            # Week 2: Retrieve relevant memories for context (past protocols for comparison)
+            memory_context = ""
+            try:
+                retrieval_engine = RetrievalEngine(db)
+
+                # Get entity IDs for retrieval
+                entity_ids = {
+                    'questions': [q['question_id'] for q in context.get('questions', [])],
+                    'hypotheses': [h['hypothesis_id'] for h in context.get('hypotheses', [])],
+                    'papers': [article_pmid]
+                }
+
+                memory_context = retrieval_engine.retrieve_context_for_task(
+                    project_id=project_id,
+                    task_type='protocol',
+                    current_entities=entity_ids,
+                    limit=3  # Fewer memories for protocols (focus on similar protocols)
+                )
+
+                if memory_context and memory_context != "No previous context available.":
+                    logger.info(f"📚 Retrieved memory context ({len(memory_context)} chars)")
+                else:
+                    memory_context = ""
+            except Exception as e:
+                logger.warning(f"⚠️  Failed to retrieve memory context: {e}")
+                memory_context = ""
+
             # Step 3: Extract protocol with context (with timeout protection)
             try:
                 protocol_data = await self._extract_protocol_with_context(
                     article=article,
                     context=context,
-                    protocol_type=protocol_type
+                    protocol_type=protocol_type,
+                    memory_context=memory_context  # Week 2: Include memory context
                 )
             except Exception as e:
                 logger.error(f"❌ Protocol extraction failed: {e}, using fallback")
@@ -162,6 +194,33 @@ class IntelligentProtocolExtractor:
             }
 
             logger.info(f"✅ Intelligent extraction complete: relevance={relevance_data.get('relevance_score', 0)}/100, confidence={confidence_data['overall_score']}/100")
+
+            # Week 2: Store protocol as memory
+            if user_id:
+                try:
+                    memory_store = MemoryStore(db)
+                    memory_store.store_memory(
+                        project_id=project_id,
+                        interaction_type='protocol',
+                        content={
+                            'pmid': article_pmid,
+                            'protocol_name': enhanced_protocol.get('protocol_name', 'Unknown'),
+                            'protocol_type': enhanced_protocol.get('protocol_type', 'other'),
+                            'relevance_score': enhanced_protocol.get('relevance_score', 50),
+                            'key_insights': enhanced_protocol.get('key_insights', []),
+                            'recommendations': enhanced_protocol.get('recommendations', [])
+                        },
+                        user_id=user_id,
+                        summary=f"Extracted protocol: {enhanced_protocol.get('protocol_name', 'Unknown')[:100]} - relevance: {enhanced_protocol.get('relevance_score', 50)}/100",
+                        linked_question_ids=enhanced_protocol.get('affected_questions', []),
+                        linked_hypothesis_ids=enhanced_protocol.get('affected_hypotheses', []),
+                        linked_paper_ids=[article_pmid],
+                        linked_protocol_ids=[],  # Will be filled after protocol is saved to DB
+                        relevance_score=enhanced_protocol.get('relevance_score', 50) / 100.0  # Normalize to 0-1
+                    )
+                    logger.info(f"💾 Stored protocol as memory")
+                except Exception as e:
+                    logger.warning(f"⚠️  Failed to store memory: {e}")
 
             return enhanced_protocol
 
@@ -452,13 +511,15 @@ class IntelligentProtocolExtractor:
         self,
         article: Article,
         context: Dict,
-        protocol_type: Optional[str]
+        protocol_type: Optional[str],
+        memory_context: str = ""
     ) -> Dict:
         """
         Agent 2: Protocol Extractor
 
         Extracts protocol with awareness of project context.
         Uses full PDF text if available, falls back to abstract.
+        Week 2: Includes memory context for comparison with past protocols.
         """
         logger.info(f"🔬 Extracting protocol with context awareness")
 
@@ -581,13 +642,21 @@ If the abstract does not contain specific experimental methods, return:
         # Week 1: Get strategic context
         strategic_context = StrategicContext.get_context('protocol')
 
+        # Week 2: Add memory context section
+        memory_section = ""
+        if memory_context:
+            memory_section = f"\n{memory_context}\n"
+
         try:
             response = await client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": f"""{strategic_context}
 
-You are a scientific protocol extraction expert. You ONLY extract information explicitly stated in papers. You NEVER use general knowledge or invent details. You distinguish between review papers (no protocol) and methods papers (has protocol). Always return materials and steps as dictionaries with specific quantitative details."""},
+{memory_section}
+
+You are a scientific protocol extraction expert. You ONLY extract information explicitly stated in papers. You NEVER use general knowledge or invent details. You distinguish between review papers (no protocol) and methods papers (has protocol). Always return materials and steps as dictionaries with specific quantitative details.
+If previous protocol context is provided, use it to maintain consistency in extraction style and detail level."""},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,  # Lower temperature for more factual, less creative responses

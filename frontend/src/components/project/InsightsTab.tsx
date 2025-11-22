@@ -109,7 +109,7 @@ export default function InsightsTab({ projectId, userId }: InsightsTabProps) {
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6 text-center">
           <p className="text-red-400 mb-4">{error}</p>
           <button
-            onClick={fetchInsights}
+            onClick={handleRegenerate}
             className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors"
           >
             Try Again

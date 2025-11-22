@@ -22,6 +22,10 @@ from backend.app.services.strategic_context import StrategicContext
 from backend.app.services.tool_patterns import ToolPatterns
 from backend.app.services.orchestration_rules import OrchestrationRules
 
+# Week 2 Improvements: Memory System
+from backend.app.services.memory_store import MemoryStore
+from backend.app.services.retrieval_engine import RetrievalEngine
+
 logger = logging.getLogger(__name__)
 
 # Initialize OpenAI client
@@ -37,7 +41,8 @@ class LivingSummaryService:
         self,
         project_id: str,
         db: Session,
-        force_refresh: bool = False
+        force_refresh: bool = False,
+        user_id: str = None
     ) -> Dict:
         """
         Generate or retrieve cached project summary
@@ -61,10 +66,10 @@ class LivingSummaryService:
         
         # Gather project data
         project_data = await self._gather_project_data(project_id, db)
-        
-        # Generate summary with AI
-        summary_data = await self._generate_ai_summary(project_data)
-        
+
+        # Generate summary with AI (Week 2: pass db and user_id for memory system)
+        summary_data = await self._generate_ai_summary(project_data, db=db, user_id=user_id)
+
         # Save to database
         summary = self._save_summary(project_id, summary_data, db)
         
@@ -162,14 +167,15 @@ class LivingSummaryService:
             'decisions': decisions
         }
     
-    async def _generate_ai_summary(self, project_data: Dict) -> Dict:
+    async def _generate_ai_summary(self, project_data: Dict, db: Session = None, user_id: str = None) -> Dict:
         """
-        Generate summary using AI with Week 1 improvements:
+        Generate summary using AI with Week 1 & Week 2 improvements:
         - Strategic context (WHY)
         - Tool usage patterns
         - Orchestration rules (deterministic logic)
+        - Memory system (context from past summaries) [Week 2]
         """
-        logger.info(f"🤖 Generating AI summary with Week 1 improvements...")
+        logger.info(f"🤖 Generating AI summary with Week 1 & Week 2 improvements...")
 
         # Week 1: Use orchestration rules to decide what to focus on
         orchestration_rules = OrchestrationRules()
@@ -180,6 +186,33 @@ class LivingSummaryService:
 
         # Build context for AI (now returns tuple with timeline events)
         context, timeline_events = self._build_context(project_data)
+
+        # Week 2: Retrieve relevant memories for context (especially past summaries)
+        memory_context = ""
+        if db:
+            try:
+                retrieval_engine = RetrievalEngine(db)
+
+                # Get entity IDs for retrieval
+                entity_ids = {
+                    'questions': [q['question_id'] for q in project_data.get('questions', [])],
+                    'hypotheses': [h['hypothesis_id'] for h in project_data.get('hypotheses', [])]
+                }
+
+                memory_context = retrieval_engine.retrieve_context_for_task(
+                    project_id=project_data['project_id'],
+                    task_type='summary',
+                    current_entities=entity_ids,
+                    limit=3  # Fewer memories for summaries (focus on recent)
+                )
+
+                if memory_context and memory_context != "No previous context available.":
+                    logger.info(f"📚 Retrieved memory context ({len(memory_context)} chars)")
+                else:
+                    memory_context = ""
+            except Exception as e:
+                logger.warning(f"⚠️  Failed to retrieve memory context: {e}")
+                memory_context = ""
 
         # Generate summary
         try:
@@ -192,7 +225,8 @@ class LivingSummaryService:
                         "role": "system",
                         "content": self._get_system_prompt(
                             priority_focus=priority_focus,
-                            focus_guidance=focus_guidance
+                            focus_guidance=focus_guidance,
+                            memory_context=memory_context  # Week 2: Include memory context
                         )
                     },
                     {
@@ -215,6 +249,24 @@ class LivingSummaryService:
 
             # Add timeline events to the summary data
             summary_data['timeline_events'] = timeline_events
+
+            # Week 2: Store summary as memory
+            if db and user_id:
+                try:
+                    memory_store = MemoryStore(db)
+                    memory_store.store_memory(
+                        project_id=project_data['project_id'],
+                        interaction_type='summary',
+                        content=summary_data,
+                        user_id=user_id,
+                        summary=f"Project summary: {summary_data.get('overall_progress', 'Progress update')}",
+                        linked_question_ids=[q['question_id'] for q in project_data.get('questions', [])],
+                        linked_hypothesis_ids=[h['hypothesis_id'] for h in project_data.get('hypotheses', [])],
+                        relevance_score=1.0
+                    )
+                    logger.info(f"💾 Stored summary as memory")
+                except Exception as e:
+                    logger.warning(f"⚠️  Failed to store memory: {e}")
 
             logger.info(f"✅ AI summary generated successfully with {len(timeline_events)} timeline events")
             return summary_data
@@ -612,14 +664,16 @@ class LivingSummaryService:
     def _get_system_prompt(
         self,
         priority_focus: str = None,
-        focus_guidance: str = None
+        focus_guidance: str = None,
+        memory_context: str = ""
     ) -> str:
         """
-        Get context-aware system prompt for AI with Week 1 improvements.
+        Get context-aware system prompt for AI with Week 1 & Week 2 improvements.
 
         Args:
             priority_focus: Priority focus area (from orchestration rules)
             focus_guidance: Guidance text for priority focus
+            memory_context: Previous context from memory system [Week 2]
         """
         # Week 1: Add strategic context (WHY)
         strategic_context = StrategicContext.get_context('summary')
@@ -633,6 +687,11 @@ class LivingSummaryService:
         if focus_guidance:
             focus_section = f"\n{focus_guidance}\n"
 
+        # Week 2: Add memory context section
+        memory_section = ""
+        if memory_context:
+            memory_section = f"\n{memory_context}\n"
+
         return f"""{strategic_context}
 
 {focus_section}
@@ -640,6 +699,8 @@ class LivingSummaryService:
 {evidence_chain_pattern}
 
 {progress_tracking_pattern}
+
+{memory_section}
 
 ## 🎯 YOUR SUMMARY TASK
 

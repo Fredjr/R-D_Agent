@@ -66,6 +66,22 @@ interface NextStep {
   estimated_effort: string;
 }
 
+interface TimelineEvent {
+  id: string;
+  timestamp: string;
+  type: 'question' | 'hypothesis' | 'paper' | 'protocol' | 'experiment' | 'decision' | 'result';
+  title: string;
+  description?: string;
+  status?: string;
+  rationale?: string;
+  score?: number;
+  confidence?: number;
+  supports_hypothesis?: boolean | null;
+  confidence_change?: number | null;
+  interpretation?: string;
+  metadata?: Record<string, any>;
+}
+
 interface ProjectSummary {
   summary_id: string;
   project_id: string;
@@ -74,6 +90,7 @@ interface ProjectSummary {
   protocol_insights: string[];
   experiment_status: string;
   next_steps: NextStep[];
+  timeline_events?: TimelineEvent[];
   last_updated: string;
   cache_valid_until: string;
 }

@@ -24,6 +24,10 @@ from backend.app.services.tool_patterns import ToolPatterns
 from backend.app.services.orchestration_rules import OrchestrationRules
 from backend.app.services.validation_service import ValidationService
 
+# Week 2 Improvements: Memory System
+from backend.app.services.memory_store import MemoryStore
+from backend.app.services.retrieval_engine import RetrievalEngine
+
 logger = logging.getLogger(__name__)
 
 # Initialize OpenAI client
@@ -40,7 +44,8 @@ class InsightsService:
         self,
         project_id: str,
         db: Session,
-        force_regenerate: bool = False
+        force_regenerate: bool = False,
+        user_id: str = None
     ) -> Dict:
         """
         Generate AI insights from project data
@@ -49,6 +54,7 @@ class InsightsService:
             project_id: Project ID
             db: Database session
             force_regenerate: If True, bypass cache and regenerate
+            user_id: User ID for memory storage [Week 2]
 
         Returns:
             Dict with insights categories:
@@ -79,8 +85,8 @@ class InsightsService:
         # Calculate metrics
         metrics = self._calculate_metrics(project_data)
 
-        # Generate AI insights
-        insights = await self._generate_ai_insights(project_data, metrics)
+        # Generate AI insights (Week 2: pass db and user_id for memory system)
+        insights = await self._generate_ai_insights(project_data, metrics, db=db, user_id=user_id)
 
         # Save to database
         cached_insights = self._save_insights(project_id, insights, db)
@@ -212,15 +218,16 @@ class InsightsService:
             'plan_status': plan_status
         }
 
-    async def _generate_ai_insights(self, project_data: Dict, metrics: Dict) -> Dict:
+    async def _generate_ai_insights(self, project_data: Dict, metrics: Dict, db: Session = None, user_id: str = None) -> Dict:
         """
-        Generate insights using AI with Week 1 improvements:
+        Generate insights using AI with Week 1 & Week 2 improvements:
         - Strategic context (WHY)
         - Tool usage patterns
         - Orchestration rules (deterministic logic)
         - Response validation
+        - Memory system (context from past interactions) [Week 2]
         """
-        logger.info(f"🤖 Generating AI insights with Week 1 improvements...")
+        logger.info(f"🤖 Generating AI insights with Week 1 & Week 2 improvements...")
 
         # Week 1: Use orchestration rules to decide what to analyze
         orchestration_rules = OrchestrationRules()
@@ -234,6 +241,33 @@ class InsightsService:
         # Build context
         context = self._build_context(project_data, metrics)
 
+        # Week 2: Retrieve relevant memories for context
+        memory_context = ""
+        if db:
+            try:
+                retrieval_engine = RetrievalEngine(db)
+
+                # Get entity IDs for retrieval
+                entity_ids = {
+                    'questions': [q['question_id'] for q in project_data.get('questions', [])],
+                    'hypotheses': [h['hypothesis_id'] for h in project_data.get('hypotheses', [])]
+                }
+
+                memory_context = retrieval_engine.retrieve_context_for_task(
+                    project_id=project_data['project_id'],
+                    task_type='insights',
+                    current_entities=entity_ids,
+                    limit=5
+                )
+
+                if memory_context and memory_context != "No previous context available.":
+                    logger.info(f"📚 Retrieved memory context ({len(memory_context)} chars)")
+                else:
+                    memory_context = ""
+            except Exception as e:
+                logger.warning(f"⚠️  Failed to retrieve memory context: {e}")
+                memory_context = ""
+
         # Generate insights
         try:
             response = await client.chat.completions.create(
@@ -246,7 +280,8 @@ class InsightsService:
                         "content": self._get_system_prompt(
                             required_insight_types=required_insight_types,
                             priority_focus=priority_focus,
-                            focus_guidance=focus_guidance
+                            focus_guidance=focus_guidance,
+                            memory_context=memory_context  # Week 2: Include memory context
                         )
                     },
                     {
@@ -273,6 +308,24 @@ class InsightsService:
 
             # Add metrics to response
             validated_insights['metrics'] = metrics
+
+            # Week 2: Store insights as memory
+            if db and user_id:
+                try:
+                    memory_store = MemoryStore(db)
+                    memory_store.store_memory(
+                        project_id=project_data['project_id'],
+                        interaction_type='insights',
+                        content=validated_insights,
+                        user_id=user_id,
+                        summary=f"Generated insights: {len(validated_insights.get('key_findings', []))} findings, {len(validated_insights.get('recommendations', []))} recommendations",
+                        linked_question_ids=[q['question_id'] for q in project_data.get('questions', [])],
+                        linked_hypothesis_ids=[h['hypothesis_id'] for h in project_data.get('hypotheses', [])],
+                        relevance_score=1.0
+                    )
+                    logger.info(f"💾 Stored insights as memory")
+                except Exception as e:
+                    logger.warning(f"⚠️  Failed to store memory: {e}")
 
             logger.info(f"✅ AI insights generated and validated successfully")
             return validated_insights
@@ -516,15 +569,17 @@ class InsightsService:
         self,
         required_insight_types: List[str] = None,
         priority_focus: str = None,
-        focus_guidance: str = None
+        focus_guidance: str = None,
+        memory_context: str = ""
     ) -> str:
         """
-        Get context-aware system prompt for AI with Week 1 improvements.
+        Get context-aware system prompt for AI with Week 1 & Week 2 improvements.
 
         Args:
             required_insight_types: List of required insight types (from orchestration rules)
             priority_focus: Priority focus area (from orchestration rules)
             focus_guidance: Guidance text for priority focus
+            memory_context: Previous context from memory system [Week 2]
         """
         # Week 1: Add strategic context (WHY)
         strategic_context = StrategicContext.get_context('insights')
@@ -537,11 +592,18 @@ class InsightsService:
         if focus_guidance:
             focus_section = f"\n{focus_guidance}\n"
 
+        # Week 2: Add memory context section
+        memory_section = ""
+        if memory_context:
+            memory_section = f"\n{memory_context}\n"
+
         return f"""{strategic_context}
 
 {focus_section}
 
 {tool_patterns}
+
+{memory_section}
 
 ## 🎯 YOUR ANALYSIS TASK
 

@@ -1243,6 +1243,61 @@ class ProjectAlert(Base):
     )
 
 
+class ConversationMemory(Base):
+    """
+    Conversation memory for AI context retention (Week 2: Memory System)
+    Stores interactions and context across the research journey
+    """
+    __tablename__ = "conversation_memory"
+
+    memory_id = Column(String, primary_key=True)  # UUID
+    project_id = Column(String, ForeignKey("projects.project_id", ondelete="CASCADE"), nullable=False)
+
+    # Interaction details
+    interaction_type = Column(String, nullable=False)  # insights, summary, triage, protocol, experiment, question, hypothesis
+    interaction_subtype = Column(String, nullable=True)  # More specific categorization
+
+    # Memory content (stored as JSON for flexibility)
+    content = Column(JSON, nullable=False)  # The actual interaction data
+    summary = Column(Text, nullable=True)  # Human-readable summary of the interaction
+
+    # Context linkage
+    linked_question_ids = Column(JSON, default=list)  # Questions involved in this interaction
+    linked_hypothesis_ids = Column(JSON, default=list)  # Hypotheses involved
+    linked_paper_ids = Column(JSON, default=list)  # Papers involved (PMIDs)
+    linked_protocol_ids = Column(JSON, default=list)  # Protocols involved
+    linked_experiment_ids = Column(JSON, default=list)  # Experiments involved
+
+    # Relevance scoring (for retrieval)
+    relevance_score = Column(Float, default=1.0)  # Base relevance (can be updated)
+    access_count = Column(Integer, default=0)  # How many times this memory was retrieved
+    last_accessed_at = Column(DateTime(timezone=True), nullable=True)  # Last retrieval time
+
+    # Memory lifecycle
+    expires_at = Column(DateTime(timezone=True), nullable=True)  # Optional expiration
+    is_archived = Column(Boolean, default=False)  # Archived memories (kept but not actively retrieved)
+
+    # Metadata
+    created_by = Column(String, ForeignKey("users.user_id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    project = relationship("Project")
+    creator = relationship("User")
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_memory_project', 'project_id'),
+        Index('idx_memory_type', 'interaction_type'),
+        Index('idx_memory_created', 'created_at'),
+        Index('idx_memory_relevance', 'relevance_score'),
+        Index('idx_memory_archived', 'is_archived'),
+        Index('idx_memory_expires', 'expires_at'),
+        Index('idx_memory_project_type', 'project_id', 'interaction_type'),  # Composite index for common queries
+    )
+
+
 # Database session dependency
 def get_db():
     """Dependency to get database session"""

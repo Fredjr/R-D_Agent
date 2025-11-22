@@ -27,6 +27,10 @@ from database import Article, ResearchQuestion, Hypothesis, PaperTriage, Project
 from backend.app.services.strategic_context import StrategicContext
 from backend.app.services.validation_service import ValidationService
 
+# Week 2 Improvements: Memory System
+from backend.app.services.memory_store import MemoryStore
+from backend.app.services.retrieval_engine import RetrievalEngine
+
 logger = logging.getLogger(__name__)
 
 # Initialize OpenAI client
@@ -96,11 +100,39 @@ class AITriageService:
         # 4. Build context for AI
         context = self._build_project_context(project, questions, hypotheses)
 
+        # Week 2: Retrieve relevant memories for context (past triages for consistency)
+        memory_context = ""
+        try:
+            retrieval_engine = RetrievalEngine(db)
+
+            # Get entity IDs for retrieval
+            entity_ids = {
+                'questions': [q.question_id for q in questions],
+                'hypotheses': [h.hypothesis_id for h in hypotheses],
+                'papers': [article_pmid]
+            }
+
+            memory_context = retrieval_engine.retrieve_context_for_task(
+                project_id=project_id,
+                task_type='triage',
+                current_entities=entity_ids,
+                limit=3  # Fewer memories for triage (focus on consistency)
+            )
+
+            if memory_context and memory_context != "No previous context available.":
+                logger.info(f"📚 Retrieved memory context ({len(memory_context)} chars)")
+            else:
+                memory_context = ""
+        except Exception as e:
+            logger.warning(f"⚠️  Failed to retrieve memory context: {e}")
+            memory_context = ""
+
         # 5. Call OpenAI for triage analysis (with PDF text if available)
         triage_result = await self._analyze_paper_relevance(
             article=article,
             context=context,
-            pdf_text=pdf_text
+            pdf_text=pdf_text,
+            memory_context=memory_context  # Week 2: Include memory context
         )
 
         # 6. Create or update triage record
@@ -148,7 +180,35 @@ class AITriageService:
             db.refresh(triage)
 
             logger.info(f"✅ Created new triage for paper {article_pmid} with score {triage.relevance_score}")
-            return triage
+
+        # Week 2: Store triage as memory (for both new and updated)
+        if user_id:
+            try:
+                memory_store = MemoryStore(db)
+                triage_to_store = existing_triage if existing_triage else triage
+                memory_store.store_memory(
+                    project_id=project_id,
+                    interaction_type='triage',
+                    content={
+                        'pmid': article_pmid,
+                        'title': article.title,
+                        'triage_status': triage_to_store.triage_status,
+                        'relevance_score': triage_to_store.relevance_score,
+                        'impact_assessment': triage_to_store.impact_assessment,
+                        'ai_reasoning': triage_to_store.ai_reasoning
+                    },
+                    user_id=user_id,
+                    summary=f"Triaged paper: {article.title[:100]}... - {triage_to_store.triage_status} (score: {triage_to_store.relevance_score})",
+                    linked_question_ids=triage_to_store.affected_questions or [],
+                    linked_hypothesis_ids=triage_to_store.affected_hypotheses or [],
+                    linked_paper_ids=[article_pmid],
+                    relevance_score=triage_to_store.relevance_score / 100.0  # Normalize to 0-1
+                )
+                logger.info(f"💾 Stored triage as memory")
+            except Exception as e:
+                logger.warning(f"⚠️  Failed to store memory: {e}")
+
+        return existing_triage if existing_triage else triage
 
     def _build_project_context(
         self,
@@ -184,18 +244,21 @@ class AITriageService:
         self,
         article: Article,
         context: Dict,
-        pdf_text: Optional[str] = None
+        pdf_text: Optional[str] = None,
+        memory_context: str = ""
     ) -> Dict:
         """
         Use OpenAI to analyze paper relevance to project.
 
         Week 19-20 Critical Fix: Now uses PDF text when available!
         Week 1 Improvements: Strategic context, validation
+        Week 2 Improvements: Memory context for consistency
 
         Args:
             article: Article object
             context: Project context
             pdf_text: Full PDF text (if available)
+            memory_context: Previous triage context from memory [Week 2]
 
         Returns:
             Dict with triage_status, relevance_score, impact_assessment,
@@ -207,8 +270,13 @@ class AITriageService:
         # Week 1: Get strategic context
         strategic_context = StrategicContext.get_context('triage')
 
+        # Week 2: Add memory context section
+        memory_section = ""
+        if memory_context:
+            memory_section = f"\n{memory_context}\n"
+
         try:
-            # Call OpenAI with strategic context
+            # Call OpenAI with strategic context and memory context
             response = await client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -216,8 +284,11 @@ class AITriageService:
                         "role": "system",
                         "content": f"""{strategic_context}
 
+{memory_section}
+
 You are an expert research assistant helping to triage scientific papers.
-Analyze papers for relevance to research projects using the strategic context above."""
+Analyze papers for relevance to research projects using the strategic context above.
+If previous triage context is provided, maintain consistency with past decisions."""
                     },
                     {
                         "role": "user",

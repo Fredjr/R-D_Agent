@@ -49,11 +49,12 @@ async def get_project_summary(
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
         
-        # Generate or retrieve summary
+        # Generate or retrieve summary (Week 2: pass user_id for memory system)
         summary = await summary_service.generate_summary(
             project_id=project_id,
             db=db,
-            force_refresh=force_refresh
+            force_refresh=force_refresh,
+            user_id=user_id
         )
         
         logger.info(f"✅ Summary retrieved successfully")
@@ -89,11 +90,12 @@ async def refresh_summary(
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
         
-        # Force regenerate summary
+        # Force regenerate summary (Week 2: pass user_id for memory system)
         summary = await summary_service.generate_summary(
             project_id=project_id,
             db=db,
-            force_refresh=True
+            force_refresh=True,
+            user_id=user_id
         )
         
         logger.info(f"✅ Summary refreshed successfully")

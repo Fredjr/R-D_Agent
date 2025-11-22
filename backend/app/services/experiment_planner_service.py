@@ -26,6 +26,10 @@ from database import (
 from backend.app.services.strategic_context import StrategicContext
 from backend.app.services.validation_service import ValidationService
 
+# Week 2 Improvements: Memory System
+from backend.app.services.memory_store import MemoryStore
+from backend.app.services.retrieval_engine import RetrievalEngine
+
 logger = logging.getLogger(__name__)
 
 
@@ -90,12 +94,40 @@ class ExperimentPlannerService:
             
             if not context["protocol"]:
                 raise ValueError(f"Protocol {protocol_id} not found")
-            
+
+            # Week 2: Retrieve relevant memories for context (past plans for learning)
+            memory_context = ""
+            try:
+                retrieval_engine = RetrievalEngine(db)
+
+                # Get entity IDs for retrieval
+                entity_ids = {
+                    'questions': [q['question_id'] for q in context.get('questions', [])],
+                    'hypotheses': [h['hypothesis_id'] for h in context.get('hypotheses', [])],
+                    'protocols': [protocol_id]
+                }
+
+                memory_context = retrieval_engine.retrieve_context_for_task(
+                    project_id=project_id,
+                    task_type='experiment',
+                    current_entities=entity_ids,
+                    limit=3  # Fewer memories for experiments (focus on similar plans)
+                )
+
+                if memory_context and memory_context != "No previous context available.":
+                    logger.info(f"📚 Retrieved memory context ({len(memory_context)} chars)")
+                else:
+                    memory_context = ""
+            except Exception as e:
+                logger.warning(f"⚠️  Failed to retrieve memory context: {e}")
+                memory_context = ""
+
             # Step 2: Generate plan with AI
             plan_data = await self._generate_plan_with_ai(
                 context=context,
                 custom_objective=custom_objective,
-                custom_notes=custom_notes
+                custom_notes=custom_notes,
+                memory_context=memory_context  # Week 2: Include memory context
             )
             
             # Step 3: Validate and structure output
@@ -111,7 +143,33 @@ class ExperimentPlannerService:
             )
             
             logger.info(f"✅ Experiment plan generated successfully: {experiment_plan.plan_id}")
-            
+
+            # Week 2: Store plan as memory
+            try:
+                memory_store = MemoryStore(db)
+                memory_store.store_memory(
+                    project_id=project_id,
+                    interaction_type='experiment',
+                    content={
+                        'plan_id': experiment_plan.plan_id,
+                        'plan_name': validated_plan.get('plan_name', 'Unknown'),
+                        'objective': validated_plan.get('objective', ''),
+                        'timeline_estimate': validated_plan.get('timeline_estimate', ''),
+                        'difficulty_level': validated_plan.get('difficulty_level', 'moderate'),
+                        'key_insights': validated_plan.get('key_insights', [])
+                    },
+                    user_id=user_id,
+                    summary=f"Created experiment plan: {validated_plan.get('plan_name', 'Unknown')[:100]} - {validated_plan.get('timeline_estimate', 'Unknown timeline')}",
+                    linked_question_ids=validated_plan.get('affected_questions', []),
+                    linked_hypothesis_ids=validated_plan.get('affected_hypotheses', []),
+                    linked_protocol_ids=[protocol_id],
+                    linked_experiment_ids=[experiment_plan.plan_id],
+                    relevance_score=1.0  # New plans are highly relevant
+                )
+                logger.info(f"💾 Stored experiment plan as memory")
+            except Exception as e:
+                logger.warning(f"⚠️  Failed to store memory: {e}")
+
             return self._format_plan_response(experiment_plan)
             
         except Exception as e:
@@ -166,17 +224,24 @@ class ExperimentPlannerService:
         self,
         context: Dict,
         custom_objective: Optional[str],
-        custom_notes: Optional[str]
+        custom_notes: Optional[str],
+        memory_context: str = ""
     ) -> Dict:
         """
-        Generate experiment plan using AI with Week 1 improvements.
+        Generate experiment plan using AI with Week 1 & 2 improvements.
 
         Week 1 Improvements: Strategic context, validation
+        Week 2 Improvements: Memory context for learning from past plans
         """
-        logger.info(f"🤖 Generating plan with AI (Week 1 improvements)")
+        logger.info(f"🤖 Generating plan with AI (Week 1 & 2 improvements)")
 
         # Week 1: Get strategic context
         strategic_context = StrategicContext.get_context('experiment')
+
+        # Week 2: Add memory context section
+        memory_section = ""
+        if memory_context:
+            memory_section = f"\n{memory_context}\n"
 
         # Build prompt
         prompt = self._build_plan_prompt(context, custom_objective, custom_notes)
@@ -185,7 +250,7 @@ class ExperimentPlannerService:
             # Get OpenAI client
             client = self._get_client()
 
-            # Call OpenAI with strategic context
+            # Call OpenAI with strategic context and memory context
             response = await client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -193,11 +258,14 @@ class ExperimentPlannerService:
                         "role": "system",
                         "content": f"""{strategic_context}
 
+{memory_section}
+
 You are an expert research scientist and experiment planner.
 Generate detailed, practical, and actionable experiment plans based on protocols and research context.
 Be specific about materials, procedures, timelines, and success criteria.
 Consider real-world constraints like cost, time, and expertise requirements.
-Always provide risk assessments and troubleshooting guidance."""
+Always provide risk assessments and troubleshooting guidance.
+If previous experiment context is provided, learn from past plans to improve quality and consistency."""
                     },
                     {
                         "role": "user",
