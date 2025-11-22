@@ -234,34 +234,31 @@ async def run_migration_011(
                 "columns_exist": True
             }
 
-        # Read migration SQL
-        migration_path = "backend/migrations/011_add_tables_and_figures.sql"
-        with open(migration_path, 'r') as f:
-            migration_sql = f.read()
-
-        # Split by semicolon and execute each statement
-        statements = [
-            s.strip()
-            for s in migration_sql.split(';')
-            if s.strip() and not s.strip().startswith('--')
+        # Add columns one by one (same logic as run_migration_011.py)
+        columns_to_add = [
+            ("articles", "pdf_tables", "ALTER TABLE articles ADD COLUMN IF NOT EXISTS pdf_tables JSONB DEFAULT '[]'::jsonb"),
+            ("articles", "pdf_figures", "ALTER TABLE articles ADD COLUMN IF NOT EXISTS pdf_figures JSONB DEFAULT '[]'::jsonb"),
+            ("protocols", "tables_data", "ALTER TABLE protocols ADD COLUMN IF NOT EXISTS tables_data JSONB DEFAULT '[]'::jsonb"),
+            ("protocols", "figures_data", "ALTER TABLE protocols ADD COLUMN IF NOT EXISTS figures_data JSONB DEFAULT '[]'::jsonb"),
+            ("protocols", "figures_analysis", "ALTER TABLE protocols ADD COLUMN IF NOT EXISTS figures_analysis TEXT"),
         ]
 
         results = []
-        for stmt in statements:
-            if stmt:
-                try:
-                    db.execute(text(stmt))
-                    results.append({"statement": stmt[:100] + "...", "status": "success"})
-                    logger.info(f"✅ Executed: {stmt[:60]}...")
-                except Exception as e:
-                    error_msg = str(e)
-                    if "already exists" in error_msg or "duplicate" in error_msg.lower():
-                        results.append({"statement": stmt[:100] + "...", "status": "already_exists"})
-                        logger.info(f"⚠️ Already exists: {stmt[:60]}...")
-                    else:
-                        raise
-
-        db.commit()
+        for table, column, stmt in columns_to_add:
+            try:
+                logger.info(f"📄 Adding {column} to {table}...")
+                db.execute(text(stmt))
+                db.commit()
+                results.append({"table": table, "column": column, "status": "success"})
+                logger.info(f"✅ Added {column}")
+            except Exception as e:
+                error_msg = str(e)
+                if "already exists" in error_msg.lower() or "duplicate" in error_msg.lower():
+                    results.append({"table": table, "column": column, "status": "already_exists"})
+                    logger.info(f"⚠️ {column} already exists, skipping")
+                else:
+                    logger.error(f"❌ Failed to add {column}: {e}")
+                    raise
 
         logger.info("✅ Migration 011 completed successfully!")
 
