@@ -291,11 +291,22 @@ class LivingSummaryService:
 
         # 6. Experiment Results (outcomes)
         for result in project_data.get('results', []):
+            # Find the plan name for this result
+            plan = next((p for p in project_data.get('plans', []) if p.plan_id == result.plan_id), None)
+            plan_name = plan.plan_name if plan else "Unknown Experiment"
+
+            # Create descriptive title based on outcome
+            if result.supports_hypothesis is not None:
+                support_text = "Supports Hypothesis" if result.supports_hypothesis else "Refutes Hypothesis"
+                title = f"{plan_name} - {support_text}"
+            else:
+                title = f"{plan_name} - Result"
+
             event = {
                 'timestamp': result.completed_at or result.created_at,
                 'type': 'result',
                 'content': f"Experiment Result: {result.outcome or 'Completed'}",
-                'title': f"Result for {result.plan_id}",
+                'title': title,
                 'status': result.status,
                 'supports_hypothesis': result.supports_hypothesis,
                 'confidence_change': result.confidence_change,

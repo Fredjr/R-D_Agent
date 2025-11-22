@@ -351,7 +351,7 @@ class InsightsService:
             date_str = event['date'].strftime('%Y-%m-%d')
             context += f"[{date_str}] {event['text']}\n"
 
-        context += "\n## 🔗 Complete Evidence Chains (Question → Hypothesis → Paper → Protocol → Experiment):\n\n"
+        context += "\n## 🔗 Complete Evidence Chains (Question → Hypothesis → Paper → Protocol → Experiment → Result):\n\n"
 
         # Build complete evidence chains showing full research loop
         for q in questions[:5]:  # Top 5 questions
@@ -452,11 +452,12 @@ You track the complete research journey: Question → Hypothesis → Evidence �
 Your role is to analyze the COMPLETE EVIDENCE CHAINS and provide insights on:
 
 1. **Progress Insights** - Track research loop completion:
-   - Which questions have complete evidence chains (Q → H → Papers → Protocol → Experiment)?
-   - Which hypotheses are well-supported by papers AND have experimental validation?
+   - Which questions have complete evidence chains (Q → H → Papers → Protocol → Experiment → Result)?
+   - Which hypotheses are well-supported by papers AND have experimental validation with results?
    - Where is the research journey STUCK (broken chains)?
-   - How has hypothesis confidence evolved based on evidence?
-   - Which questions are ready to be answered based on completed experiments?
+   - How has hypothesis confidence evolved based on evidence AND experimental results?
+   - Which questions are ready to be answered based on completed experiments with results?
+   - IMPORTANT: Highlight completed research loops that include experiment results!
 
 2. **Connection Insights** - Find cross-cutting patterns:
    - Which papers support MULTIPLE hypotheses (high-value papers)?
