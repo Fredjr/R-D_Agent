@@ -109,9 +109,9 @@ def regenerate_insights():
 def regenerate_summary():
     """Regenerate summary to include the new result"""
     print(f"\n🔄 Regenerating summary...")
-    
+
     response = requests.post(
-        f"{BACKEND_URL}/summaries/projects/{PROJECT_ID}/summary/regenerate",
+        f"{BACKEND_URL}/summaries/projects/{PROJECT_ID}/summary/refresh",
         headers={"User-ID": USER_ID}
     )
     
