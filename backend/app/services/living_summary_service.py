@@ -254,6 +254,8 @@ class LivingSummaryService:
             # Week 2: Store summary as memory
             if db and user_id:
                 try:
+                    # Ensure clean session state before memory storage
+                    db.commit()
                     memory_store = MemoryStore(db)
                     memory_store.store_memory(
                         project_id=project_data['project_id'],
@@ -268,6 +270,11 @@ class LivingSummaryService:
                     logger.info(f"💾 Stored summary as memory")
                 except Exception as e:
                     logger.warning(f"⚠️  Failed to store memory: {e}")
+                    # Rollback to clean up failed transaction
+                    try:
+                        db.rollback()
+                    except:
+                        pass
 
             logger.info(f"✅ AI summary generated successfully with {len(timeline_events)} timeline events")
             return summary_data

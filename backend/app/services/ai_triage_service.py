@@ -184,6 +184,8 @@ class AITriageService:
         # Week 2: Store triage as memory (for both new and updated)
         if user_id:
             try:
+                # Ensure clean session state before memory storage
+                db.commit()
                 memory_store = MemoryStore(db)
                 triage_to_store = existing_triage if existing_triage else triage
                 memory_store.store_memory(
@@ -207,6 +209,11 @@ class AITriageService:
                 logger.info(f"💾 Stored triage as memory")
             except Exception as e:
                 logger.warning(f"⚠️  Failed to store memory: {e}")
+                # Rollback to clean up failed transaction
+                try:
+                    db.rollback()
+                except:
+                    pass
 
         return existing_triage if existing_triage else triage
 

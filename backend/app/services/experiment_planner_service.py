@@ -146,6 +146,8 @@ class ExperimentPlannerService:
 
             # Week 2: Store plan as memory
             try:
+                # Ensure clean session state before memory storage
+                db.commit()
                 memory_store = MemoryStore(db)
                 memory_store.store_memory(
                     project_id=project_id,
@@ -169,6 +171,11 @@ class ExperimentPlannerService:
                 logger.info(f"💾 Stored experiment plan as memory")
             except Exception as e:
                 logger.warning(f"⚠️  Failed to store memory: {e}")
+                # Rollback to clean up failed transaction
+                try:
+                    db.rollback()
+                except:
+                    pass
 
             return self._format_plan_response(experiment_plan)
             

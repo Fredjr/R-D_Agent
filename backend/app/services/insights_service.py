@@ -313,6 +313,8 @@ class InsightsService:
             # Week 2: Store insights as memory
             if db and user_id:
                 try:
+                    # Ensure clean session state before memory storage
+                    db.commit()
                     memory_store = MemoryStore(db)
                     memory_store.store_memory(
                         project_id=project_data['project_id'],
@@ -327,6 +329,11 @@ class InsightsService:
                     logger.info(f"💾 Stored insights as memory")
                 except Exception as e:
                     logger.warning(f"⚠️  Failed to store memory: {e}")
+                    # Rollback to clean up failed transaction
+                    try:
+                        db.rollback()
+                    except:
+                        pass
 
             logger.info(f"✅ AI insights generated and validated successfully")
             return validated_insights

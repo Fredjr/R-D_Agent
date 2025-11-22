@@ -198,6 +198,8 @@ class IntelligentProtocolExtractor:
             # Week 2: Store protocol as memory
             if user_id:
                 try:
+                    # Ensure clean session state before memory storage
+                    db.commit()
                     memory_store = MemoryStore(db)
                     memory_store.store_memory(
                         project_id=project_id,
@@ -221,6 +223,11 @@ class IntelligentProtocolExtractor:
                     logger.info(f"💾 Stored protocol as memory")
                 except Exception as e:
                     logger.warning(f"⚠️  Failed to store memory: {e}")
+                    # Rollback to clean up failed transaction
+                    try:
+                        db.rollback()
+                    except:
+                        pass
 
             return enhanced_protocol
 
