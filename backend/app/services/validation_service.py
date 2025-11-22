@@ -125,16 +125,23 @@ class ProtocolResponse(BaseModel):
 # ============================================================================
 
 class ExperimentPlanResponse(BaseModel):
-    """Experiment plan response"""
+    """Experiment plan response - matches experiment planner service format"""
+    plan_name: str = Field(..., min_length=5)
     objective: str = Field(..., min_length=10)
-    hypothesis_being_tested: Optional[str] = Field(default=None, min_length=10)
-    materials_needed: List[str] = Field(default_factory=list)
-    procedure_steps: Optional[List[str]] = Field(default_factory=list, min_items=1)
+    linked_questions: List[str] = Field(default_factory=list)
+    linked_hypotheses: List[str] = Field(default_factory=list)
+    materials: List[Dict] = Field(default_factory=list)  # Array of {name, amount, source, notes}
+    procedure: List[Dict] = Field(default_factory=list)  # Array of {step_number, description, duration, critical_notes}
+    expected_outcomes: List[str] = Field(default_factory=list)
     success_criteria: List[Dict] = Field(default_factory=list)  # Array of {criterion, measurement_method, target_value}
-    expected_outcomes: List[str] = Field(default_factory=list)  # Array of outcome descriptions
     timeline_estimate: Optional[str] = None
-    budget_estimate: Optional[str] = None
-    risks_and_mitigations: Optional[List[str]] = None
+    estimated_cost: Optional[str] = None
+    difficulty_level: str = Field(default="moderate", pattern="^(easy|moderate|difficult|expert)$")
+    risk_assessment: Dict = Field(default_factory=lambda: {"risks": [], "mitigation_strategies": []})
+    troubleshooting_guide: List[Dict] = Field(default_factory=list)  # Array of {issue, solution, prevention}
+    safety_considerations: List[str] = Field(default_factory=list)
+    required_expertise: List[str] = Field(default_factory=list)
+    notes: Optional[str] = None
 
 
 # ============================================================================
