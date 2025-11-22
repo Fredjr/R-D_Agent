@@ -15,6 +15,14 @@ else
     echo "⚠️ Virtual environment not found, using system Python"
 fi
 
+# Run database migrations (Week 22)
+echo "Running database migrations..."
+if [ -f "backend/run_migration_011.py" ]; then
+    python backend/run_migration_011.py || echo "⚠️ Migration 011 failed or already applied"
+else
+    echo "⚠️ Migration script not found, skipping"
+fi
+
 # Use Railway's PORT environment variable or default to 3000
 PORT=${PORT:-3000}
 echo "Using PORT: $PORT for Railway deployment"

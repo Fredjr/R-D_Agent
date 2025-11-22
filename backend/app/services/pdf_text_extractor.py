@@ -76,11 +76,18 @@ class PDFTextExtractor:
         # Check cache (Week 22: Now returns dict with text, tables, figures)
         if article.pdf_text and not force_refresh:
             logger.info(f"✅ Using cached PDF data for {pmid} ({len(article.pdf_text)} chars)")
-            # Return cached data with tables/figures if available
+            # Return cached data with tables/figures if available (backward compatible)
+            try:
+                tables = article.pdf_tables if hasattr(article, 'pdf_tables') and article.pdf_tables else []
+                figures = article.pdf_figures if hasattr(article, 'pdf_figures') and article.pdf_figures else []
+            except Exception:
+                # Columns don't exist yet (pre-migration)
+                tables, figures = [], []
+
             return {
                 "text": article.pdf_text,
-                "tables": getattr(article, 'pdf_tables', []) or [],
-                "figures": getattr(article, 'pdf_figures', []) or []
+                "tables": tables,
+                "figures": figures
             }
         
         # Get PDF URL using existing infrastructure
@@ -108,11 +115,15 @@ class PDFTextExtractor:
             article.pdf_url = pdf_info['url']
             article.pdf_source = pdf_info['source']
 
-            # Store tables and figures as JSON (if columns exist)
-            if hasattr(article, 'pdf_tables'):
-                article.pdf_tables = extraction_result.get('tables', [])
-            if hasattr(article, 'pdf_figures'):
-                article.pdf_figures = extraction_result.get('figures', [])
+            # Store tables and figures as JSON (backward compatible - only if columns exist)
+            try:
+                if hasattr(article, 'pdf_tables'):
+                    article.pdf_tables = extraction_result.get('tables', [])
+                if hasattr(article, 'pdf_figures'):
+                    article.pdf_figures = extraction_result.get('figures', [])
+            except Exception as e:
+                # Columns don't exist yet (pre-migration), skip storing tables/figures
+                logger.warning(f"⚠️ Could not store tables/figures (migration not run yet): {e}")
 
             db.commit()
             logger.info(f"✅ Extracted {len(extraction_result['text'])} chars, {len(extraction_result.get('tables', []))} tables, {len(extraction_result.get('figures', []))} figures from PDF {pmid} (source: {pdf_info['source']})")
