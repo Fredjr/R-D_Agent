@@ -729,7 +729,7 @@ Your role is to:
 IMPORTANT: You MUST respond with ONLY valid JSON. Do not include any text before or after the JSON.
 
 Required JSON structure:
-{
+{{
   "summary_text": "2-3 paragraph narrative that follows the research journey CHRONOLOGICALLY. Start with when the research began, mention key questions asked, hypotheses formed, papers discovered, protocols extracted, and experiments planned. Highlight pivots and decisions. Show the PROGRESSION over time.",
   "key_findings": [
     "Finding 1: [Specific finding] from [Paper title] (Score: X/100) - Supports [Hypothesis name] with [confidence level]% confidence",
@@ -741,15 +741,15 @@ Required JSON structure:
   ],
   "experiment_status": "Summary showing: 1) Which experiments are planned/in-progress/completed, 2) Which hypotheses they test, 3) Which questions they aim to answer. Highlight any gaps (protocols without experiments, hypotheses without experimental validation).",
   "next_steps": [
-    {
+    {{
       "action": "Specific action that closes a research loop (e.g., 'Develop hypothesis for Question X', 'Find papers supporting Hypothesis Y', 'Plan experiment using Protocol Z')",
       "priority": "high|medium|low",
       "estimated_effort": "time estimate",
       "rationale": "Why this step makes sense in the research journey - reference the specific gap it fills",
       "closes_loop": "Specific Q/H/Protocol this addresses (e.g., 'Question: [question text]', 'Hypothesis: [hypothesis text]')"
-    }
+    }}
   ]
-}
+}}
 
 Guidelines for Context-Aware Summaries:
 - CHRONOLOGICAL NARRATIVE: Start with "The research journey began on [date] with [first question]..." Show temporal progression

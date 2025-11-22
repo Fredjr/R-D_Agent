@@ -669,50 +669,50 @@ Your role is to analyze the COMPLETE EVIDENCE CHAINS and provide insights on:
 IMPORTANT: You MUST respond with ONLY valid JSON. Do not include any text before or after the JSON.
 
 Required JSON structure:
-{
+{{
   "progress_insights": [
-    {
+    {{
       "title": "insight title",
       "description": "detailed observation about research progress",
       "impact": "high|medium|low",
       "evidence_chain": "which Q/H/Papers this relates to"
-    }
+    }}
   ],
   "connection_insights": [
-    {
+    {{
       "title": "connection title",
       "description": "cross-cutting theme showing how elements connect",
       "entities": ["entity1", "entity2"],
       "strengthens": "what this connection strengthens"
-    }
+    }}
   ],
   "gap_insights": [
-    {
+    {{
       "title": "gap title",
       "description": "missing link in the research loop",
       "priority": "high|medium|low",
       "suggestion": "specific action to close this gap",
       "blocks": "what this gap is blocking"
-    }
+    }}
   ],
   "trend_insights": [
-    {
+    {{
       "title": "trend title",
       "description": "emerging pattern in the research journey",
       "confidence": "high|medium|low",
       "implications": "what this trend means for the research"
-    }
+    }}
   ],
   "recommendations": [
-    {
+    {{
       "action": "specific action that closes a research loop",
       "rationale": "why this matters in the research journey",
       "priority": "high|medium|low",
       "estimated_effort": "time estimate",
       "closes_loop": "which Q/H/gap this addresses"
-    }
+    }}
   ]
-}
+}}
 
 Guidelines:
 - Focus on the ITERATIVE research journey: Question → Hypothesis → Evidence → Method → Experiment → Result → Answer
