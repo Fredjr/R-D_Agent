@@ -949,6 +949,14 @@ try:
 except ImportError as e:
     print(f"⚠️ Failed to import experiment plans router: {e}")
 
+# Phase 4: Experiment Results endpoints (Complete Research Loop)
+try:
+    from backend.app.routers.experiment_results import router as experiment_results_router
+    app.include_router(experiment_results_router)
+    print("✅ Experiment results endpoints registered successfully")
+except ImportError as e:
+    print(f"⚠️ Failed to import experiment results router: {e}")
+
 # Week 21-22: Living Summaries endpoints
 try:
     from backend.app.routers.summaries import router as summaries_router
