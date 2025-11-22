@@ -3,15 +3,14 @@
 -- Date: 2025-11-22
 
 -- Add tables and figures columns to articles table (for caching)
-ALTER TABLE articles 
-ADD COLUMN IF NOT EXISTS pdf_tables JSONB DEFAULT '[]'::jsonb,
-ADD COLUMN IF NOT EXISTS pdf_figures JSONB DEFAULT '[]'::jsonb;
+-- Split into separate statements for better error handling
+ALTER TABLE articles ADD COLUMN IF NOT EXISTS pdf_tables JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE articles ADD COLUMN IF NOT EXISTS pdf_figures JSONB DEFAULT '[]'::jsonb;
 
 -- Add tables and figures columns to protocols table
-ALTER TABLE protocols 
-ADD COLUMN IF NOT EXISTS tables_data JSONB DEFAULT '[]'::jsonb,
-ADD COLUMN IF NOT EXISTS figures_data JSONB DEFAULT '[]'::jsonb,
-ADD COLUMN IF NOT EXISTS figures_analysis TEXT;
+ALTER TABLE protocols ADD COLUMN IF NOT EXISTS tables_data JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE protocols ADD COLUMN IF NOT EXISTS figures_data JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE protocols ADD COLUMN IF NOT EXISTS figures_analysis TEXT;
 
 -- Create indexes for JSON columns for better query performance
 CREATE INDEX IF NOT EXISTS idx_articles_pdf_tables ON articles USING GIN (pdf_tables);
