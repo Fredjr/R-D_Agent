@@ -414,7 +414,8 @@ Be precise and include all relevant details like catalog numbers, durations, and
             if decisions:
                 research_context += "**User Decisions & Priorities:**\n"
                 for d in decisions[:3]:  # Top 3 recent decisions
-                    research_context += f"- {d.decision_text}"
+                    # Fixed: Database has title + description, not decision_text
+                    research_context += f"- {d.title}: {d.description}"
                     if hasattr(d, 'rationale') and d.rationale:
                         research_context += f" (Rationale: {d.rationale})"
                     research_context += "\n"

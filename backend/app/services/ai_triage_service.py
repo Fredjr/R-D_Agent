@@ -287,7 +287,8 @@ class AITriageService:
         if decisions:
             context["decisions"] = [
                 {
-                    "decision_text": d.decision_text,
+                    # Fixed: Database has title + description, not decision_text
+                    "decision_text": f"{d.title}: {d.description}",
                     "rationale": getattr(d, 'rationale', None),
                     "decided_at": str(d.decided_at) if hasattr(d, 'decided_at') else None
                 }

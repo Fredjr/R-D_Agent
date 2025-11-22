@@ -175,7 +175,8 @@ class ProjectContextService:
         return [
             {
                 "decision_id": d.decision_id,
-                "decision_text": d.decision_text,
+                # Fixed: Database has title + description, not decision_text
+                "decision_text": f"{d.title}: {d.description}",
                 "decision_type": d.decision_type,
                 "rationale": d.rationale,
                 "created_at": d.created_at.isoformat() if d.created_at else None

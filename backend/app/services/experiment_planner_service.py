@@ -390,7 +390,8 @@ Abstract: {abstract_text}
         if decisions:
             decisions_section = "\nUSER DECISIONS & PRIORITIES:\n"
             for i, d in enumerate(decisions[:3], 1):  # Top 3 recent decisions
-                decisions_section += f"{i}. {d.decision_text}"
+                # Fixed: Database has title + description, not decision_text
+                decisions_section += f"{i}. {d.title}: {d.description}"
                 if hasattr(d, 'rationale') and d.rationale:
                     decisions_section += f"\n   Rationale: {d.rationale}"
                 decisions_section += "\n"
