@@ -49,6 +49,60 @@ def format_authors(authors) -> Optional[str]:
     return authors
 
 
+def normalize_string_list(data: List) -> List[str]:
+    """
+    Normalize a list to ensure all items are strings.
+
+    Handles backward compatibility with old dict-based data.
+    Converts dicts to formatted strings if needed.
+
+    Args:
+        data: List of strings or dicts
+
+    Returns:
+        List of strings
+    """
+    if not data:
+        return []
+
+    normalized = []
+    for item in data:
+        if isinstance(item, str):
+            # Already a string
+            normalized.append(item)
+        elif isinstance(item, dict):
+            # Convert dict to formatted string
+            # Handle different dict formats
+            if 'parameter' in item:
+                # key_parameters format: {'parameter': 'X', 'description': 'Y'}
+                param = item.get('parameter', '')
+                desc = item.get('description', '')
+                normalized.append(f"{param}: {desc}" if desc else param)
+            elif 'outcome' in item:
+                # expected_outcomes format: {'outcome': 'X', 'description': 'Y'}
+                outcome = item.get('outcome', '')
+                desc = item.get('description', '')
+                normalized.append(f"{outcome}: {desc}" if desc else outcome)
+            elif 'issue' in item:
+                # troubleshooting_tips format: {'issue': 'X', 'solution': 'Y'}
+                issue = item.get('issue', '')
+                solution = item.get('solution', '')
+                normalized.append(f"{issue} - Solution: {solution}" if solution else issue)
+            elif 'recommendation' in item:
+                # recommendations format: {'recommendation': 'X', 'rationale': 'Y'}
+                rec = item.get('recommendation', '')
+                rationale = item.get('rationale', '')
+                normalized.append(f"{rec} (Rationale: {rationale})" if rationale else rec)
+            else:
+                # Generic dict - convert to string
+                normalized.append(str(item))
+        else:
+            # Other types - convert to string
+            normalized.append(str(item))
+
+    return normalized
+
+
 def normalize_protocol_data(materials: List, steps: List) -> tuple:
     """
     Normalize protocol materials and steps to ensure they're in dict format.
@@ -306,18 +360,18 @@ async def extract_protocol(
             created_by=protocol.created_by,
             created_at=protocol.created_at.isoformat() if protocol.created_at else None,
             updated_at=protocol.updated_at.isoformat() if protocol.updated_at else None,
-            # Enhanced fields
-            key_parameters=getattr(protocol, 'key_parameters', []),
-            expected_outcomes=getattr(protocol, 'expected_outcomes', []),
-            troubleshooting_tips=getattr(protocol, 'troubleshooting_tips', []),
+            # Enhanced fields (Week 24: Normalize to strings for backward compatibility)
+            key_parameters=normalize_string_list(getattr(protocol, 'key_parameters', [])),
+            expected_outcomes=normalize_string_list(getattr(protocol, 'expected_outcomes', [])),
+            troubleshooting_tips=normalize_string_list(getattr(protocol, 'troubleshooting_tips', [])),
             # Context-aware fields
             relevance_score=getattr(protocol, 'relevance_score', 50),
             affected_questions=getattr(protocol, 'affected_questions', []),
             affected_hypotheses=getattr(protocol, 'affected_hypotheses', []),
             relevance_reasoning=getattr(protocol, 'relevance_reasoning', None),
-            key_insights=getattr(protocol, 'key_insights', []),
-            potential_applications=getattr(protocol, 'potential_applications', []),
-            recommendations=getattr(protocol, 'recommendations', []),
+            key_insights=normalize_string_list(getattr(protocol, 'key_insights', [])),
+            potential_applications=normalize_string_list(getattr(protocol, 'potential_applications', [])),
+            recommendations=normalize_string_list(getattr(protocol, 'recommendations', [])),
             context_relevance=getattr(protocol, 'context_relevance', None),
             extraction_method=getattr(protocol, 'extraction_method', 'basic'),
             context_aware=getattr(protocol, 'context_aware', False),
@@ -476,18 +530,18 @@ async def get_project_protocols(
                     article_authors=format_authors(article.authors) if article else None,
                     article_journal=article.journal if article else None,
                     article_year=article.publication_year if article else None,
-                    # Enhanced fields (Week 19)
-                    key_parameters=getattr(protocol, 'key_parameters', []),
-                    expected_outcomes=getattr(protocol, 'expected_outcomes', []),
-                    troubleshooting_tips=getattr(protocol, 'troubleshooting_tips', []),
+                    # Enhanced fields (Week 24: Normalize to strings for backward compatibility)
+                    key_parameters=normalize_string_list(getattr(protocol, 'key_parameters', [])),
+                    expected_outcomes=normalize_string_list(getattr(protocol, 'expected_outcomes', [])),
+                    troubleshooting_tips=normalize_string_list(getattr(protocol, 'troubleshooting_tips', [])),
                     # Context-aware fields (Week 19)
                     relevance_score=getattr(protocol, 'relevance_score', 50),
                     affected_questions=getattr(protocol, 'affected_questions', []),
                     affected_hypotheses=getattr(protocol, 'affected_hypotheses', []),
                     relevance_reasoning=getattr(protocol, 'relevance_reasoning', None),
-                    key_insights=getattr(protocol, 'key_insights', []),
-                    potential_applications=getattr(protocol, 'potential_applications', []),
-                    recommendations=getattr(protocol, 'recommendations', []),
+                    key_insights=normalize_string_list(getattr(protocol, 'key_insights', [])),
+                    potential_applications=normalize_string_list(getattr(protocol, 'potential_applications', [])),
+                    recommendations=normalize_string_list(getattr(protocol, 'recommendations', [])),
                     context_relevance=getattr(protocol, 'context_relevance', None),
                     extraction_method=getattr(protocol, 'extraction_method', 'basic'),
                     context_aware=getattr(protocol, 'context_aware', False),
@@ -548,18 +602,18 @@ async def get_protocol(
             created_by=protocol.created_by,
             created_at=protocol.created_at.isoformat() if protocol.created_at else None,
             updated_at=protocol.updated_at.isoformat() if protocol.updated_at else None,
-            # Enhanced fields
-            key_parameters=getattr(protocol, 'key_parameters', []),
-            expected_outcomes=getattr(protocol, 'expected_outcomes', []),
-            troubleshooting_tips=getattr(protocol, 'troubleshooting_tips', []),
+            # Enhanced fields (Week 24: Normalize to strings for backward compatibility)
+            key_parameters=normalize_string_list(getattr(protocol, 'key_parameters', [])),
+            expected_outcomes=normalize_string_list(getattr(protocol, 'expected_outcomes', [])),
+            troubleshooting_tips=normalize_string_list(getattr(protocol, 'troubleshooting_tips', [])),
             # Context-aware fields
             relevance_score=getattr(protocol, 'relevance_score', 50),
             affected_questions=getattr(protocol, 'affected_questions', []),
             affected_hypotheses=getattr(protocol, 'affected_hypotheses', []),
             relevance_reasoning=getattr(protocol, 'relevance_reasoning', None),
-            key_insights=getattr(protocol, 'key_insights', []),
-            potential_applications=getattr(protocol, 'potential_applications', []),
-            recommendations=getattr(protocol, 'recommendations', []),
+            key_insights=normalize_string_list(getattr(protocol, 'key_insights', [])),
+            potential_applications=normalize_string_list(getattr(protocol, 'potential_applications', [])),
+            recommendations=normalize_string_list(getattr(protocol, 'recommendations', [])),
             context_relevance=getattr(protocol, 'context_relevance', None),
             extraction_method=getattr(protocol, 'extraction_method', 'basic'),
             context_aware=getattr(protocol, 'context_aware', False),
