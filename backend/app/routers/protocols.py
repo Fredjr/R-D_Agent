@@ -88,17 +88,52 @@ def normalize_string_list(data: List) -> List[str]:
                 issue = item.get('issue', '')
                 solution = item.get('solution', '')
                 normalized.append(f"{issue} - Solution: {solution}" if solution else issue)
-            elif 'recommendation' in item:
-                # recommendations format: {'recommendation': 'X', 'rationale': 'Y'}
-                rec = item.get('recommendation', '')
-                rationale = item.get('rationale', '')
-                normalized.append(f"{rec} (Rationale: {rationale})" if rationale else rec)
             else:
                 # Generic dict - convert to string
                 normalized.append(str(item))
         else:
             # Other types - convert to string
             normalized.append(str(item))
+
+    return normalized
+
+
+def normalize_dict_list(data: List) -> List[dict]:
+    """
+    Normalize a list to ensure all items are dicts.
+
+    Handles backward compatibility with old string-based data.
+    Converts strings to dicts if needed.
+
+    Args:
+        data: List of dicts or strings
+
+    Returns:
+        List of dicts
+    """
+    if not data:
+        return []
+
+    normalized = []
+    for item in data:
+        if isinstance(item, dict):
+            # Already a dict
+            normalized.append(item)
+        elif isinstance(item, str):
+            # Convert string to dict
+            # recommendations format: {'recommendation': 'X', 'priority': 'medium'}
+            normalized.append({
+                "recommendation": item,
+                "priority": "medium",
+                "rationale": None
+            })
+        else:
+            # Other types - convert to dict
+            normalized.append({
+                "recommendation": str(item),
+                "priority": "medium",
+                "rationale": None
+            })
 
     return normalized
 
@@ -371,7 +406,7 @@ async def extract_protocol(
             relevance_reasoning=getattr(protocol, 'relevance_reasoning', None),
             key_insights=normalize_string_list(getattr(protocol, 'key_insights', [])),
             potential_applications=normalize_string_list(getattr(protocol, 'potential_applications', [])),
-            recommendations=normalize_string_list(getattr(protocol, 'recommendations', [])),
+            recommendations=normalize_dict_list(getattr(protocol, 'recommendations', [])),
             context_relevance=getattr(protocol, 'context_relevance', None),
             extraction_method=getattr(protocol, 'extraction_method', 'basic'),
             context_aware=getattr(protocol, 'context_aware', False),
@@ -541,7 +576,7 @@ async def get_project_protocols(
                     relevance_reasoning=getattr(protocol, 'relevance_reasoning', None),
                     key_insights=normalize_string_list(getattr(protocol, 'key_insights', [])),
                     potential_applications=normalize_string_list(getattr(protocol, 'potential_applications', [])),
-                    recommendations=normalize_string_list(getattr(protocol, 'recommendations', [])),
+                    recommendations=normalize_dict_list(getattr(protocol, 'recommendations', [])),
                     context_relevance=getattr(protocol, 'context_relevance', None),
                     extraction_method=getattr(protocol, 'extraction_method', 'basic'),
                     context_aware=getattr(protocol, 'context_aware', False),
@@ -613,7 +648,7 @@ async def get_protocol(
             relevance_reasoning=getattr(protocol, 'relevance_reasoning', None),
             key_insights=normalize_string_list(getattr(protocol, 'key_insights', [])),
             potential_applications=normalize_string_list(getattr(protocol, 'potential_applications', [])),
-            recommendations=normalize_string_list(getattr(protocol, 'recommendations', [])),
+            recommendations=normalize_dict_list(getattr(protocol, 'recommendations', [])),
             context_relevance=getattr(protocol, 'context_relevance', None),
             extraction_method=getattr(protocol, 'extraction_method', 'basic'),
             context_aware=getattr(protocol, 'context_aware', False),
