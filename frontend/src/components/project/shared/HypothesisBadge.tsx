@@ -44,9 +44,16 @@ export function HypothesisBadge({ hypothesisId, projectId, onClick, compact = fa
     const fetchHypothesis = async () => {
       try {
         setLoading(true);
+
+        // Get user from localStorage for authentication
+        const userStr = localStorage.getItem('user');
+        const user = userStr ? JSON.parse(userStr) : null;
+        const userId = user?.email || user?.user_id || 'default_user';
+
         const response = await fetch(`/api/proxy/hypotheses/${hypothesisId}`, {
           headers: {
             'Content-Type': 'application/json',
+            'User-ID': userId,
           },
         });
 

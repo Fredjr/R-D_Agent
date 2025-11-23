@@ -42,9 +42,16 @@ export function QuestionBadge({ questionId, projectId, onClick, compact = false 
     const fetchQuestion = async () => {
       try {
         setLoading(true);
+
+        // Get user from localStorage for authentication
+        const userStr = localStorage.getItem('user');
+        const user = userStr ? JSON.parse(userStr) : null;
+        const userId = user?.email || user?.user_id || 'default_user';
+
         const response = await fetch(`/api/proxy/questions/${questionId}`, {
           headers: {
             'Content-Type': 'application/json',
+            'User-ID': userId,
           },
         });
 

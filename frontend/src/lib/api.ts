@@ -559,6 +559,21 @@ export interface PaperTriageData {
     abstract: string;
     journal: string;
     pub_year: number;
+    // Week 22: PDF extraction fields
+    pdf_tables?: Array<{
+      page: number;
+      table_number: number;
+      data: any[][];
+      caption?: string;
+    }>;
+    pdf_figures?: Array<{
+      page: number;
+      figure_number: number;
+      image_data?: string;
+      caption?: string;
+    }>;
+    pdf_text?: string;
+    pdf_extracted_at?: string;
   };
 }
 

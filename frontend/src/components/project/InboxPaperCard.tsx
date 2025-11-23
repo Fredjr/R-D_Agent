@@ -10,7 +10,9 @@ import {
   ChevronUpIcon,
   BookOpenIcon,
   SparklesIcon,
-  BeakerIcon
+  BeakerIcon,
+  TableCellsIcon,
+  PhotoIcon
 } from '@heroicons/react/24/outline';
 
 /**
@@ -41,6 +43,8 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
   const [showEvidence, setShowEvidence] = useState(true); // Default expanded - users paid for this!
   const [showQuestionScores, setShowQuestionScores] = useState(false);
   const [showHypothesisScores, setShowHypothesisScores] = useState(false);
+  const [showTables, setShowTables] = useState(false);
+  const [showFigures, setShowFigures] = useState(false);
 
   // Get color based on relevance score
   const getRelevanceColor = (score: number) => {
@@ -266,6 +270,97 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
                   <div className="text-xs text-gray-100 italic">
                     <span className="font-semibold text-purple-300">Evidence:</span> &ldquo;{data.evidence}&rdquo;
                   </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Week 22: PDF Tables */}
+      {paper.article?.pdf_tables && paper.article.pdf_tables.length > 0 && (
+        <div className="mb-4">
+          <button
+            onClick={() => setShowTables(!showTables)}
+            className="flex items-center gap-2 text-sm text-white hover:text-green-300 transition-colors mb-2"
+          >
+            {showTables ? (
+              <ChevronUpIcon className="w-4 h-4" />
+            ) : (
+              <ChevronDownIcon className="w-4 h-4" />
+            )}
+            <TableCellsIcon className="w-4 h-4 text-green-400" />
+            <span className="font-semibold">Tables Extracted ({paper.article.pdf_tables.length})</span>
+          </button>
+          {showTables && (
+            <div className="space-y-3">
+              {paper.article.pdf_tables.map((table, idx) => (
+                <div key={idx} className="p-3 bg-green-500/10 rounded-lg border border-green-500/20">
+                  <div className="text-xs text-green-300 font-semibold mb-2">
+                    Table {table.table_number} (Page {table.page})
+                  </div>
+                  {table.caption && (
+                    <div className="text-xs text-gray-100 mb-2 italic">{table.caption}</div>
+                  )}
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-xs text-gray-100">
+                      <tbody>
+                        {table.data.slice(0, 5).map((row, rowIdx) => (
+                          <tr key={rowIdx} className="border-b border-green-500/20">
+                            {row.map((cell, cellIdx) => (
+                              <td key={cellIdx} className="px-2 py-1 border-r border-green-500/20">
+                                {cell}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {table.data.length > 5 && (
+                      <div className="text-xs text-green-300 mt-2">
+                        ... and {table.data.length - 5} more rows
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Week 22: PDF Figures */}
+      {paper.article?.pdf_figures && paper.article.pdf_figures.length > 0 && (
+        <div className="mb-4">
+          <button
+            onClick={() => setShowFigures(!showFigures)}
+            className="flex items-center gap-2 text-sm text-white hover:text-blue-300 transition-colors mb-2"
+          >
+            {showFigures ? (
+              <ChevronUpIcon className="w-4 h-4" />
+            ) : (
+              <ChevronDownIcon className="w-4 h-4" />
+            )}
+            <PhotoIcon className="w-4 h-4 text-blue-400" />
+            <span className="font-semibold">Figures Extracted ({paper.article.pdf_figures.length})</span>
+          </button>
+          {showFigures && (
+            <div className="grid grid-cols-2 gap-3">
+              {paper.article.pdf_figures.map((figure, idx) => (
+                <div key={idx} className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                  <div className="text-xs text-blue-300 font-semibold mb-2">
+                    Figure {figure.figure_number} (Page {figure.page})
+                  </div>
+                  {figure.caption && (
+                    <div className="text-xs text-gray-100 mb-2 italic">{figure.caption}</div>
+                  )}
+                  {figure.image_data && (
+                    <img
+                      src={figure.image_data}
+                      alt={`Figure ${figure.figure_number}`}
+                      className="w-full rounded border border-blue-500/30"
+                    />
+                  )}
                 </div>
               ))}
             </div>

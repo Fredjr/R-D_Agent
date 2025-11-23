@@ -7,11 +7,11 @@
  * Week 19-20: Experiment Planning Feature
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   X, Edit2, Save, XCircle, Clock, DollarSign, AlertTriangle,
   CheckCircle, Target, Beaker, Shield, Wrench, BookOpen,
-  ChevronDown, ChevronUp, Trash2, Calendar, Link
+  ChevronDown, ChevronUp, Trash2, Calendar, Link, TrendingUp
 } from 'lucide-react';
 import { updateExperimentPlan, deleteExperimentPlan, ExperimentPlan, UpdateExperimentPlanRequest } from '../../lib/api';
 import { QuestionBadge, HypothesisBadge } from './shared';
@@ -41,6 +41,45 @@ export default function ExperimentPlanDetailModal({
   const [editedOutcome, setEditedOutcome] = useState(plan.outcome || '');
   const [editedLessons, setEditedLessons] = useState(plan.lessons_learned || '');
   const [showResearchContext, setShowResearchContext] = useState(true);
+  const [showConfidencePredictions, setShowConfidencePredictions] = useState(true);
+
+  // Parse confidence predictions from notes
+  const confidencePredictions = useMemo(() => {
+    if (!plan.notes) return null;
+
+    try {
+      // Look for confidence predictions in notes
+      const match = plan.notes.match(/\*\*Confidence Predictions:\*\*\s*\n([\s\S]*?)(?:\n\n|$)/);
+      if (match && match[1]) {
+        return JSON.parse(match[1].trim());
+      }
+    } catch (e) {
+      console.error('Failed to parse confidence predictions:', e);
+    }
+
+    return null;
+  }, [plan.notes]);
+
+  // Extract cross-service learning context from notes
+  const crossServiceContext = useMemo(() => {
+    if (!plan.notes) return null;
+
+    // Look for mentions of previous protocols, experiments, or lessons learned
+    const contextPatterns = [
+      /based on previous (protocol|experiment|work)/i,
+      /similar to (protocol|experiment)/i,
+      /learned from previous/i,
+      /building on/i,
+      /following the approach from/i
+    ];
+
+    const lines = plan.notes.split('\n');
+    const contextLines = lines.filter(line =>
+      contextPatterns.some(pattern => pattern.test(line))
+    );
+
+    return contextLines.length > 0 ? contextLines : null;
+  }, [plan.notes]);
   const [showMaterials, setShowMaterials] = useState(true);
   const [showProcedure, setShowProcedure] = useState(true);
   const [showRisks, setShowRisks] = useState(true);
@@ -372,6 +411,82 @@ export default function ExperimentPlanDetailModal({
                   )}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Confidence Predictions */}
+          {confidencePredictions && Object.keys(confidencePredictions).length > 0 && (
+            <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg border border-purple-500/30">
+              <button
+                onClick={() => setShowConfidencePredictions(!showConfidencePredictions)}
+                className="w-full p-4 flex items-center justify-between hover:bg-purple-500/5 transition-colors"
+              >
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-purple-400" />
+                  🎯 Confidence Predictions ({Object.keys(confidencePredictions).length})
+                </h3>
+                {showConfidencePredictions ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+              </button>
+              {showConfidencePredictions && (
+                <div className="p-4 pt-0 space-y-4">
+                  <div className="text-sm text-purple-300 mb-3">
+                    How this experiment will change confidence in each hypothesis:
+                  </div>
+                  {Object.entries(confidencePredictions).map(([hypothesisId, prediction]: [string, any]) => (
+                    <div key={hypothesisId} className="bg-gray-900/50 rounded-lg p-4 border border-purple-500/20">
+                      <div className="text-sm font-medium text-purple-300 mb-3">
+                        Hypothesis: {hypothesisId}
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-3 mb-3">
+                        <div className="bg-gray-800/50 rounded p-3 border border-gray-700">
+                          <div className="text-xs text-gray-400 mb-1">Current</div>
+                          <div className="text-2xl font-bold text-white">{prediction.current_confidence}%</div>
+                        </div>
+                        <div className="bg-green-500/10 rounded p-3 border border-green-500/30">
+                          <div className="text-xs text-green-300 mb-1">If Success</div>
+                          <div className="text-2xl font-bold text-green-400">{prediction.predicted_confidence_if_success}%</div>
+                          <div className="text-xs text-green-300 mt-1">
+                            +{prediction.predicted_confidence_if_success - prediction.current_confidence}%
+                          </div>
+                        </div>
+                        <div className="bg-red-500/10 rounded p-3 border border-red-500/30">
+                          <div className="text-xs text-red-300 mb-1">If Failure</div>
+                          <div className="text-2xl font-bold text-red-400">{prediction.predicted_confidence_if_failure}%</div>
+                          <div className="text-xs text-red-300 mt-1">
+                            {prediction.predicted_confidence_if_failure - prediction.current_confidence}%
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-sm text-gray-300 bg-gray-800/30 rounded p-3">
+                        <div className="font-medium text-purple-300 mb-1">Reasoning:</div>
+                        {prediction.reasoning}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Cross-Service Learning Context */}
+          {crossServiceContext && crossServiceContext.length > 0 && (
+            <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-lg border border-blue-500/30 p-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-3">
+                <BookOpen className="w-5 h-5 text-blue-400" />
+                📚 Based on Previous Work
+              </h3>
+              <div className="space-y-2">
+                {crossServiceContext.map((line, idx) => (
+                  <div key={idx} className="bg-gray-900/50 rounded p-3 border border-blue-500/20 text-sm text-gray-300">
+                    {line}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 text-xs text-blue-300">
+                ✨ This experiment plan incorporates lessons learned from previous protocols and experiments
+              </div>
             </div>
           )}
 
