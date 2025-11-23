@@ -30,7 +30,13 @@ from backend.app.services.validation_service import ValidationService
 from backend.app.services.memory_store import MemoryStore
 from backend.app.services.retrieval_engine import RetrievalEngine
 
+# Week 23: Multi-Agent System
+from backend.app.services.agents.orchestrator import MultiAgentOrchestrator
+
 logger = logging.getLogger(__name__)
+
+# Feature flag for multi-agent system
+USE_MULTI_AGENT_SYSTEM = os.getenv("USE_MULTI_AGENT_SYSTEM", "true").lower() == "true"
 
 
 class ExperimentPlannerService:
@@ -261,12 +267,24 @@ class ExperimentPlannerService:
         memory_context: str = ""
     ) -> Dict:
         """
-        Generate experiment plan using AI with Week 1 & 2 improvements.
+        Generate experiment plan using AI.
 
         Week 1 Improvements: Strategic context, validation
         Week 2 Improvements: Memory context for learning from past plans
+        Week 23: Multi-agent system for better quality and completeness
         """
-        logger.info(f"🤖 Generating plan with AI (Week 1 & 2 improvements)")
+
+        # Week 23: Use multi-agent system if enabled
+        if USE_MULTI_AGENT_SYSTEM:
+            logger.info(f"🎭 Generating plan with Multi-Agent System (Week 23)")
+            return await self._generate_plan_with_multi_agent(
+                context=context,
+                custom_objective=custom_objective,
+                custom_notes=custom_notes
+            )
+
+        # Fallback to legacy single-prompt system
+        logger.info(f"🤖 Generating plan with legacy single-prompt system")
 
         # Week 1: Get strategic context
         strategic_context = StrategicContext.get_context('experiment')
@@ -322,6 +340,50 @@ If previous experiment context is provided, learn from past plans to improve qua
         except Exception as e:
             logger.error(f"❌ Error calling OpenAI: {e}")
             raise
+
+    async def _generate_plan_with_multi_agent(
+        self,
+        context: Dict,
+        custom_objective: Optional[str],
+        custom_notes: Optional[str]
+    ) -> Dict:
+        """
+        Generate experiment plan using multi-agent system (Week 23).
+
+        This method uses specialized agents to generate higher quality,
+        more complete experiment plans with confidence predictions and
+        cross-service learning insights.
+        """
+        try:
+            # Initialize orchestrator
+            orchestrator = MultiAgentOrchestrator()
+
+            # Add custom fields to context
+            agent_context = {
+                **context,
+                "custom_objective": custom_objective,
+                "custom_notes": custom_notes
+            }
+
+            # Generate plan with multi-agent system
+            plan_data = await orchestrator.generate_experiment_plan(agent_context)
+
+            logger.info(f"✅ Multi-agent plan generation complete")
+            return plan_data
+
+        except Exception as e:
+            logger.error(f"❌ Multi-agent system failed: {e}")
+            logger.warning(f"⚠️ Falling back to legacy single-prompt system")
+
+            # Fallback to legacy system
+            global USE_MULTI_AGENT_SYSTEM
+            USE_MULTI_AGENT_SYSTEM = False
+            return await self._generate_plan_with_ai(
+                context=context,
+                custom_objective=custom_objective,
+                custom_notes=custom_notes,
+                memory_context=""
+            )
 
     def _build_plan_prompt(
         self,
