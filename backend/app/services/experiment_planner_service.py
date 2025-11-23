@@ -216,10 +216,21 @@ class ExperimentPlannerService:
             ResearchQuestion.project_id == project_id
         ).order_by(ResearchQuestion.created_at.desc()).limit(10).all()
         
-        # Get hypotheses (top 10 most recent)
-        hypotheses = db.query(Hypothesis).filter(
-            Hypothesis.project_id == project_id
+        # Get hypotheses (prioritize active ones: exploring, testing, supported)
+        # First get active hypotheses, then fill with others if needed
+        active_hypotheses = db.query(Hypothesis).filter(
+            Hypothesis.project_id == project_id,
+            Hypothesis.status.in_(['exploring', 'testing', 'supported'])
         ).order_by(Hypothesis.created_at.desc()).limit(10).all()
+
+        # If we have fewer than 10 active, get some inactive ones too for context
+        hypotheses = active_hypotheses
+        if len(active_hypotheses) < 10:
+            inactive_hypotheses = db.query(Hypothesis).filter(
+                Hypothesis.project_id == project_id,
+                Hypothesis.status.in_(['refuted', 'parked'])
+            ).order_by(Hypothesis.created_at.desc()).limit(10 - len(active_hypotheses)).all()
+            hypotheses = active_hypotheses + inactive_hypotheses
 
         # Phase 1.3: Get decision history
         from database import ProjectDecision, ExperimentResult
@@ -368,9 +379,10 @@ Description: {project.description if project and project.description else 'Not p
         # Hypotheses
         hypotheses_section = ""
         if hypotheses:
-            hypotheses_section = "\nHYPOTHESES:\n"
+            hypotheses_section = "\nHYPOTHESES (prioritize 'exploring', 'testing', 'supported' status):\n"
             for i, h in enumerate(hypotheses[:5], 1):  # Top 5 hypotheses
-                hypotheses_section += f"{i}. [ID: {h.hypothesis_id}] {h.hypothesis_text}\n"
+                status_indicator = "🔬" if h.status in ['exploring', 'testing'] else "✅" if h.status == 'supported' else "❌"
+                hypotheses_section += f"{i}. {status_indicator} [ID: {h.hypothesis_id}] {h.hypothesis_text}\n"
                 hypotheses_section += f"   Type: {h.hypothesis_type}, Status: {h.status}, Confidence: {h.confidence_level}%\n"
 
         # Source article context (Phase 1.2: Expanded from 500 to 2000 chars)
