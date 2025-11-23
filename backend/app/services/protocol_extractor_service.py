@@ -257,9 +257,40 @@ class ProtocolExtractorService:
                         affected_hypothesis_ids.append(hypotheses[idx].hypothesis_id)
 
         # Week 24 Phase 2: Enhanced fields from multi-agent system
-        key_parameters = protocol_data.get("key_parameters", [])
-        expected_outcomes = protocol_data.get("expected_outcomes", [])
-        troubleshooting_tips = protocol_data.get("troubleshooting_tips", [])
+        # Flatten structured data to strings for database storage
+        key_parameters_raw = protocol_data.get("key_parameters", [])
+        key_parameters = []
+        for param in key_parameters_raw:
+            if isinstance(param, dict):
+                # Convert dict to string: "parameter: rationale"
+                param_str = param.get("parameter", "")
+                rationale = param.get("rationale", "")
+                key_parameters.append(f"{param_str}: {rationale}" if rationale else param_str)
+            else:
+                key_parameters.append(str(param))
+
+        expected_outcomes_raw = protocol_data.get("expected_outcomes", [])
+        expected_outcomes = []
+        for outcome in expected_outcomes_raw:
+            if isinstance(outcome, dict):
+                # Convert dict to string: "outcome: rationale"
+                outcome_str = outcome.get("outcome", "")
+                rationale = outcome.get("rationale", "")
+                expected_outcomes.append(f"{outcome_str}: {rationale}" if rationale else outcome_str)
+            else:
+                expected_outcomes.append(str(outcome))
+
+        troubleshooting_tips_raw = protocol_data.get("troubleshooting_tips", [])
+        troubleshooting_tips = []
+        for tip in troubleshooting_tips_raw:
+            if isinstance(tip, dict):
+                # Convert dict to string: "issue - solution"
+                issue = tip.get("issue", "")
+                solution = tip.get("solution", "")
+                troubleshooting_tips.append(f"{issue} - {solution}" if solution else issue)
+            else:
+                troubleshooting_tips.append(str(tip))
+
         relevance_score = protocol_data.get("relevance_score", 50)
         key_insights = protocol_data.get("key_insights", [])
         potential_applications = protocol_data.get("potential_applications", [])
@@ -294,7 +325,7 @@ class ProtocolExtractorService:
             affected_questions=affected_question_ids,
             affected_hypotheses=affected_hypothesis_ids,
             relevance_reasoning=research_rationale,
-            recommendations=[suggested_modifications] if suggested_modifications else [],
+            recommendations=[{"recommendation": suggested_modifications}] if suggested_modifications else [],
             context_relevance=protocol_comparison,  # Phase 2.2: Store protocol comparison
             context_aware=True if (questions or hypotheses or existing_protocols) else False,
             extraction_method='intelligent_multi_agent_v1' if self.orchestrator else 'intelligent_context_aware_v3',
