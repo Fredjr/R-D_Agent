@@ -248,7 +248,23 @@ class AITriageService:
                 except:
                     pass
 
-        return existing_triage if existing_triage else triage
+        # Week 22: Auto-extract PDF (tables + figures) after triage
+        triage_result = existing_triage if existing_triage else triage
+        try:
+            from backend.app.services.pdf_text_extractor import PDFTextExtractor
+            pdf_extractor = PDFTextExtractor()
+            pdf_data = await pdf_extractor.extract_and_store(article_pmid, db, force_refresh=False)
+            if pdf_data and isinstance(pdf_data, dict):
+                tables_count = len(pdf_data.get('tables', []))
+                figures_count = len(pdf_data.get('figures', []))
+                logger.info(f"✅ PDF extracted for {article_pmid}: {tables_count} tables, {figures_count} figures")
+            else:
+                logger.info(f"✅ PDF extracted for {article_pmid} (text only)")
+        except Exception as e:
+            logger.warning(f"⚠️ PDF extraction failed for {article_pmid}: {e}")
+            # Don't fail triage if PDF extraction fails
+
+        return triage_result
 
     def _build_project_context(
         self,

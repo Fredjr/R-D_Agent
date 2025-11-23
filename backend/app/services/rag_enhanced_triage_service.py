@@ -412,6 +412,19 @@ Provide your assessment following the exact format specified."""
 
             db.commit()
             db.refresh(existing_triage)
+
+            # Week 22: Auto-extract PDF (tables + figures) after triage
+            try:
+                from backend.app.services.pdf_text_extractor import PDFTextExtractor
+                pdf_extractor = PDFTextExtractor()
+                pdf_data = await pdf_extractor.extract_and_store(article_pmid, db, force_refresh=False)
+                if pdf_data and isinstance(pdf_data, dict):
+                    tables_count = len(pdf_data.get('tables', []))
+                    figures_count = len(pdf_data.get('figures', []))
+                    logger.info(f"✅ PDF extracted for {article_pmid}: {tables_count} tables, {figures_count} figures")
+            except Exception as e:
+                logger.warning(f"⚠️ PDF extraction failed for {article_pmid}: {e}")
+
             return existing_triage
         else:
             # Create new
@@ -427,5 +440,18 @@ Provide your assessment following the exact format specified."""
             db.add(triage)
             db.commit()
             db.refresh(triage)
+
+            # Week 22: Auto-extract PDF (tables + figures) after triage
+            try:
+                from backend.app.services.pdf_text_extractor import PDFTextExtractor
+                pdf_extractor = PDFTextExtractor()
+                pdf_data = await pdf_extractor.extract_and_store(article_pmid, db, force_refresh=False)
+                if pdf_data and isinstance(pdf_data, dict):
+                    tables_count = len(pdf_data.get('tables', []))
+                    figures_count = len(pdf_data.get('figures', []))
+                    logger.info(f"✅ PDF extracted for {article_pmid}: {tables_count} tables, {figures_count} figures")
+            except Exception as e:
+                logger.warning(f"⚠️ PDF extraction failed for {article_pmid}: {e}")
+
             return triage
 
