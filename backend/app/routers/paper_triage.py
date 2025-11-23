@@ -40,6 +40,7 @@ logger.info(f"🎯 Triage service initialized: {'Enhanced' if USE_ENHANCED_TRIAG
 class TriageRequest(BaseModel):
     """Request to triage a paper"""
     article_pmid: str
+    force_refresh: bool = False  # Week 24: Force re-triage with multi-agent system
 
 
 class TriageStatusUpdate(BaseModel):
@@ -164,12 +165,13 @@ async def triage_paper(
 
         # Run AI triage (use enhanced service if enabled)
         if USE_ENHANCED_TRIAGE:
-            logger.info(f"🚀 Using enhanced AI triage service")
+            logger.info(f"🚀 Using enhanced AI triage service (force_refresh={request.force_refresh})")
             triage = await enhanced_ai_triage_service.triage_paper(
                 project_id=project_id,
                 article_pmid=request.article_pmid,
                 db=db,
-                user_id=user_id
+                user_id=user_id,
+                force_refresh=request.force_refresh  # Week 24: Pass force_refresh
             )
         else:
             logger.info(f"📊 Using standard AI triage service")
