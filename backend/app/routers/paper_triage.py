@@ -433,7 +433,12 @@ async def update_triage_status(
                 "authors": article.authors,
                 "abstract": article.abstract,
                 "journal": article.journal,
-                "pub_year": article.publication_year
+                "pub_year": article.publication_year,
+                # Week 22: PDF extraction fields
+                "pdf_tables": article.pdf_tables if hasattr(article, 'pdf_tables') else None,
+                "pdf_figures": article.pdf_figures if hasattr(article, 'pdf_figures') else None,
+                "pdf_text": article.pdf_text if hasattr(article, 'pdf_text') else None,
+                "pdf_extracted_at": article.pdf_extracted_at.isoformat() if hasattr(article, 'pdf_extracted_at') and article.pdf_extracted_at else None
             } if article else None
         )
 

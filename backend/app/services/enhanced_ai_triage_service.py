@@ -31,6 +31,10 @@ client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # Week 24: Multi-Agent Feature Flag
 USE_MULTI_AGENT_TRIAGE = os.getenv("USE_MULTI_AGENT_TRIAGE", "true").lower() == "true"
 
+# Week 24: Auto Evidence Linking Feature Flag
+AUTO_EVIDENCE_LINKING = os.getenv("AUTO_EVIDENCE_LINKING", "false").lower() == "true"
+AUTO_HYPOTHESIS_STATUS = os.getenv("AUTO_HYPOTHESIS_STATUS", "false").lower() == "true"
+
 
 class EnhancedAITriageService:
     """Enhanced service for AI-powered paper triage with transparency and evidence"""
@@ -187,6 +191,30 @@ class EnhancedAITriageService:
             except Exception as e:
                 logger.warning(f"⚠️ PDF extraction failed for {article_pmid}: {e}")
 
+            # Week 24: Auto-link evidence to hypotheses (if feature flag enabled)
+            if AUTO_EVIDENCE_LINKING:
+                try:
+                    from backend.app.services.auto_evidence_linking_service import AutoEvidenceLinkingService
+                    from backend.app.services.auto_hypothesis_status_service import AutoHypothesisStatusService
+
+                    evidence_linker = AutoEvidenceLinkingService()
+                    linking_result = await evidence_linker.link_evidence_from_triage(
+                        triage_result=triage_result,
+                        article_pmid=article_pmid,
+                        project_id=project_id,
+                        db=db
+                    )
+                    logger.info(f"✅ Auto-linked {linking_result['evidence_links_created']} evidence links")
+
+                    # Week 24: Auto-update hypothesis status (if feature flag enabled)
+                    if AUTO_HYPOTHESIS_STATUS and linking_result['hypotheses_updated']:
+                        status_updater = AutoHypothesisStatusService()
+                        for hyp_id in linking_result['hypotheses_updated']:
+                            status_result = await status_updater.update_hypothesis_status(hyp_id, db)
+                            logger.info(f"✅ Updated hypothesis {hyp_id[:8]}... status: {status_result['old_status']} → {status_result['new_status']}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Auto evidence linking failed for {article_pmid}: {e}")
+
             return existing_triage
         else:
             # Create new triage
@@ -228,6 +256,30 @@ class EnhancedAITriageService:
                     logger.info(f"✅ PDF extracted for {article_pmid}: {tables_count} tables, {figures_count} figures")
             except Exception as e:
                 logger.warning(f"⚠️ PDF extraction failed for {article_pmid}: {e}")
+
+            # Week 24: Auto-link evidence to hypotheses (if feature flag enabled)
+            if AUTO_EVIDENCE_LINKING:
+                try:
+                    from backend.app.services.auto_evidence_linking_service import AutoEvidenceLinkingService
+                    from backend.app.services.auto_hypothesis_status_service import AutoHypothesisStatusService
+
+                    evidence_linker = AutoEvidenceLinkingService()
+                    linking_result = await evidence_linker.link_evidence_from_triage(
+                        triage_result=triage_result,
+                        article_pmid=article_pmid,
+                        project_id=project_id,
+                        db=db
+                    )
+                    logger.info(f"✅ Auto-linked {linking_result['evidence_links_created']} evidence links")
+
+                    # Week 24: Auto-update hypothesis status (if feature flag enabled)
+                    if AUTO_HYPOTHESIS_STATUS and linking_result['hypotheses_updated']:
+                        status_updater = AutoHypothesisStatusService()
+                        for hyp_id in linking_result['hypotheses_updated']:
+                            status_result = await status_updater.update_hypothesis_status(hyp_id, db)
+                            logger.info(f"✅ Updated hypothesis {hyp_id[:8]}... status: {status_result['old_status']} → {status_result['new_status']}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Auto evidence linking failed for {article_pmid}: {e}")
 
             return triage
 
