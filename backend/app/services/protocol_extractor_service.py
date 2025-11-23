@@ -31,20 +31,37 @@ client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 class ProtocolExtractorService:
     """
     Cost-effective protocol extraction service.
-    
+
     Optimizations:
     - Cache-first (check if protocol exists for PMID)
     - Methods section only (not full text)
     - Specialized prompt for protocols
     - Structured JSON output
     - 30-day cache TTL
+
+    Week 24 Phase 2: Multi-agent extraction with 3 specialized agents
     """
-    
+
     def __init__(self):
         self.model = "gpt-4o-mini"  # Cost-effective model
         self.temperature = 0.1  # Deterministic for consistency
         self.cache_ttl_days = 30  # Protocols don't change
-        logger.info(f"✅ ProtocolExtractorService initialized with model: {self.model}, cache TTL: {self.cache_ttl_days} days")
+
+        # Week 24 Phase 2: Multi-agent orchestrator
+        self.use_multi_agent = os.getenv("USE_MULTI_AGENT_PROTOCOL", "true").lower() == "true"
+        self.orchestrator = None
+
+        if self.use_multi_agent:
+            try:
+                from backend.app.services.agents.protocol.protocol_orchestrator import ProtocolOrchestrator
+                self.orchestrator = ProtocolOrchestrator()
+                logger.info(f"✅ ProtocolExtractorService initialized with MULTI-AGENT system (3 agents)")
+            except Exception as e:
+                logger.error(f"❌ Failed to initialize ProtocolOrchestrator: {e}")
+                logger.info("⚠️  Falling back to legacy extraction system")
+                self.orchestrator = None
+        else:
+            logger.info(f"✅ ProtocolExtractorService initialized with LEGACY system (model: {self.model}, cache TTL: {self.cache_ttl_days} days)")
     
     async def extract_protocol(
         self,
@@ -162,19 +179,53 @@ class ProtocolExtractorService:
                 logger.warning(f"⚠️ Figure analysis failed: {e}")
 
         # Step 6: Extract protocol using AI (with PDF text, tables, figures AND research context)
-        protocol_data = await self._extract_with_ai(
-            article=article,
-            protocol_type=protocol_type,
-            pdf_text=pdf_text,
-            project=project,
-            questions=questions,
-            hypotheses=hypotheses,
-            decisions=decisions,
-            existing_protocols=existing_protocols,  # Phase 2.2
-            triage_result=triage_result,  # Phase 3.1
-            tables=tables,  # Week 22
-            figures_analysis=figures_analysis  # Week 22
-        )
+        # Week 24 Phase 2: Use multi-agent system if available
+        if self.orchestrator:
+            logger.info(f"🤖 Using MULTI-AGENT protocol extraction for {article_pmid}")
+            try:
+                protocol_data = await self.orchestrator.extract_protocol(
+                    article=article,
+                    pdf_text=pdf_text,
+                    project=project,
+                    questions=questions,
+                    hypotheses=hypotheses,
+                    decisions=decisions,
+                    existing_protocols=existing_protocols,
+                    triage_result=triage_result,
+                    tables=tables,
+                    figures_analysis=figures_analysis
+                )
+            except Exception as e:
+                logger.error(f"❌ Multi-agent extraction failed: {e}")
+                logger.info("⚠️  Falling back to legacy extraction system")
+                protocol_data = await self._extract_with_ai(
+                    article=article,
+                    protocol_type=protocol_type,
+                    pdf_text=pdf_text,
+                    project=project,
+                    questions=questions,
+                    hypotheses=hypotheses,
+                    decisions=decisions,
+                    existing_protocols=existing_protocols,
+                    triage_result=triage_result,
+                    tables=tables,
+                    figures_analysis=figures_analysis
+                )
+        else:
+            logger.info(f"📝 Using LEGACY protocol extraction for {article_pmid}")
+            protocol_data = await self._extract_with_ai(
+                article=article,
+                protocol_type=protocol_type,
+                pdf_text=pdf_text,
+                project=project,
+                questions=questions,
+                hypotheses=hypotheses,
+                decisions=decisions,
+                existing_protocols=existing_protocols,
+                triage_result=triage_result,
+                tables=tables,
+                figures_analysis=figures_analysis
+            )
 
         # Step 6: Save to database (Phase 1: Enhanced with research context)
         import uuid
@@ -205,6 +256,18 @@ class ProtocolExtractorService:
                     if 0 <= idx < len(hypotheses):
                         affected_hypothesis_ids.append(hypotheses[idx].hypothesis_id)
 
+        # Week 24 Phase 2: Enhanced fields from multi-agent system
+        key_parameters = protocol_data.get("key_parameters", [])
+        expected_outcomes = protocol_data.get("expected_outcomes", [])
+        troubleshooting_tips = protocol_data.get("troubleshooting_tips", [])
+        relevance_score = protocol_data.get("relevance_score", 50)
+        key_insights = protocol_data.get("key_insights", [])
+        potential_applications = protocol_data.get("potential_applications", [])
+        extraction_confidence = protocol_data.get("extraction_confidence")
+        confidence_explanation = protocol_data.get("confidence_explanation", {})
+        material_sources = protocol_data.get("material_sources", {})
+        step_sources = protocol_data.get("step_sources", {})
+
         protocol = Protocol(
             protocol_id=str(uuid.uuid4()),
             project_id=project_id,  # Now required!
@@ -216,6 +279,17 @@ class ProtocolExtractorService:
             equipment=protocol_data.get("equipment", []),
             duration_estimate=protocol_data.get("duration_estimate"),
             difficulty_level=protocol_data.get("difficulty_level", "moderate"),
+            # Week 24 Phase 2: NEW fields from multi-agent system
+            key_parameters=key_parameters,
+            expected_outcomes=expected_outcomes,
+            troubleshooting_tips=troubleshooting_tips,
+            relevance_score=relevance_score,
+            key_insights=key_insights,
+            potential_applications=potential_applications,
+            extraction_confidence=extraction_confidence,
+            confidence_explanation=confidence_explanation,
+            material_sources=material_sources,
+            step_sources=step_sources,
             # Phase 1: Research context fields
             affected_questions=affected_question_ids,
             affected_hypotheses=affected_hypothesis_ids,
@@ -223,7 +297,7 @@ class ProtocolExtractorService:
             recommendations=[suggested_modifications] if suggested_modifications else [],
             context_relevance=protocol_comparison,  # Phase 2.2: Store protocol comparison
             context_aware=True if (questions or hypotheses or existing_protocols) else False,
-            extraction_method='intelligent_context_aware_v3',  # Week 22: Now includes tables+figures
+            extraction_method='intelligent_multi_agent_v1' if self.orchestrator else 'intelligent_context_aware_v3',
             extracted_by="ai",
             created_by=user_id,
             # Week 22: Store tables and figures
