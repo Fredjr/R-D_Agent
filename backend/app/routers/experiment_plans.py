@@ -14,7 +14,7 @@ from database import get_db
 from backend.app.services.experiment_planner_service import ExperimentPlannerService
 import logging
 
-router = APIRouter(prefix="/experiment-plans", tags=["experiment-plans"])
+router = APIRouter(prefix="/api/experiment-plans", tags=["experiment-plans"])
 logger = logging.getLogger(__name__)
 
 

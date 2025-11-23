@@ -15,7 +15,7 @@ from datetime import datetime
 import logging
 import uuid
 
-router = APIRouter(prefix="/experiment-results", tags=["experiment-results"])
+router = APIRouter(prefix="/api/experiment-results", tags=["experiment-results"])
 logger = logging.getLogger(__name__)
 
 

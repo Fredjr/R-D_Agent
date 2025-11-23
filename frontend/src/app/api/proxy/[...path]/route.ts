@@ -16,7 +16,11 @@ function buildTargetUrl(req: Request, path: string[]): string {
                          suffix.startsWith('triage') ||
                          suffix.startsWith('decisions') ||
                          suffix.startsWith('alerts') ||
-                         suffix.startsWith('protocols');
+                         suffix.startsWith('protocols') ||
+                         suffix.startsWith('experiment-plans') ||
+                         suffix.startsWith('experiment-results') ||
+                         suffix.startsWith('summaries') ||
+                         suffix.startsWith('insights');
 
   const finalPath = needsApiPrefix ? `api/${suffix}` : suffix;
 

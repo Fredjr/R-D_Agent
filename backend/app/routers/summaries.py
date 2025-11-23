@@ -13,7 +13,7 @@ from backend.app.services.living_summary_service import LivingSummaryService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/summaries", tags=["summaries"])
+router = APIRouter(prefix="/api/summaries", tags=["summaries"])
 
 # Initialize service
 summary_service = LivingSummaryService()

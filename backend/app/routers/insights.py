@@ -15,7 +15,7 @@ from backend.app.services.orchestrator_service import OrchestratorService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/insights", tags=["insights"])
+router = APIRouter(prefix="/api/insights", tags=["insights"])
 
 # Initialize services
 insights_service = InsightsService()
