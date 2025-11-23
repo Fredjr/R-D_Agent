@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 # Initialize OpenAI client
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+# Week 24: Multi-Agent Feature Flag
+USE_MULTI_AGENT_TRIAGE = os.getenv("USE_MULTI_AGENT_TRIAGE", "true").lower() == "true"
+
 
 class EnhancedAITriageService:
     """Enhanced service for AI-powered paper triage with transparency and evidence"""
@@ -36,7 +39,20 @@ class EnhancedAITriageService:
         self.model = "gpt-4o-mini"  # Using gpt-4o-mini for cost efficiency
         self.temperature = 0.5  # Increased for more creative connections
         self.cache_ttl_days = 7  # Cache triage results for 7 days
-        logger.info(f"✅ EnhancedAITriageService initialized with model: {self.model}, cache TTL: {self.cache_ttl_days} days")
+
+        # Week 24: Initialize multi-agent orchestrator
+        self.orchestrator = None
+        if USE_MULTI_AGENT_TRIAGE:
+            try:
+                from backend.app.services.agents.triage.triage_orchestrator import TriageOrchestrator
+                self.orchestrator = TriageOrchestrator()
+                logger.info(f"✅ EnhancedAITriageService initialized with MULTI-AGENT system, cache TTL: {self.cache_ttl_days} days")
+            except Exception as e:
+                logger.error(f"❌ Failed to initialize multi-agent orchestrator: {e}")
+                logger.info("⚠️  Falling back to legacy triage system")
+                self.orchestrator = None
+        else:
+            logger.info(f"✅ EnhancedAITriageService initialized with LEGACY system (model: {self.model}), cache TTL: {self.cache_ttl_days} days")
 
     async def triage_paper(
         self,
@@ -92,12 +108,34 @@ class EnhancedAITriageService:
         # 4. Calculate metadata-based score (citations, recency, journal)
         metadata_score = self._calculate_metadata_score(article)
 
-        # 5. Call OpenAI for enhanced triage analysis
-        triage_result = await self._analyze_paper_relevance_enhanced(
-            article=article,
-            context=context,
-            metadata_score=metadata_score
-        )
+        # 5. Call AI for triage analysis (multi-agent or legacy)
+        if self.orchestrator:
+            # Week 24: Use multi-agent system
+            logger.info(f"🤖 Using MULTI-AGENT triage system for {article_pmid}")
+            try:
+                triage_result = await self.orchestrator.triage_paper(
+                    article=article,
+                    questions=questions,
+                    hypotheses=hypotheses,
+                    project=project,
+                    metadata_score=metadata_score
+                )
+            except Exception as e:
+                logger.error(f"❌ Multi-agent triage failed: {e}")
+                logger.info("⚠️  Falling back to legacy triage system")
+                triage_result = await self._analyze_paper_relevance_enhanced(
+                    article=article,
+                    context=context,
+                    metadata_score=metadata_score
+                )
+        else:
+            # Legacy system
+            logger.info(f"🔧 Using LEGACY triage system for {article_pmid}")
+            triage_result = await self._analyze_paper_relevance_enhanced(
+                article=article,
+                context=context,
+                metadata_score=metadata_score
+            )
 
         # 6. Combine AI score with metadata score
         final_score = self._combine_scores(
