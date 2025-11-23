@@ -255,53 +255,21 @@ async def extract_protocol(
                 logger.info(f"📋 Found project_id from triage: {project_id}")
 
         # Choose extraction method
+        # Week 24 Phase 2: Use new multi-agent system (ProtocolExtractorService with ProtocolOrchestrator)
         if request.use_intelligent_extraction and USE_INTELLIGENT_EXTRACTION and project_id:
-            # Use intelligent context-aware extraction
-            logger.info(f"🧠 Using intelligent multi-agent extraction")
-            enhanced_data = await intelligent_protocol_extractor.extract_protocol_with_context(
+            # Use NEW multi-agent extraction (Week 24 Phase 2)
+            logger.info(f"🤖 Using NEW multi-agent extraction (Week 24 Phase 2)")
+            protocol = await protocol_extractor.extract_protocol(
                 article_pmid=request.article_pmid,
-                project_id=project_id,
+                protocol_type=request.protocol_type,
                 user_id=user_id,
                 db=db,
-                protocol_type=request.protocol_type,
+                project_id=project_id,
                 force_refresh=request.force_refresh
             )
 
-            # Create Protocol object from enhanced data
-            protocol = Protocol(
-                protocol_id=str(uuid.uuid4()),
-                project_id=project_id,
-                source_pmid=request.article_pmid,
-                protocol_name=enhanced_data.get("protocol_name", "Unknown Protocol"),
-                protocol_type=enhanced_data.get("protocol_type", "other"),
-                description=enhanced_data.get("context_relevance"),
-                materials=enhanced_data.get("materials", []),
-                steps=enhanced_data.get("steps", []),
-                equipment=enhanced_data.get("equipment", []),
-                duration_estimate=enhanced_data.get("duration_estimate"),
-                difficulty_level=enhanced_data.get("difficulty_level", "moderate"),
-                key_parameters=enhanced_data.get("key_parameters", []),
-                expected_outcomes=enhanced_data.get("expected_outcomes", []),
-                troubleshooting_tips=enhanced_data.get("troubleshooting_tips", []),
-                relevance_score=enhanced_data.get("relevance_score", 50),
-                affected_questions=enhanced_data.get("affected_questions", []),
-                affected_hypotheses=enhanced_data.get("affected_hypotheses", []),
-                relevance_reasoning=enhanced_data.get("relevance_reasoning"),
-                key_insights=enhanced_data.get("key_insights", []),
-                potential_applications=enhanced_data.get("potential_applications", []),
-                recommendations=enhanced_data.get("recommendations", []),
-                context_relevance=enhanced_data.get("context_relevance"),
-                extraction_method="intelligent_multi_agent",
-                context_aware=True,
-                extracted_by="ai",
-                created_by=user_id
-            )
-
-            db.add(protocol)
-            db.commit()
-            db.refresh(protocol)
-
-            logger.info(f"✅ Intelligent extraction complete: {protocol.protocol_name}")
+            # Protocol object already created and saved by protocol_extractor
+            logger.info(f"✅ Multi-agent extraction complete: {protocol.protocol_name}")
 
         else:
             # Use basic extraction
