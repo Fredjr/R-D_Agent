@@ -94,8 +94,8 @@ class RelevanceScorerAgent(BaseTriageAgent):
         for i, h in enumerate(hypotheses[:10], 1):
             hypotheses_section += f"H{i} [ID: {h.hypothesis_id}]: {h.hypothesis_text}\n"
         
-        prompt = f"""**PROJECT:** {project.name}
-**PROJECT GOAL:** {project.goal if hasattr(project, 'goal') and project.goal else 'N/A'}
+        prompt = f"""**PROJECT:** {project.project_name if project else 'N/A'}
+**PROJECT DESCRIPTION:** {project.description if project and hasattr(project, 'description') and project.description else 'N/A'}
 
 {questions_section}
 
