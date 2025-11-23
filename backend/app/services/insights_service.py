@@ -2,10 +2,12 @@
 Insights Service - AI-powered project insights and recommendations
 Week 21-22: AI Insights Feature
 Week 1 Improvements: Strategic context, tool patterns, validation, orchestration rules
+Week 24 Phase 3: Multi-Agent System
 """
 
 import logging
 import json
+import os
 from typing import Dict, List, Optional
 from datetime import datetime, timedelta, timezone
 import uuid
@@ -29,10 +31,16 @@ from backend.app.services.validation_service import ValidationService
 from backend.app.services.memory_store import MemoryStore
 from backend.app.services.retrieval_engine import RetrievalEngine
 
+# Week 24 Phase 3: Multi-Agent System
+from backend.app.services.agents.insights.insights_orchestrator import InsightsOrchestrator
+
 logger = logging.getLogger(__name__)
 
 # Initialize OpenAI client
 client = AsyncOpenAI()
+
+# Feature flag for multi-agent system (Week 24 Phase 3)
+USE_MULTI_AGENT_INSIGHTS = os.getenv('USE_MULTI_AGENT_INSIGHTS', 'true').lower() == 'true'
 
 
 class InsightsService:
@@ -86,8 +94,18 @@ class InsightsService:
         # Calculate metrics
         metrics = self._calculate_metrics(project_data)
 
-        # Generate AI insights (Week 2: pass db and user_id for memory system)
-        insights = await self._generate_ai_insights(project_data, metrics, db=db, user_id=user_id)
+        # Week 24 Phase 3: Use multi-agent system or legacy system
+        if USE_MULTI_AGENT_INSIGHTS:
+            logger.info("🤖 Using multi-agent insights system (Week 24 Phase 3)")
+            try:
+                insights = await self._generate_multi_agent_insights(project_data, metrics, db=db, user_id=user_id)
+            except Exception as e:
+                logger.error(f"❌ Multi-agent system failed: {e}")
+                logger.info("🔄 Falling back to legacy system...")
+                insights = await self._generate_ai_insights(project_data, metrics, db=db, user_id=user_id)
+        else:
+            logger.info("📝 Using legacy insights system")
+            insights = await self._generate_ai_insights(project_data, metrics, db=db, user_id=user_id)
 
         # Save to database
         cached_insights = self._save_insights(project_id, insights, db)
@@ -218,6 +236,67 @@ class InsightsService:
             'total_plans': len(plans),
             'plan_status': plan_status
         }
+
+    async def _generate_multi_agent_insights(self, project_data: Dict, metrics: Dict, db: Session = None, user_id: str = None) -> Dict:
+        """
+        Generate insights using multi-agent system (Week 24 Phase 3)
+
+        Uses 5 specialized agents:
+        1. ProgressAnalyzer - Analyzes research progress and evidence chains
+        2. ConnectionFinder - Finds cross-cutting patterns
+        3. GapIdentifier - Identifies broken loops and missing evidence
+        4. TrendDetector - Detects temporal patterns
+        5. ActionPlanner - Generates actionable recommendations
+
+        Args:
+            project_data: Dict with all project data
+            metrics: Dict with calculated metrics
+            db: Database session (for memory system)
+            user_id: User ID (for memory system)
+
+        Returns:
+            Dict with all 5 insight types
+        """
+        logger.info(f"🤖 Generating insights with multi-agent system (Week 24 Phase 3)...")
+
+        try:
+            # Initialize orchestrator
+            orchestrator = InsightsOrchestrator()
+
+            # Generate insights using 5 agents
+            insights = await orchestrator.generate_insights(project_data, metrics)
+
+            # Week 2: Store insights as memory
+            if db and user_id:
+                try:
+                    # Ensure clean session state before memory storage
+                    db.commit()
+                    memory_store = MemoryStore(db)
+                    memory_store.store_memory(
+                        project_id=project_data['project'].project_id,
+                        interaction_type='insights',
+                        content=insights,
+                        user_id=user_id,
+                        summary=f"Generated insights: {len(insights.get('progress_insights', []))} progress, {len(insights.get('recommendations', []))} recommendations",
+                        linked_question_ids=[q.question_id if hasattr(q, 'question_id') else q['question_id'] for q in project_data.get('questions', [])],
+                        linked_hypothesis_ids=[h.hypothesis_id if hasattr(h, 'hypothesis_id') else h['hypothesis_id'] for h in project_data.get('hypotheses', [])],
+                        relevance_score=1.0
+                    )
+                    logger.info(f"💾 Stored insights as memory")
+                except Exception as e:
+                    logger.warning(f"⚠️  Failed to store memory: {e}")
+                    # Rollback to clean up failed transaction
+                    try:
+                        db.rollback()
+                    except:
+                        pass
+
+            logger.info(f"✅ Multi-agent insights generated successfully")
+            return insights
+
+        except Exception as e:
+            logger.error(f"❌ Multi-agent insights generation failed: {e}")
+            raise
 
     async def _generate_ai_insights(self, project_data: Dict, metrics: Dict, db: Session = None, user_id: str = None) -> Dict:
         """
