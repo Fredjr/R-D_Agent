@@ -119,20 +119,22 @@ Abstract: {abstract}
 - 0-29: Not relevant to our research
 
 **TASK:**
-Score this paper's relevance to the project using the rubric. Be strict and calibrated.
+Score this paper's relevance to the project using the rubric. Be calibrated but not overly strict.
 
 **Return JSON:**
 {{
   "relevance_score": <0-100 integer using rubric>,
-  "triage_status": "<must_read (90-100) | nice_to_know (50-89) | ignore (0-49)>",
+  "triage_status": "<must_read (70-100) | nice_to_know (40-69) | ignore (0-39)>",
   "confidence_score": <0.0-1.0 float, how confident are you in this score>,
   "scoring_rationale": "<2-3 sentences explaining the score using the rubric>"
 }}
 
 **IMPORTANT:**
-- Be STRICT with scoring - most papers should be 30-70
-- Only 90-100 if paper DIRECTLY tests our hypotheses or answers our questions
-- Confidence should be 0.7-0.9 for must_read, 0.4-0.6 for nice_to_know, 0.2-0.4 for ignore
+- Use the FULL scoring range - don't cluster everything in 30-50
+- 70-100 (must_read): Paper directly addresses research questions/hypotheses OR provides critical methods/data
+- 40-69 (nice_to_know): Paper provides useful context, related approaches, or background
+- 0-39 (ignore): Paper is not relevant to the research focus
+- Confidence should be 0.7-0.9 for must_read, 0.5-0.7 for nice_to_know, 0.3-0.5 for ignore
 """
         
         return prompt
@@ -140,28 +142,42 @@ Score this paper's relevance to the project using the rubric. Be strict and cali
     def validate_output(self, output: Dict[str, Any]) -> bool:
         """Validate relevance scorer output"""
         required_fields = ["relevance_score", "triage_status", "confidence_score", "scoring_rationale"]
-        
+
         for field in required_fields:
             if field not in output:
                 logger.error(f"❌ {self.name}: Missing required field: {field}")
                 return False
-        
+
         # Validate score range
         if not (0 <= output["relevance_score"] <= 100):
             logger.error(f"❌ {self.name}: relevance_score out of range: {output['relevance_score']}")
             return False
-        
+
         # Validate confidence range
         if not (0.0 <= output["confidence_score"] <= 1.0):
             logger.error(f"❌ {self.name}: confidence_score out of range: {output['confidence_score']}")
             return False
-        
+
         # Validate triage_status
         valid_statuses = ["must_read", "nice_to_know", "ignore"]
         if output["triage_status"] not in valid_statuses:
             logger.error(f"❌ {self.name}: Invalid triage_status: {output['triage_status']}")
             return False
-        
+
+        # Validate triage_status matches score thresholds
+        score = output["relevance_score"]
+        status = output["triage_status"]
+
+        if score >= 70 and status != "must_read":
+            logger.warning(f"⚠️  {self.name}: Score {score} should be 'must_read', got '{status}' - auto-correcting")
+            output["triage_status"] = "must_read"
+        elif 40 <= score < 70 and status != "nice_to_know":
+            logger.warning(f"⚠️  {self.name}: Score {score} should be 'nice_to_know', got '{status}' - auto-correcting")
+            output["triage_status"] = "nice_to_know"
+        elif score < 40 and status != "ignore":
+            logger.warning(f"⚠️  {self.name}: Score {score} should be 'ignore', got '{status}' - auto-correcting")
+            output["triage_status"] = "ignore"
+
         logger.info(f"✅ {self.name}: Output validation passed")
         return True
 

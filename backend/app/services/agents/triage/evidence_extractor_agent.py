@@ -35,13 +35,10 @@ class EvidenceExtractorAgent(BaseTriageAgent):
     ) -> Dict[str, Any]:
         """Extract evidence from abstract"""
         logger.info(f"📝 {self.name}: Extracting evidence quotes...")
-        
-        # Skip if paper is ignore status
-        relevance_output = previous_outputs.get("relevance_scorer", {})
-        if relevance_output.get("triage_status") == "ignore":
-            logger.info(f"⏭️  {self.name}: Skipping evidence extraction for 'ignore' paper")
-            return {"evidence_excerpts": []}
-        
+
+        # ALWAYS extract evidence, regardless of triage status
+        # User requirement: Generate ALL details for every paper
+
         prompt = self.get_prompt(context, previous_outputs)
         
         try:

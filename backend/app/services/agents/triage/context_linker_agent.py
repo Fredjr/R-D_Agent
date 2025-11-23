@@ -35,18 +35,10 @@ class ContextLinkerAgent(BaseTriageAgent):
     ) -> Dict[str, Any]:
         """Link evidence to Q/H"""
         logger.info(f"🔗 {self.name}: Linking evidence to questions and hypotheses...")
-        
-        # Skip if paper is ignore status
-        relevance_output = previous_outputs.get("relevance_scorer", {})
-        if relevance_output.get("triage_status") == "ignore":
-            logger.info(f"⏭️  {self.name}: Skipping context linking for 'ignore' paper")
-            return {
-                "affected_questions": [],
-                "affected_hypotheses": [],
-                "question_relevance_scores": {},
-                "hypothesis_relevance_scores": {}
-            }
-        
+
+        # ALWAYS link evidence, regardless of triage status
+        # User requirement: Generate ALL details for every paper
+
         prompt = self.get_prompt(context, previous_outputs)
         
         try:
