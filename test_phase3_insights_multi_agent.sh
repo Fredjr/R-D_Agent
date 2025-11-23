@@ -20,7 +20,7 @@ echo ""
 echo "🔄 Regenerating insights with multi-agent system..."
 echo ""
 
-RESPONSE=$(curl -s -X POST "$BASE_URL/api/insights/projects/$PROJECT_ID/insights/regenerate" \
+RESPONSE=$(curl -s -X POST "$BASE_URL/insights/projects/$PROJECT_ID/insights/regenerate" \
   -H "Content-Type: application/json" \
   -H "User-ID: $USER_ID")
 
