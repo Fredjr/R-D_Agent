@@ -30,6 +30,7 @@ httpx>=0.25.2
 pdfminer.six>=20231228
 PyPDF2>=3.0.0  # PDF text extraction for protocol extraction
 pdfplumber>=0.10.0  # Fallback PDF extraction
+Pillow>=10.0.0  # Week 24: Image processing for PDF figure extraction
 
 # Utilities - Python 3.12 compatible
 jsonschema>=4.20.0

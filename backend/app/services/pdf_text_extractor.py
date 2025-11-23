@@ -429,16 +429,19 @@ class PDFTextExtractor:
 
     async def _extract_figures(self, pdf_reader) -> List[Dict[str, Any]]:
         """
-        Extract figures/images from PDF using PyPDF2.
+        Extract figures/images from PDF using PyPDF2 and convert to web-compatible format.
 
         Args:
             pdf_reader: PyPDF2 PdfReader object
 
         Returns:
-            List of figures with base64-encoded images
+            List of figures with base64-encoded PNG images in data URI format
         """
         figures = []
         try:
+            from PIL import Image
+            import io
+
             for page_num, page in enumerate(pdf_reader.pages, 1):
                 try:
                     if '/XObject' in page['/Resources']:
@@ -449,31 +452,76 @@ class PDFTextExtractor:
 
                             if obj['/Subtype'] == '/Image':
                                 try:
-                                    # Extract image data
-                                    size = (obj['/Width'], obj['/Height'])
+                                    # Extract image properties
+                                    width = obj['/Width']
+                                    height = obj['/Height']
+
+                                    # Get raw image data (PyPDF2 handles decompression)
                                     data = obj.get_data()
 
-                                    # Convert to base64 for storage (limit size to avoid token bloat)
-                                    if len(data) < 500000:  # Limit to ~500KB per image
-                                        img_base64 = base64.b64encode(data).decode('utf-8')
-
-                                        figures.append({
-                                            "page": page_num,
-                                            "figure_number": len(figures) + 1,
-                                            "width": size[0],
-                                            "height": size[1],
-                                            "size_bytes": len(data),
-                                            "image_data": img_base64[:100000]  # Limit to 100KB base64 for token efficiency
-                                        })
-                                        logger.info(f"🖼️ Extracted figure {len(figures)} from page {page_num}: {size[0]}x{size[1]}px")
-                                    else:
+                                    # Skip very large images
+                                    if len(data) > 2000000:  # 2MB limit
                                         logger.warning(f"⚠️ Skipping large image on page {page_num}: {len(data)} bytes")
+                                        continue
+
+                                    # Determine color space and mode
+                                    color_space = obj.get('/ColorSpace', '/DeviceRGB')
+                                    if color_space == '/DeviceRGB':
+                                        mode = 'RGB'
+                                    elif color_space == '/DeviceGray':
+                                        mode = 'L'
+                                    elif color_space == '/DeviceCMYK':
+                                        mode = 'CMYK'
+                                    else:
+                                        mode = 'RGB'  # Default
+
+                                    # Create PIL Image from raw data
+                                    try:
+                                        img = Image.frombytes(mode, (width, height), data)
+                                    except Exception as e:
+                                        # If frombytes fails, try to open as image file
+                                        logger.warning(f"⚠️ frombytes failed, trying Image.open: {e}")
+                                        img = Image.open(io.BytesIO(data))
+
+                                    # Convert to RGB if needed
+                                    if img.mode not in ('RGB', 'L'):
+                                        img = img.convert('RGB')
+
+                                    # Resize if too large (max 800px width)
+                                    max_width = 800
+                                    if img.width > max_width:
+                                        ratio = max_width / img.width
+                                        new_height = int(img.height * ratio)
+                                        img = img.resize((max_width, new_height), Image.Resampling.LANCZOS)
+                                        logger.info(f"🔄 Resized image from {width}x{height} to {img.width}x{img.height}")
+
+                                    # Convert to PNG and encode as base64
+                                    buffer = io.BytesIO()
+                                    img.save(buffer, format='PNG', optimize=True)
+                                    png_data = buffer.getvalue()
+
+                                    # Create data URI for web display
+                                    img_base64 = base64.b64encode(png_data).decode('utf-8')
+                                    data_uri = f"data:image/png;base64,{img_base64}"
+
+                                    figures.append({
+                                        "page": page_num,
+                                        "figure_number": len(figures) + 1,
+                                        "width": img.width,
+                                        "height": img.height,
+                                        "size_bytes": len(png_data),
+                                        "image_data": data_uri  # Full data URI for web display
+                                    })
+                                    logger.info(f"🖼️ Extracted figure {len(figures)} from page {page_num}: {img.width}x{img.height}px ({len(png_data)} bytes)")
+
                                 except Exception as e:
                                     logger.warning(f"⚠️ Failed to extract image from page {page_num}: {e}")
                                     continue
                 except Exception as e:
                     logger.warning(f"⚠️ Failed to process images on page {page_num}: {e}")
                     continue
+        except ImportError:
+            logger.error(f"❌ PIL (Pillow) not installed - cannot extract figures")
         except Exception as e:
             logger.error(f"❌ Figure extraction failed: {e}")
 
