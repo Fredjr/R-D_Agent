@@ -114,39 +114,45 @@ Title: {article.title}
 **RELEVANCE SCORE:** {relevance_output.get('relevance_score', 0)}/100
 
 **TASK:**
-Link this paper to specific research questions and hypotheses. For each link:
-1. Identify which questions this paper addresses (if any)
-2. Identify which hypotheses this paper relates to (if any)
-3. Score each link (0-100) based on how directly it addresses the Q/H
-4. Provide specific reasoning with evidence references
+Score this paper's relevance to EVERY research question and hypothesis. You MUST provide scores for ALL questions and ALL hypotheses, even if the paper is not relevant (score 0-10).
 
 **Return JSON:**
 {{
-  "affected_questions": ["<question_id>", ...],
+  "affected_questions": ["<question_id>", ...],  // List ALL question IDs that score >= 40
   "question_relevance_scores": {{
     "<question_id>": {{
-      "score": <0-100 integer>,
+      "score": <0-100 integer>,  // REQUIRED for EVERY question
       "reasoning": "<why and how this paper addresses this question - 1-2 sentences>",
-      "evidence": "<reference to specific evidence quote or finding>"
+      "evidence": "<reference to specific evidence quote or finding, or 'No direct evidence' if score < 20>"
     }}
+    // MUST include ALL questions from above, even if score is 0
   }},
-  "affected_hypotheses": ["<hypothesis_id>", ...],
+  "affected_hypotheses": ["<hypothesis_id>", ...],  // List ALL hypothesis IDs that score >= 40
   "hypothesis_relevance_scores": {{
     "<hypothesis_id>": {{
-      "score": <0-100 integer>,
-      "support_type": "<supports|contradicts|tests|provides_context>",
+      "score": <0-100 integer>,  // REQUIRED for EVERY hypothesis
+      "support_type": "<supports|contradicts|tests|provides_context|not_relevant>",
       "reasoning": "<why and how this paper relates to this hypothesis - 1-2 sentences>",
-      "evidence": "<reference to specific evidence quote or finding>"
+      "evidence": "<reference to specific evidence quote or finding, or 'No direct evidence' if score < 20>"
     }}
+    // MUST include ALL hypotheses from above, even if score is 0
   }}
 }}
 
-**IMPORTANT:**
+**SCORING GUIDE:**
+- 90-100: Directly tests/answers the Q/H with novel data
+- 70-89: Provides critical methods, data, or findings for the Q/H
+- 50-69: Provides useful context or related approaches
+- 30-49: Tangentially related, some background
+- 10-29: Minimal relevance, different focus
+- 0-9: Not relevant at all
+
+**CRITICAL REQUIREMENTS:**
 - Use EXACT question_id and hypothesis_id values from above
-- Only include Q/H that are actually addressed by the paper
-- Scores should reflect directness: 80-100 (directly addresses), 50-79 (provides relevant context), 0-49 (tangentially related)
-- Reference specific evidence quotes in reasoning
-- If no Q/H are addressed, return empty arrays and empty objects
+- MUST score ALL questions and ALL hypotheses (no empty objects allowed)
+- affected_questions/affected_hypotheses should only include IDs with score >= 40
+- Reference specific evidence quotes when score >= 30
+- For low scores (< 30), explain why paper is not relevant
 """
         
         return prompt
