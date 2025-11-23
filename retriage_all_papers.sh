@@ -58,7 +58,7 @@ SKIPPED_COUNT=0
 
 for PMID in $PAPERS; do
   echo -n "📄 Re-triaging $PMID... "
-  
+
   # Re-triage with force_refresh=true
   RESPONSE=$(curl -s -w "\n%{http_code}" \
     "${BACKEND_URL}/api/triage/project/${PROJECT_ID}/triage" \
@@ -66,9 +66,9 @@ for PMID in $PAPERS; do
     -H "User-ID: ${USER_ID}" \
     -H "Content-Type: application/json" \
     -d "{\"article_pmid\": \"${PMID}\", \"force_refresh\": true}")
-  
-  HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-  BODY=$(echo "$RESPONSE" | head -n -1)
+
+  HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+  BODY=$(echo "$RESPONSE" | sed '$d')
   
   if [ "$HTTP_CODE" == "200" ]; then
     # Check if evidence was extracted
