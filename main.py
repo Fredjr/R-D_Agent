@@ -10183,7 +10183,14 @@ async def get_article_details(
             "references_pmids": article.references_pmids or [],
             "url": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
             "created_at": article.created_at,
-            "updated_at": article.updated_at
+            "updated_at": article.updated_at,
+            # Week 22: PDF extraction fields
+            "pdf_text": article.pdf_text,
+            "pdf_tables": article.pdf_tables or [],
+            "pdf_figures": article.pdf_figures or [],
+            "pdf_extracted_at": article.pdf_extracted_at,
+            "pdf_source": article.pdf_source,
+            "pdf_extraction_method": article.pdf_extraction_method
         }
 
     except HTTPException:
