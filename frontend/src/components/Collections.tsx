@@ -82,7 +82,10 @@ export default function Collections({
     }
   }, [projectId, refreshCollections]);
 
-  // Week 24: Fetch hypotheses for the project
+  // Week 24: Fetch hypotheses and research questions for the project
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [questionsLoading, setQuestionsLoading] = useState(false);
+
   useEffect(() => {
     const fetchHypotheses = async () => {
       if (!projectId || !user?.email) {
@@ -114,7 +117,37 @@ export default function Collections({
       }
     };
 
+    const fetchQuestions = async () => {
+      if (!projectId || !user?.email) {
+        console.log('⚠️ Skipping questions fetch - missing projectId or user email');
+        return;
+      }
+
+      console.log('🔄 Fetching research questions for project:', projectId);
+      setQuestionsLoading(true);
+      try {
+        const response = await fetch(`/api/proxy/questions/project/${projectId}`, {
+          headers: { 'User-ID': user.email }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setQuestions(data);
+          console.log('✅ Fetched research questions for collections:', {
+            count: data.length
+          });
+        } else {
+          console.error('❌ Failed to fetch questions:', response.statusText);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching questions:', error);
+      } finally {
+        setQuestionsLoading(false);
+      }
+    };
+
     fetchHypotheses();
+    fetchQuestions();
   }, [projectId, user?.email]);
 
   // Week 24: Create hypothesis map for quick lookup
@@ -132,6 +165,15 @@ export default function Collections({
     });
     return map;
   }, [hypotheses]);
+
+  // Week 24: Create questions map for quick lookup
+  const questionsMap = useMemo(() => {
+    const map = questions.reduce((acc, q) => {
+      acc[q.question_id] = q.question_text;
+      return acc;
+    }, {} as Record<string, string>);
+    return map;
+  }, [questions]);
 
   // 🔧 Handle URL parameters to auto-open collection views
   useEffect(() => {
@@ -569,6 +611,8 @@ export default function Collections({
               projectId={projectId}
               linkedHypothesisIds={collection.linked_hypothesis_ids || []}
               hypothesesMap={hypothesesMap}
+              linkedQuestionIds={collection.linked_question_ids || []}
+              questionsMap={questionsMap}
               onClick={() => handleViewArticles(collection)}
               onExplore={() => handleViewArticles(collection)}
               onNetworkView={() => handleViewNetwork(collection)}

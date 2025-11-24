@@ -51,9 +51,11 @@ export function MyCollectionsTab({ projectId, onRefresh, onCreateCollection }: M
     broadcastCollectionDeleted
   } = useGlobalCollectionSync(projectId);
 
-  // Fetch hypotheses for showing links on collection cards
+  // Fetch hypotheses and research questions for showing links on collection cards
   const [hypotheses, setHypotheses] = React.useState<any[]>([]);
+  const [questions, setQuestions] = React.useState<any[]>([]);
   const [hypothesesLoading, setHypothesesLoading] = React.useState(false);
+  const [questionsLoading, setQuestionsLoading] = React.useState(false);
 
   React.useEffect(() => {
     const fetchHypotheses = async () => {
@@ -83,7 +85,35 @@ export function MyCollectionsTab({ projectId, onRefresh, onCreateCollection }: M
       }
     };
 
+    const fetchQuestions = async () => {
+      if (!projectId || !user?.email) {
+        console.log('⚠️ MyCollectionsTab: Skipping questions fetch - missing projectId or user email');
+        return;
+      }
+
+      console.log('🔄 MyCollectionsTab: Fetching research questions for project:', projectId);
+      setQuestionsLoading(true);
+      try {
+        const response = await fetch(`/api/proxy/questions/project/${projectId}`, {
+          headers: { 'User-ID': user.email }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('✅ MyCollectionsTab: Research questions fetched:', data);
+          setQuestions(data || []);
+        } else {
+          console.error('❌ MyCollectionsTab: Failed to fetch questions:', response.status);
+        }
+      } catch (error) {
+        console.error('❌ MyCollectionsTab: Error fetching questions:', error);
+      } finally {
+        setQuestionsLoading(false);
+      }
+    };
+
     fetchHypotheses();
+    fetchQuestions();
   }, [projectId, user?.email]);
 
   // Create hypothesis map for quick lookup
@@ -94,6 +124,15 @@ export function MyCollectionsTab({ projectId, onRefresh, onCreateCollection }: M
     }, {} as Record<string, string>);
     return map;
   }, [hypotheses]);
+
+  // Create questions map for quick lookup
+  const questionsMap = React.useMemo(() => {
+    const map = questions.reduce((acc, q) => {
+      acc[q.question_id] = q.question_text;
+      return acc;
+    }, {} as Record<string, string>);
+    return map;
+  }, [questions]);
 
   // View state
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -486,6 +525,8 @@ export function MyCollectionsTab({ projectId, onRefresh, onCreateCollection }: M
                 projectId={projectId}
                 linkedHypothesisIds={collection.linked_hypothesis_ids || []}
                 hypothesesMap={hypothesesMap}
+                linkedQuestionIds={collection.linked_question_ids || []}
+                questionsMap={questionsMap}
                 onClick={() => handleCollectionClick(collection)}
                 onExplore={() => handleCollectionClick(collection)}
                 onNetworkView={() => {

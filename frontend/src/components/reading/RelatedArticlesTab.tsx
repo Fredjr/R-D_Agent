@@ -36,6 +36,7 @@ export default function RelatedArticlesTab({
   const [collections, setCollections] = useState<any[]>([]);
   const [showCollectionModal, setShowCollectionModal] = useState(false);
   const [selectedPmid, setSelectedPmid] = useState<string | null>(null);
+  const [selectedArticle, setSelectedArticle] = useState<RelatedArticle | null>(null);
   const [showExplanation, setShowExplanation] = useState<string | null>(null);
 
   useEffect(() => {
@@ -161,16 +162,21 @@ export default function RelatedArticlesTab({
   };
 
   const handleAddToCollection = (articlePmid: string) => {
-    setSelectedPmid(articlePmid);
-    setShowCollectionModal(true);
+    // Find the article in the list
+    const article = relatedArticles.find(a => a.pmid === articlePmid);
+    if (article) {
+      setSelectedArticle(article);
+      setSelectedPmid(articlePmid);
+      setShowCollectionModal(true);
+    }
   };
 
   const handleCollectionSelect = async (collectionId: string) => {
-    if (!selectedPmid || !projectId || !userId) return;
+    if (!selectedPmid || !selectedArticle || !projectId || !userId) return;
 
     try {
       const response = await fetch(
-        `/api/proxy/collections/${collectionId}/articles`,
+        `/api/proxy/collections/${collectionId}/articles?projectId=${projectId}`,
         {
           method: 'POST',
           headers: {
@@ -178,20 +184,31 @@ export default function RelatedArticlesTab({
             'User-ID': userId,
           },
           body: JSON.stringify({
-            pmid: selectedPmid,
+            article_pmid: selectedPmid,
+            article_title: selectedArticle.title,
+            article_authors: selectedArticle.authors || [],
+            article_journal: selectedArticle.journal || '',
+            article_year: selectedArticle.year || new Date().getFullYear(),
+            source_type: 'related_articles',
+            notes: `Added from Related Articles tab`
           }),
         }
       );
 
       if (response.ok) {
         console.log(`✅ Added PMID ${selectedPmid} to collection ${collectionId}`);
+        alert('✅ Article added to collection successfully!');
         setShowCollectionModal(false);
         setSelectedPmid(null);
+        setSelectedArticle(null);
       } else {
-        console.error('Failed to add to collection');
+        const errorData = await response.json();
+        console.error('Failed to add to collection:', errorData);
+        alert(`❌ Failed to add article: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error adding to collection:', error);
+      alert('❌ Failed to add article to collection. Please try again.');
     }
   };
 

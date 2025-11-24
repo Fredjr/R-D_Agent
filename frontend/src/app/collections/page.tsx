@@ -44,6 +44,7 @@ interface Collection {
   updatedAt: string;
   isShared: boolean;
   linkedHypothesisIds?: string[];  // Week 24
+  linkedQuestionIds?: string[];  // Week 24
 }
 
 export default function CollectionsPage() {
@@ -61,8 +62,9 @@ export default function CollectionsPage() {
   const [selectedArticle, setSelectedArticle] = useState<any | null>(null);
   const [showNetworkView, setShowNetworkView] = useState(false);
 
-  // Week 24: State for hypotheses
+  // Week 24: State for hypotheses and research questions
   const [hypothesesByProject, setHypothesesByProject] = useState<Record<string, Record<string, string>>>({});
+  const [questionsByProject, setQuestionsByProject] = useState<Record<string, Record<string, string>>>({});
 
   // State for creating new collection
   const [newCollection, setNewCollection] = useState({
@@ -148,7 +150,8 @@ export default function CollectionsPage() {
               createdAt: collection.created_at,
               updatedAt: collection.updated_at,
               isShared: false, // TODO: Add sharing logic
-              linkedHypothesisIds: collection.linked_hypothesis_ids || []  // Week 24
+              linkedHypothesisIds: collection.linked_hypothesis_ids || [],  // Week 24
+              linkedQuestionIds: collection.linked_question_ids || []  // Week 24
             }));
 
             allCollections.push(...transformedCollections);
@@ -169,10 +172,13 @@ export default function CollectionsPage() {
       console.log('✅ Total collections loaded:', allCollections.length);
       setCollections(allCollections);
 
-      // Week 24: Fetch hypotheses for all projects
+      // Week 24: Fetch hypotheses and research questions for all projects
       const hypothesesData: Record<string, Record<string, string>> = {};
+      const questionsData: Record<string, Record<string, string>> = {};
+
       for (const project of projects) {
         try {
+          // Fetch hypotheses
           const hypothesesResponse = await fetch(`/api/proxy/hypotheses/project/${project.project_id}`, {
             headers: {
               'User-ID': user?.email || 'default_user',
@@ -189,11 +195,30 @@ export default function CollectionsPage() {
             hypothesesData[project.project_id] = hypothesesMap;
             console.log(`✅ Loaded ${hypotheses.length} hypotheses for project: ${project.project_name}`);
           }
+
+          // Fetch research questions
+          const questionsResponse = await fetch(`/api/proxy/questions/project/${project.project_id}`, {
+            headers: {
+              'User-ID': user?.email || 'default_user',
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (questionsResponse.ok) {
+            const questions = await questionsResponse.json();
+            const questionsMap = questions.reduce((acc: Record<string, string>, q: any) => {
+              acc[q.question_id] = q.question_text;
+              return acc;
+            }, {});
+            questionsData[project.project_id] = questionsMap;
+            console.log(`✅ Loaded ${questions.length} research questions for project: ${project.project_name}`);
+          }
         } catch (error) {
-          console.warn(`⚠️ Failed to fetch hypotheses for project ${project.project_name}:`, error);
+          console.warn(`⚠️ Failed to fetch hypotheses/questions for project ${project.project_name}:`, error);
         }
       }
       setHypothesesByProject(hypothesesData);
+      setQuestionsByProject(questionsData);
 
     } catch (error) {
       console.error('❌ Failed to fetch collections:', error);
@@ -396,9 +421,10 @@ export default function CollectionsPage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {projectCollections.map((collection) => {
-                      // Get the first project ID from the collections to find hypotheses
+                      // Get the first project ID from the collections to find hypotheses and questions
                       const projectId = projectCollections[0]?.projectId;
                       const hypothesesMap = projectId ? hypothesesByProject[projectId] || {} : {};
+                      const questionsMap = projectId ? questionsByProject[projectId] || {} : {};
 
                       return (
                         <DeletableCollectionCard
@@ -412,6 +438,8 @@ export default function CollectionsPage() {
                           color={collection.color}
                           linkedHypothesisIds={collection.linkedHypothesisIds}
                           hypothesesMap={hypothesesMap}
+                          linkedQuestionIds={collection.linkedQuestionIds}
+                          questionsMap={questionsMap}
                           onClick={() => {
                             console.log('Selected collection:', collection);
                             trackCollectionAction('view', collection.id);

@@ -259,6 +259,8 @@ interface DeletableCollectionCardProps {
   className?: string;
   linkedHypothesisIds?: string[];  // Week 24: Show linked hypotheses
   hypothesesMap?: Record<string, string>;  // Week 24: Map of hypothesis_id -> hypothesis_text
+  linkedQuestionIds?: string[];  // Week 24: Show linked research questions
+  questionsMap?: Record<string, string>;  // Week 24: Map of question_id -> question_text
 }
 
 export const DeletableCollectionCard: React.FC<DeletableCollectionCardProps> = ({
@@ -275,7 +277,9 @@ export const DeletableCollectionCard: React.FC<DeletableCollectionCardProps> = (
   projectId,
   className,
   linkedHypothesisIds = [],
-  hypothesesMap = {}
+  hypothesesMap = {},
+  linkedQuestionIds = [],
+  questionsMap = {}
 }) => {
   const { contextMenu, openContextMenu, closeContextMenu } = useContextMenu();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -350,39 +354,81 @@ export const DeletableCollectionCard: React.FC<DeletableCollectionCardProps> = (
             <p className="text-sm mb-4" style={{ color: '#374151' }}>{description}</p>
           )}
 
-          {/* Week 24: Show linked hypotheses */}
-          {linkedHypothesisIds && linkedHypothesisIds.length > 0 && hypothesesMap && Object.keys(hypothesesMap).length > 0 && (
+          {/* Week 24: Show linked hypotheses and research questions */}
+          {((linkedHypothesisIds && linkedHypothesisIds.length > 0) || (linkedQuestionIds && linkedQuestionIds.length > 0)) && (
             <div className="mt-3 mb-3 flex flex-wrap gap-2">
-              {linkedHypothesisIds.slice(0, 2).map((hypId) => {
-                const hypothesisText = hypothesesMap[hypId];
-                if (!hypothesisText) {
-                  return null;
-                }
+              {/* Research Questions */}
+              {linkedQuestionIds && linkedQuestionIds.length > 0 && questionsMap && Object.keys(questionsMap).length > 0 && (
+                <>
+                  {linkedQuestionIds.slice(0, 1).map((qId) => {
+                    const questionText = questionsMap[qId];
+                    if (!questionText) {
+                      return null;
+                    }
 
-                const truncatedText = hypothesisText.length > 40
-                  ? hypothesisText.slice(0, 40) + '...'
-                  : hypothesisText;
+                    const truncatedText = questionText.length > 40
+                      ? questionText.slice(0, 40) + '...'
+                      : questionText;
 
-                return (
-                  <div
-                    key={hypId}
-                    className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full"
-                    title={hypothesisText}
-                    style={{ border: '1px solid purple' }}
-                  >
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                    </svg>
-                    <span className="max-w-[200px] truncate">
-                      {truncatedText}
-                    </span>
-                  </div>
-                );
-              })}
-              {linkedHypothesisIds.length > 2 && (
-                <div className="inline-flex items-center px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
-                  +{linkedHypothesisIds.length - 2} more
-                </div>
+                    return (
+                      <div
+                        key={qId}
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full"
+                        title={`Research Question: ${questionText}`}
+                        style={{ border: '1px solid #3B82F6' }}
+                      >
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                        </svg>
+                        <span className="max-w-[200px] truncate">
+                          {truncatedText}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {linkedQuestionIds.length > 1 && (
+                    <div className="inline-flex items-center px-2 py-1 bg-blue-50 text-blue-600 text-xs rounded-full">
+                      +{linkedQuestionIds.length - 1} more question{linkedQuestionIds.length > 2 ? 's' : ''}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Hypotheses */}
+              {linkedHypothesisIds && linkedHypothesisIds.length > 0 && hypothesesMap && Object.keys(hypothesesMap).length > 0 && (
+                <>
+                  {linkedHypothesisIds.slice(0, 2).map((hypId) => {
+                    const hypothesisText = hypothesesMap[hypId];
+                    if (!hypothesisText) {
+                      return null;
+                    }
+
+                    const truncatedText = hypothesisText.length > 40
+                      ? hypothesisText.slice(0, 40) + '...'
+                      : hypothesisText;
+
+                    return (
+                      <div
+                        key={hypId}
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full"
+                        title={`Hypothesis: ${hypothesisText}`}
+                        style={{ border: '1px solid purple' }}
+                      >
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                        <span className="max-w-[200px] truncate">
+                          {truncatedText}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {linkedHypothesisIds.length > 2 && (
+                    <div className="inline-flex items-center px-2 py-1 bg-purple-50 text-purple-600 text-xs rounded-full">
+                      +{linkedHypothesisIds.length - 2} more hypothesis{linkedHypothesisIds.length > 3 ? 'es' : ''}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}

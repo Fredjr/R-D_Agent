@@ -62,10 +62,41 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
   // Triage state
   const [triagingPmids, setTriagingPmids] = useState<Set<string>>(new Set());
 
+  // Week 24: Fetch hypotheses and research questions for displaying links
+  const [hypotheses, setHypotheses] = useState<any[]>([]);
+  const [questions, setQuestions] = useState<any[]>([]);
+
   useEffect(() => {
     fetchArticles();
     fetchAnnotations();
+    fetchHypothesesAndQuestions();
   }, [collection.collection_id]);
+
+  const fetchHypothesesAndQuestions = async () => {
+    if (!user?.email) return;
+
+    try {
+      // Fetch hypotheses
+      const hypothesesResponse = await fetch(`/api/proxy/hypotheses/project/${projectId}`, {
+        headers: { 'User-ID': user.email }
+      });
+      if (hypothesesResponse.ok) {
+        const hypothesesData = await hypothesesResponse.json();
+        setHypotheses(hypothesesData || []);
+      }
+
+      // Fetch research questions
+      const questionsResponse = await fetch(`/api/proxy/questions/project/${projectId}`, {
+        headers: { 'User-ID': user.email }
+      });
+      if (questionsResponse.ok) {
+        const questionsData = await questionsResponse.json();
+        setQuestions(questionsData || []);
+      }
+    } catch (error) {
+      console.error('Error fetching hypotheses/questions:', error);
+    }
+  };
 
   const fetchArticles = async () => {
     setLoading(true);
@@ -198,12 +229,63 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
           >
             <BeakerIcon className="w-5 h-5 text-white" />
           </div>
-          <div>
+          <div className="flex-1">
             <h2 className="text-2xl font-bold text-gray-900">{collection.collection_name}</h2>
             <p className="text-gray-600">{collection.article_count} articles • Click any article to explore its network</p>
           </div>
         </div>
       </div>
+
+      {/* Week 24: Linked Research Questions and Hypotheses */}
+      {((collection.linked_question_ids && collection.linked_question_ids.length > 0) ||
+        (collection.linked_hypothesis_ids && collection.linked_hypothesis_ids.length > 0)) && (
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200 p-4">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">🔗 Linked to Research</h3>
+          <div className="flex flex-wrap gap-2">
+            {/* Research Questions - Blue badges */}
+            {collection.linked_question_ids && collection.linked_question_ids.length > 0 && (
+              <>
+                {collection.linked_question_ids.map((questionId) => {
+                  const question = questions.find(q => q.question_id === questionId);
+                  if (!question) return null;
+                  return (
+                    <div
+                      key={questionId}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-800 rounded-full text-xs font-medium border border-blue-200"
+                    >
+                      <span className="text-blue-600">❓</span>
+                      <span className="max-w-[200px] truncate" title={question.question_text}>
+                        {question.question_text}
+                      </span>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+
+            {/* Hypotheses - Purple badges */}
+            {collection.linked_hypothesis_ids && collection.linked_hypothesis_ids.length > 0 && (
+              <>
+                {collection.linked_hypothesis_ids.map((hypothesisId) => {
+                  const hypothesis = hypotheses.find(h => h.hypothesis_id === hypothesisId);
+                  if (!hypothesis) return null;
+                  return (
+                    <div
+                      key={hypothesisId}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-100 text-purple-800 rounded-full text-xs font-medium border border-purple-200"
+                    >
+                      <span className="text-purple-600">💡</span>
+                      <span className="max-w-[200px] truncate" title={hypothesis.hypothesis_text}>
+                        {hypothesis.hypothesis_text}
+                      </span>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Collection Notes Section */}
       <div className="bg-white rounded-lg shadow border border-gray-200">
