@@ -322,6 +322,16 @@ async def get_project_inbox(
         for triage in triages:
             article = db.query(Article).filter(Article.pmid == triage.article_pmid).first()
 
+            # Week 24: Generate collection suggestions dynamically
+            collection_suggestions = []
+            try:
+                from backend.app.services.collection_hypothesis_integration_service import CollectionHypothesisIntegrationService
+                collection_suggestions = CollectionHypothesisIntegrationService.suggest_collections_for_triage(
+                    triage, project_id, db
+                )
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to generate collection suggestions for triage {triage.triage_id}: {e}")
+
             response = TriageResponse(
                 triage_id=triage.triage_id,
                 project_id=triage.project_id,
@@ -345,6 +355,8 @@ async def get_project_inbox(
                 evidence_excerpts=getattr(triage, 'evidence_excerpts', []),
                 question_relevance_scores=getattr(triage, 'question_relevance_scores', {}),
                 hypothesis_relevance_scores=getattr(triage, 'hypothesis_relevance_scores', {}),
+                # Week 24: Integration Gaps - Collection suggestions
+                collection_suggestions=collection_suggestions,
                 article={
                     "pmid": article.pmid,
                     "title": article.title,
