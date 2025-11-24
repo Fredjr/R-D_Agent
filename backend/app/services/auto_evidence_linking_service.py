@@ -31,24 +31,27 @@ class AutoEvidenceLinkingService:
     def _map_support_type_to_evidence_type(self, support_type: str) -> str:
         """
         Map AI triage support_type to hypothesis evidence_type.
-        
+
         AI triage support_type values:
         - supports: Paper provides evidence supporting the hypothesis
         - contradicts: Paper provides evidence contradicting the hypothesis
         - tests: Paper directly tests the hypothesis
         - provides_context: Paper provides relevant context
         - not_relevant: Paper is not relevant
-        
+
         Hypothesis evidence_type values:
         - supports: Evidence supports the hypothesis
         - contradicts: Evidence contradicts the hypothesis
         - neutral: Evidence is neutral or provides context
+
+        Week 24: Changed provides_context to map to "supports" instead of "neutral"
+        so that hypothesis status gets updated when context papers are linked.
         """
         mapping = {
             "supports": "supports",
             "tests": "supports",  # Testing is a form of support
             "contradicts": "contradicts",
-            "provides_context": "neutral",
+            "provides_context": "supports",  # Week 24: Context papers count as supporting evidence
             "not_relevant": "neutral"
         }
         return mapping.get(support_type, "neutral")
