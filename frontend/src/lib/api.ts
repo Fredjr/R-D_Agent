@@ -486,7 +486,12 @@ export async function fetchResearchStats(projectId: string, userId: string): Pro
 
     // Calculate total evidence count (sum of evidence for all questions and hypotheses)
     const questionEvidenceCount = questions.reduce((sum, q) => sum + (q.evidence_count || 0), 0);
-    const hypothesisEvidenceCount = hypotheses.reduce((sum, h) => sum + (h.evidence_count || 0), 0);
+    // Week 24: Hypotheses use supporting_evidence_count + contradicting_evidence_count instead of evidence_count
+    const hypothesisEvidenceCount = hypotheses.reduce((sum, h) => {
+      const supporting = (h as any).supporting_evidence_count || 0;
+      const contradicting = (h as any).contradicting_evidence_count || 0;
+      return sum + supporting + contradicting;
+    }, 0);
     const evidenceCount = questionEvidenceCount + hypothesisEvidenceCount;
 
     return {
