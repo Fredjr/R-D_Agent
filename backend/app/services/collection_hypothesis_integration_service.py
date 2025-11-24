@@ -48,10 +48,22 @@ class CollectionHypothesisIntegrationService:
             if not affected_hypotheses:
                 logger.info("No affected hypotheses, no collection suggestions")
                 return []
-            
-            hypothesis_ids = [h.get('hypothesis_id') for h in affected_hypotheses if h.get('hypothesis_id')]
+
+            # Week 24: Handle both formats - list of strings or list of dicts
+            hypothesis_ids = []
+            for h in affected_hypotheses:
+                if isinstance(h, str):
+                    # Format: ["hypothesis_id1", "hypothesis_id2"]
+                    hypothesis_ids.append(h)
+                elif isinstance(h, dict) and h.get('hypothesis_id'):
+                    # Format: [{"hypothesis_id": "...", ...}, ...]
+                    hypothesis_ids.append(h.get('hypothesis_id'))
+
             if not hypothesis_ids:
+                logger.info(f"No valid hypothesis IDs extracted from affected_hypotheses: {affected_hypotheses}")
                 return []
+
+            logger.info(f"Extracted {len(hypothesis_ids)} hypothesis IDs for collection suggestions")
             
             # Find collections linked to these hypotheses
             collections = db.query(Collection).filter(
