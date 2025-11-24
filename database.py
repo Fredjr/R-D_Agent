@@ -287,6 +287,11 @@ class Annotation(Base):
     exploration_session_id = Column(String, nullable=True)
     research_question = Column(Text, nullable=True)
 
+    # Week 24: Integration Gaps - Notes + Evidence
+    linked_evidence_id = Column(String, nullable=True)  # Links to evidence excerpt from triage
+    evidence_quote = Column(Text, nullable=True)  # The actual evidence quote
+    linked_hypothesis_id = Column(String, nullable=True)  # Links to hypothesis this note relates to
+
     # NEW: PDF annotation fields (Week 11 Day 1)
     pdf_page = Column(Integer, nullable=True)  # Page number in PDF
     pdf_coordinates = Column(JSON, nullable=True)  # {x, y, width, height, pageWidth, pageHeight}
@@ -340,6 +345,12 @@ class Collection(Base):
     color = Column(String, nullable=True)  # Hex color for UI display
     icon = Column(String, nullable=True)  # Icon identifier for UI
     sort_order = Column(Integer, default=0)  # User-defined ordering
+
+    # Week 24: Integration Gaps - Collections + Hypotheses
+    linked_hypothesis_ids = Column(JSON, default=list)  # List of hypothesis IDs this collection supports
+    linked_question_ids = Column(JSON, default=list)  # List of research question IDs this collection relates to
+    collection_purpose = Column(String, default='general')  # 'supporting_evidence', 'contradicting_evidence', 'methodology', 'general'
+    auto_update = Column(Boolean, default=False)  # Auto-add papers matching linked hypotheses
 
     # Relationships
     project = relationship("Project", back_populates="collections")
