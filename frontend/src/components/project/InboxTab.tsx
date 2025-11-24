@@ -270,6 +270,68 @@ export const InboxTab: React.FC<InboxTabProps> = ({ projectId }) => {
     }
   };
 
+  // Week 24: Add paper to collection
+  const handleAddToCollection = async (paper: PaperTriageData, collectionId: string) => {
+    if (!user?.user_id) return;
+
+    try {
+      console.log(`📚 Adding paper ${paper.article_pmid} to collection ${collectionId}...`);
+
+      const response = await fetch(`/api/proxy/projects/${projectId}/collections/${collectionId}/articles`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user.user_id,
+        },
+        body: JSON.stringify({
+          article_pmid: paper.article_pmid
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to add paper to collection');
+      }
+
+      console.log(`✅ Paper added to collection successfully`);
+      alert(`✅ Paper added to collection!`);
+
+    } catch (error) {
+      console.error('❌ Error adding paper to collection:', error);
+      alert(`Failed to add paper to collection: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  // Week 24: Create note from evidence
+  const handleCreateNoteFromEvidence = async (paper: PaperTriageData, evidenceIndex: number, evidenceQuote: string) => {
+    if (!user?.user_id) return;
+
+    try {
+      console.log(`📝 Creating note from evidence ${evidenceIndex} for paper ${paper.article_pmid}...`);
+
+      const response = await fetch(`/api/proxy/annotations/from-evidence?triage_id=${paper.triage_id}&evidence_index=${evidenceIndex}&project_id=${projectId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user.user_id,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to create note from evidence');
+      }
+
+      const note = await response.json();
+      console.log(`✅ Note created successfully: ${note.annotation_id}`);
+      alert(`✅ Note created!\n\n"${evidenceQuote.substring(0, 100)}..."\n\nView it in the Notes section.`);
+
+    } catch (error) {
+      console.error('❌ Error creating note from evidence:', error);
+      alert(`Failed to create note: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
   // Week 10: Undo last action
   const handleUndo = async () => {
     if (!user?.user_id || undoStack.length === 0) return;
@@ -577,6 +639,8 @@ export const InboxTab: React.FC<InboxTabProps> = ({ projectId }) => {
                 onMaybe={() => handleMaybe(paper)}
                 onMarkAsRead={() => handleMarkAsRead(paper)}
                 onExtractProtocol={() => handleExtractProtocol(paper)}
+                onAddToCollection={(collectionId) => handleAddToCollection(paper, collectionId)}
+                onCreateNoteFromEvidence={(evidenceIndex, evidenceQuote) => handleCreateNoteFromEvidence(paper, evidenceIndex, evidenceQuote)}
               />
             </div>
           ))}
