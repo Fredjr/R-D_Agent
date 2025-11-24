@@ -5609,6 +5609,37 @@ async def run_database_migration(
             "return_code": -1
         }
 
+@app.post("/admin/run-week24-migrations")
+async def run_week24_migrations(
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """Run Week 24 Integration Gaps migrations (Collections+Hypotheses, Notes+Evidence)"""
+    try:
+        import subprocess
+        import os
+
+        # Run the Week 24 migrations script
+        result = subprocess.run(
+            ["python3", "run_week24_migrations.py"],
+            capture_output=True,
+            text=True,
+            cwd=os.getcwd()
+        )
+
+        return {
+            "status": "success" if result.returncode == 0 else "failed",
+            "message": result.stdout if result.returncode == 0 else result.stderr,
+            "return_code": result.returncode
+        }
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Migration failed: {str(e)}",
+            "return_code": -1
+        }
+
 @app.get("/projects/{project_id}", response_model=ProjectDetailResponse)
 async def get_project(project_id: str, request: Request, db: Session = Depends(get_db)):
     """Get project details with associated reports and collaborators"""
