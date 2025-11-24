@@ -85,7 +85,7 @@ class HypothesisEvidenceResponse(BaseModel):
     evidence_type: str
     strength: str
     key_finding: Optional[str]
-    added_by: str
+    added_by: Optional[str]  # Week 24: Made optional to support AI-generated evidence links
     added_at: datetime
 
     class Config:

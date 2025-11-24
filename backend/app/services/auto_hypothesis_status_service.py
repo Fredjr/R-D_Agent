@@ -49,17 +49,18 @@ class AutoHypothesisStatusService:
             }
         """
         # Count by evidence type
-        supporting = db.query(func.count(HypothesisEvidence.evidence_id)).filter(
+        # Week 24: Fixed - use 'id' instead of 'evidence_id' (HypothesisEvidence model uses 'id')
+        supporting = db.query(func.count(HypothesisEvidence.id)).filter(
             HypothesisEvidence.hypothesis_id == hypothesis_id,
             HypothesisEvidence.evidence_type == "supports"
         ).scalar() or 0
-        
-        contradicting = db.query(func.count(HypothesisEvidence.evidence_id)).filter(
+
+        contradicting = db.query(func.count(HypothesisEvidence.id)).filter(
             HypothesisEvidence.hypothesis_id == hypothesis_id,
             HypothesisEvidence.evidence_type == "contradicts"
         ).scalar() or 0
-        
-        neutral = db.query(func.count(HypothesisEvidence.evidence_id)).filter(
+
+        neutral = db.query(func.count(HypothesisEvidence.id)).filter(
             HypothesisEvidence.hypothesis_id == hypothesis_id,
             HypothesisEvidence.evidence_type == "neutral"
         ).scalar() or 0
