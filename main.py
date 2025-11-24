@@ -4597,9 +4597,7 @@ async def get_feature_flags():
             "USE_ENHANCED_TRIAGE": "Use enhanced triage service (vs basic triage)"
         }
     }
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        }
+
 
 @app.get("/health/db")
 async def health_check_db(db: Session = Depends(get_db)):
