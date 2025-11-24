@@ -102,8 +102,11 @@ class AutoEvidenceLinkingService:
             skipped = []
             
             # Get hypothesis_relevance_scores from triage
+            logger.info(f"🔍 DEBUG: triage_result type: {type(triage_result)}")
+            logger.info(f"🔍 DEBUG: triage_result keys: {list(triage_result.keys()) if hasattr(triage_result, 'keys') else 'N/A'}")
             hyp_scores = triage_result.get("hypothesis_relevance_scores", {})
-            
+            logger.info(f"🔍 DEBUG: hyp_scores: {hyp_scores}")
+
             if not hyp_scores:
                 logger.info(f"⏭️  {self.name}: No hypothesis scores in triage result")
                 return {
