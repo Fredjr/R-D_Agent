@@ -4533,7 +4533,7 @@ async def debug_environment():
     try:
         import os
         from database import get_engine
-        
+
         # Check critical environment variables (without exposing secrets)
         env_status = {
             "DATABASE_URL": "present" if os.getenv("DATABASE_URL") else "missing",
@@ -4541,14 +4541,14 @@ async def debug_environment():
             "PINECONE_API_KEY": "present" if os.getenv("PINECONE_API_KEY") else "missing",
             "DATABASE_TYPE": "postgresql" if os.getenv("DATABASE_URL", "").startswith(("postgresql://", "postgres://")) else "sqlite"
         }
-        
+
         # Test database engine creation (without connecting)
         try:
             engine = get_engine()
             db_engine_status = "created"
         except Exception as e:
             db_engine_status = f"failed: {str(e)}"
-        
+
         return {
             "status": "debug_info",
             "environment": env_status,
@@ -4558,6 +4558,42 @@ async def debug_environment():
     except Exception as e:
         return {
             "status": "debug_error",
+
+
+@app.get("/admin/feature-flags")
+async def get_feature_flags():
+    """
+    Admin endpoint to check Week 24 feature flags status.
+
+    Returns current status of all feature flags.
+    """
+    import os
+
+    feature_flags = {
+        "AUTO_EVIDENCE_LINKING": os.getenv("AUTO_EVIDENCE_LINKING", "false"),
+        "AUTO_HYPOTHESIS_STATUS": os.getenv("AUTO_HYPOTHESIS_STATUS", "false"),
+        "USE_MULTI_AGENT_TRIAGE": os.getenv("USE_MULTI_AGENT_TRIAGE", "true"),
+        "USE_ENHANCED_TRIAGE": os.getenv("USE_ENHANCED_TRIAGE", "true"),
+    }
+
+    # Parse boolean values
+    parsed_flags = {
+        key: value.lower() == "true"
+        for key, value in feature_flags.items()
+    }
+
+    return {
+        "status": "success",
+        "feature_flags": feature_flags,
+        "parsed_flags": parsed_flags,
+        "message": "To enable a flag, set the environment variable on Railway to 'true'",
+        "instructions": {
+            "AUTO_EVIDENCE_LINKING": "Automatically create hypothesis_evidence records from AI triage",
+            "AUTO_HYPOTHESIS_STATUS": "Automatically update hypothesis status based on evidence",
+            "USE_MULTI_AGENT_TRIAGE": "Use multi-agent system for triage (vs legacy single-agent)",
+            "USE_ENHANCED_TRIAGE": "Use enhanced triage service (vs basic triage)"
+        }
+    }
             "error": str(e),
             "timestamp": datetime.now().isoformat()
         }
