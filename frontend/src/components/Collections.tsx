@@ -85,8 +85,12 @@ export default function Collections({
   // Week 24: Fetch hypotheses for the project
   useEffect(() => {
     const fetchHypotheses = async () => {
-      if (!projectId || !user?.email) return;
+      if (!projectId || !user?.email) {
+        console.log('⚠️ Skipping hypothesis fetch - missing projectId or user email:', { projectId, userEmail: user?.email });
+        return;
+      }
 
+      console.log('🔄 Fetching hypotheses for project:', projectId);
       setHypothesesLoading(true);
       try {
         const response = await fetch(`/api/proxy/hypotheses/project/${projectId}`, {
@@ -96,12 +100,15 @@ export default function Collections({
         if (response.ok) {
           const data = await response.json();
           setHypotheses(data);
-          console.log('✅ Fetched hypotheses for collections:', data.length);
+          console.log('✅ Fetched hypotheses for collections:', {
+            count: data.length,
+            hypotheses: data.map((h: any) => ({ id: h.hypothesis_id, text: h.hypothesis_text }))
+          });
         } else {
-          console.error('Failed to fetch hypotheses:', response.statusText);
+          console.error('❌ Failed to fetch hypotheses:', response.statusText);
         }
       } catch (error) {
-        console.error('Error fetching hypotheses:', error);
+        console.error('❌ Error fetching hypotheses:', error);
       } finally {
         setHypothesesLoading(false);
       }
@@ -112,12 +119,14 @@ export default function Collections({
 
   // Week 24: Create hypothesis map for quick lookup
   const hypothesesMap = useMemo(() => {
+    console.log('🔬 Creating hypotheses map from:', hypotheses);
     const map = hypotheses.reduce((acc, h) => {
       acc[h.hypothesis_id] = h.hypothesis_text;
       return acc;
     }, {} as Record<string, string>);
     console.log('🔬 Hypotheses map created:', {
       hypothesesCount: hypotheses.length,
+      mapSize: Object.keys(map).length,
       mapKeys: Object.keys(map),
       map
     });

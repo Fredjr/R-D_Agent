@@ -350,23 +350,78 @@ export const DeletableCollectionCard: React.FC<DeletableCollectionCardProps> = (
             <p className="text-sm mb-4" style={{ color: '#374151' }}>{description}</p>
           )}
 
+          {/* DEBUG: Test badge that always shows */}
+          <div
+            className="mt-2 mb-2 px-3 py-2 bg-red-100 border-2 border-red-500 rounded-lg"
+            style={{ backgroundColor: '#FEE2E2', border: '2px solid #EF4444' }}
+          >
+            <div className="text-xs font-bold text-red-700">
+              🔴 DEBUG TEST BADGE - If you see this, rendering works!
+            </div>
+            <div className="text-xs text-red-600 mt-1">
+              linkedHypothesisIds: {JSON.stringify(linkedHypothesisIds)}
+            </div>
+            <div className="text-xs text-red-600">
+              hypothesesMap keys: {JSON.stringify(Object.keys(hypothesesMap))}
+            </div>
+          </div>
+
           {/* Week 24: Show linked hypotheses */}
           {(() => {
-            console.log('🔍 DeletableCollectionCard badge check:', {
+            const hasLinkedIds = linkedHypothesisIds && linkedHypothesisIds.length > 0;
+            const hasMap = hypothesesMap && Object.keys(hypothesesMap).length > 0;
+            const shouldShow = hasLinkedIds && hasMap;
+
+            console.log('🔍 DeletableCollectionCard DETAILED badge check:', {
               collectionId,
               title,
               linkedHypothesisIds,
+              linkedHypothesisIdsType: typeof linkedHypothesisIds,
+              linkedHypothesisIdsIsArray: Array.isArray(linkedHypothesisIds),
+              linkedHypothesisIdsLength: linkedHypothesisIds?.length,
               hypothesesMapKeys: Object.keys(hypothesesMap),
+              hypothesesMapType: typeof hypothesesMap,
+              hypothesesMapSize: Object.keys(hypothesesMap).length,
               hypothesesMap,
-              shouldShow: linkedHypothesisIds.length > 0 && Object.keys(hypothesesMap).length > 0
+              hasLinkedIds,
+              hasMap,
+              shouldShow,
+              willRender: shouldShow ? 'YES - BADGES SHOULD APPEAR' : 'NO - BADGES WILL NOT APPEAR'
             });
+
+            // Test render - force show a badge for debugging
+            if (shouldShow) {
+              console.log('✅ RENDERING BADGES FOR:', title);
+            } else {
+              console.log('❌ NOT RENDERING BADGES FOR:', title, 'Reason:', {
+                noLinkedIds: !hasLinkedIds,
+                noMap: !hasMap
+              });
+            }
+
             return null;
           })()}
-          {linkedHypothesisIds.length > 0 && Object.keys(hypothesesMap).length > 0 && (
-            <div className="mt-3 mb-3 flex flex-wrap gap-2">
+          {linkedHypothesisIds && linkedHypothesisIds.length > 0 && hypothesesMap && Object.keys(hypothesesMap).length > 0 && (
+            <div
+              className="mt-3 mb-3 flex flex-wrap gap-2"
+              style={{
+                backgroundColor: '#FEF3C7',
+                padding: '8px',
+                border: '2px solid #F59E0B',
+                borderRadius: '8px'
+              }}
+            >
+              <div style={{ width: '100%', fontSize: '10px', color: '#92400E', marginBottom: '4px' }}>
+                🔬 DEBUG: Rendering {linkedHypothesisIds.length} hypothesis badges
+              </div>
               {linkedHypothesisIds.slice(0, 2).map((hypId) => {
                 const hypothesisText = hypothesesMap[hypId];
-                if (!hypothesisText) return null;
+                console.log('🎨 Rendering badge for hypothesis:', { hypId, hypothesisText });
+
+                if (!hypothesisText) {
+                  console.log('⚠️ No hypothesis text found for ID:', hypId);
+                  return null;
+                }
 
                 const truncatedText = hypothesisText.length > 40
                   ? hypothesisText.slice(0, 40) + '...'
@@ -377,6 +432,7 @@ export const DeletableCollectionCard: React.FC<DeletableCollectionCardProps> = (
                     key={hypId}
                     className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full"
                     title={hypothesisText}
+                    style={{ border: '1px solid purple' }}
                   >
                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
