@@ -117,42 +117,51 @@ class AutoEvidenceLinkingService:
                 }
             
             for hyp_id, score_data in hyp_scores.items():
+                logger.info(f"🔍 DEBUG: Processing hypothesis {hyp_id} with score_data: {score_data}")
                 score = score_data.get("score", 0)
-                
+                logger.info(f"🔍 DEBUG: Score: {score}, MIN_SCORE_FOR_LINKING: {self.MIN_SCORE_FOR_LINKING}")
+
                 # Only link if score >= threshold
                 if score < self.MIN_SCORE_FOR_LINKING:
+                    logger.info(f"🔍 DEBUG: SKIPPED - score {score} < threshold {self.MIN_SCORE_FOR_LINKING}")
                     skipped.append({
                         "hypothesis_id": hyp_id,
                         "reason": "score_below_threshold",
                         "score": score
                     })
                     continue
-                
+
                 # Check if evidence link already exists
+                logger.info(f"🔍 DEBUG: Checking if evidence link already exists for hyp {hyp_id} and PMID {article_pmid}")
                 existing = db.query(HypothesisEvidence).filter(
                     HypothesisEvidence.hypothesis_id == hyp_id,
                     HypothesisEvidence.article_pmid == article_pmid
                 ).first()
-                
+
                 if existing:
+                    logger.info(f"🔍 DEBUG: SKIPPED - evidence link already exists (id={existing.id})")
                     skipped.append({
                         "hypothesis_id": hyp_id,
                         "reason": "already_linked",
                         "evidence_id": existing.id  # Use 'id' not 'evidence_id'
                     })
                     continue
-                
+
                 # Verify hypothesis exists
+                logger.info(f"🔍 DEBUG: Verifying hypothesis {hyp_id} exists")
                 hypothesis = db.query(Hypothesis).filter(
                     Hypothesis.hypothesis_id == hyp_id
                 ).first()
-                
+
                 if not hypothesis:
+                    logger.info(f"🔍 DEBUG: SKIPPED - hypothesis {hyp_id} not found in database")
                     skipped.append({
                         "hypothesis_id": hyp_id,
                         "reason": "hypothesis_not_found"
                     })
                     continue
+
+                logger.info(f"🔍 DEBUG: ✅ All checks passed! Creating evidence link...")
                 
                 # Map support_type to evidence_type
                 support_type = score_data.get("support_type", "provides_context")
