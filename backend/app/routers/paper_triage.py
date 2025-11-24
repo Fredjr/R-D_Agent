@@ -76,6 +76,9 @@ class TriageResponse(BaseModel):
     question_relevance_scores: Optional[dict] = {}
     hypothesis_relevance_scores: Optional[dict] = {}
 
+    # Week 24: Integration Gaps - Collection suggestions
+    collection_suggestions: Optional[List[dict]] = []
+
     # Include article details for convenience
     article: Optional[dict] = None
 
@@ -196,6 +199,18 @@ async def triage_paper(
             # Don't fail triage if alert generation fails
             logger.error(f"⚠️ Error generating alerts: {alert_error}")
 
+        # Week 24: Get collection suggestions based on affected hypotheses
+        collection_suggestions = []
+        try:
+            from backend.app.services.collection_hypothesis_integration_service import CollectionHypothesisIntegrationService
+            collection_suggestions = CollectionHypothesisIntegrationService.suggest_collections_for_triage(
+                triage, project_id, db
+            )
+            logger.info(f"📚 Generated {len(collection_suggestions)} collection suggestions for paper {request.article_pmid}")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to generate collection suggestions: {e}")
+            # Don't fail the request if suggestions fail
+
         # Build response with article details
         response = TriageResponse(
             triage_id=triage.triage_id,
@@ -220,6 +235,8 @@ async def triage_paper(
             evidence_excerpts=getattr(triage, 'evidence_excerpts', []),
             question_relevance_scores=getattr(triage, 'question_relevance_scores', {}),
             hypothesis_relevance_scores=getattr(triage, 'hypothesis_relevance_scores', {}),
+            # Week 24: Integration Gaps - Collection suggestions
+            collection_suggestions=collection_suggestions,
             article={
                 "pmid": article.pmid,
                 "title": article.title,

@@ -7180,6 +7180,104 @@ async def get_all_annotation_threads(
         "total_annotations": sum(thread["total_in_thread"] for thread in threads)
     }
 
+# =============================================================================
+# WEEK 24: INTEGRATION GAPS - NOTES+EVIDENCE ENDPOINTS
+# =============================================================================
+
+@app.post("/api/annotations/from-evidence")
+async def create_note_from_evidence(
+    request: Request,
+    triage_id: str = Query(..., description="Triage ID"),
+    evidence_index: int = Query(..., description="Evidence excerpt index (0-based)"),
+    project_id: str = Query(..., description="Project ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Week 24: Integration Gap 2 - Create a note from an evidence excerpt
+
+    Pre-fills the note with the evidence quote and links it to the evidence.
+    """
+    try:
+        from backend.app.services.note_evidence_integration_service import NoteEvidenceIntegrationService
+        from database import PaperTriage
+
+        current_user = request.headers.get("User-ID", "default_user")
+
+        # Get triage result
+        triage = db.query(PaperTriage).filter(
+            PaperTriage.triage_id == triage_id,
+            PaperTriage.project_id == project_id
+        ).first()
+
+        if not triage:
+            raise HTTPException(status_code=404, detail="Triage not found")
+
+        # Validate evidence index
+        if not triage.evidence_excerpts or evidence_index >= len(triage.evidence_excerpts):
+            raise HTTPException(status_code=400, detail="Invalid evidence index")
+
+        evidence_excerpt = triage.evidence_excerpts[evidence_index]
+
+        # Create note
+        note = NoteEvidenceIntegrationService.create_note_from_evidence(
+            triage_id=triage_id,
+            evidence_index=evidence_index,
+            evidence_excerpt=evidence_excerpt,
+            project_id=project_id,
+            user_id=current_user,
+            db=db
+        )
+
+        return {
+            "annotation_id": note.annotation_id,
+            "content": note.content,
+            "linked_evidence_id": note.linked_evidence_id,
+            "evidence_quote": note.evidence_quote,
+            "article_pmid": note.article_pmid,
+            "created_at": note.created_at
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create note from evidence: {str(e)}")
+
+@app.get("/api/annotations/for-triage/{triage_id}")
+async def get_notes_for_triage(
+    triage_id: str,
+    request: Request = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Week 24: Integration Gap 2 - Get all notes for a triage, grouped by evidence
+
+    Returns notes organized by evidence excerpt.
+    """
+    try:
+        from backend.app.services.note_evidence_integration_service import NoteEvidenceIntegrationService
+
+        notes_by_evidence = NoteEvidenceIntegrationService.get_notes_for_triage(triage_id, db)
+
+        return {
+            "triage_id": triage_id,
+            "notes_by_evidence": {
+                evidence_id: [
+                    {
+                        "annotation_id": note.annotation_id,
+                        "content": note.content,
+                        "evidence_quote": note.evidence_quote,
+                        "created_at": note.created_at,
+                        "author_id": note.author_id
+                    }
+                    for note in notes
+                ]
+                for evidence_id, notes in notes_by_evidence.items()
+            }
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get notes for triage: {str(e)}")
+
 # Report Endpoints
 
 @app.post("/projects/{project_id}/reports", response_model=ReportResponse)
@@ -9584,12 +9682,22 @@ class CollectionCreate(BaseModel):
     description: Optional[str] = Field(None, max_length=1000, description="Collection description")
     color: Optional[str] = Field(None, pattern=r"^#[0-9A-Fa-f]{6}$", description="Hex color code")
     icon: Optional[str] = Field(None, max_length=50, description="Icon identifier")
+    # Week 24: Integration Gaps - Collections+Hypotheses
+    linked_hypothesis_ids: Optional[List[str]] = Field(default_factory=list, description="List of hypothesis IDs linked to this collection")
+    linked_question_ids: Optional[List[str]] = Field(default_factory=list, description="List of research question IDs linked to this collection")
+    collection_purpose: Optional[str] = Field("general", description="Purpose of collection: 'general', 'hypothesis_support', 'hypothesis_challenge', 'question_exploration'")
+    auto_update: Optional[bool] = Field(False, description="Whether to auto-add papers supporting linked hypotheses")
 
 class CollectionUpdate(BaseModel):
     collection_name: Optional[str] = Field(None, min_length=1, max_length=200, description="Collection name")
     description: Optional[str] = Field(None, max_length=1000, description="Collection description")
     color: Optional[str] = Field(None, pattern=r"^#[0-9A-Fa-f]{6}$", description="Hex color code")
     icon: Optional[str] = Field(None, max_length=50, description="Icon identifier")
+    # Week 24: Integration Gaps - Collections+Hypotheses
+    linked_hypothesis_ids: Optional[List[str]] = Field(None, description="List of hypothesis IDs linked to this collection")
+    linked_question_ids: Optional[List[str]] = Field(None, description="List of research question IDs linked to this collection")
+    collection_purpose: Optional[str] = Field(None, description="Purpose of collection")
+    auto_update: Optional[bool] = Field(None, description="Whether to auto-add papers supporting linked hypotheses")
 
 class ArticleToCollection(BaseModel):
     article_pmid: Optional[str] = Field(None, description="PubMed ID")
@@ -9635,6 +9743,17 @@ async def create_collection(
 
     try:
         import uuid
+        from backend.app.services.collection_hypothesis_integration_service import CollectionHypothesisIntegrationService
+
+        # Week 24: Validate hypothesis and question links if provided
+        if collection_data.linked_hypothesis_ids:
+            CollectionHypothesisIntegrationService.validate_hypothesis_links(
+                collection_data.linked_hypothesis_ids, project_id, db
+            )
+        if collection_data.linked_question_ids:
+            CollectionHypothesisIntegrationService.validate_question_links(
+                collection_data.linked_question_ids, project_id, db
+            )
 
         # Create new collection
         collection = Collection(
@@ -9644,7 +9763,12 @@ async def create_collection(
             description=collection_data.description,
             created_by=current_user,
             color=collection_data.color,
-            icon=collection_data.icon
+            icon=collection_data.icon,
+            # Week 24: Integration Gaps - Collections+Hypotheses
+            linked_hypothesis_ids=collection_data.linked_hypothesis_ids or [],
+            linked_question_ids=collection_data.linked_question_ids or [],
+            collection_purpose=collection_data.collection_purpose or "general",
+            auto_update=collection_data.auto_update or False
         )
 
         db.add(collection)
@@ -9722,7 +9846,12 @@ async def get_project_collections(
                 "color": collection.color,
                 "icon": collection.icon,
                 "sort_order": collection.sort_order,
-                "article_count": getattr(collection, 'article_count', 0)
+                "article_count": getattr(collection, 'article_count', 0),
+                # Week 24: Integration Gaps - Collections+Hypotheses
+                "linked_hypothesis_ids": collection.linked_hypothesis_ids or [],
+                "linked_question_ids": collection.linked_question_ids or [],
+                "collection_purpose": collection.collection_purpose or "general",
+                "auto_update": collection.auto_update or False
             }
             for collection in collections
         ]
@@ -9758,6 +9887,8 @@ async def update_collection(
         raise HTTPException(status_code=403, detail="Access denied")
 
     try:
+        from backend.app.services.collection_hypothesis_integration_service import CollectionHypothesisIntegrationService
+
         # Find the collection
         collection = db.query(Collection).filter(
             Collection.collection_id == collection_id,
@@ -9768,6 +9899,16 @@ async def update_collection(
         if not collection:
             raise HTTPException(status_code=404, detail="Collection not found")
 
+        # Week 24: Validate hypothesis and question links if provided
+        if collection_data.linked_hypothesis_ids is not None:
+            CollectionHypothesisIntegrationService.validate_hypothesis_links(
+                collection_data.linked_hypothesis_ids, project_id, db
+            )
+        if collection_data.linked_question_ids is not None:
+            CollectionHypothesisIntegrationService.validate_question_links(
+                collection_data.linked_question_ids, project_id, db
+            )
+
         # Update fields if provided
         if collection_data.collection_name is not None:
             collection.collection_name = collection_data.collection_name
@@ -9777,6 +9918,15 @@ async def update_collection(
             collection.color = collection_data.color
         if collection_data.icon is not None:
             collection.icon = collection_data.icon
+        # Week 24: Integration Gaps - Collections+Hypotheses
+        if collection_data.linked_hypothesis_ids is not None:
+            collection.linked_hypothesis_ids = collection_data.linked_hypothesis_ids
+        if collection_data.linked_question_ids is not None:
+            collection.linked_question_ids = collection_data.linked_question_ids
+        if collection_data.collection_purpose is not None:
+            collection.collection_purpose = collection_data.collection_purpose
+        if collection_data.auto_update is not None:
+            collection.auto_update = collection_data.auto_update
 
         db.commit()
         db.refresh(collection)
@@ -13252,6 +13402,90 @@ async def preflight_generate_review() -> Response:
         "Access-Control-Allow-Methods": "POST, OPTIONS",
         "Access-Control-Allow-Headers": "*",
     })
+
+# =============================================================================
+# WEEK 24: INTEGRATION GAPS - COLLECTIONS+HYPOTHESES ENDPOINTS
+# =============================================================================
+
+@app.post("/api/collections/suggest")
+async def suggest_collections_for_triage(
+    request: Request,
+    triage_id: str = Query(..., description="Triage ID"),
+    project_id: str = Query(..., description="Project ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Week 24: Integration Gap 1 - Suggest collections for a triaged paper
+
+    Returns collection suggestions based on affected hypotheses and questions.
+    """
+    try:
+        from backend.app.services.collection_hypothesis_integration_service import CollectionHypothesisIntegrationService
+        from database import PaperTriage
+
+        current_user = request.headers.get("User-ID", "default_user")
+
+        # Get triage result
+        triage = db.query(PaperTriage).filter(
+            PaperTriage.triage_id == triage_id,
+            PaperTriage.project_id == project_id
+        ).first()
+
+        if not triage:
+            raise HTTPException(status_code=404, detail="Triage not found")
+
+        # Get suggestions
+        suggestions = CollectionHypothesisIntegrationService.suggest_collections_for_triage(
+            triage, project_id, db
+        )
+
+        return {
+            "triage_id": triage_id,
+            "suggestions": suggestions
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to suggest collections: {str(e)}")
+
+@app.get("/api/collections/by-hypothesis/{hypothesis_id}")
+async def get_collections_by_hypothesis(
+    hypothesis_id: str,
+    project_id: str = Query(..., description="Project ID"),
+    request: Request = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Week 24: Integration Gap 1 - Get collections linked to a hypothesis
+
+    Returns all collections that are linked to the specified hypothesis.
+    """
+    try:
+        from backend.app.services.collection_hypothesis_integration_service import CollectionHypothesisIntegrationService
+
+        collections = CollectionHypothesisIntegrationService.get_collections_for_hypothesis(
+            hypothesis_id, project_id, db
+        )
+
+        return {
+            "hypothesis_id": hypothesis_id,
+            "collections": [
+                {
+                    "collection_id": c.collection_id,
+                    "collection_name": c.collection_name,
+                    "description": c.description,
+                    "collection_purpose": c.collection_purpose,
+                    "auto_update": c.auto_update,
+                    "linked_hypothesis_ids": c.linked_hypothesis_ids,
+                    "linked_question_ids": c.linked_question_ids
+                }
+                for c in collections
+            ]
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get collections: {str(e)}")
 
 # =============================================================================
 # NETWORK VIEW ENDPOINTS
