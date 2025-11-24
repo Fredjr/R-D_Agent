@@ -10,7 +10,7 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:800
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { triageId: string } }
+  { params }: { params: Promise<{ triageId: string }> }
 ) {
   try {
     const userId = request.headers.get('User-ID');
@@ -21,7 +21,7 @@ export async function GET(
       );
     }
 
-    const { triageId } = params;
+    const { triageId } = await params;
 
     // Forward to backend
     const backendUrl = `${BACKEND_URL}/api/annotations/for-triage/${triageId}`;

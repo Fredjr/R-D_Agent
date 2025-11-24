@@ -13,6 +13,10 @@ export interface Collection {
   color?: string;
   icon?: string;
   sort_order?: number;
+  linked_hypothesis_ids?: string[];  // Week 24: Hypothesis links
+  linked_question_ids?: string[];  // Week 24: Question links
+  collection_purpose?: string;  // Week 24: Collection purpose
+  auto_update?: boolean;  // Week 24: Auto-update flag
 }
 
 interface CollectionSyncState {
