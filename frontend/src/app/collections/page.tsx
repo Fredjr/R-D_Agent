@@ -17,7 +17,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { PageHeader } from '@/components/ui/Navigation';
 import { Button } from '@/components/ui/Button';
-import { SpotifyCollectionCard } from '@/components/ui/SpotifyCard';
+import { DeletableCollectionCard } from '@/components/ui/DeletableCard';
 import { SpotifyTopBar, SpotifyTabs } from '@/components/ui/SpotifyNavigation';
 import { MobileResponsiveLayout } from '@/components/ui/MobileResponsiveLayout';
 import { UnifiedHeroSection, HeroAction } from '@/components/ui/UnifiedHeroSection';
@@ -401,7 +401,7 @@ export default function CollectionsPage() {
                       const hypothesesMap = projectId ? hypothesesByProject[projectId] || {} : {};
 
                       return (
-                        <SpotifyCollectionCard
+                        <DeletableCollectionCard
                           key={collection.id}
                           title={collection.name}
                           description={collection.description}
@@ -428,6 +428,12 @@ export default function CollectionsPage() {
                             // 🔧 NEW: Show article selector modal instead of navigating
                             setSelectedCollection(collection);
                             setShowArticleSelector(true);
+                          }}
+                          onDelete={async () => {
+                            console.log('🗑️ Delete collection:', collection);
+                            trackCollectionAction('delete', collection.id);
+                            // TODO: Implement delete functionality
+                            alert(`Delete collection: ${collection.name}`);
                           }}
                         />
                       );

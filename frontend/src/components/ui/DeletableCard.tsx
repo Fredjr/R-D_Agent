@@ -52,7 +52,7 @@ export const DeletableProjectCard: React.FC<DeletableProjectCardProps> = ({
     }
   });
 
-  const longPressProps = useLongPress(() => {
+  const { longPressTriggered, ...longPressHandlers } = useLongPress(() => {
     setShowDeleteModal(true);
   }, 3000);
 
@@ -102,7 +102,7 @@ export const DeletableProjectCard: React.FC<DeletableProjectCardProps> = ({
     <>
       <div
         onContextMenu={openContextMenu}
-        {...longPressProps}
+        {...longPressHandlers}
         className={className}
       >
         <SpotifyProjectCard
@@ -170,7 +170,7 @@ export const DeletableReportCard: React.FC<DeletableReportCardProps> = ({
     }
   });
 
-  const longPressProps = useLongPress(() => {
+  const { longPressTriggered, ...longPressHandlers } = useLongPress(() => {
     setShowDeleteModal(true);
   }, 3000);
 
@@ -211,7 +211,7 @@ export const DeletableReportCard: React.FC<DeletableReportCardProps> = ({
     <>
       <div
         onContextMenu={openContextMenu}
-        {...longPressProps}
+        {...longPressHandlers}
         className={className}
       >
         <SpotifyReportCard
@@ -289,7 +289,7 @@ export const DeletableCollectionCard: React.FC<DeletableCollectionCardProps> = (
     }
   });
 
-  const longPressProps = useLongPress(() => {
+  const { longPressTriggered, ...longPressHandlers } = useLongPress(() => {
     setShowDeleteModal(true);
   }, 3000);
 
@@ -327,7 +327,7 @@ export const DeletableCollectionCard: React.FC<DeletableCollectionCardProps> = (
     <>
       <div
         onContextMenu={openContextMenu}
-        {...longPressProps}
+        {...longPressHandlers}
         className={className}
       >
         {/* Use the existing SpotifyCollectionCard component */}
@@ -350,76 +350,12 @@ export const DeletableCollectionCard: React.FC<DeletableCollectionCardProps> = (
             <p className="text-sm mb-4" style={{ color: '#374151' }}>{description}</p>
           )}
 
-          {/* DEBUG: Test badge that always shows */}
-          <div
-            className="mt-2 mb-2 px-3 py-2 bg-red-100 border-2 border-red-500 rounded-lg"
-            style={{ backgroundColor: '#FEE2E2', border: '2px solid #EF4444' }}
-          >
-            <div className="text-xs font-bold text-red-700">
-              🔴 DEBUG TEST BADGE - If you see this, rendering works!
-            </div>
-            <div className="text-xs text-red-600 mt-1">
-              linkedHypothesisIds: {JSON.stringify(linkedHypothesisIds)}
-            </div>
-            <div className="text-xs text-red-600">
-              hypothesesMap keys: {JSON.stringify(Object.keys(hypothesesMap))}
-            </div>
-          </div>
-
           {/* Week 24: Show linked hypotheses */}
-          {(() => {
-            const hasLinkedIds = linkedHypothesisIds && linkedHypothesisIds.length > 0;
-            const hasMap = hypothesesMap && Object.keys(hypothesesMap).length > 0;
-            const shouldShow = hasLinkedIds && hasMap;
-
-            console.log('🔍 DeletableCollectionCard DETAILED badge check:', {
-              collectionId,
-              title,
-              linkedHypothesisIds,
-              linkedHypothesisIdsType: typeof linkedHypothesisIds,
-              linkedHypothesisIdsIsArray: Array.isArray(linkedHypothesisIds),
-              linkedHypothesisIdsLength: linkedHypothesisIds?.length,
-              hypothesesMapKeys: Object.keys(hypothesesMap),
-              hypothesesMapType: typeof hypothesesMap,
-              hypothesesMapSize: Object.keys(hypothesesMap).length,
-              hypothesesMap,
-              hasLinkedIds,
-              hasMap,
-              shouldShow,
-              willRender: shouldShow ? 'YES - BADGES SHOULD APPEAR' : 'NO - BADGES WILL NOT APPEAR'
-            });
-
-            // Test render - force show a badge for debugging
-            if (shouldShow) {
-              console.log('✅ RENDERING BADGES FOR:', title);
-            } else {
-              console.log('❌ NOT RENDERING BADGES FOR:', title, 'Reason:', {
-                noLinkedIds: !hasLinkedIds,
-                noMap: !hasMap
-              });
-            }
-
-            return null;
-          })()}
           {linkedHypothesisIds && linkedHypothesisIds.length > 0 && hypothesesMap && Object.keys(hypothesesMap).length > 0 && (
-            <div
-              className="mt-3 mb-3 flex flex-wrap gap-2"
-              style={{
-                backgroundColor: '#FEF3C7',
-                padding: '8px',
-                border: '2px solid #F59E0B',
-                borderRadius: '8px'
-              }}
-            >
-              <div style={{ width: '100%', fontSize: '10px', color: '#92400E', marginBottom: '4px' }}>
-                🔬 DEBUG: Rendering {linkedHypothesisIds.length} hypothesis badges
-              </div>
+            <div className="mt-3 mb-3 flex flex-wrap gap-2">
               {linkedHypothesisIds.slice(0, 2).map((hypId) => {
                 const hypothesisText = hypothesesMap[hypId];
-                console.log('🎨 Rendering badge for hypothesis:', { hypId, hypothesisText });
-
                 if (!hypothesisText) {
-                  console.log('⚠️ No hypothesis text found for ID:', hypId);
                   return null;
                 }
 
@@ -512,7 +448,7 @@ export const DeletableDeepDiveCard: React.FC<DeletableDeepDiveCardProps> = ({
     }
   });
 
-  const longPressProps = useLongPress(() => {
+  const { longPressTriggered, ...longPressHandlers } = useLongPress(() => {
     setShowDeleteModal(true);
   }, 3000);
 
@@ -561,7 +497,7 @@ export const DeletableDeepDiveCard: React.FC<DeletableDeepDiveCardProps> = ({
     <>
       <div
         onContextMenu={openContextMenu}
-        {...longPressProps}
+        {...longPressHandlers}
         className={className}
       >
         <div

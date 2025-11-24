@@ -19,6 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useGlobalCollectionSync, type Collection } from '@/hooks/useGlobalCollectionSync';
 import CollectionArticles from '@/components/CollectionArticles';
 import MultiColumnNetworkView from '@/components/MultiColumnNetworkView';
+import { DeletableCollectionCard } from '@/components/ui/DeletableCard';
 import {
   SpotifyTabSection,
   SpotifyTabCard,
@@ -49,6 +50,50 @@ export function MyCollectionsTab({ projectId, onRefresh, onCreateCollection }: M
     refreshCollections,
     broadcastCollectionDeleted
   } = useGlobalCollectionSync(projectId);
+
+  // Fetch hypotheses for showing links on collection cards
+  const [hypotheses, setHypotheses] = React.useState<any[]>([]);
+  const [hypothesesLoading, setHypothesesLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    const fetchHypotheses = async () => {
+      if (!projectId || !user?.email) {
+        console.log('⚠️ MyCollectionsTab: Skipping hypothesis fetch - missing projectId or user email');
+        return;
+      }
+
+      console.log('🔄 MyCollectionsTab: Fetching hypotheses for project:', projectId);
+      setHypothesesLoading(true);
+      try {
+        const response = await fetch(`/api/proxy/hypotheses/project/${projectId}`, {
+          headers: { 'User-ID': user.email }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('✅ MyCollectionsTab: Hypotheses fetched:', data);
+          setHypotheses(data || []);
+        } else {
+          console.error('❌ MyCollectionsTab: Failed to fetch hypotheses:', response.status);
+        }
+      } catch (error) {
+        console.error('❌ MyCollectionsTab: Error fetching hypotheses:', error);
+      } finally {
+        setHypothesesLoading(false);
+      }
+    };
+
+    fetchHypotheses();
+  }, [projectId, user?.email]);
+
+  // Create hypothesis map for quick lookup
+  const hypothesesMap = React.useMemo(() => {
+    const map = hypotheses.reduce((acc, h) => {
+      acc[h.hypothesis_id] = h.hypothesis_text;
+      return acc;
+    }, {} as Record<string, string>);
+    return map;
+  }, [hypotheses]);
 
   // View state
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -423,88 +468,32 @@ export function MyCollectionsTab({ projectId, onRefresh, onCreateCollection }: M
           }}
         />
       ) : viewMode === 'grid' ? (
-        // Grid View
+        // Grid View - Using DeletableCollectionCard
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredCollections.map((collection, index) => {
             const colors = ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'];
             const color = colors[index % colors.length];
-            const isSelected = selectedCollections.has(collection.collection_id);
 
             return (
-              <div
+              <DeletableCollectionCard
                 key={collection.collection_id}
+                title={collection.collection_name}
+                description={collection.description}
+                articleCount={collection.article_count}
+                lastUpdated={new Date(collection.created_at).toLocaleDateString()}
+                color={color}
+                collectionId={collection.collection_id}
+                projectId={projectId}
+                linkedHypothesisIds={collection.linked_hypothesis_ids || []}
+                hypothesesMap={hypothesesMap}
                 onClick={() => handleCollectionClick(collection)}
-                className={`bg-[var(--spotify-dark-gray)] rounded-lg border-2 shadow-sm hover:shadow-md transition-all cursor-pointer ${
-                  isSelected ? 'border-blue-500 bg-blue-500/10' : 'border-[var(--spotify-border-gray)] hover:border-[var(--spotify-light-text)]'
-                }`}
-              >
-                {/* Collection Card Header */}
-                <div className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div
-                      className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: color }}
-                    >
-                      <FolderIcon className="w-6 h-6 text-white" />
-                    </div>
-                    {bulkMode && (
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleCollectionSelection(collection.collection_id)}
-                        className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    )}
-                  </div>
-
-                  <h3 className="text-lg font-bold text-[var(--spotify-white)] mb-2 line-clamp-2">
-                    {collection.collection_name}
-                  </h3>
-
-                  {collection.description && (
-                    <p className="text-sm text-[var(--spotify-light-text)] mb-4 line-clamp-2">
-                      {collection.description}
-                    </p>
-                  )}
-
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-[var(--spotify-light-text)]">
-                      {collection.article_count || 0} paper{collection.article_count !== 1 ? 's' : ''}
-                    </span>
-                    <span className="text-[var(--spotify-light-text)] opacity-70">
-                      {new Date(collection.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Collection Card Actions */}
-                {!bulkMode && (
-                  <div className="border-t border-[var(--spotify-border-gray)] px-6 py-3 flex items-center justify-between bg-[var(--spotify-black)]">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedCollection(collection);
-                        setShowNetworkView(true);
-                      }}
-                      className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
-                    >
-                      <ChartBarIcon className="w-4 h-4" />
-                      Network
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteCollection(collection);
-                      }}
-                      className="text-sm text-red-600 hover:text-red-700 font-medium flex items-center gap-1"
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                      Delete
-                    </button>
-                  </div>
-                )}
-              </div>
+                onExplore={() => handleCollectionClick(collection)}
+                onNetworkView={() => {
+                  setSelectedCollection(collection);
+                  setShowNetworkView(true);
+                }}
+                onDelete={() => handleDeleteCollection(collection)}
+              />
             );
           })}
         </div>
