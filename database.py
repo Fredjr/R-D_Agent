@@ -765,7 +765,8 @@ class HypothesisEvidence(Base):
     key_finding = Column(Text, nullable=True)  # User's note about the evidence
 
     # Metadata
-    added_by = Column(String, ForeignKey("users.user_id"), nullable=False)
+    # Week 24: Made nullable to allow AI-generated evidence links without a user
+    added_by = Column(String, ForeignKey("users.user_id"), nullable=True)
     added_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
