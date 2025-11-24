@@ -403,6 +403,8 @@ export default function CollectionsPage() {
                       return (
                         <DeletableCollectionCard
                           key={collection.id}
+                          collectionId={collection.id}
+                          projectId={collection.projectId}
                           title={collection.name}
                           description={collection.description}
                           articleCount={collection.articleCount}

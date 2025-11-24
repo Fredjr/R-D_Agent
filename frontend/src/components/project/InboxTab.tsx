@@ -50,6 +50,22 @@ export const InboxTab: React.FC<InboxTabProps> = ({ projectId }) => {
     loadStats();
   }, [projectId, filter, readFilter, user?.user_id]);
 
+  // Week 24: Listen for triage completion events to auto-refresh inbox
+  // This ensures newly triaged papers appear immediately in the inbox
+  useEffect(() => {
+    const handleInboxRefresh = (event: CustomEvent) => {
+      console.log('🔄 Inbox refresh triggered by triage:', event.detail);
+      loadInbox();
+      loadStats();
+    };
+
+    window.addEventListener('hypotheses-refresh', handleInboxRefresh as EventListener);
+
+    return () => {
+      window.removeEventListener('hypotheses-refresh', handleInboxRefresh as EventListener);
+    };
+  }, [projectId, user?.user_id]);
+
   // Week 10: Keyboard shortcuts
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {

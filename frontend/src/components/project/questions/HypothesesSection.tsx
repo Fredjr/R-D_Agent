@@ -58,6 +58,21 @@ export function HypothesesSection({
     loadHypotheses();
   }, [questionId, userId]);
 
+  // Week 24: Listen for triage completion events to auto-refresh hypotheses
+  // This ensures AI-generated evidence is visible immediately after triage
+  useEffect(() => {
+    const handleHypothesesRefresh = (event: CustomEvent) => {
+      console.log('🔄 Hypotheses refresh triggered by triage:', event.detail);
+      loadHypotheses();
+    };
+
+    window.addEventListener('hypotheses-refresh', handleHypothesesRefresh as EventListener);
+
+    return () => {
+      window.removeEventListener('hypotheses-refresh', handleHypothesesRefresh as EventListener);
+    };
+  }, [questionId, userId]);
+
   // Handle create
   const handleCreate = async (data: {
     hypothesis_text: string;

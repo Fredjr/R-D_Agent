@@ -198,10 +198,16 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
       const result = await triagePaper(project.project_id, article.pmid, user.user_id);
       console.log('✅ Paper triaged:', result);
 
+      // Week 24: Dispatch custom event to notify hypothesis components to refresh
+      // This allows automatic evidence linking to be visible without manual refresh
+      window.dispatchEvent(new CustomEvent('hypotheses-refresh', {
+        detail: { projectId: project.project_id, triageResult: result }
+      }));
+
       // Show success message with relevance score
       const statusEmoji = result.triage_status === 'must_read' ? '🔴' :
                          result.triage_status === 'nice_to_know' ? '🟡' : '⚪';
-      alert(`${statusEmoji} Paper triaged!\n\nRelevance Score: ${result.relevance_score}/100\nStatus: ${result.triage_status.replace('_', ' ').toUpperCase()}\n\nCheck the Inbox tab to see AI insights.`);
+      alert(`${statusEmoji} Paper triaged!\n\nRelevance Score: ${result.relevance_score}/100\nStatus: ${result.triage_status.replace('_', ' ').toUpperCase()}\n\nAI-generated evidence has been automatically linked to relevant hypotheses.`);
     } catch (error) {
       console.error('❌ Error triaging article:', error);
       alert('Failed to triage article. Please try again.');
