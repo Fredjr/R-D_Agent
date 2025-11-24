@@ -13519,6 +13519,16 @@ async def get_project_network(
         # Get or create network graph
         graph_data = await get_or_create_network_graph("project", project_id, db)
 
+        # Week 24: Enrich network with research context (triage scores, protocol status, hypothesis links)
+        try:
+            from backend.app.services.network_context_integration_service import NetworkContextIntegrationService
+            graph_data = NetworkContextIntegrationService.enrich_network_with_context(
+                graph_data, project_id, db
+            )
+        except Exception as e:
+            # Don't fail the request if enrichment fails, just log it
+            print(f"⚠️ Failed to enrich network with context: {e}")
+
         # Log activity
         await log_activity(
             project_id, resolved_user_id,
