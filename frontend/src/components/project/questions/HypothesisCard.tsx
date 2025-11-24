@@ -48,8 +48,9 @@ export function HypothesisCard({
   const [isLoadingEvidence, setIsLoadingEvidence] = useState(false);
 
   // Load evidence when evidence section is expanded
+  // Week 24: Always reload to catch AI-generated evidence from recent triages
   useEffect(() => {
-    if (showEvidence && evidence.length === 0) {
+    if (showEvidence) {
       loadEvidence();
     }
   }, [showEvidence]);

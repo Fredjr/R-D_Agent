@@ -14,7 +14,7 @@ import {
   updateHypothesis,
   deleteHypothesis
 } from '@/lib/api/questions';
-import { PlusIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { SpotifyTabLoading, SpotifyTabEmptyState } from '../shared';
 
 interface HypothesesSectionProps {
@@ -140,13 +140,24 @@ export function HypothesesSection({
         <h3 className="text-lg font-semibold text-white">
           Hypotheses ({hypotheses.length})
         </h3>
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-[var(--spotify-green)] text-black rounded-full hover:scale-105 transition-transform"
-        >
-          <PlusIcon className="w-4 h-4" />
-          Add Hypothesis
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Week 24: Refresh button to catch AI-generated evidence */}
+          <button
+            onClick={loadHypotheses}
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-[var(--spotify-light-gray)] text-white rounded-full hover:bg-[var(--spotify-medium-gray)] transition-colors"
+            title="Refresh to see latest evidence from AI triage"
+          >
+            <ArrowPathIcon className="w-4 h-4" />
+            Refresh
+          </button>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-[var(--spotify-green)] text-black rounded-full hover:scale-105 transition-transform"
+          >
+            <PlusIcon className="w-4 h-4" />
+            Add Hypothesis
+          </button>
+        </div>
       </div>
 
       {/* Hypotheses list */}
