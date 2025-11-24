@@ -61,6 +61,10 @@ export default function Collections({
     icon: 'folder'
   });
 
+  // Week 24: Fetch hypotheses for showing links on collection cards
+  const [hypotheses, setHypotheses] = useState<any[]>([]);
+  const [hypothesesLoading, setHypothesesLoading] = useState(false);
+
   // 🔍 Week 6: Filter state
   const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,6 +81,42 @@ export default function Collections({
       refreshCollections();
     }
   }, [projectId, refreshCollections]);
+
+  // Week 24: Fetch hypotheses for the project
+  useEffect(() => {
+    const fetchHypotheses = async () => {
+      if (!projectId || !user?.email) return;
+
+      setHypothesesLoading(true);
+      try {
+        const response = await fetch(`/api/proxy/hypotheses/project/${projectId}`, {
+          headers: { 'User-ID': user.email }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setHypotheses(data);
+          console.log('✅ Fetched hypotheses for collections:', data.length);
+        } else {
+          console.error('Failed to fetch hypotheses:', response.statusText);
+        }
+      } catch (error) {
+        console.error('Error fetching hypotheses:', error);
+      } finally {
+        setHypothesesLoading(false);
+      }
+    };
+
+    fetchHypotheses();
+  }, [projectId, user?.email]);
+
+  // Week 24: Create hypothesis map for quick lookup
+  const hypothesesMap = useMemo(() => {
+    return hypotheses.reduce((acc, h) => {
+      acc[h.hypothesis_id] = h.hypothesis_text;
+      return acc;
+    }, {} as Record<string, string>);
+  }, [hypotheses]);
 
   // 🔧 Handle URL parameters to auto-open collection views
   useEffect(() => {
@@ -512,6 +552,8 @@ export default function Collections({
               color={colors[index % colors.length]}
               collectionId={collection.collection_id}
               projectId={projectId}
+              linkedHypothesisIds={collection.linked_hypothesis_ids || []}
+              hypothesesMap={hypothesesMap}
               onClick={() => handleViewArticles(collection)}
               onExplore={() => handleViewArticles(collection)}
               onNetworkView={() => handleViewNetwork(collection)}
