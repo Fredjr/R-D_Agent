@@ -4558,6 +4558,9 @@ async def debug_environment():
     except Exception as e:
         return {
             "status": "debug_error",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
 
 
 @app.get("/admin/feature-flags")
