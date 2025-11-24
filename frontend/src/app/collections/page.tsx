@@ -43,6 +43,7 @@ interface Collection {
   createdAt: string;
   updatedAt: string;
   isShared: boolean;
+  linkedHypothesisIds?: string[];  // Week 24
 }
 
 export default function CollectionsPage() {
@@ -59,6 +60,9 @@ export default function CollectionsPage() {
   const [showArticleSelector, setShowArticleSelector] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState<any | null>(null);
   const [showNetworkView, setShowNetworkView] = useState(false);
+
+  // Week 24: State for hypotheses
+  const [hypothesesByProject, setHypothesesByProject] = useState<Record<string, Record<string, string>>>({});
 
   // State for creating new collection
   const [newCollection, setNewCollection] = useState({
@@ -143,7 +147,8 @@ export default function CollectionsPage() {
               projectId: project.project_id,
               createdAt: collection.created_at,
               updatedAt: collection.updated_at,
-              isShared: false // TODO: Add sharing logic
+              isShared: false, // TODO: Add sharing logic
+              linkedHypothesisIds: collection.linked_hypothesis_ids || []  // Week 24
             }));
 
             allCollections.push(...transformedCollections);
@@ -163,6 +168,32 @@ export default function CollectionsPage() {
 
       console.log('✅ Total collections loaded:', allCollections.length);
       setCollections(allCollections);
+
+      // Week 24: Fetch hypotheses for all projects
+      const hypothesesData: Record<string, Record<string, string>> = {};
+      for (const project of projects) {
+        try {
+          const hypothesesResponse = await fetch(`/api/proxy/hypotheses/project/${project.project_id}`, {
+            headers: {
+              'User-ID': user?.email || 'default_user',
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (hypothesesResponse.ok) {
+            const hypotheses = await hypothesesResponse.json();
+            const hypothesesMap = hypotheses.reduce((acc: Record<string, string>, h: any) => {
+              acc[h.hypothesis_id] = h.hypothesis_text;
+              return acc;
+            }, {});
+            hypothesesData[project.project_id] = hypothesesMap;
+            console.log(`✅ Loaded ${hypotheses.length} hypotheses for project: ${project.project_name}`);
+          }
+        } catch (error) {
+          console.warn(`⚠️ Failed to fetch hypotheses for project ${project.project_name}:`, error);
+        }
+      }
+      setHypothesesByProject(hypothesesData);
 
     } catch (error) {
       console.error('❌ Failed to fetch collections:', error);
@@ -364,35 +395,43 @@ export default function CollectionsPage() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {projectCollections.map((collection) => (
-                      <SpotifyCollectionCard
-                        key={collection.id}
-                        title={collection.name}
-                        description={collection.description}
-                        articleCount={collection.articleCount}
-                        lastUpdated={collection.updatedAt}
-                        color={collection.color}
-                        onClick={() => {
-                          console.log('Selected collection:', collection);
-                          trackCollectionAction('view', collection.id);
-                          // Navigate to project page with collections tab active
-                          router.push(`/project/${collection.projectId}?tab=collections&collection=${collection.id}`);
-                        }}
-                        onExplore={() => {
-                          console.log('Explore collection:', collection);
-                          trackCollectionAction('view', collection.id);
-                          // Navigate to project page with collections tab and articles view
-                          router.push(`/project/${collection.projectId}?tab=collections&collection=${collection.id}&view=articles`);
-                        }}
-                        onNetworkView={() => {
-                          console.log('🔵 Network view button clicked for collection:', collection);
-                          trackCollectionAction('network_view', collection.id);
-                          // 🔧 NEW: Show article selector modal instead of navigating
-                          setSelectedCollection(collection);
-                          setShowArticleSelector(true);
-                        }}
-                      />
-                    ))}
+                    {projectCollections.map((collection) => {
+                      // Get the first project ID from the collections to find hypotheses
+                      const projectId = projectCollections[0]?.projectId;
+                      const hypothesesMap = projectId ? hypothesesByProject[projectId] || {} : {};
+
+                      return (
+                        <SpotifyCollectionCard
+                          key={collection.id}
+                          title={collection.name}
+                          description={collection.description}
+                          articleCount={collection.articleCount}
+                          lastUpdated={collection.updatedAt}
+                          color={collection.color}
+                          linkedHypothesisIds={collection.linkedHypothesisIds}
+                          hypothesesMap={hypothesesMap}
+                          onClick={() => {
+                            console.log('Selected collection:', collection);
+                            trackCollectionAction('view', collection.id);
+                            // Navigate to project page with collections tab active
+                            router.push(`/project/${collection.projectId}?tab=collections&collection=${collection.id}`);
+                          }}
+                          onExplore={() => {
+                            console.log('Explore collection:', collection);
+                            trackCollectionAction('view', collection.id);
+                            // Navigate to project page with collections tab and articles view
+                            router.push(`/project/${collection.projectId}?tab=collections&collection=${collection.id}&view=articles`);
+                          }}
+                          onNetworkView={() => {
+                            console.log('🔵 Network view button clicked for collection:', collection);
+                            trackCollectionAction('network_view', collection.id);
+                            // 🔧 NEW: Show article selector modal instead of navigating
+                            setSelectedCollection(collection);
+                            setShowArticleSelector(true);
+                          }}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               ))}

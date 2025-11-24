@@ -213,6 +213,8 @@ export const SpotifyCollectionCard: React.FC<{
   onClick?: () => void;
   onExplore?: () => void;
   onNetworkView?: () => void;
+  linkedHypothesisIds?: string[];  // Week 24: Show linked hypotheses
+  hypothesesMap?: Record<string, string>;  // Week 24: Map of hypothesis_id -> hypothesis_text
 }> = ({
   title,
   description,
@@ -221,7 +223,9 @@ export const SpotifyCollectionCard: React.FC<{
   color = 'var(--spotify-green)',
   onClick,
   onExplore,
-  onNetworkView
+  onNetworkView,
+  linkedHypothesisIds = [],
+  hypothesesMap = {}
 }) => {
   return (
     <div className="spotify-card-enhanced bg-[var(--spotify-dark-gray)] hover:bg-[var(--spotify-medium-gray)]" onClick={onClick}>
@@ -250,12 +254,46 @@ export const SpotifyCollectionCard: React.FC<{
         </p>
       )}
 
+      {/* Week 24: Hypothesis Badges */}
+      {linkedHypothesisIds.length > 0 && Object.keys(hypothesesMap).length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {linkedHypothesisIds.slice(0, 2).map((hypId) => {
+            const hypothesisText = hypothesesMap[hypId];
+            if (!hypothesisText) return null;
+
+            const truncatedText = hypothesisText.length > 40
+              ? hypothesisText.slice(0, 40) + '...'
+              : hypothesisText;
+
+            return (
+              <div
+                key={hypId}
+                className="inline-flex items-center gap-1 px-2 py-1 bg-purple-900/50 text-purple-300 text-xs rounded-full border border-purple-700/50"
+                title={hypothesisText}
+              >
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                </svg>
+                <span className="max-w-[200px] truncate">
+                  {truncatedText}
+                </span>
+              </div>
+            );
+          })}
+          {linkedHypothesisIds.length > 2 && (
+            <div className="inline-flex items-center px-2 py-1 bg-gray-800/50 text-gray-400 text-xs rounded-full border border-gray-700/50">
+              +{linkedHypothesisIds.length - 2} more
+            </div>
+          )}
+        </div>
+      )}
+
       {lastUpdated && (
         <p className="text-[var(--spotify-light-text)] text-xs mb-4">
           Updated {lastUpdated}
         </p>
       )}
-      
+
       <div className="flex gap-2">
         {onExplore && (
           <button
