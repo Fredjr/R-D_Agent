@@ -112,10 +112,16 @@ export default function Collections({
 
   // Week 24: Create hypothesis map for quick lookup
   const hypothesesMap = useMemo(() => {
-    return hypotheses.reduce((acc, h) => {
+    const map = hypotheses.reduce((acc, h) => {
       acc[h.hypothesis_id] = h.hypothesis_text;
       return acc;
     }, {} as Record<string, string>);
+    console.log('🔬 Hypotheses map created:', {
+      hypothesesCount: hypotheses.length,
+      mapKeys: Object.keys(map),
+      map
+    });
+    return map;
   }, [hypotheses]);
 
   // 🔧 Handle URL parameters to auto-open collection views

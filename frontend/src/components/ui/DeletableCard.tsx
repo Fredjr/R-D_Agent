@@ -351,6 +351,17 @@ export const DeletableCollectionCard: React.FC<DeletableCollectionCardProps> = (
           )}
 
           {/* Week 24: Show linked hypotheses */}
+          {(() => {
+            console.log('🔍 DeletableCollectionCard badge check:', {
+              collectionId,
+              title,
+              linkedHypothesisIds,
+              hypothesesMapKeys: Object.keys(hypothesesMap),
+              hypothesesMap,
+              shouldShow: linkedHypothesisIds.length > 0 && Object.keys(hypothesesMap).length > 0
+            });
+            return null;
+          })()}
           {linkedHypothesisIds.length > 0 && Object.keys(hypothesesMap).length > 0 && (
             <div className="mt-3 mb-3 flex flex-wrap gap-2">
               {linkedHypothesisIds.slice(0, 2).map((hypId) => {
