@@ -35,6 +35,10 @@ USE_MULTI_AGENT_TRIAGE = os.getenv("USE_MULTI_AGENT_TRIAGE", "true").lower() == 
 AUTO_EVIDENCE_LINKING = os.getenv("AUTO_EVIDENCE_LINKING", "false").lower() == "true"
 AUTO_HYPOTHESIS_STATUS = os.getenv("AUTO_HYPOTHESIS_STATUS", "false").lower() == "true"
 
+# DEBUG: Log feature flag values at module load time
+logger.info(f"🔧 AUTO_EVIDENCE_LINKING = {AUTO_EVIDENCE_LINKING} (env: {os.getenv('AUTO_EVIDENCE_LINKING', 'NOT_SET')})")
+logger.info(f"🔧 AUTO_HYPOTHESIS_STATUS = {AUTO_HYPOTHESIS_STATUS} (env: {os.getenv('AUTO_HYPOTHESIS_STATUS', 'NOT_SET')})")
+
 
 class EnhancedAITriageService:
     """Enhanced service for AI-powered paper triage with transparency and evidence"""
@@ -192,12 +196,15 @@ class EnhancedAITriageService:
                 logger.warning(f"⚠️ PDF extraction failed for {article_pmid}: {e}")
 
             # Week 24: Auto-link evidence to hypotheses (if feature flag enabled)
+            logger.info(f"🔍 DEBUG: AUTO_EVIDENCE_LINKING = {AUTO_EVIDENCE_LINKING}")
             if AUTO_EVIDENCE_LINKING:
+                logger.info(f"🔗 Starting auto evidence linking for {article_pmid}...")
                 try:
                     from backend.app.services.auto_evidence_linking_service import AutoEvidenceLinkingService
                     from backend.app.services.auto_hypothesis_status_service import AutoHypothesisStatusService
 
                     evidence_linker = AutoEvidenceLinkingService()
+                    logger.info(f"🔗 Calling link_evidence_from_triage with triage_result keys: {list(triage_result.keys())}")
                     linking_result = await evidence_linker.link_evidence_from_triage(
                         triage_result=triage_result,
                         article_pmid=article_pmid,
@@ -213,7 +220,11 @@ class EnhancedAITriageService:
                             status_result = await status_updater.update_hypothesis_status(hyp_id, db)
                             logger.info(f"✅ Updated hypothesis {hyp_id[:8]}... status: {status_result['old_status']} → {status_result['new_status']}")
                 except Exception as e:
-                    logger.warning(f"⚠️ Auto evidence linking failed for {article_pmid}: {e}")
+                    logger.error(f"❌ Auto evidence linking failed for {article_pmid}: {e}")
+                    import traceback
+                    logger.error(f"❌ Traceback: {traceback.format_exc()}")
+            else:
+                logger.info(f"⚠️ AUTO_EVIDENCE_LINKING is disabled, skipping auto evidence linking")
 
             return existing_triage
         else:
@@ -258,12 +269,15 @@ class EnhancedAITriageService:
                 logger.warning(f"⚠️ PDF extraction failed for {article_pmid}: {e}")
 
             # Week 24: Auto-link evidence to hypotheses (if feature flag enabled)
+            logger.info(f"🔍 DEBUG: AUTO_EVIDENCE_LINKING = {AUTO_EVIDENCE_LINKING}")
             if AUTO_EVIDENCE_LINKING:
+                logger.info(f"🔗 Starting auto evidence linking for {article_pmid}...")
                 try:
                     from backend.app.services.auto_evidence_linking_service import AutoEvidenceLinkingService
                     from backend.app.services.auto_hypothesis_status_service import AutoHypothesisStatusService
 
                     evidence_linker = AutoEvidenceLinkingService()
+                    logger.info(f"🔗 Calling link_evidence_from_triage with triage_result keys: {list(triage_result.keys())}")
                     linking_result = await evidence_linker.link_evidence_from_triage(
                         triage_result=triage_result,
                         article_pmid=article_pmid,
@@ -279,7 +293,11 @@ class EnhancedAITriageService:
                             status_result = await status_updater.update_hypothesis_status(hyp_id, db)
                             logger.info(f"✅ Updated hypothesis {hyp_id[:8]}... status: {status_result['old_status']} → {status_result['new_status']}")
                 except Exception as e:
-                    logger.warning(f"⚠️ Auto evidence linking failed for {article_pmid}: {e}")
+                    logger.error(f"❌ Auto evidence linking failed for {article_pmid}: {e}")
+                    import traceback
+                    logger.error(f"❌ Traceback: {traceback.format_exc()}")
+            else:
+                logger.info(f"⚠️ AUTO_EVIDENCE_LINKING is disabled, skipping auto evidence linking")
 
             return triage
 
