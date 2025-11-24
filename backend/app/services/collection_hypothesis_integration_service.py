@@ -28,23 +28,29 @@ class CollectionHypothesisIntegrationService:
     
     @staticmethod
     def suggest_collections_for_triage(
-        triage_result: Dict[str, Any],
+        triage_result,  # Can be Dict or PaperTriage object
         project_id: str,
         db: Session
     ) -> List[Dict[str, Any]]:
         """
         Suggest collections for a triaged paper based on affected hypotheses
-        
+
         Args:
-            triage_result: Triage result with affected_hypotheses
+            triage_result: Triage result (dict or PaperTriage object) with affected_hypotheses
             project_id: Project ID
-            db: Database session
-            
+            db: Session
+
         Returns:
             List of suggested collections with reasons
         """
         try:
-            affected_hypotheses = triage_result.get('affected_hypotheses', [])
+            # Handle both dict and object formats
+            if isinstance(triage_result, dict):
+                affected_hypotheses = triage_result.get('affected_hypotheses', [])
+            else:
+                # PaperTriage object
+                affected_hypotheses = getattr(triage_result, 'affected_hypotheses', [])
+
             if not affected_hypotheses:
                 logger.info("No affected hypotheses, no collection suggestions")
                 return []
