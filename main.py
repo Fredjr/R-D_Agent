@@ -4599,6 +4599,65 @@ async def get_feature_flags():
     }
 
 
+@app.post("/admin/run-migration-fix-added-by")
+async def run_migration_fix_added_by(db: Session = Depends(get_db)):
+    """
+    Admin endpoint to run migration: Make hypothesis_evidence.added_by nullable.
+    This allows AI-generated evidence links without requiring a user account.
+    """
+    try:
+        from sqlalchemy import text
+
+        logger.info("🔧 Starting migration: Fix hypothesis_evidence.added_by constraint")
+
+        # Step 1: Make added_by nullable
+        logger.info("📋 Step 1: Making added_by nullable...")
+        db.execute(text("""
+            ALTER TABLE hypothesis_evidence
+            ALTER COLUMN added_by DROP NOT NULL
+        """))
+        logger.info("✅ Step 1 complete")
+
+        # Step 2: Update existing records
+        logger.info("📋 Step 2: Updating existing 'ai_triage' records to NULL...")
+        result = db.execute(text("""
+            UPDATE hypothesis_evidence
+            SET added_by = NULL
+            WHERE added_by = 'ai_triage'
+        """))
+        logger.info(f"✅ Step 2 complete: Updated {result.rowcount} records")
+
+        # Step 3: Verify
+        logger.info("📋 Step 3: Verifying changes...")
+        result = db.execute(text("""
+            SELECT
+                COUNT(*) as total_evidence_links,
+                COUNT(added_by) as links_with_user,
+                COUNT(*) - COUNT(added_by) as links_without_user
+            FROM hypothesis_evidence
+        """))
+        row = result.fetchone()
+
+        db.commit()
+
+        logger.info("✅ Migration complete!")
+
+        return {
+            "status": "success",
+            "message": "Migration completed successfully",
+            "results": {
+                "total_evidence_links": row[0],
+                "links_with_user": row[1],
+                "links_without_user": row[2]
+            }
+        }
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"❌ Migration failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")
+
+
 @app.get("/health/db")
 async def health_check_db(db: Session = Depends(get_db)):
     """Health check endpoint that tests database connectivity"""
