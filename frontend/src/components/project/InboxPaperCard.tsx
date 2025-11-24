@@ -12,7 +12,9 @@ import {
   SparklesIcon,
   BeakerIcon,
   TableCellsIcon,
-  PhotoIcon
+  PhotoIcon,
+  FolderPlusIcon,
+  PencilSquareIcon
 } from '@heroicons/react/24/outline';
 
 /**
@@ -29,6 +31,9 @@ interface InboxPaperCardProps {
   onMaybe: () => void;
   onMarkAsRead: () => void;
   onExtractProtocol?: () => void;
+  // Week 24: Integration Gaps
+  onAddToCollection?: (collectionId: string) => void;
+  onCreateNoteFromEvidence?: (evidenceIndex: number, evidenceQuote: string) => void;
 }
 
 export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
@@ -37,7 +42,9 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
   onReject,
   onMaybe,
   onMarkAsRead,
-  onExtractProtocol
+  onExtractProtocol,
+  onAddToCollection,
+  onCreateNoteFromEvidence
 }) => {
   const [showReasoning, setShowReasoning] = useState(false);
   const [showEvidence, setShowEvidence] = useState(true); // Default expanded - users paid for this!
@@ -45,6 +52,7 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
   const [showHypothesisScores, setShowHypothesisScores] = useState(false);
   const [showTables, setShowTables] = useState(false);
   const [showFigures, setShowFigures] = useState(false);
+  const [showCollectionSuggestions, setShowCollectionSuggestions] = useState(true); // Week 24: Default expanded
 
   // Get color based on relevance score
   const getRelevanceColor = (score: number) => {
@@ -152,12 +160,69 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
                     <span className="text-purple-300 font-semibold">Relevance:</span>
                     <span className="text-gray-100">{excerpt.relevance}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs mt-1">
-                    <span className="text-purple-300 font-semibold">Linked to:</span>
-                    <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">
-                      {excerpt.linked_to}
-                    </span>
+                  <div className="flex items-center justify-between gap-2 text-xs mt-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-purple-300 font-semibold">Linked to:</span>
+                      <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                        {excerpt.linked_to}
+                      </span>
+                    </div>
+                    {/* Week 24: Add Note button */}
+                    {onCreateNoteFromEvidence && (
+                      <button
+                        onClick={() => onCreateNoteFromEvidence(idx, excerpt.quote)}
+                        className="flex items-center gap-1 px-2 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded transition-colors border border-blue-500/30"
+                        title="Create note from this evidence"
+                      >
+                        <PencilSquareIcon className="w-3 h-3" />
+                        <span className="text-xs">Add Note</span>
+                      </button>
+                    )}
                   </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Week 24: Collection Suggestions */}
+      {paper.collection_suggestions && paper.collection_suggestions.length > 0 && (
+        <div className="mb-4">
+          <button
+            onClick={() => setShowCollectionSuggestions(!showCollectionSuggestions)}
+            className="flex items-center gap-2 text-sm text-white hover:text-green-300 transition-colors mb-2"
+          >
+            {showCollectionSuggestions ? (
+              <ChevronUpIcon className="w-4 h-4" />
+            ) : (
+              <ChevronDownIcon className="w-4 h-4" />
+            )}
+            <FolderPlusIcon className="w-4 h-4 text-green-400" />
+            <span className="font-semibold">Suggested Collections ({paper.collection_suggestions.length})</span>
+          </button>
+          {showCollectionSuggestions && (
+            <div className="space-y-2">
+              {paper.collection_suggestions.map((suggestion, idx) => (
+                <div key={idx} className="p-3 bg-green-500/10 rounded-lg border border-green-500/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-green-300">{suggestion.collection_name}</span>
+                      <span className="px-2 py-0.5 rounded bg-green-500/20 text-green-400 text-xs border border-green-500/30">
+                        {Math.round(suggestion.confidence * 100)}% match
+                      </span>
+                    </div>
+                    {onAddToCollection && (
+                      <button
+                        onClick={() => onAddToCollection(suggestion.collection_id)}
+                        className="flex items-center gap-1 px-3 py-1 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded transition-colors border border-green-500/30"
+                      >
+                        <FolderPlusIcon className="w-4 h-4" />
+                        <span className="text-sm">Add</span>
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-100">{suggestion.reason}</p>
                 </div>
               ))}
             </div>

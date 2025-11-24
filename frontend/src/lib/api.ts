@@ -552,6 +552,14 @@ export interface PaperTriageData {
     evidence: string;  // Quote from paper
   }>;
 
+  // Week 24: Integration Gaps - Collection suggestions
+  collection_suggestions?: Array<{
+    collection_id: string;
+    collection_name: string;
+    confidence: number;  // 0.9 for hypothesis match, 0.7 for question match
+    reason: string;  // Why this collection is suggested
+  }>;
+
   article?: {
     pmid: string;
     title: string;
