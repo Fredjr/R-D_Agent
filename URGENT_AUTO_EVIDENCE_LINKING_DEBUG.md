@@ -1,7 +1,7 @@
 # URGENT: Auto Evidence Linking Not Working - Debug Guide
 
-**Date**: November 24, 2025  
-**Status**: 🔴 **CRITICAL - NEEDS INVESTIGATION**
+**Date**: November 24, 2025
+**Status**: 🔴 **CRITICAL - ROOT CAUSE IDENTIFIED**
 
 ---
 
@@ -12,6 +12,27 @@ You reported that auto evidence linking is **NOT working** even though:
 - ✅ AI triage returns correct `hypothesis_relevance_scores` with score=70 and support_type="provides_context"
 - ❌ No `HypothesisEvidence` record created
 - ❌ Hypothesis remains unchanged (status: "Proposed", confidence: 60%, evidence count: 0)
+
+---
+
+## ✅ **CONFIRMED: AI Triage Is Working Correctly**
+
+I verified that the AI triage endpoint IS returning the correct data:
+
+```json
+{
+  "hypothesis_relevance_scores": {
+    "28777578-e417-4fae-9b76-b510fc2a3e5f": {
+      "score": 70,
+      "support_type": "provides_context",
+      "reasoning": "The paper provides context for the hypothesis...",
+      "evidence": "This statement underscores the genetic factors..."
+    }
+  }
+}
+```
+
+**This means the problem is NOT in the AI triage service, but in the auto evidence linking service.**
 
 ---
 

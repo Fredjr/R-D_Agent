@@ -49,12 +49,12 @@ def get_hypothesis_before(hypothesis_id):
     print("\n" + "="*80)
     print("STEP 2: Get Hypothesis State BEFORE Triage")
     print("="*80)
-    
+
     response = requests.get(
-        f"{BACKEND_URL}/api/projects/{PROJECT_ID}/hypotheses/{hypothesis_id}",
+        f"{BACKEND_URL}/api/hypotheses/{hypothesis_id}",
         headers={"User-ID": USER_ID}
     )
-    
+
     if response.status_code == 200:
         hyp = response.json()
         print(f"✅ Hypothesis found:")
@@ -66,6 +66,7 @@ def get_hypothesis_before(hypothesis_id):
         return hyp
     else:
         print(f"❌ Failed to get hypothesis: {response.status_code}")
+        print(f"   Response: {response.text}")
         return None
 
 def triage_paper():
@@ -103,30 +104,31 @@ def get_hypothesis_after(hypothesis_id):
     print("\n" + "="*80)
     print("STEP 4: Get Hypothesis State AFTER Triage")
     print("="*80)
-    
+
     # Wait a bit for async processing
     time.sleep(2)
-    
+
     response = requests.get(
-        f"{BACKEND_URL}/api/projects/{PROJECT_ID}/hypotheses/{hypothesis_id}",
+        f"{BACKEND_URL}/api/hypotheses/{hypothesis_id}",
         headers={"User-ID": USER_ID}
     )
-    
+
     if response.status_code == 200:
         hyp = response.json()
         print(f"✅ Hypothesis found:")
         print(f"   Status: {hyp['status']}")
         print(f"   Confidence: {hyp['confidence_level']}")
         print(f"   Evidence count: {len(hyp.get('evidence', []))}")
-        
+
         if hyp.get('evidence'):
             print(f"   Evidence links:")
             for ev in hyp['evidence']:
                 print(f"      - PMID: {ev.get('article_pmid')}, Type: {ev.get('evidence_type')}, Strength: {ev.get('strength')}")
-        
+
         return hyp
     else:
         print(f"❌ Failed to get hypothesis: {response.status_code}")
+        print(f"   Response: {response.text}")
         return None
 
 def verify_acceptance_criteria(hyp_before: Dict, hyp_after: Dict, triage: Dict, test_paper: Dict) -> Dict:
@@ -244,9 +246,10 @@ def print_acceptance_criteria_results(results: Dict):
         print(f"{status} - {description}")
 
         # Print details if available
-        details_key = key.replace('_', '_details').replace('details_details', 'details')
-        if f"{key.rsplit('_', 1)[0]}_details" in results:
-            print(f"         {results[f'{key.rsplit('_', 1)[0]}_details']}")
+        base_key = key.rsplit('_', 1)[0] if '_' in key else key
+        details_key = f"{base_key}_details"
+        if details_key in results:
+            print(f"         {results[details_key]}")
 
         if not passed:
             all_passed = False
@@ -260,13 +263,13 @@ def print_acceptance_criteria_results(results: Dict):
 
     return all_passed
 
-def test_paper(test_paper: Dict) -> bool:
+def test_single_paper(paper_info: Dict) -> bool:
     """Test a single paper"""
     print("\n" + "="*80)
-    print(f"TESTING PAPER: {test_paper['pmid']}")
+    print(f"TESTING PAPER: {paper_info['pmid']}")
     print("="*80)
 
-    hypothesis_id = test_paper['hypothesis_id']
+    hypothesis_id = paper_info['hypothesis_id']
 
     # Get hypothesis state before
     hyp_before = get_hypothesis_before(hypothesis_id)
@@ -274,7 +277,7 @@ def test_paper(test_paper: Dict) -> bool:
         return False
 
     # Triage paper
-    triage = triage_paper_with_pmid(test_paper['pmid'])
+    triage = triage_paper_with_pmid(paper_info['pmid'])
     if not triage:
         return False
 
@@ -284,7 +287,7 @@ def test_paper(test_paper: Dict) -> bool:
         return False
 
     # Verify acceptance criteria
-    results = verify_acceptance_criteria(hyp_before, hyp_after, triage, test_paper)
+    results = verify_acceptance_criteria(hyp_before, hyp_after, triage, paper_info)
     all_passed = print_acceptance_criteria_results(results)
 
     return all_passed
@@ -324,7 +327,7 @@ def main():
     # Step 2: Test each paper
     all_tests_passed = True
     for test_paper in TEST_PAPERS:
-        passed = test_paper(test_paper)
+        passed = test_single_paper(test_paper)
         if not passed:
             all_tests_passed = False
 
