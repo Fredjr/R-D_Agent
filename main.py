@@ -14870,6 +14870,47 @@ async def migrate_collections_schema():
             "error_type": type(e).__name__
         }
 
+@app.post("/admin/cleanup-test-evidence")
+async def cleanup_test_evidence():
+    """Admin endpoint to clean up test evidence link for hypothesis 28777578-e417-4fae-9b76-b510fc2a3e5f"""
+    try:
+        from database import get_engine
+        from sqlalchemy import text
+
+        engine = get_engine()
+
+        with engine.connect() as conn:
+            trans = conn.begin()
+            try:
+                # Delete evidence link id=8 for hypothesis 28777578-e417-4fae-9b76-b510fc2a3e5f
+                result = conn.execute(text("""
+                    DELETE FROM hypothesis_evidence
+                    WHERE id = 8
+                    AND hypothesis_id = '28777578-e417-4fae-9b76-b510fc2a3e5f'
+                    AND article_pmid = '38924432'
+                """))
+
+                deleted_count = result.rowcount
+
+                trans.commit()
+
+                return {
+                    "status": "success",
+                    "message": f"Deleted {deleted_count} evidence link(s)",
+                    "deleted_count": deleted_count
+                }
+            except Exception as e:
+                trans.rollback()
+                raise e
+    except Exception as e:
+        import traceback
+        return {
+            "status": "error",
+            "message": f"Cleanup failed: {str(e)}",
+            "error_type": type(e).__name__,
+            "traceback": traceback.format_exc()
+        }
+
 @app.post("/admin/migrate-network-view")
 async def migrate_network_view_schema():
     """Admin endpoint to migrate database schema for Network View feature"""
