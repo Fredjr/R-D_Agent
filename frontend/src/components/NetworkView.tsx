@@ -38,6 +38,16 @@ export interface NetworkNode {
     explorationResults?: any[];
     explorationTimestamp?: string;
   };
+  // Week 24: Integration Gaps - Enriched network context
+  relevance_score?: number;  // 0-100
+  triage_status?: string;  // 'must_read' | 'nice_to_know' | 'ignore' | 'not_triaged'
+  has_protocol?: boolean;
+  supports_hypotheses?: Array<{
+    hypothesis_id: string;
+    evidence_type: string;
+    strength: string;
+  }>;
+  priority_score?: number;  // 0-1
 }
 
 interface NetworkEdge {
@@ -251,9 +261,21 @@ const createArticleSpecificNetwork = (originalArticle: any, sourceId: string) =>
 
 // Custom node component for articles
 const ArticleNode = ({ data }: { data: any }) => {
-  const { metadata, size, color } = data;
+  const { metadata, size, color, has_protocol, priority_score, relevance_score } = data;
   const nodeSize = Math.max(40, Math.min(size, 120));
-  
+
+  // Week 24: Build tooltip with enriched data
+  let tooltip = `${metadata.title}\nCitations: ${metadata.citation_count}\nYear: ${metadata.year}`;
+  if (relevance_score !== undefined) {
+    tooltip += `\nRelevance: ${relevance_score}/100`;
+  }
+  if (priority_score !== undefined) {
+    tooltip += `\nPriority: ${Math.round(priority_score * 100)}%`;
+  }
+  if (has_protocol) {
+    tooltip += `\n🧪 Protocol Extracted`;
+  }
+
   return (
     <div
       className="article-node"
@@ -269,8 +291,9 @@ const ArticleNode = ({ data }: { data: any }) => {
         cursor: 'pointer',
         boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
         transition: 'all 0.2s ease',
+        position: 'relative',
       }}
-      title={`${metadata.title}\nCitations: ${metadata.citation_count}\nYear: ${metadata.year}`}
+      title={tooltip}
     >
       <div
         className="node-content"
@@ -287,13 +310,49 @@ const ArticleNode = ({ data }: { data: any }) => {
       >
         {metadata.citation_count}
       </div>
+      {/* Week 24: Protocol badge */}
+      {has_protocol && (
+        <div
+          style={{
+            position: 'absolute',
+            top: -4,
+            right: -4,
+            width: 16,
+            height: 16,
+            backgroundColor: '#8b5cf6',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 10,
+            border: '2px solid #fff',
+          }}
+          title="Protocol Extracted"
+        >
+          🧪
+        </div>
+      )}
     </div>
   );
 };
 
+// Week 24: Utility function to get node color based on priority score
+// High priority (>70) = Green, Medium (40-70) = Yellow, Low (<40) = Gray
+const getNodeColorByPriority = (priorityScore: number): string => {
+  const score = priorityScore * 100; // Convert 0-1 to 0-100
+  if (score >= 70) return '#10b981'; // Green - High priority
+  if (score >= 40) return '#eab308'; // Yellow - Medium priority
+  return '#6b7280'; // Gray - Low priority
+};
+
 // Utility function to get node color based on collection status and year
 // ResearchRabbit-style: Green = in collection, Blue gradient = suggested (darker = more recent)
-const getNodeColor = (year: number, isInCollection: boolean = false): string => {
+const getNodeColor = (year: number, isInCollection: boolean = false, priorityScore?: number): string => {
+  // Week 24: If priority score is available, use it for color-coding
+  if (priorityScore !== undefined && priorityScore !== null) {
+    return getNodeColorByPriority(priorityScore);
+  }
+
   if (isInCollection) {
     return '#10b981'; // Green for papers in collection
   }
@@ -929,12 +988,14 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         const isInCollection = isPmidInCollection(nodePmid);
         const nodeYear = node.metadata?.year || new Date().getFullYear();
 
-        // Use ResearchRabbit-style coloring: green for collection, blue gradient for suggested
-        const nodeColor = getNodeColor(nodeYear, isInCollection);
+        // Week 24: Use priority score for color-coding if available
+        const priorityScore = node.priority_score;
+        const nodeColor = getNodeColor(nodeYear, isInCollection, priorityScore);
 
         console.log(`🎨 [NetworkView] Node ${nodePmid} color calculation:`, {
           year: nodeYear,
           isInCollection,
+          priorityScore,
           calculatedColor: nodeColor,
           backendColor: node.color
         });
@@ -960,6 +1021,12 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             // Set size and color explicitly (DO NOT use backend values)
             size: node.size || 60,
             color: nodeColor, // ALWAYS use frontend-calculated gradient color
+            // Week 24: Add enriched context fields
+            relevance_score: node.relevance_score,
+            triage_status: node.triage_status,
+            has_protocol: node.has_protocol,
+            supports_hypotheses: node.supports_hypotheses,
+            priority_score: node.priority_score,
           },
         };
       });
