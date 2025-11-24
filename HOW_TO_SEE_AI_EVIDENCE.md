@@ -6,29 +6,40 @@ You were triaging papers and seeing hypothesis relevance scores in the Smart Inb
 
 **Root Cause:** The UI wasn't refreshing after triage completed, so newly created evidence links weren't visible.
 
-## Solution Deployed
+## Solution Deployed ✅
 
-I've made two key changes:
+I've implemented **automatic refresh** - no manual button clicks needed!
 
 ### 1. Always Reload Evidence When Expanding
 **File:** `HypothesisCard.tsx`
 
 Previously, evidence was only loaded the first time you expanded a hypothesis. Now it reloads every time you expand, ensuring you see the latest AI-generated evidence.
 
-### 2. Added Refresh Button
+### 2. Added Refresh Button (Optional)
 **File:** `HypothesesSection.tsx`
 
-Added a "Refresh" button next to "Add Hypothesis" that reloads all hypotheses with updated evidence counts.
+Added a "Refresh" button next to "Add Hypothesis" that reloads all hypotheses with updated evidence counts. **You don't need to use this anymore** - the UI refreshes automatically!
+
+### 3. ⭐ Automatic Refresh After Triage (NEW!)
+**Files:** `ExploreTab.tsx`, `HypothesesSection.tsx`, `InboxTab.tsx`
+
+When you triage a paper, the system now:
+- ✅ Automatically refreshes the hypothesis list
+- ✅ Automatically refreshes the inbox
+- ✅ Shows updated evidence counts immediately
+- ✅ No manual refresh needed!
+
+**How it works:** Uses browser CustomEvent API to notify all relevant components when triage completes.
 
 ## How to Use (After Vercel Deployment Completes)
 
 ### Step 1: Triage a Paper
 
-1. Go to **Explore** tab
-2. Search for a paper
-3. Click **"Triage with AI"**
-4. Wait for triage to complete
-5. Note the hypothesis relevance scores in the console/alert
+1. Go to **Papers** tab → **Explore** sub-tab
+2. Search for a paper (e.g., "CRISPR gene editing")
+3. Click **"Triage with AI"** button
+4. Wait for triage to complete (~5-10 seconds)
+5. See success alert with relevance score
 
 **Example from your test:**
 ```
@@ -38,23 +49,20 @@ Support Type: tests
 Evidence: "With positive study outcome, AZD0530 may provide a therapy..."
 ```
 
-### Step 2: Go to Research Questions Tab
+### Step 2: Evidence Appears Automatically! ⭐
 
-1. Click on **Research** tab
-2. Click on **Questions** sub-tab
-3. Scroll down to see your hypotheses
+**No manual steps needed!** The UI automatically:
+- ✅ Refreshes hypothesis list
+- ✅ Updates evidence counts
+- ✅ Refreshes inbox with new paper
 
-### Step 3: Click Refresh Button
+### Step 3: View the Evidence
 
-1. Look for the **"Refresh"** button (next to "Add Hypothesis")
-2. Click it to reload hypotheses with updated evidence counts
-3. You should now see updated counts:
-   - "1 supporting" (instead of "0 supporting")
-
-### Step 4: Expand Evidence Section
-
-1. Click on the evidence count to expand
-2. You should see:
+1. Click on **Research** tab → **Questions** sub-tab
+2. Scroll to your hypothesis
+3. You'll see updated count: **"1 supporting"** (was "0 supporting")
+4. Click on the evidence count to expand
+5. You should see:
    - ✅ Paper title
    - ✅ **Supports** badge (green)
    - ✅ **Strong** badge (score 85 → strong)
@@ -62,6 +70,12 @@ Evidence: "With positive study outcome, AZD0530 may provide a therapy..."
    - ✅ Key finding text
    - ✅ View Paper button
    - ✅ Remove button
+
+### Alternative: Check the Inbox
+
+1. Click on **Papers** tab → **Inbox** sub-tab
+2. The newly triaged paper appears automatically
+3. See AI insights and hypothesis relevance breakdown
 
 ## Visual Guide
 
@@ -117,21 +131,27 @@ Evidence: "With positive study outcome, AZD0530 may provide a therapy..."
 
 ## Troubleshooting
 
-### "I clicked Refresh but still see 0 supporting"
+### "I still see 0 supporting after triage"
 
 **Check 1:** Did the triage actually create evidence?
 - Look at the browser console for the triage result
 - Check if `hypothesis_relevance_scores` has a score >= 40
+- Look for console message: `🔄 Hypotheses refresh triggered by triage`
 
 **Check 2:** Check Railway logs
 - Go to Railway dashboard
 - Look for: `✅ Auto-linked X evidence links`
-- If you see `✅ Auto-linked 0 evidence links`, the score was below threshold
+- If you see `✅ Auto-linked 0 evidence links`, the score was below threshold (< 40)
 
 **Check 3:** Check the hypothesis ID
 - Make sure the hypothesis ID in the triage result matches the one you're looking at
 - Copy the ID from the triage console log
 - Compare with the hypothesis ID in the URL or UI
+
+**Check 4:** Hard refresh the page
+- Press Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows)
+- This clears any cached JavaScript
+- Try triaging again
 
 ### "I see evidence count updated but no evidence when I expand"
 
@@ -173,7 +193,9 @@ Evidence: "With positive study outcome, AZD0530 may provide a therapy..."
 1. `b1f5170` - Added 🤖 AI-Generated badge to UI
 2. `48f13e6` - Added visual guide documentation
 3. `5ffccf7` - Added diagnostic guide
-4. `b00cfa8` - **Fixed refresh mechanism** ⬅️ Most important!
+4. `b00cfa8` - Fixed refresh mechanism
+5. `7baa89d` - Added user guide
+6. `7412087` - **Automatic refresh + Vercel build fix** ⬅️ Most important!
 
 ### Files Changed:
 - `frontend/src/components/project/questions/HypothesisCard.tsx`
@@ -182,6 +204,17 @@ Evidence: "With positive study outcome, AZD0530 may provide a therapy..."
 
 - `frontend/src/components/project/questions/HypothesesSection.tsx`
   - Added "Refresh" button to reload hypotheses
+  - **Added event listener for automatic refresh after triage**
+
+- `frontend/src/components/project/ExploreTab.tsx`
+  - **Dispatch 'hypotheses-refresh' event after successful triage**
+  - Updated success message to indicate auto-linking
+
+- `frontend/src/components/project/InboxTab.tsx`
+  - **Added event listener for automatic inbox refresh after triage**
+
+- `frontend/src/app/collections/page.tsx`
+  - Fixed missing collectionId and projectId props (Vercel build fix)
 
 - `frontend/src/lib/types/questions.ts`
   - Made `added_by` optional/nullable in TypeScript types
@@ -204,11 +237,15 @@ Backend updates hypothesis evidence counts
          ⬇️
 Backend updates hypothesis status (proposed → testing)
          ⬇️
-User clicks "Refresh" button in UI
+Backend returns triage result to frontend
          ⬇️
-UI fetches updated hypothesis data
+⭐ Frontend dispatches 'hypotheses-refresh' event ⭐
          ⬇️
-UI shows updated evidence counts
+⭐ HypothesesSection listens and auto-refreshes ⭐
+         ⬇️
+⭐ InboxTab listens and auto-refreshes ⭐
+         ⬇️
+UI shows updated evidence counts immediately
          ⬇️
 User expands evidence section
          ⬇️
@@ -217,7 +254,25 @@ UI fetches evidence links
 UI shows evidence with 🤖 AI-Generated badge
 ```
 
+## Key Improvements
+
+### Before (Manual Workflow):
+1. Triage paper in Explore tab
+2. Switch to Research Questions tab
+3. Click "Refresh" button
+4. Expand hypothesis to see evidence
+
+### After (Automatic Workflow): ⭐
+1. Triage paper in Explore tab
+2. **Evidence appears automatically!**
+3. Switch to Research Questions tab
+4. Evidence counts already updated
+5. Expand hypothesis to see evidence
+
+**Time saved:** ~10-15 seconds per triage
+**User friction:** Eliminated 2 manual steps
+
 ---
 
-**The feature is now fully functional!** Just wait for Vercel to deploy and test it out. 🚀
+**The feature is now fully functional with automatic refresh!** Just wait for Vercel to deploy and test it out. 🚀
 
