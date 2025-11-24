@@ -112,7 +112,7 @@ export interface QuestionEvidence {
   evidence_type: EvidenceType;
   relevance_score: number; // 1-10
   key_finding?: string;
-  added_by: string;
+  added_by?: string | null; // Week 24: Optional/null for AI-generated evidence
   added_at: string;
 
   // Populated from Article table (joined data)
@@ -136,7 +136,7 @@ export interface HypothesisEvidence {
   evidence_type: 'supports' | 'contradicts' | 'neutral';
   strength: 'weak' | 'moderate' | 'strong';
   key_finding?: string;
-  added_by: string;
+  added_by?: string | null; // Week 24: Optional/null for AI-generated evidence
   added_at: string;
 
   // Populated from Article table (joined data)

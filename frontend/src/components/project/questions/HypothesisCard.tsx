@@ -325,7 +325,7 @@ export function HypothesisCard({
                         </button>
 
                         {/* Evidence type and strength badges */}
-                        <div className="flex items-center gap-2 mb-2">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
                           <span className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs ${typeStyle.color} ${typeStyle.bg}`}>
                             {typeStyle.icon}
                             {ev.evidence_type}
@@ -334,6 +334,13 @@ export function HypothesisCard({
                             <SignalIcon className="w-3 h-3" />
                             {strengthStyle.label}
                           </span>
+                          {/* AI-generated indicator */}
+                          {!ev.added_by && (
+                            <span className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-purple-500/20 text-purple-400 border border-purple-500/30" title="Automatically linked by AI during triage">
+                              <span>🤖</span>
+                              <span>AI-Generated</span>
+                            </span>
+                          )}
                         </div>
 
                         {/* Key finding */}
