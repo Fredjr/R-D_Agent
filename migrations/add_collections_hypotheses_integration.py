@@ -102,28 +102,39 @@ def upgrade():
             """))
             logger.info("✅ Added auto_update column")
         
-        # Create index for performance
+        # Commit column additions first
+        session.commit()
+        logger.info("✅ Column additions committed successfully!")
+
+        # Create index for performance (in separate transaction)
         logger.info("📊 Creating index on linked_hypothesis_ids...")
         if is_postgres:
             try:
+                # Use jsonb_path_ops for better performance with JSON
                 session.execute(text("""
                     CREATE INDEX IF NOT EXISTS idx_collections_linked_hypotheses
-                    ON collections USING GIN (linked_hypothesis_ids)
+                    ON collections USING GIN (linked_hypothesis_ids jsonb_path_ops)
                 """))
+                session.commit()
                 logger.info("✅ Created GIN index on linked_hypothesis_ids")
             except Exception as e:
+                session.rollback()
                 logger.warning(f"⚠️  Could not create GIN index: {e}")
-                # Try regular index instead
-                session.execute(text("""
-                    CREATE INDEX IF NOT EXISTS idx_collections_linked_hypotheses
-                    ON collections ((linked_hypothesis_ids::text))
-                """))
-                logger.info("✅ Created text index on linked_hypothesis_ids")
+                # Try B-tree index on array length instead (useful for filtering)
+                try:
+                    session.execute(text("""
+                        CREATE INDEX IF NOT EXISTS idx_collections_linked_hypotheses
+                        ON collections (jsonb_array_length(COALESCE(linked_hypothesis_ids, '[]'::jsonb)))
+                    """))
+                    session.commit()
+                    logger.info("✅ Created B-tree index on linked_hypothesis_ids array length")
+                except Exception as e2:
+                    session.rollback()
+                    logger.warning(f"⚠️  Could not create any index: {e2}. Continuing without index.")
         elif is_sqlite:
             # SQLite doesn't support GIN indexes, skip indexing JSON columns
             logger.info("⚠️  SQLite doesn't support JSON indexing, skipping index creation")
-        
-        session.commit()
+
         logger.info("✅ Migration completed successfully!")
         
     except Exception as e:
