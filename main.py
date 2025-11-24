@@ -7314,13 +7314,16 @@ async def create_note_from_evidence(
 
         evidence_excerpt = triage.evidence_excerpts[evidence_index]
 
+        # Add index to evidence excerpt for ID generation
+        evidence_excerpt['index'] = evidence_index
+
         # Create note
         note = NoteEvidenceIntegrationService.create_note_from_evidence(
-            triage_id=triage_id,
-            evidence_index=evidence_index,
             evidence_excerpt=evidence_excerpt,
-            project_id=project_id,
+            triage_id=triage_id,
             user_id=current_user,
+            project_id=project_id,
+            additional_content="",  # Empty for now, can be added later
             db=db
         )
 

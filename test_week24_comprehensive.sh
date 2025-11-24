@@ -126,7 +126,7 @@ echo ""
 echo "TEST 2.2: Filter Collections by Hypothesis"
 echo "-------------------------------------------"
 COLLECTIONS_RESPONSE=$(curl -s -X GET \
-  "${BASE_URL}/api/collections/by-hypothesis/${HYPOTHESIS_ID}" \
+  "${BASE_URL}/api/collections/by-hypothesis/${HYPOTHESIS_ID}?project_id=${PROJECT_ID}" \
   -H "User-ID: ${USER_ID}")
 
 echo "Response: $COLLECTIONS_RESPONSE"
