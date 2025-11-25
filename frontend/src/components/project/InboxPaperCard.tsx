@@ -34,6 +34,7 @@ interface InboxPaperCardProps {
   // Week 24: Integration Gaps
   onAddToCollection?: (collectionId: string) => void;
   onCreateNoteFromEvidence?: (evidenceIndex: number, evidenceQuote: string) => void;
+  collections?: Array<{ collection_id: string; collection_name: string }>;
 }
 
 export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
@@ -44,7 +45,8 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
   onMarkAsRead,
   onExtractProtocol,
   onAddToCollection,
-  onCreateNoteFromEvidence
+  onCreateNoteFromEvidence,
+  collections = []
 }) => {
   const [showReasoning, setShowReasoning] = useState(false);
   const [showEvidence, setShowEvidence] = useState(true); // Default expanded - users paid for this!
@@ -126,6 +128,23 @@ export const InboxPaperCard: React.FC<InboxPaperCardProps> = ({
           )}
         </div>
       </div>
+
+      {/* Week 24: Collection Membership Badge */}
+      {collections.length > 0 && (
+        <div className="mb-4 p-3 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-lg border border-green-500/30">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-semibold text-green-300">📚 In Collections:</span>
+            {collections.map((collection) => (
+              <span
+                key={collection.collection_id}
+                className="px-2 py-1 bg-green-500/20 text-green-300 rounded-lg text-xs border border-green-500/30"
+              >
+                {collection.collection_name}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Abstract */}
       {paper.article?.abstract && (

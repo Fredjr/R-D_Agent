@@ -30,6 +30,9 @@ export const InboxTab: React.FC<InboxTabProps> = ({ projectId }) => {
   const [filter, setFilter] = useState<'all' | 'must_read' | 'nice_to_know' | 'ignore'>('all');
   const [readFilter, setReadFilter] = useState<'all' | 'unread' | 'reading' | 'read'>('all');
 
+  // Week 24: Collection membership data
+  const [paperCollections, setPaperCollections] = useState<Map<string, any[]>>(new Map());
+
   // Week 10: Batch triage mode
   const [batchMode, setBatchMode] = useState(false);
   const [selectedPapers, setSelectedPapers] = useState<Set<string>>(new Set());
@@ -48,6 +51,7 @@ export const InboxTab: React.FC<InboxTabProps> = ({ projectId }) => {
   useEffect(() => {
     loadInbox();
     loadStats();
+    loadCollectionMembership();
   }, [projectId, filter, readFilter, user?.user_id]);
 
   // Week 24: Listen for triage completion events to auto-refresh inbox
@@ -152,6 +156,50 @@ export const InboxTab: React.FC<InboxTabProps> = ({ projectId }) => {
       setStats(statsData);
     } catch (error) {
       console.error('Error loading stats:', error);
+    }
+  };
+
+  const loadCollectionMembership = async () => {
+    if (!user?.email) return;
+
+    try {
+      // Fetch all collections for the project
+      const response = await fetch(`/api/proxy/collections?projectId=${projectId}`, {
+        headers: { 'User-ID': user.email }
+      });
+
+      if (!response.ok) return;
+
+      const collections = await response.json();
+      const membershipMap = new Map<string, any[]>();
+
+      // For each collection, fetch articles and build membership map
+      for (const collection of collections) {
+        const articlesResponse = await fetch(
+          `/api/proxy/collections/${collection.collection_id}/articles?projectId=${projectId}`,
+          { headers: { 'User-ID': user.email } }
+        );
+
+        if (articlesResponse.ok) {
+          const articlesData = await articlesResponse.json();
+          const articles = Array.isArray(articlesData) ? articlesData : (articlesData.articles || []);
+
+          articles.forEach((article: any) => {
+            const pmid = article.article_pmid || article.pmid;
+            if (pmid) {
+              const existing = membershipMap.get(pmid) || [];
+              membershipMap.set(pmid, [...existing, {
+                collection_id: collection.collection_id,
+                collection_name: collection.collection_name
+              }]);
+            }
+          });
+        }
+      }
+
+      setPaperCollections(membershipMap);
+    } catch (error) {
+      console.error('Error loading collection membership:', error);
     }
   };
 
@@ -657,6 +705,7 @@ export const InboxTab: React.FC<InboxTabProps> = ({ projectId }) => {
                 onExtractProtocol={() => handleExtractProtocol(paper)}
                 onAddToCollection={(collectionId) => handleAddToCollection(paper, collectionId)}
                 onCreateNoteFromEvidence={(evidenceIndex, evidenceQuote) => handleCreateNoteFromEvidence(paper, evidenceIndex, evidenceQuote)}
+                collections={paperCollections.get(paper.article_pmid) || []}
               />
             </div>
           ))}

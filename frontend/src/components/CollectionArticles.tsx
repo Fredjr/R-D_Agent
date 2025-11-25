@@ -62,14 +62,21 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
   // Triage state
   const [triagingPmids, setTriagingPmids] = useState<Set<string>>(new Set());
 
+  // Protocol extraction state
+  const [extractingProtocolPmids, setExtractingProtocolPmids] = useState<Set<string>>(new Set());
+
   // Week 24: Fetch hypotheses and research questions for displaying links
   const [hypotheses, setHypotheses] = useState<any[]>([]);
   const [questions, setQuestions] = useState<any[]>([]);
+
+  // Triage data for showing status
+  const [triageData, setTriageData] = useState<Map<string, any>>(new Map());
 
   useEffect(() => {
     fetchArticles();
     fetchAnnotations();
     fetchHypothesesAndQuestions();
+    fetchTriageData();
   }, [collection.collection_id]);
 
   const fetchHypothesesAndQuestions = async () => {
@@ -146,6 +153,27 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
     setShowNetworkExploration(true);
   };
 
+  const fetchTriageData = async () => {
+    if (!user?.email) return;
+
+    try {
+      const response = await fetch(`/api/proxy/triage/project/${projectId}/triages`, {
+        headers: { 'User-ID': user.email }
+      });
+
+      if (response.ok) {
+        const triages = await response.json();
+        const triageMap = new Map();
+        triages.forEach((triage: any) => {
+          triageMap.set(triage.article_pmid, triage);
+        });
+        setTriageData(triageMap);
+      }
+    } catch (error) {
+      console.error('Error fetching triage data:', error);
+    }
+  };
+
   const handleTriageArticle = async (article: Article, e: React.MouseEvent) => {
     e.stopPropagation();
 
@@ -160,6 +188,9 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
       const result = await triagePaper(projectId, article.article_pmid, user.user_id);
       console.log('✅ Paper triaged:', result);
 
+      // Update triage data
+      setTriageData(prev => new Map(prev).set(article.article_pmid, result));
+
       // Show success message with relevance score
       const statusEmoji = result.triage_status === 'must_read' ? '🔴' :
                          result.triage_status === 'nice_to_know' ? '🟡' : '⚪';
@@ -169,6 +200,55 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
       alert('Failed to triage article. Please try again.');
     } finally {
       setTriagingPmids(prev => {
+        const next = new Set(prev);
+        next.delete(article.article_pmid);
+        return next;
+      });
+    }
+  };
+
+  const handleExtractProtocol = async (article: Article, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (!user?.user_id || !article.article_pmid) {
+      alert('Unable to extract protocol: Missing user ID or PMID');
+      return;
+    }
+
+    setExtractingProtocolPmids(prev => new Set(prev).add(article.article_pmid));
+
+    try {
+      console.log(`🧪 Extracting protocol from paper ${article.article_pmid}...`);
+
+      const response = await fetch('/api/proxy/protocols/extract', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user.user_id,
+        },
+        body: JSON.stringify({
+          article_pmid: article.article_pmid,
+          protocol_type: null, // Let AI determine type
+          force_refresh: false, // Use cache if available
+          project_id: projectId, // Include project context
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to extract protocol');
+      }
+
+      const protocol = await response.json();
+      console.log(`✅ Protocol extracted: ${protocol.protocol_name}`);
+
+      // Show success message
+      alert(`✅ Protocol extracted successfully!\n\n${protocol.protocol_name}\n\nView it in the Protocols tab.`);
+    } catch (error) {
+      console.error('❌ Error extracting protocol:', error);
+      alert(`Failed to extract protocol: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setExtractingProtocolPmids(prev => {
         const next = new Set(prev);
         next.delete(article.article_pmid);
         return next;
@@ -397,9 +477,40 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
                       </div>
                     )}
 
+                    {/* Week 24: Triage Status Badge */}
+                    {article.article_pmid && triageData.has(article.article_pmid) && (
+                      <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-gray-700">✅ AI Triaged</span>
+                            <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                              triageData.get(article.article_pmid).triage_status === 'must_read'
+                                ? 'bg-red-100 text-red-700 border border-red-300'
+                                : triageData.get(article.article_pmid).triage_status === 'nice_to_know'
+                                ? 'bg-yellow-100 text-yellow-700 border border-yellow-300'
+                                : 'bg-gray-100 text-gray-700 border border-gray-300'
+                            }`}>
+                              {triageData.get(article.article_pmid).triage_status.replace('_', ' ').toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-lg font-bold text-blue-600">
+                              {triageData.get(article.article_pmid).relevance_score}/100
+                            </div>
+                            <div className="text-xs text-gray-500">Relevance</div>
+                          </div>
+                        </div>
+                        {triageData.get(article.article_pmid).affected_hypotheses?.length > 0 && (
+                          <div className="mt-2 text-xs text-purple-700">
+                            🔗 Linked to {triageData.get(article.article_pmid).affected_hypotheses.length} hypothesis{triageData.get(article.article_pmid).affected_hypotheses.length !== 1 ? 'es' : ''}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Action Buttons */}
                     {article.article_pmid && (
-                      <div className="mt-4 flex gap-2">
+                      <div className="mt-4 flex flex-wrap gap-2">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -418,7 +529,15 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
                           className="inline-flex items-center px-3 py-1.5 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <SparklesIcon className="w-4 h-4 mr-1" />
-                          {triagingPmids.has(article.article_pmid) ? 'Triaging...' : 'Triage with AI'}
+                          {triagingPmids.has(article.article_pmid) ? 'Triaging...' : 'AI Triage'}
+                        </button>
+                        <button
+                          onClick={(e) => handleExtractProtocol(article, e)}
+                          disabled={extractingProtocolPmids.has(article.article_pmid)}
+                          className="inline-flex items-center px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <BeakerIcon className="w-4 h-4 mr-1" />
+                          {extractingProtocolPmids.has(article.article_pmid) ? 'Extracting...' : 'Extract Protocol'}
                         </button>
                       </div>
                     )}
