@@ -22,6 +22,10 @@ import FreeformDrawing from './FreeformDrawing';
 import PDFControlsToolbar from './PDFControlsToolbar';
 import PageThumbnailsSidebar from './PageThumbnailsSidebar';
 import PDFSearchSidebar from './PDFSearchSidebar';
+import AIEvidenceLayer from './AIEvidenceLayer'; // Phase 2: Auto-highlight AI evidence
+import SmartSuggestionToast from './SmartSuggestionToast'; // Phase 2: Smart note suggestions
+import { useSmartNoteSuggestions } from '@/hooks/useSmartNoteSuggestions'; // Phase 2: Smart suggestions hook
+import { fetchAIEvidenceForPaper, type AIEvidence } from '@/lib/api/evidence'; // Phase 2: AI evidence API
 import type { Highlight, TextSelection, PDFCoordinates, AnnotationType, StickyNotePosition } from '@/types/pdf-annotations';
 import { HIGHLIGHT_COLORS } from '@/types/pdf-annotations';
 
@@ -88,6 +92,16 @@ export default function PDFViewer({ pmid, title, projectId, collectionId, onClos
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [currentSearchResultIndex, setCurrentSearchResultIndex] = useState<number>(0);
 
+  // Phase 2: AI Evidence and Smart Suggestions state
+  const [aiEvidence, setAiEvidence] = useState<AIEvidence[]>([]);
+  const [loadingAiEvidence, setLoadingAiEvidence] = useState<boolean>(false);
+
+  // Phase 2: Smart note suggestions hook
+  const { suggestion, checkForMatch, clearSuggestion } = useSmartNoteSuggestions({
+    aiEvidence,
+    enabled: true,
+  });
+
   // WebSocket for real-time annotation updates
   useAnnotationWebSocket({
     projectId: projectId || '',
@@ -139,6 +153,7 @@ export default function PDFViewer({ pmid, title, projectId, collectionId, onClos
   useEffect(() => {
     if (pdfUrl && projectId && user) {
       fetchHighlights();
+      fetchAIEvidence(); // Phase 2: Also load AI evidence
     }
   }, [pdfUrl, projectId, user, pmid]);
 
@@ -430,6 +445,26 @@ export default function PDFViewer({ pmid, title, projectId, collectionId, onClos
     }
   };
 
+  // Phase 2: Fetch AI evidence for this article
+  const fetchAIEvidence = async () => {
+    if (!projectId || !user?.email) return;
+
+    try {
+      setLoadingAiEvidence(true);
+      console.log(`🤖 Fetching AI evidence for PMID: ${pmid}`);
+
+      const evidence = await fetchAIEvidenceForPaper(projectId, pmid, user.email);
+      setAiEvidence(evidence);
+
+      console.log(`✅ Loaded ${evidence.length} AI evidence excerpts`);
+    } catch (err) {
+      console.error('❌ Error fetching AI evidence:', err);
+      setAiEvidence([]);
+    } finally {
+      setLoadingAiEvidence(false);
+    }
+  };
+
   // ✅ FIX: Helper function to check if two text selections overlap
   const doSelectionsOverlap = (
     selection1: { pageNumber: number; text: string },
@@ -600,6 +635,9 @@ export default function PDFViewer({ pmid, title, projectId, collectionId, onClos
     }) => {
       console.log('🎨 Drag-to-highlight completed:', selection.text.substring(0, 50));
 
+      // Phase 2: Check if selection matches AI evidence
+      const matchingSuggestion = checkForMatch(selection.text);
+
       // Get the selected color from the toolbar
       const color = selectedColor || HIGHLIGHT_COLORS[0].hex;
 
@@ -613,8 +651,11 @@ export default function PDFViewer({ pmid, title, projectId, collectionId, onClos
 
       // Call the existing handleHighlight function
       await handleHighlight(color, textSelection);
+
+      // Phase 2: If there's a matching suggestion, it will be shown via the suggestion state
+      // The toast will appear automatically
     },
-    [selectedColor, handleHighlight]
+    [selectedColor, handleHighlight, checkForMatch]
   );
 
   // Handle deleting a highlight
@@ -1286,6 +1327,21 @@ export default function PDFViewer({ pmid, title, projectId, collectionId, onClos
                   />
                 )}
 
+                {/* Phase 2: AI Evidence Layer - auto-highlights AI-extracted evidence in purple */}
+                {projectId && pdfDocument && (
+                  <AIEvidenceLayer
+                    pmid={pmid}
+                    projectId={projectId}
+                    pdfDocument={pdfDocument}
+                    pageNumber={pageNumber}
+                    scale={scale}
+                    onEvidenceClick={(evidence) => {
+                      console.log('🤖 AI Evidence clicked:', evidence);
+                      // TODO: Show evidence details in sidebar
+                    }}
+                  />
+                )}
+
                 {/* Search Highlight Layer - renders search keyword highlights */}
                 {showSearch && searchQuery && pdfDocument && (
                   <SearchHighlightLayer
@@ -1579,6 +1635,92 @@ export default function PDFViewer({ pmid, title, projectId, collectionId, onClos
           Keyboard shortcuts: ← → (navigate pages) | Esc (close search/thumbnails) | Cmd/Ctrl+F (search) | Cmd/Ctrl+H (toggle highlight mode)
         </p>
       </div>
+
+      {/* Phase 2: Smart Suggestion Toast - shows when user highlights AI evidence */}
+      {suggestion && (
+        <SmartSuggestionToast
+          suggestion={suggestion}
+          onAccept={async () => {
+            console.log('✨ Accepting smart suggestion:', suggestion);
+
+            // Find the most recent highlight (the one just created)
+            const recentHighlight = highlights[highlights.length - 1];
+
+            if (recentHighlight && projectId && user) {
+              try {
+                // Update annotation to link to hypothesis
+                const response = await fetch(
+                  `/api/proxy/projects/${projectId}/annotations/${recentHighlight.annotation_id}`,
+                  {
+                    method: 'PATCH',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'User-ID': user.email,
+                    },
+                    body: JSON.stringify({
+                      linked_hypothesis_id: suggestion.evidence.hypothesis_id,
+                      evidence_quote: suggestion.selectedText,
+                    }),
+                  }
+                );
+
+                if (!response.ok) {
+                  throw new Error('Failed to link annotation to hypothesis');
+                }
+
+                console.log('✅ Annotation linked to hypothesis');
+
+                // Also create evidence link in hypothesis_evidence table
+                if (suggestion.evidence.hypothesis_id) {
+                  const evidenceResponse = await fetch(
+                    `/api/proxy/hypotheses/${suggestion.evidence.hypothesis_id}/evidence`,
+                    {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'User-ID': user.email,
+                      },
+                      body: JSON.stringify({
+                        article_pmid: pmid,
+                        evidence_type: 'supports',
+                        strength: 'moderate',
+                        key_finding: suggestion.selectedText.substring(0, 500),
+                      }),
+                    }
+                  );
+
+                  if (evidenceResponse.ok) {
+                    console.log('✅ Evidence link created in hypothesis_evidence table');
+                  }
+                }
+
+                // Update local state
+                setHighlights((prev) =>
+                  prev.map((h) =>
+                    h.annotation_id === recentHighlight.annotation_id
+                      ? {
+                          ...h,
+                          linked_hypothesis_id: suggestion.evidence.hypothesis_id,
+                          evidence_quote: suggestion.selectedText,
+                        }
+                      : h
+                  )
+                );
+
+                // Clear suggestion
+                clearSuggestion();
+              } catch (err) {
+                console.error('❌ Error linking annotation to hypothesis:', err);
+                alert('Failed to link annotation to hypothesis. Please try again.');
+              }
+            }
+          }}
+          onDismiss={() => {
+            console.log('❌ Dismissing smart suggestion');
+            clearSuggestion();
+          }}
+        />
+      )}
     </div>
   );
 }
