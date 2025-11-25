@@ -21,7 +21,7 @@ export async function GET(
     console.log(`🚀 [Analysis API] Fetching parallel analysis for project ${projectId} (force=${forceRegenerate})`);
 
     const response = await fetch(
-      `${BACKEND_URL}/insights/projects/${projectId}/analysis?force_regenerate=${forceRegenerate}`,
+      `${BACKEND_URL}/api/insights/projects/${projectId}/analysis?force_regenerate=${forceRegenerate}`,
       {
         method: 'GET',
         headers: {
@@ -69,7 +69,7 @@ export async function POST(
     console.log(`🔄 [Analysis API] Force regenerating parallel analysis for project ${projectId}`);
 
     const response = await fetch(
-      `${BACKEND_URL}/insights/projects/${projectId}/analysis/regenerate`,
+      `${BACKEND_URL}/api/insights/projects/${projectId}/analysis/regenerate`,
       {
         method: 'POST',
         headers: {
