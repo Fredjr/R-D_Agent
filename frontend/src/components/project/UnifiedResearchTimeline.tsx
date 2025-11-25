@@ -115,7 +115,15 @@ export default function UnifiedResearchTimeline({ projectId, userId }: UnifiedRe
 
       const currentOffset = loadMore ? offset : 0;
       const actorTypeParam = filterActorType !== 'all' ? `&actor_types=${filterActorType}` : '';
-      
+
+      console.log('🔍 [Timeline] Fetching timeline:', {
+        projectId,
+        userId,
+        limit,
+        offset: currentOffset,
+        filterActorType
+      });
+
       const response = await fetch(
         `/api/proxy/projects/${projectId}/timeline?limit=${limit}&offset=${currentOffset}${actorTypeParam}`,
         {
@@ -126,23 +134,33 @@ export default function UnifiedResearchTimeline({ projectId, userId }: UnifiedRe
         }
       );
 
-      if (response.ok) {
-        const data = await response.json();
-        
-        if (loadMore) {
-          setEvents((prev) => [...prev, ...data.events]);
-        } else {
-          setEvents(data.events);
-        }
-        
-        setHasMore(data.has_more);
-        setOffset(currentOffset + data.events.length);
-      } else {
-        setError('Failed to load timeline');
+      console.log('📡 [Timeline] Response status:', response.status, response.ok);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [Timeline] Error response:', errorText);
+        setError(`Failed to load timeline: ${response.status}`);
+        return;
       }
+
+      const data = await response.json();
+      console.log('✅ [Timeline] Data received:', {
+        eventCount: data.events?.length || 0,
+        hasMore: data.has_more,
+        totalCount: data.total_count
+      });
+
+      if (loadMore) {
+        setEvents((prev) => [...prev, ...(data.events || [])]);
+      } else {
+        setEvents(data.events || []);
+      }
+
+      setHasMore(data.has_more || false);
+      setOffset(currentOffset + (data.events?.length || 0));
     } catch (err) {
-      console.error('Error fetching timeline:', err);
-      setError('Failed to load timeline');
+      console.error('❌ [Timeline] Exception:', err);
+      setError(`Failed to load timeline: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
