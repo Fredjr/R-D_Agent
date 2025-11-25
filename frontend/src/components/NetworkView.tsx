@@ -735,12 +735,22 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         });
 
         // Create edge based on relation type
+        // Map our relation types to Cytoscape stylesheet relationship values
+        const relationshipMapping: Record<string, string> = {
+          similar: 'similarity',      // Maps to purple edges
+          citations: 'citation',      // Maps to green edges
+          references: 'reference',    // Maps to blue edges
+          authors: 'co-authored'      // Maps to orange edges
+        };
+
         const edgeLabels: Record<string, string> = {
           similar: 'similar to',
           citations: 'cites',
           references: 'referenced by',
           authors: 'co-authored'
         };
+
+        const cytoscapeRelationship = relationshipMapping[relationType] || 'similarity';
 
         newEdges.push({
           id: `edge_${sourceNodeId}_${newNodeId}`,
@@ -749,7 +759,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           animated: true,
           label: edgeLabels[relationType],
           data: {
-            relationship: relationType
+            relationship: cytoscapeRelationship  // Use mapped value for Cytoscape
           }
         });
       });

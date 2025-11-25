@@ -238,15 +238,20 @@ const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
         name: 'cose',
         animate: false,
         nodeDimensionsIncludeLabels: true,
-        idealEdgeLength: 150,
-        nodeRepulsion: 8000,
-        edgeElasticity: 100,
+        idealEdgeLength: 180,
+        nodeRepulsion: 10000,
+        edgeElasticity: 120,
         nestingFactor: 1.2,
-        gravity: 1,
-        numIter: 1000,
-        initialTemp: 200,
+        gravity: 0.8,
+        numIter: 1200,
+        initialTemp: 250,
         coolingFactor: 0.95,
         minTemp: 1.0,
+        fit: true,
+        padding: 50,
+        randomize: false,
+        componentSpacing: 100,
+        nodeOverlap: 20,
       },
       minZoom: 0.1,
       maxZoom: 3,
@@ -401,22 +406,27 @@ const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
         animate: true,
         animationDuration: 500,
         nodeDimensionsIncludeLabels: true,
-        idealEdgeLength: 150,
-        nodeRepulsion: 8000,
-        edgeElasticity: 100,
+        idealEdgeLength: 180,
+        nodeRepulsion: 10000,
+        edgeElasticity: 120,
         nestingFactor: 1.2,
-        gravity: 1,
-        numIter: 1000,
-        initialTemp: 200,
+        gravity: 0.8,
+        numIter: 1200,
+        initialTemp: 250,
         coolingFactor: 0.95,
         minTemp: 1.0,
+        fit: true,
+        padding: 50,
+        randomize: false,
+        componentSpacing: 100,
+        nodeOverlap: 20,
       });
-      
+
       layout.run();
-      
-      // Fit view after layout completes
+
+      // Fit view after layout completes with better padding
       setTimeout(() => {
-        cy.fit(undefined, 50);
+        cy.fit(undefined, 80);
       }, 600);
     }
   }, [nodes, edges, isInitialized, fitView]);
