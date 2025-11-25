@@ -29,6 +29,10 @@ export default function PaperListPanel({
   const [showRecentOnly, setShowRecentOnly] = useState(false);
   const [showHighlyCitedOnly, setShowHighlyCitedOnly] = useState(false);
 
+  // Week 24: AI Context Filters
+  const [triageStatusFilter, setTriageStatusFilter] = useState<string>('all');
+  const [minRelevanceScore, setMinRelevanceScore] = useState<number>(0);
+
   // Get relationship for a paper
   const getRelationship = (paperId: string): string | null => {
     if (!sourceNodeId || paperId === sourceNodeId) return null;
@@ -111,6 +115,22 @@ export default function PaperListPanel({
       );
     }
 
+    // Week 24: AI Context Filters
+    if (triageStatusFilter !== 'all') {
+      filtered = filtered.filter(paper => {
+        if (triageStatusFilter === 'has_protocol') {
+          return paper.has_protocol === true;
+        }
+        return paper.triage_status === triageStatusFilter;
+      });
+    }
+
+    if (minRelevanceScore > 0) {
+      filtered = filtered.filter(paper =>
+        (paper.relevance_score || 0) >= minRelevanceScore
+      );
+    }
+
     // Phase 2.3: Enhanced Sort
     const sorted = [...filtered].sort((a, b) => {
       if (sortBy === 'year') {
@@ -127,7 +147,7 @@ export default function PaperListPanel({
     });
 
     return sorted;
-  }, [papers, searchQuery, sortBy, filterRelationship, showSeedsOnly, showRecentOnly, showHighlyCitedOnly, seedPapers, edges, sourceNodeId]);
+  }, [papers, searchQuery, sortBy, filterRelationship, showSeedsOnly, showRecentOnly, showHighlyCitedOnly, triageStatusFilter, minRelevanceScore, seedPapers, edges, sourceNodeId]);
 
   // Count papers by relationship
   const relationshipCounts = useMemo(() => {
@@ -283,6 +303,44 @@ export default function PaperListPanel({
             )}
           </div>
         </div>
+
+        {/* Week 24: AI Context Filters */}
+        <div className="mt-3">
+          <label className="block text-xs font-medium text-gray-700 mb-1">🤖 AI Triage Status</label>
+          <select
+            value={triageStatusFilter}
+            onChange={(e) => setTriageStatusFilter(e.target.value)}
+            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="all">All Papers</option>
+            <option value="must_read">🔴 Must Read</option>
+            <option value="nice_to_know">🟡 Nice to Know</option>
+            <option value="ignore">⚪ Ignore</option>
+            <option value="not_triaged">🔵 Not Triaged</option>
+            <option value="has_protocol">🧪 Has Protocol</option>
+          </select>
+        </div>
+
+        {/* Week 24: Relevance Score Slider */}
+        <div className="mt-3">
+          <label className="block text-xs font-medium text-gray-700 mb-1">
+            ⭐ Min Relevance Score: {minRelevanceScore}
+          </label>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            step="10"
+            value={minRelevanceScore}
+            onChange={(e) => setMinRelevanceScore(Number(e.target.value))}
+            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+          />
+          <div className="flex justify-between text-xs text-gray-500 mt-1">
+            <span>0</span>
+            <span>50</span>
+            <span>100</span>
+          </div>
+        </div>
       </div>
 
       {/* Paper List */}
@@ -304,6 +362,12 @@ export default function PaperListPanel({
               const citationCount = paper.metadata.citation_count || 0;
               const isHighlyCited = citationCount >= 50;
               const isRecent = (new Date().getFullYear() - (paper.metadata.year || 0)) <= 3;
+
+              // Week 24: AI Context indicators
+              const triageStatus = paper.triage_status;
+              const relevanceScore = paper.relevance_score;
+              const hasProtocol = paper.has_protocol;
+              const hypothesesCount = paper.supports_hypotheses?.length || 0;
 
               return (
                 <button
@@ -328,6 +392,22 @@ export default function PaperListPanel({
                     {isInCollection && !isSeed && (
                       <span className="text-green-500 text-sm flex-shrink-0 mt-0.5" title="In Collection">
                         ✓
+                      </span>
+                    )}
+                    {/* Week 24: Triage Status Indicator */}
+                    {triageStatus === 'must_read' && (
+                      <span className="text-red-500 text-sm flex-shrink-0 mt-0.5" title="Must Read">
+                        🔴
+                      </span>
+                    )}
+                    {triageStatus === 'nice_to_know' && (
+                      <span className="text-yellow-500 text-sm flex-shrink-0 mt-0.5" title="Nice to Know">
+                        🟡
+                      </span>
+                    )}
+                    {triageStatus === 'ignore' && (
+                      <span className="text-gray-400 text-sm flex-shrink-0 mt-0.5" title="Ignore">
+                        ⚪
                       </span>
                     )}
                     <h3
@@ -373,6 +453,27 @@ export default function PaperListPanel({
                       }}
                     />
                   )}
+
+                  {/* Week 24: AI Context Badges */}
+                  {(relevanceScore !== undefined && relevanceScore > 0) || hasProtocol || hypothesesCount > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {relevanceScore !== undefined && relevanceScore > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md bg-green-50 text-green-700 border border-green-200">
+                          ⭐ {relevanceScore}
+                        </span>
+                      )}
+                      {hasProtocol && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md bg-purple-50 text-purple-700 border border-purple-200">
+                          🧪 Protocol
+                        </span>
+                      )}
+                      {hypothesesCount > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md bg-purple-50 text-purple-700 border border-purple-200">
+                          💡 {hypothesesCount}
+                        </span>
+                      )}
+                    </div>
+                  ) : null}
 
                   {/* Relationship Badge */}
                   {badge && (

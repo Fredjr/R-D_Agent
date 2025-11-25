@@ -261,19 +261,31 @@ const createArticleSpecificNetwork = (originalArticle: any, sourceId: string) =>
 
 // Custom node component for articles
 const ArticleNode = ({ data }: { data: any }) => {
-  const { metadata, size, color, has_protocol, priority_score, relevance_score } = data;
+  const { metadata, size, color, has_protocol, priority_score, relevance_score, triage_status, supports_hypotheses } = data;
   const nodeSize = Math.max(40, Math.min(size, 120));
 
-  // Week 24: Build tooltip with enriched data
+  // Week 24: Build tooltip with enriched AI context data
   let tooltip = `${metadata.title}\nCitations: ${metadata.citation_count}\nYear: ${metadata.year}`;
-  if (relevance_score !== undefined) {
-    tooltip += `\nRelevance: ${relevance_score}/100`;
+
+  // Add triage status to tooltip
+  if (triage_status) {
+    const statusLabel = triage_status === 'must_read' ? 'Must Read' :
+                       triage_status === 'nice_to_know' ? 'Nice to Know' :
+                       triage_status === 'ignore' ? 'Ignore' : 'Not Triaged';
+    tooltip += `\n📊 Status: ${statusLabel}`;
+  }
+
+  if (relevance_score !== undefined && relevance_score > 0) {
+    tooltip += `\n⭐ Relevance: ${relevance_score}/100`;
   }
   if (priority_score !== undefined) {
     tooltip += `\nPriority: ${Math.round(priority_score * 100)}%`;
   }
   if (has_protocol) {
     tooltip += `\n🧪 Protocol Extracted`;
+  }
+  if (supports_hypotheses && supports_hypotheses.length > 0) {
+    tooltip += `\n💡 Supports ${supports_hypotheses.length} hypothesis(es)`;
   }
 
   return (
@@ -310,7 +322,35 @@ const ArticleNode = ({ data }: { data: any }) => {
       >
         {metadata.citation_count}
       </div>
-      {/* Week 24: Protocol badge */}
+
+      {/* Week 24: Relevance score badge (top-left) - Shows AI relevance score */}
+      {relevance_score !== undefined && relevance_score > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: -6,
+            left: -6,
+            minWidth: 20,
+            height: 20,
+            backgroundColor: '#10b981',
+            borderRadius: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 9,
+            fontWeight: 'bold',
+            color: '#fff',
+            border: '2px solid #fff',
+            padding: '0 4px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+          }}
+          title={`Relevance Score: ${relevance_score}/100`}
+        >
+          {relevance_score}
+        </div>
+      )}
+
+      {/* Week 24: Protocol badge (top-right) */}
       {has_protocol && (
         <div
           style={{
@@ -332,8 +372,51 @@ const ArticleNode = ({ data }: { data: any }) => {
           🧪
         </div>
       )}
+
+      {/* Week 24: Hypothesis support badge (bottom-right) */}
+      {supports_hypotheses && supports_hypotheses.length > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: -4,
+            right: -4,
+            minWidth: 16,
+            height: 16,
+            backgroundColor: '#a855f7',
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 9,
+            fontWeight: 'bold',
+            color: '#fff',
+            border: '2px solid #fff',
+            padding: '0 3px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+          }}
+          title={`Supports ${supports_hypotheses.length} hypothesis(es)`}
+        >
+          💡{supports_hypotheses.length}
+        </div>
+      )}
     </div>
   );
+};
+
+// Week 24: Utility function to get node color based on triage status (HIGHEST PRIORITY)
+// This makes AI research context immediately visible in the network
+const getNodeColorByTriageStatus = (triageStatus: string): string => {
+  switch (triageStatus) {
+    case 'must_read':
+      return '#EF4444'; // Red - Must Read (highest priority)
+    case 'nice_to_know':
+      return '#F59E0B'; // Yellow/Orange - Nice to Know
+    case 'ignore':
+      return '#6B7280'; // Gray - Ignore
+    case 'not_triaged':
+    default:
+      return '#3B82F6'; // Blue - Not Triaged (default)
+  }
 };
 
 // Week 24: Utility function to get node color based on priority score
@@ -347,7 +430,19 @@ const getNodeColorByPriority = (priorityScore: number): string => {
 
 // Utility function to get node color based on collection status and year
 // ResearchRabbit-style: Green = in collection, Blue gradient = suggested (darker = more recent)
-const getNodeColor = (year: number, isInCollection: boolean = false, priorityScore?: number): string => {
+// Week 24 Update: Prioritize triage_status over priority_score for better AI context visibility
+const getNodeColor = (
+  year: number,
+  isInCollection: boolean = false,
+  priorityScore?: number,
+  triageStatus?: string
+): string => {
+  // Week 24: HIGHEST PRIORITY - If triage status is available, use it for color-coding
+  // This makes AI research context immediately visible
+  if (triageStatus && triageStatus !== 'not_triaged') {
+    return getNodeColorByTriageStatus(triageStatus);
+  }
+
   // Week 24: If priority score is available, use it for color-coding
   if (priorityScore !== undefined && priorityScore !== null) {
     return getNodeColorByPriority(priorityScore);
@@ -988,13 +1083,15 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         const isInCollection = isPmidInCollection(nodePmid);
         const nodeYear = node.metadata?.year || new Date().getFullYear();
 
-        // Week 24: Use priority score for color-coding if available
+        // Week 24: Use triage_status for color-coding (highest priority), then priority score
+        const triageStatus = node.triage_status;
         const priorityScore = node.priority_score;
-        const nodeColor = getNodeColor(nodeYear, isInCollection, priorityScore);
+        const nodeColor = getNodeColor(nodeYear, isInCollection, priorityScore, triageStatus);
 
         console.log(`🎨 [NetworkView] Node ${nodePmid} color calculation:`, {
           year: nodeYear,
           isInCollection,
+          triageStatus,
           priorityScore,
           calculatedColor: nodeColor,
           backendColor: node.color

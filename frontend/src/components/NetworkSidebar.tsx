@@ -1125,6 +1125,109 @@ export default function NetworkSidebar({
           </div>
         </div>
 
+        {/* Week 24: AI Context Section - Prominent Display */}
+        {(selectedNode.triage_status || selectedNode.relevance_score || selectedNode.has_protocol || (selectedNode.supports_hypotheses && selectedNode.supports_hypotheses.length > 0)) && (
+          <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-sm font-semibold text-gray-900">🤖 AI Research Context</span>
+            </div>
+
+            <div className="space-y-2">
+              {/* Triage Status */}
+              {selectedNode.triage_status && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-gray-700">Status:</span>
+                  <span className={`text-xs font-semibold px-2 py-1 rounded ${
+                    selectedNode.triage_status === 'must_read' ? 'bg-red-100 text-red-700' :
+                    selectedNode.triage_status === 'nice_to_know' ? 'bg-yellow-100 text-yellow-700' :
+                    selectedNode.triage_status === 'ignore' ? 'bg-gray-100 text-gray-600' :
+                    'bg-blue-100 text-blue-700'
+                  }`}>
+                    {selectedNode.triage_status === 'must_read' ? '🔴 Must Read' :
+                     selectedNode.triage_status === 'nice_to_know' ? '🟡 Nice to Know' :
+                     selectedNode.triage_status === 'ignore' ? '⚪ Ignore' :
+                     '🔵 Not Triaged'}
+                  </span>
+                </div>
+              )}
+
+              {/* Relevance Score */}
+              {selectedNode.relevance_score !== undefined && selectedNode.relevance_score > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-gray-700">Relevance:</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full"
+                        style={{ width: `${selectedNode.relevance_score}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-bold text-green-700">{selectedNode.relevance_score}/100</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Protocol Status */}
+              {selectedNode.has_protocol && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-gray-700">Protocol:</span>
+                  <span className="text-xs font-semibold px-2 py-1 rounded bg-purple-100 text-purple-700">
+                    🧪 Extracted
+                  </span>
+                </div>
+              )}
+
+              {/* Hypothesis Support */}
+              {selectedNode.supports_hypotheses && selectedNode.supports_hypotheses.length > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-gray-700">Hypotheses:</span>
+                  <span className="text-xs font-semibold px-2 py-1 rounded bg-purple-100 text-purple-700">
+                    💡 Supports {selectedNode.supports_hypotheses.length}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Week 24: AI Triage Button for Untriaged Papers */}
+        {(!selectedNode.triage_status || selectedNode.triage_status === 'not_triaged') && projectId && (
+          <div className="mt-3">
+            <button
+              onClick={async () => {
+                if (!user?.user_id) {
+                  alert('Please sign in to triage papers');
+                  return;
+                }
+
+                try {
+                  // Import triagePaper function
+                  const { triagePaper } = await import('@/lib/api');
+
+                  const result = await triagePaper(projectId, selectedNode.id, user.user_id);
+                  console.log('✅ Paper triaged:', result);
+
+                  // Dispatch event to refresh
+                  window.dispatchEvent(new CustomEvent('hypotheses-refresh', {
+                    detail: { projectId, triageResult: result }
+                  }));
+
+                  alert(`Paper triaged!\n\nRelevance: ${result.relevance_score}/100\nStatus: ${result.triage_status}`);
+
+                  // Reload the page to show updated data
+                  window.location.reload();
+                } catch (error) {
+                  console.error('Error triaging paper:', error);
+                  alert('Failed to triage paper. Please try again.');
+                }
+              }}
+              className="w-full px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all shadow-sm"
+            >
+              🤖 AI Triage This Paper
+            </button>
+          </div>
+        )}
+
         {/* Paper Abstract - Collapsible to save space */}
         {metadata.abstract && (
           <div className="mt-2">
