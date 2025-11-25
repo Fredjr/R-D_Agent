@@ -986,6 +986,15 @@ except ImportError as e:
     print(f"⚠️ Failed to import collection suggestions router: {e}")
     print(f"   Error details: {type(e).__name__}")
 
+# Phase 3: Research Timeline endpoints
+try:
+    from backend.app.routers.research_timeline import router as research_timeline_router
+    app.include_router(research_timeline_router)
+    print("✅ Research timeline endpoints registered successfully")
+except ImportError as e:
+    print(f"⚠️ Failed to import research timeline router: {e}")
+    print(f"   Error details: {type(e).__name__}")
+
 # Database migration endpoint for Phase 5
 @app.post("/admin/migrate-citation-schema")
 async def migrate_citation_schema(user_id: str = Header(..., alias="User-ID")):

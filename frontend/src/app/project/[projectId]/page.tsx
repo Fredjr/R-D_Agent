@@ -35,6 +35,7 @@ import ProtocolsTab from '@/components/project/ProtocolsTab';
 import ExperimentPlansTab from '@/components/project/ExperimentPlansTab';
 import SummariesTab from '@/components/project/SummariesTab';
 import InsightsTab from '@/components/project/InsightsTab';
+import UnifiedResearchTimeline from '@/components/project/UnifiedResearchTimeline';
 import { ProjectHeroActions } from '@/components/project/ProjectHeroActions';
 import { NetworkQuickStart } from '@/components/project/NetworkQuickStart';
 import { ContextualActions, ProjectState, ActionType } from '@/components/project/ContextualActions';
@@ -2068,12 +2069,13 @@ export default function ProjectPage() {
               <InsightsTab projectId={projectId} userId={user.user_id} />
             )}
 
-            {activeSubTab === 'timeline' && (
-              <ProgressTab
-                project={project}
-                totalPapers={totalPapers}
-                collectionsCount={collections.length}
-              />
+            {activeSubTab === 'timeline' && user?.email && (
+              <div className="p-6">
+                <UnifiedResearchTimeline
+                  projectId={projectId as string}
+                  userId={user.email}
+                />
+              </div>
             )}
           </div>
         )}
