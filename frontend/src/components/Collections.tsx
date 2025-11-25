@@ -15,6 +15,7 @@ import { DeletableCollectionCard } from './ui/DeletableCard';
 import { useWeeklyMixIntegration } from '@/hooks/useWeeklyMixIntegration';
 import FilterPanel, { type FilterSection } from './filters/FilterPanel';
 import FilterChips, { type FilterChip } from './filters/FilterChips';
+import CollectionSuggestionBanner from './collections/CollectionSuggestionBanner';
 
 interface CollectionsProps {
   projectId: string;
@@ -532,6 +533,20 @@ export default function Collections({
           data-form-type="other"
         />
       </div>
+
+      {/* 🤖 Phase 3: Smart Collection Suggestions */}
+      {user?.email && (
+        <CollectionSuggestionBanner
+          projectId={projectId}
+          userId={user.email}
+          onCollectionCreated={(collectionId) => {
+            console.log('✅ Collection created from suggestion:', collectionId);
+            // Refresh collections list
+            refreshCollections();
+            onRefresh?.();
+          }}
+        />
+      )}
 
       {/* 🔍 Week 6: Filter Panel */}
       <FilterPanel
