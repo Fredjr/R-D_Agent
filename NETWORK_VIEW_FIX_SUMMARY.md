@@ -1,7 +1,7 @@
-# 🔧 Network View Fix - Unified Graph Expansion
+# 🔧 Network View Fixes - Complete Summary
 
-**Date**: 2025-11-25  
-**Commit**: `3a56d6a`  
+**Date**: 2025-11-25
+**Commits**: `3a56d6a` (Unified Graph Expansion) + `f4fdf53` (Bug Fixes)
 **Status**: ✅ **COMPLETE** - Deployed to Production
 
 ---
@@ -221,6 +221,137 @@ The network view is now fully unified! All exploration buttons expand the same g
 2. Gather user feedback on the unified graph experience
 3. Consider adding a legend showing edge color meanings
 4. Potentially add graph filtering by edge type (show only citations, only authors, etc.)
+
+---
+
+## 🐛 **Additional Fixes (Commit `f4fdf53`)**
+
+After the initial implementation, you identified 3 critical issues:
+
+### **Issue 1: Grey Edges Instead of Colored Edges** 🔴 **CRITICAL BUG**
+
+**Problem**:
+- When clicking "All References", "All Citations", "Citations Network", "References Network", etc.
+- Edges were appearing **grey** (dotted lines) instead of colored
+- Expected: Green for citations, Blue for references, Purple for similar, Orange for authors
+
+**Root Cause**:
+- **Mismatch** between relation types in `addExplorationNodesToGraph` and Cytoscape stylesheet
+- `addExplorationNodesToGraph` used: `'similar'`, `'citations'`, `'references'`, `'authors'`
+- Cytoscape stylesheet expected: `'similarity'`, `'citation'`, `'reference'`, `'co-authored'`
+- Without matching values, Cytoscape used default grey color
+
+**Fix** (NetworkView.tsx lines 737-764):
+```typescript
+// Map our relation types to Cytoscape stylesheet relationship values
+const relationshipMapping: Record<string, string> = {
+  similar: 'similarity',      // Maps to purple edges
+  citations: 'citation',      // Maps to green edges
+  references: 'reference',    // Maps to blue edges
+  authors: 'co-authored'      // Maps to orange edges
+};
+
+const cytoscapeRelationship = relationshipMapping[relationType] || 'similarity';
+
+newEdges.push({
+  id: `edge_${sourceNodeId}_${newNodeId}`,
+  source: sourceNodeId,
+  target: newNodeId,
+  animated: true,
+  label: edgeLabels[relationType],
+  data: {
+    relationship: cytoscapeRelationship  // Use mapped value for Cytoscape
+  }
+});
+```
+
+**Result**: ✅ **Colored edges now working correctly!**
+- 🟢 **Green** edges for Citations (Later Work)
+- 🔵 **Blue** edges for References (Earlier Work)
+- 🟣 **Purple** edges for Similar Work
+- 🟠 **Orange** edges for Co-authored (These Authors, Suggested Authors)
+
+---
+
+### **Issue 2: Duplicate "Similar Work" Button** 🔴
+
+**Problem**:
+- Two "Similar Work" buttons in the sidebar
+- One standalone button (old implementation)
+- One in the "Explore Papers" section (new unified implementation)
+- Confusing for users
+
+**Fix** (NetworkSidebar.tsx):
+- Removed standalone "Similar Work" button (lines 1481-1506)
+- Kept only the one in "Explore Papers" section
+
+**Result**: ✅ **Single "Similar Work" button in "Explore Papers" section**
+
+---
+
+### **Issue 3: Graph Layout Issues** 🟡
+
+**Problems**:
+1. Graph concentrated on **left quarter** of screen
+2. Lots of **whitespace on right side**
+3. When de-zoomed, graph didn't utilize full width
+4. **Responsive issues**: Vertical bar half-hidden at 100% zoom
+
+**Fix** (CytoscapeGraph.tsx lines 237-255 and 402-431):
+
+Improved layout configuration:
+```typescript
+layout: {
+  name: 'cose',
+  animate: false,
+  nodeDimensionsIncludeLabels: true,
+  idealEdgeLength: 180,        // ⬆️ Increased from 150
+  nodeRepulsion: 10000,        // ⬆️ Increased from 8000
+  edgeElasticity: 120,         // ⬆️ Increased from 100
+  nestingFactor: 1.2,
+  gravity: 0.8,                // ⬇️ Reduced from 1
+  numIter: 1200,               // ⬆️ Increased from 1000
+  initialTemp: 250,            // ⬆️ Increased from 200
+  coolingFactor: 0.95,
+  minTemp: 1.0,
+  fit: true,                   // ✅ Added
+  padding: 50,                 // ✅ Added
+  randomize: false,            // ✅ Added
+  componentSpacing: 100,       // ✅ Added
+  nodeOverlap: 20,             // ✅ Added
+}
+```
+
+Also increased fit padding from 50 to 80 pixels for better margins.
+
+**Result**: ✅ **Better graph layout!**
+- Nodes spread across **full width**
+- Better **space utilization**
+- Improved **responsive behavior**
+- Less whitespace on right side
+- Better node distribution
+
+---
+
+## 📊 **Final Result - All Issues Fixed**
+
+### **Before:**
+- ❌ Confusing multi-panel/multi-column behavior
+- ❌ Grey edges instead of colored edges
+- ❌ Duplicate "Similar Work" button
+- ❌ Graph concentrated on left side
+- ❌ Whitespace on right side
+- ❌ Responsive issues
+
+### **After:**
+- ✅ **Single unified graph** that expands dynamically
+- ✅ **Colored edges** working correctly (green, blue, purple, orange)
+- ✅ **Single "Similar Work" button** in proper location
+- ✅ **Full-width graph layout** with better distribution
+- ✅ **Better space utilization** across entire viewport
+- ✅ **Improved responsive behavior**
+- ✅ **Consistent UX** across all exploration buttons
+- ✅ **Clear visual relationships** using color-coded edges
 
 ---
 
