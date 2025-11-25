@@ -34,6 +34,26 @@ export default function NetworkPDFViewer({ pmid, title, onClose }: NetworkPDFVie
   const [scale, setScale] = useState<number>(1.0);
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
+  // 🎯 Notify network view that PDF viewer is open
+  useEffect(() => {
+    // Dispatch event to notify network view that PDF is opening
+    window.dispatchEvent(new CustomEvent('pdfViewerOpened', {
+      detail: { pmid, isExpanded }
+    }));
+
+    // Cleanup: notify when component unmounts
+    return () => {
+      window.dispatchEvent(new CustomEvent('pdfViewerClosed'));
+    };
+  }, [pmid]);
+
+  // 🎯 Notify when expansion state changes
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('pdfViewerResized', {
+      detail: { isExpanded }
+    }));
+  }, [isExpanded]);
+
   useEffect(() => {
     fetchPDF();
   }, [pmid]);
@@ -76,9 +96,9 @@ export default function NetworkPDFViewer({ pmid, title, onClose }: NetworkPDFVie
   const zoomOut = () => setScale(prev => Math.max(prev - 0.2, 0.5));
 
   return (
-    <div 
+    <div
       className={`fixed top-0 right-0 h-full bg-white shadow-2xl border-l border-gray-300 z-50 flex flex-col transition-all duration-300 ${
-        isExpanded ? 'w-[70%]' : 'w-[40%]'
+        isExpanded ? 'w-[70%]' : 'w-[50%]'
       }`}
     >
       {/* Header */}

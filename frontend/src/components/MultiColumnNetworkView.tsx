@@ -62,6 +62,10 @@ export default function MultiColumnNetworkView({
   const [collections, setCollections] = useState<any[]>([]);
   const mainNetworkViewRef = useRef<any>(null);
 
+  // 🎯 Track PDF viewer state for dynamic resizing
+  const [isPDFViewerOpen, setIsPDFViewerOpen] = useState<boolean>(false);
+  const [isPDFViewerExpanded, setIsPDFViewerExpanded] = useState<boolean>(false);
+
   // Fetch collections for the project OR all collections across all projects if no projectId
   const fetchCollections = useCallback(async () => {
     if (!user?.email) return;
@@ -439,6 +443,38 @@ export default function MultiColumnNetworkView({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // 🎯 Listen for PDF viewer open/close events for dynamic resizing
+  useEffect(() => {
+    const handlePDFOpened = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      console.log('📄 PDF Viewer opened:', customEvent.detail);
+      setIsPDFViewerOpen(true);
+      setIsPDFViewerExpanded(customEvent.detail?.isExpanded || false);
+    };
+
+    const handlePDFClosed = () => {
+      console.log('📄 PDF Viewer closed');
+      setIsPDFViewerOpen(false);
+      setIsPDFViewerExpanded(false);
+    };
+
+    const handlePDFResized = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      console.log('📄 PDF Viewer resized:', customEvent.detail);
+      setIsPDFViewerExpanded(customEvent.detail?.isExpanded || false);
+    };
+
+    window.addEventListener('pdfViewerOpened', handlePDFOpened);
+    window.addEventListener('pdfViewerClosed', handlePDFClosed);
+    window.addEventListener('pdfViewerResized', handlePDFResized);
+
+    return () => {
+      window.removeEventListener('pdfViewerOpened', handlePDFOpened);
+      window.removeEventListener('pdfViewerClosed', handlePDFClosed);
+      window.removeEventListener('pdfViewerResized', handlePDFResized);
+    };
+  }, []);
+
   // Adaptive widths based on screen size
   const isMobile = screenWidth < 768;
   const isTablet = screenWidth >= 768 && screenWidth < 1024;
@@ -450,7 +486,21 @@ export default function MultiColumnNetworkView({
   const COLUMN_MIN_WIDTH = isMobile ? screenWidth : isTablet ? 500 : isLargeDesktop ? 800 : 700;
   const SIDEBAR_WIDTH = isMobile ? screenWidth : 360; // Wider sidebar for better readability
 
-  const mainViewWidth = isMobile ? '100vw' : `${MAIN_VIEW_MIN_WIDTH}px`;
+  // 🎯 FIX: Main view should take FULL WIDTH when no columns are open
+  // When columns exist, use fixed width for consistent multi-column layout
+  // When PDF viewer is open, adjust width to accommodate it
+  let mainViewWidth: string;
+  if (isMobile) {
+    mainViewWidth = '100vw';
+  } else if (isPDFViewerOpen) {
+    // PDF viewer takes 50% (or 70% when expanded), so network view takes the remaining space
+    mainViewWidth = isPDFViewerExpanded ? '30%' : '50%';
+  } else if (hasColumns) {
+    mainViewWidth = `${MAIN_VIEW_MIN_WIDTH}px`;
+  } else {
+    mainViewWidth = '100%';
+  }
+
   const columnWidth = isMobile ? '100vw' : `${COLUMN_MIN_WIDTH}px`;
 
   // Scroll container ref for keyboard/mouse navigation
@@ -618,10 +668,13 @@ export default function MultiColumnNetworkView({
         aria-label="Multi-panel network view"
         tabIndex={0}
       >
-        <div className="flex h-full gap-1" style={{ minWidth: `${MAIN_VIEW_MIN_WIDTH + (columns.length * COLUMN_MIN_WIDTH) + (columns.length * 4)}px` }}>
+        <div className="flex h-full gap-1" style={{
+          minWidth: hasColumns ? `${MAIN_VIEW_MIN_WIDTH + (columns.length * COLUMN_MIN_WIDTH) + (columns.length * 4)}px` : '100%',
+          width: isPDFViewerOpen ? (isPDFViewerExpanded ? '30%' : '50%') : '100%'
+        }}>
         {/* Main Network View */}
         <div
-          className="network-column flex-shrink-0 border-r-2 border-gray-300 relative shadow-md bg-white"
+          className={`network-column ${hasColumns || isPDFViewerOpen ? 'flex-shrink-0 border-r-2 border-gray-300' : 'flex-1'} relative shadow-md bg-white transition-all duration-300`}
           style={{ width: mainViewWidth }}
         >
         <div className="h-full relative flex flex-col">
