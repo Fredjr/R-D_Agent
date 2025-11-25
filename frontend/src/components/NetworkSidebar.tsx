@@ -897,76 +897,64 @@ export default function NetworkSidebar({
             console.log(`ℹ️ No ${mode} found - this is normal for recent papers or specific search types`);
           }
 
-          // 🚀 NEW: Create new column for exploration results (ResearchRabbit-style)!
-          // 🎯 IMPORTANT: Only "Similar Work" creates columns. "All References" and "All Citations" show list only.
-          console.log('🔍 Checking conditions for new column creation:', {
+          // 🚀 NEW: Add exploration results to the SAME GRAPH (not new columns)!
+          // 🎯 ALL exploration types should expand the same graph with colored edges
+          console.log('🔍 Checking conditions for graph expansion:', {
             resultsLength: results.length,
-            hasCreateColumnCallback: !!onCreatePaperColumn,
+            hasAddExplorationNodesCallback: !!onAddExplorationNodes,
             hasSelectedNode: !!selectedNode,
             selectedNodeId: selectedNode?.id,
             section,
             mode
           });
 
-          // Only create column for "Similar Work" (papers-similar)
-          const shouldCreateColumn = section === 'papers' && mode === 'similar';
+          // Map exploration types to relation types for colored edges
+          let relationType: 'similar' | 'citations' | 'references' | 'authors' = 'similar';
+          if (section === 'papers') {
+            if (mode === 'similar') relationType = 'similar';
+            else if (mode === 'earlier') relationType = 'references';
+            else if (mode === 'later') relationType = 'citations';
+          } else if (section === 'people') {
+            relationType = 'authors'; // Both "These Authors" and "Suggested Authors"
+          } else if (section === 'content') {
+            relationType = 'similar'; // Linked content uses similar relationship
+          }
 
-          if (results.length > 0 && onCreatePaperColumn && selectedNode && shouldCreateColumn) {
-            console.log('🎯 NetworkSidebar creating new column for Similar Work:', {
+          // Add nodes to the same graph with colored edges
+          if (results.length > 0 && onAddExplorationNodes && selectedNode) {
+            console.log('🎯 NetworkSidebar adding nodes to same graph:', {
               selectedNodeId: selectedNode.id,
               resultsCount: results.length,
               section,
               mode,
+              relationType,
               explorationType: `${section}-${mode}`,
-              sampleResult: results[0],
-              allResults: results
+              sampleResult: results[0]
             });
 
-            // ✨ IMPORTANT: Do NOT pass explorationResults to create a full NetworkView
-            // instead of ExplorationNetworkView. This ensures:
-            // 1. Full network is fetched from backend with cross-reference detection
-            // 2. Nodes get gradient colors based on year
-            // 3. Edges get proper colors based on relationship type
-            // 4. Same logic as initial graph is used
-            const columnData = {
-              ...selectedNode,
-              metadata: {
-                ...selectedNode.metadata,
-                // Store exploration type for column title, but NO explorationResults
-                explorationType: `${section}-${mode}`,
-                // explorationResults: results, // ❌ REMOVED - causes ExplorationNetworkView
-                explorationTimestamp: new Date().toISOString()
-              }
-            };
+            // Call onAddExplorationNodes to expand the same graph
+            onAddExplorationNodes(selectedNode.id, results, relationType);
 
-            console.log('🔍 Column data being passed (WITHOUT explorationResults):', {
-              hasExplorationType: !!columnData.metadata.explorationType,
-              hasExplorationResults: !!columnData.metadata.explorationResults,
-              explorationResultsLength: columnData.metadata.explorationResults?.length,
-              columnData,
-              willUseNetworkView: true // ✅ Will use NetworkView instead of ExplorationNetworkView
+            console.log('✅ Nodes added to graph with colored edges:', {
+              relationType,
+              edgeColor: relationType === 'similar' ? 'purple' :
+                         relationType === 'citations' ? 'green' :
+                         relationType === 'references' ? 'blue' :
+                         relationType === 'authors' ? 'orange' : 'gray'
             });
 
             // Add a small delay to ensure the callback is properly executed
-            // Clear any existing timeout first
-            if (timeoutRef.current) {
-              clearTimeout(timeoutRef.current);
-            }
-            timeoutRef.current = setTimeout(() => {
-              console.log('🚀 Calling onCreatePaperColumn with:', columnData);
-              onCreatePaperColumn(columnData);
-              timeoutRef.current = null;
+            setTimeout(() => {
+              console.log('✅ Graph expansion completed');
             }, 100);
           } else {
-            console.log('ℹ️ NetworkSidebar showing results in sidebar only (not creating column):', {
+            console.log('ℹ️ Not expanding graph:', {
               hasResults: results.length > 0,
-              hasCreateColumnCallback: !!onCreatePaperColumn,
+              hasCallback: !!onAddExplorationNodes,
               hasSelectedNode: !!selectedNode,
-              selectedNodeId: selectedNode?.id,
               section,
               mode,
-              shouldCreateColumn,
-              reason: !shouldCreateColumn ? 'Only Similar Work creates columns (All References/Citations show list only)' : 'Missing requirements'
+              reason: 'Missing onAddExplorationNodes callback or no results'
             });
           }
         } else {
@@ -1778,9 +1766,7 @@ export default function NetworkSidebar({
           <div className="p-3 bg-gray-50">
             <h4 className="font-medium text-sm text-gray-900">📄 Explore Papers</h4>
             <p className="text-xs text-gray-600 mt-1">
-              {supportsMultiColumn
-                ? "Click papers in list to create new columns"
-                : "Shows article list below"}
+              Expands graph with related papers
             </p>
           </div>
           <div className="p-2 space-y-1.5">
@@ -1836,9 +1822,7 @@ export default function NetworkSidebar({
           <div className="p-3 bg-gray-50">
             <h4 className="font-medium text-sm text-gray-900">👥 Explore People</h4>
             <p className="text-xs text-gray-600 mt-1">
-              {supportsMultiColumn
-                ? "Click papers in list to create new columns"
-                : "Shows article list below"}
+              Expands graph with author-related papers
             </p>
           </div>
           <div className="p-2 space-y-1.5">
@@ -1878,53 +1862,33 @@ export default function NetworkSidebar({
         <div className="border-b border-gray-200">
           <div className="p-3 bg-gray-50">
             <h4 className="font-medium text-sm text-gray-900">🕸️ Network Views</h4>
-            <p className="text-xs text-gray-600 mt-1">Updates graph with connected nodes</p>
+            <p className="text-xs text-gray-600 mt-1">Expands graph with connected nodes</p>
           </div>
           <div className="p-2 space-y-1">
             <Button
-              variant="outline"
+              variant={expandedSection === 'papers' && explorationMode === 'later' ? 'default' : 'outline'}
               size="sm"
-              className="w-full text-xs justify-start"
-              onClick={() => {
-                console.log('🔍 [NetworkSidebar] Citations Network button clicked!', {
-                  hasCallback: !!onShowCitations,
-                  hasPmid: !!selectedNode?.metadata?.pmid,
-                  pmid: selectedNode?.metadata?.pmid
-                });
-                if (onShowCitations && selectedNode?.metadata?.pmid) {
-                  console.log('✅ [NetworkSidebar] Calling onShowCitations with PMID:', selectedNode.metadata.pmid);
-                  onShowCitations(selectedNode.metadata.pmid);
-                } else {
-                  console.error('❌ [NetworkSidebar] Cannot call onShowCitations:', {
-                    hasCallback: !!onShowCitations,
-                    hasPmid: !!selectedNode?.metadata?.pmid
-                  });
-                }
-              }}
+              className={`w-full text-xs justify-start ${
+                expandedSection === 'papers' && explorationMode === 'later'
+                  ? 'bg-green-600 hover:bg-green-700 text-white'
+                  : 'hover:bg-green-50 hover:border-green-300'
+              }`}
+              onClick={() => handleExploreSection('papers', 'later')}
             >
+              <span className="mr-2">📊</span>
               Citations Network
             </Button>
             <Button
-              variant="outline"
+              variant={expandedSection === 'papers' && explorationMode === 'earlier' ? 'default' : 'outline'}
               size="sm"
-              className="w-full text-xs justify-start"
-              onClick={() => {
-                console.log('🔍 [NetworkSidebar] References Network button clicked!', {
-                  hasCallback: !!onShowReferences,
-                  hasPmid: !!selectedNode?.metadata?.pmid,
-                  pmid: selectedNode?.metadata?.pmid
-                });
-                if (onShowReferences && selectedNode?.metadata?.pmid) {
-                  console.log('✅ [NetworkSidebar] Calling onShowReferences with PMID:', selectedNode.metadata.pmid);
-                  onShowReferences(selectedNode.metadata.pmid);
-                } else {
-                  console.error('❌ [NetworkSidebar] Cannot call onShowReferences:', {
-                    hasCallback: !!onShowReferences,
-                    hasPmid: !!selectedNode?.metadata?.pmid
-                  });
-                }
-              }}
+              className={`w-full text-xs justify-start ${
+                expandedSection === 'papers' && explorationMode === 'earlier'
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                  : 'hover:bg-blue-50 hover:border-blue-300'
+              }`}
+              onClick={() => handleExploreSection('papers', 'earlier')}
             >
+              <span className="mr-2">📚</span>
               References Network
             </Button>
           </div>
@@ -1935,9 +1899,7 @@ export default function NetworkSidebar({
           <div className="p-3 bg-gray-50">
             <h4 className="font-medium text-sm text-gray-900">🔗 Explore Other Content</h4>
             <p className="text-xs text-gray-600 mt-1">
-              {supportsMultiColumn
-                ? "Click papers in list to create new columns"
-                : "Shows article list below"}
+              Expands graph with related content
             </p>
           </div>
           <div className="p-2 space-y-1">
@@ -1997,16 +1959,6 @@ export default function NetworkSidebar({
 
                       {/* Action buttons */}
                       <div className="flex gap-1 mt-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleExplorationPaperClick(paper);
-                          }}
-                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs font-medium transition-colors"
-                          title={supportsMultiColumn ? "Open this paper in a new column" : "View this paper's details"}
-                        >
-                          {supportsMultiColumn ? '📋 Open Panel' : '📄 View Details'}
-                        </button>
                         {projectId && collections.length > 0 && (
                           <button
                             onClick={(e) => {
@@ -2019,6 +1971,9 @@ export default function NetworkSidebar({
                             💾 Save
                           </button>
                         )}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1 italic">
+                        ✨ Papers are automatically added to the graph
                       </div>
                     </div>
                   ))}
