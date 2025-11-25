@@ -977,6 +977,15 @@ except ImportError as e:
     traceback.print_exc()
     print("   Experiment planning feature will not be available")
 
+# Phase 3: Smart Collection Suggestions endpoints
+try:
+    from backend.app.routers.collection_suggestions import router as collection_suggestions_router
+    app.include_router(collection_suggestions_router)
+    print("✅ Collection suggestions endpoints registered successfully")
+except ImportError as e:
+    print(f"⚠️ Failed to import collection suggestions router: {e}")
+    print(f"   Error details: {type(e).__name__}")
+
 # Database migration endpoint for Phase 5
 @app.post("/admin/migrate-citation-schema")
 async def migrate_citation_schema(user_id: str = Header(..., alias="User-ID")):
