@@ -173,24 +173,24 @@ function detectQueryType(query: string): { type: 'pmid' | 'doi' | 'url' | 'text'
  * Build optimized PubMed query from MeSH terms and keywords
  */
 function buildOptimizedQuery(query: string, meshTerms?: any[], suggestedQueries?: any[]): string {
-  // If we have suggested queries from MeSH service, use the first one
-  if (suggestedQueries && suggestedQueries.length > 0) {
-    console.log(`🎯 Using optimized MeSH query: ${suggestedQueries[0].query}`);
-    return suggestedQueries[0].query;
-  }
+  // IMPORTANT: Don't use suggested queries by default as they often include
+  // overly restrictive date filters (e.g., "2023:2024[dp]") that return 0 results
+  // Instead, build a simple MeSH-based query or use the original query
 
   // If we have MeSH terms, create MeSH-optimized query
   if (meshTerms && meshTerms.length > 0) {
-    const meshQuery = meshTerms
-      .slice(0, 3) // Use top 3 MeSH terms
-      .map(term => `"${term.term}"[MeSH Terms]`)
-      .join(' OR ');
+    // Use the main MeSH term (first one is usually most relevant)
+    const mainTerm = meshTerms[0];
+    const meshQuery = `"${mainTerm.term}"[MeSH Terms]`;
     console.log(`🎯 Using MeSH terms query: ${meshQuery}`);
     return meshQuery;
   }
 
   // Fallback to original query with basic optimization
-  return query;
+  // Add [Title/Abstract] to search in title and abstract
+  const optimizedQuery = `${query}[Title/Abstract]`;
+  console.log(`🎯 Using basic optimized query: ${optimizedQuery}`);
+  return optimizedQuery;
 }
 
 /**
