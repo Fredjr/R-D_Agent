@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { ArrowLeftIcon, BeakerIcon, ChatBubbleLeftRightIcon, DocumentTextIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, BeakerIcon, ChatBubbleLeftRightIcon, DocumentTextIcon, SparklesIcon, MagnifyingGlassIcon, ShareIcon } from '@heroicons/react/24/outline';
 import { type Collection } from '@/hooks/useGlobalCollectionSync';
 import MultiColumnNetworkView from './MultiColumnNetworkView';
 import { AnnotationList } from './annotations';
@@ -64,6 +64,13 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
 
   // Protocol extraction state
   const [extractingProtocolPmids, setExtractingProtocolPmids] = useState<Set<string>>(new Set());
+
+  // Deep Dive state
+  const [deepDivePmids, setDeepDivePmids] = useState<Set<string>>(new Set());
+  const [deepDiveModalOpen, setDeepDiveModalOpen] = useState(false);
+  const [deepDiveData, setDeepDiveData] = useState<any>(null);
+  const [deepDiveLoading, setDeepDiveLoading] = useState(false);
+  const [deepDiveError, setDeepDiveError] = useState<string | null>(null);
 
   // Week 24: Fetch hypotheses and research questions for displaying links
   const [hypotheses, setHypotheses] = useState<any[]>([]);
@@ -249,6 +256,58 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
       alert(`Failed to extract protocol: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setExtractingProtocolPmids(prev => {
+        const next = new Set(prev);
+        next.delete(article.article_pmid);
+        return next;
+      });
+    }
+  };
+
+  const handleDeepDive = async (article: Article, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (!user?.user_id || !article.article_pmid) {
+      alert('Unable to perform deep dive: Missing user ID or PMID');
+      return;
+    }
+
+    setDeepDivePmids(prev => new Set(prev).add(article.article_pmid));
+    setDeepDiveModalOpen(true);
+    setDeepDiveLoading(true);
+    setDeepDiveError(null);
+    setDeepDiveData(null);
+
+    try {
+      console.log(`🔍 Starting deep dive for paper ${article.article_pmid}...`);
+
+      const response = await fetch('/api/proxy/deep-dive-enhanced-v2', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user.user_id,
+        },
+        body: JSON.stringify({
+          pmid: article.article_pmid,
+          title: article.article_title,
+          objective: `Deep dive analysis of: ${article.article_title}`,
+          projectId: projectId,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to perform deep dive');
+      }
+
+      const data = await response.json();
+      console.log(`✅ Deep dive completed for ${article.article_pmid}`);
+      setDeepDiveData(data);
+    } catch (error) {
+      console.error('❌ Error performing deep dive:', error);
+      setDeepDiveError(error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      setDeepDiveLoading(false);
+      setDeepDivePmids(prev => {
         const next = new Set(prev);
         next.delete(article.article_pmid);
         return next;
@@ -501,8 +560,28 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
                           </div>
                         </div>
                         {triageData.get(article.article_pmid).affected_hypotheses?.length > 0 && (
-                          <div className="mt-2 text-xs text-purple-700">
-                            🔗 Linked to {triageData.get(article.article_pmid).affected_hypotheses.length} hypothesis{triageData.get(article.article_pmid).affected_hypotheses.length !== 1 ? 'es' : ''}
+                          <div className="mt-3 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-purple-700">🔗 Evidence Links:</span>
+                              <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-bold">
+                                {triageData.get(article.article_pmid).affected_hypotheses.length} hypothesis{triageData.get(article.article_pmid).affected_hypotheses.length !== 1 ? 'es' : ''}
+                              </span>
+                            </div>
+                            <div className="space-y-1">
+                              {triageData.get(article.article_pmid).affected_hypotheses.slice(0, 3).map((hypId: string) => {
+                                const hypothesis = hypotheses.find(h => h.hypothesis_id === hypId);
+                                return hypothesis ? (
+                                  <div key={hypId} className="text-xs text-gray-700 bg-white/50 rounded px-2 py-1 border border-purple-200">
+                                    <span className="font-medium">💡</span> {hypothesis.hypothesis_text.substring(0, 80)}{hypothesis.hypothesis_text.length > 80 ? '...' : ''}
+                                  </div>
+                                ) : null;
+                              })}
+                              {triageData.get(article.article_pmid).affected_hypotheses.length > 3 && (
+                                <div className="text-xs text-purple-600 italic">
+                                  +{triageData.get(article.article_pmid).affected_hypotheses.length - 3} more...
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -538,6 +617,25 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
                         >
                           <BeakerIcon className="w-4 h-4 mr-1" />
                           {extractingProtocolPmids.has(article.article_pmid) ? 'Extracting...' : 'Extract Protocol'}
+                        </button>
+                        <button
+                          onClick={(e) => handleDeepDive(article, e)}
+                          disabled={deepDivePmids.has(article.article_pmid)}
+                          className="inline-flex items-center px-3 py-1.5 text-xs bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <MagnifyingGlassIcon className="w-4 h-4 mr-1" />
+                          {deepDivePmids.has(article.article_pmid) ? 'Analyzing...' : 'Deep Dive'}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedArticle(article);
+                            setShowNetworkExploration(true);
+                          }}
+                          className="inline-flex items-center px-3 py-1.5 text-xs bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors"
+                        >
+                          <ShareIcon className="w-4 h-4 mr-1" />
+                          Network View
                         </button>
                       </div>
                     )}
@@ -587,6 +685,127 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
             fetchAnnotations(); // ✅ Refresh annotations after closing PDF viewer
           }}
         />
+      )}
+
+      {/* Deep Dive Modal */}
+      {deepDiveModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setDeepDiveModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900">🔍 Deep Dive Analysis</h2>
+              <button
+                onClick={() => setDeepDiveModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="p-6">
+              {deepDiveLoading && (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
+                  <p className="text-gray-600">Analyzing paper... This may take 30-60 seconds.</p>
+                </div>
+              )}
+
+              {deepDiveError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-red-800 font-semibold">❌ Error</p>
+                  <p className="text-red-600 text-sm mt-1">{deepDiveError}</p>
+                </div>
+              )}
+
+              {deepDiveData && !deepDiveLoading && (
+                <div className="space-y-6">
+                  {/* Model Description */}
+                  {deepDiveData.model_description_structured && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h3 className="text-lg font-bold text-blue-900 mb-3">📊 Scientific Model</h3>
+                      <div className="space-y-2 text-sm text-gray-800">
+                        {deepDiveData.model_description_structured.model_type && (
+                          <p><strong>Type:</strong> {deepDiveData.model_description_structured.model_type}</p>
+                        )}
+                        {deepDiveData.model_description_structured.description && (
+                          <p><strong>Description:</strong> {deepDiveData.model_description_structured.description}</p>
+                        )}
+                        {deepDiveData.model_description_structured.key_features && (
+                          <div>
+                            <strong>Key Features:</strong>
+                            <ul className="list-disc list-inside ml-4 mt-1">
+                              {deepDiveData.model_description_structured.key_features.map((feature: string, idx: number) => (
+                                <li key={idx}>{feature}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Methods */}
+                  {deepDiveData.methods_structured && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <h3 className="text-lg font-bold text-green-900 mb-3">🔬 Methods</h3>
+                      <div className="space-y-2 text-sm text-gray-800">
+                        {deepDiveData.methods_structured.study_design && (
+                          <p><strong>Study Design:</strong> {deepDiveData.methods_structured.study_design}</p>
+                        )}
+                        {deepDiveData.methods_structured.sample_size && (
+                          <p><strong>Sample Size:</strong> {deepDiveData.methods_structured.sample_size}</p>
+                        )}
+                        {deepDiveData.methods_structured.key_techniques && (
+                          <div>
+                            <strong>Key Techniques:</strong>
+                            <ul className="list-disc list-inside ml-4 mt-1">
+                              {deepDiveData.methods_structured.key_techniques.map((technique: string, idx: number) => (
+                                <li key={idx}>{technique}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Results */}
+                  {deepDiveData.results_structured && (
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                      <h3 className="text-lg font-bold text-purple-900 mb-3">📈 Results</h3>
+                      <div className="space-y-2 text-sm text-gray-800">
+                        {deepDiveData.results_structured.main_findings && (
+                          <div>
+                            <strong>Main Findings:</strong>
+                            <ul className="list-disc list-inside ml-4 mt-1">
+                              {deepDiveData.results_structured.main_findings.map((finding: string, idx: number) => (
+                                <li key={idx}>{finding}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {deepDiveData.results_structured.statistical_significance && (
+                          <p><strong>Statistical Significance:</strong> {deepDiveData.results_structured.statistical_significance}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {!deepDiveData.model_description_structured && !deepDiveData.methods_structured && !deepDiveData.results_structured && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <p className="text-yellow-800">⚠️ No structured analysis available. The paper may not have sufficient content or may be behind a paywall.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
