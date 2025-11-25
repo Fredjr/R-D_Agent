@@ -22,6 +22,15 @@ interface NetworkEdge {
   relationship: string;
 }
 
+export interface ResearchPathEntry {
+  pmid: string;
+  title: string;
+  explorationType: string;
+  timestamp: Date;
+  resultCount: number;
+  sourceNode: string;
+}
+
 interface NetworkSidebarProps {
   selectedNode: NetworkNode | null;
   onNavigationChange: (mode: 'similar' | 'references' | 'citations' | 'authors') => void;
@@ -53,6 +62,10 @@ interface NetworkSidebarProps {
   // NEW: Edge data for relationship visualization (Phase 1.3)
   edges?: NetworkEdge[];
   sourceNodeId?: string; // The original source paper PMID
+  // NEW: Research Path tracking
+  onExplorationPathChange?: (path: ResearchPathEntry[]) => void;
+  // NEW: PDF viewer control
+  onOpenPDF?: (pmid: string, title: string) => void;
 }
 
 export default function NetworkSidebar({
@@ -78,7 +91,9 @@ export default function NetworkSidebar({
   onFullTextOnlyChange,
   supportsMultiColumn = false,
   edges = [],
-  sourceNodeId
+  sourceNodeId,
+  onExplorationPathChange,
+  onOpenPDF
 }: NetworkSidebarProps) {
   console.log('🔍 NetworkSidebar rendered with props:', {
     hasSelectedNode: !!selectedNode,
@@ -128,14 +143,14 @@ export default function NetworkSidebar({
   const [explorationMode, setExplorationMode] = useState<string>('');
 
   // Audit trail state to track exploration path
-  const [explorationPath, setExplorationPath] = useState<Array<{
-    pmid: string;
-    title: string;
-    explorationType: string;
-    timestamp: Date;
-    resultCount: number;
-    sourceNode: string;
-  }>>([]);
+  const [explorationPath, setExplorationPath] = useState<ResearchPathEntry[]>([]);
+
+  // Notify parent component when exploration path changes
+  useEffect(() => {
+    if (onExplorationPathChange) {
+      onExplorationPathChange(explorationPath);
+    }
+  }, [explorationPath, onExplorationPathChange]);
 
   // Collection save functionality
   const [showSaveToCollectionModal, setShowSaveToCollectionModal] = useState(false);
@@ -1660,49 +1675,22 @@ export default function NetworkSidebar({
             className="w-full text-sm bg-purple-50 hover:bg-purple-100 border-purple-200"
             onClick={() => {
               console.log('📄 Read PDF button clicked!', selectedNode);
-              setShowPDFViewer(true);
+              if (onOpenPDF && selectedNode) {
+                // Use side PDF viewer in network view
+                onOpenPDF(selectedNode.id, metadata.title || selectedNode.label);
+              } else {
+                // Fallback to modal PDF viewer
+                setShowPDFViewer(true);
+              }
             }}
-            title="Read PDF (if available)"
+            title="Read PDF (if available) - Opens in side panel"
           >
             📄 Read PDF
           </Button>
         </div>
       </div>
 
-      {/* 📋 AUDIT TRAIL: Research Path Tracking - Compact */}
-      {explorationPath.length > 0 && (
-        <div className="p-2 border-b border-gray-200 bg-blue-50 flex-shrink-0">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
-              <span className="text-white text-xs">📋</span>
-            </div>
-            <h4 className="text-xs font-medium text-blue-800">Research Path</h4>
-          </div>
-          <div className="space-y-1 max-h-20 overflow-y-auto">
-            {explorationPath.slice(-5).map((entry, index) => (
-              <div key={index} className="text-xs bg-white rounded p-2 border border-blue-200">
-                <div className="font-medium text-blue-900 truncate" title={entry.title}>
-                  {entry.title}
-                </div>
-                <div className="text-blue-600 mt-1">
-                  <span className="font-mono bg-blue-100 px-1 rounded">{entry.pmid}</span>
-                  <span className="mx-1">→</span>
-                  <span className="capitalize">{entry.explorationType.replace('-', ' ')}</span>
-                  <span className="mx-1">({entry.resultCount} results)</span>
-                </div>
-                <div className="text-blue-500 text-xs mt-1">
-                  {entry.timestamp.toLocaleTimeString()}
-                </div>
-              </div>
-            ))}
-          </div>
-          {explorationPath.length > 5 && (
-            <div className="text-xs text-blue-600 mt-1 text-center">
-              Showing last 5 of {explorationPath.length} explorations
-            </div>
-          )}
-        </div>
-      )}
+      {/* Research Path moved to top horizontal bar in NetworkView */}
 
       {/* Context-Aware Navigation Guide - STICKY at top */}
       {supportsMultiColumn ? (

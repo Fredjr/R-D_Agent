@@ -3,10 +3,11 @@
 import React, { useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Core } from 'cytoscape';
+import dynamic from 'next/dynamic';
 import CytoscapeGraph, { CytoscapeNode, CytoscapeEdge } from './CytoscapeGraph';
 import CytoscapeControls from './CytoscapeControls';
 import CytoscapePanel from './CytoscapePanel';
-import NetworkSidebar from './NetworkSidebar';
+import NetworkSidebar, { ResearchPathEntry } from './NetworkSidebar';
 import PaperListPanel from './PaperListPanel';
 import TimelineView from './TimelineView';
 import ArticleSummaryModal from './ArticleSummaryModal';
@@ -18,6 +19,18 @@ import { useResponsive, MobileSidebar } from './MobileOptimizations';
 import { useNetworkShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { SourceBadge, NodeSourceOverlay } from './DataSourceIndicators';
 import { useWeeklyMixIntegration } from '@/hooks/useWeeklyMixIntegration';
+import ResearchPathBar from './ResearchPathBar';
+
+// Dynamically import NetworkPDFViewer to avoid SSR issues with react-pdf
+const NetworkPDFViewer = dynamic(() => import('./NetworkPDFViewer'), {
+  ssr: false,
+  loading: () => <div className="fixed top-0 right-0 w-[40%] h-full bg-white shadow-2xl border-l border-gray-300 z-50 flex items-center justify-center">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+      <p className="text-sm text-gray-600">Loading PDF viewer...</p>
+    </div>
+  </div>
+});
 
 export interface NetworkNode {
   id: string;
@@ -514,6 +527,14 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
 
   // Store Cytoscape instance
   const [cyInstance, setCyInstance] = useState<Core | null>(null);
+
+  // Research Path state
+  const [explorationPath, setExplorationPath] = useState<ResearchPathEntry[]>([]);
+
+  // PDF Viewer state
+  const [showPDFViewer, setShowPDFViewer] = useState(false);
+  const [pdfPmid, setPdfPmid] = useState<string>('');
+  const [pdfTitle, setPdfTitle] = useState<string>('');
 
   // Dummy callbacks for compatibility
   const onNodesChange = useCallback((changes: any) => {
@@ -2054,6 +2075,16 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         />
       )}
 
+      {/* Research Path Bar - Horizontal bar above network view */}
+      <ResearchPathBar
+        explorationPath={explorationPath}
+        onEntryClick={(entry, index) => {
+          console.log('📋 Research path entry clicked:', entry, index);
+          // Could navigate to that paper or restore that exploration state
+        }}
+        maxVisible={10}
+      />
+
       {/* Three-Panel Layout (ResearchRabbit-style) */}
       <div className="flex-1 flex overflow-hidden">
         {/* LEFT PANEL - Paper List */}
@@ -2416,6 +2447,12 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
             onExploreCluster={onExploreCluster}
             edges={networkData?.edges || []}
             sourceNodeId={sourceId}
+            onExplorationPathChange={(path) => setExplorationPath(path)}
+            onOpenPDF={(pmid, title) => {
+              setPdfPmid(pmid);
+              setPdfTitle(title);
+              setShowPDFViewer(true);
+            }}
           />
           </div>
         )}
@@ -2484,6 +2521,19 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           }
         }}
       />
+
+      {/* Side PDF Viewer - Read-only, opens on right side */}
+      {showPDFViewer && pdfPmid && (
+        <NetworkPDFViewer
+          pmid={pdfPmid}
+          title={pdfTitle}
+          onClose={() => {
+            setShowPDFViewer(false);
+            setPdfPmid('');
+            setPdfTitle('');
+          }}
+        />
+      )}
     </div>
   );
 });
