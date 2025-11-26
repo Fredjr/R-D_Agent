@@ -10,6 +10,7 @@ import {
   extractDOI
 } from '@/lib/pubmed-utils';
 import { pubmedCache } from '@/utils/pubmedCache';
+import { pubmedRateLimiter } from '@/utils/pubmedRateLimiter';
 
 // PubMed eUtils URLs
 const PUBMED_SEARCH_URL = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi';
@@ -89,7 +90,7 @@ async function searchPubMed(query: string, limit: number = 20): Promise<PubMedAr
       sort: 'relevance'
     });
 
-    const searchResponse = await fetch(`${PUBMED_SEARCH_URL}?${searchParams}`, {
+    const searchResponse = await pubmedRateLimiter.fetch(`${PUBMED_SEARCH_URL}?${searchParams}`, {
       headers: {
         'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
       }
@@ -116,7 +117,7 @@ async function searchPubMed(query: string, limit: number = 20): Promise<PubMedAr
       rettype: 'abstract'
     });
 
-    const fetchResponse = await fetch(`${PUBMED_FETCH_URL}?${fetchParams}`, {
+    const fetchResponse = await pubmedRateLimiter.fetch(`${PUBMED_FETCH_URL}?${fetchParams}`, {
       headers: {
         'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
       }

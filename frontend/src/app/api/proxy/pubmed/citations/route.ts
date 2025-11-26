@@ -10,6 +10,7 @@ import {
   extractDOI
 } from '@/lib/pubmed-utils';
 import { pubmedCache } from '@/utils/pubmedCache';
+import { pubmedRateLimiter } from '@/utils/pubmedRateLimiter';
 
 /**
  * PubMed Citation Network API
@@ -98,7 +99,7 @@ async function fetchArticleDetails(pmids: string[]): Promise<PubMedArticle[]> {
     const pmidList = pmids.join(',');
     const fetchUrl = `${PUBMED_FETCH_URL}?db=pubmed&id=${pmidList}&retmode=xml&rettype=abstract`;
 
-    const response = await fetch(fetchUrl, {
+    const response = await pubmedRateLimiter.fetch(fetchUrl, {
       headers: {
         'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
       }
@@ -126,11 +127,11 @@ async function findCitingArticles(pmid: string, limit: number = 20): Promise<str
 
     console.log(`🔗 Fetching citing articles for PMID ${pmid} from: ${linkUrl}`);
 
-    const response = await fetch(linkUrl, {
+    const response = await pubmedRateLimiter.fetch(linkUrl, {
       headers: {
         'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
       },
-      signal: AbortSignal.timeout(10000) // 10 second timeout
+      signal: AbortSignal.timeout(30000) // 30 second timeout (increased for retries)
     });
 
     console.log(`📡 PubMed eLink response status: ${response.status}`);
@@ -181,7 +182,7 @@ async function findSimilarArticles(pmid: string, limit: number = 20): Promise<st
     // Use eLink to find similar articles
     const linkUrl = `${PUBMED_LINK_URL}?dbfrom=pubmed&id=${pmid}&db=pubmed&linkname=pubmed_pubmed&retmode=json`;
 
-    const response = await fetch(linkUrl, {
+    const response = await pubmedRateLimiter.fetch(linkUrl, {
       headers: {
         'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
       }

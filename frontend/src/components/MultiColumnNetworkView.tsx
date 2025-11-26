@@ -3,9 +3,19 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import NetworkView, { NetworkNode } from './NetworkView';
-import NetworkSidebar from './NetworkSidebar';
+import NetworkSidebar, { ResearchPathEntry } from './NetworkSidebar';
 import { ErrorBoundary } from './ErrorBoundary';
 import ExplorationNetworkView from './ExplorationNetworkView';
+import ResearchPathBar from './ResearchPathBar';
+import dynamic from 'next/dynamic';
+
+// Dynamically import NetworkPDFViewer to avoid SSR issues with react-pdf
+const NetworkPDFViewer = dynamic(() => import('./NetworkPDFViewer'), {
+  ssr: false,
+  loading: () => <div className="fixed top-0 right-0 w-[40%] h-full bg-white shadow-2xl border-l border-gray-300 z-50 flex items-center justify-center">
+    <div className="text-gray-500">Loading PDF viewer...</div>
+  </div>
+});
 
 interface PaperColumn {
   id: string;
@@ -65,6 +75,14 @@ export default function MultiColumnNetworkView({
   // 🎯 Track PDF viewer state for dynamic resizing
   const [isPDFViewerOpen, setIsPDFViewerOpen] = useState<boolean>(false);
   const [isPDFViewerExpanded, setIsPDFViewerExpanded] = useState<boolean>(false);
+
+  // 🎯 Research Path state
+  const [explorationPath, setExplorationPath] = useState<ResearchPathEntry[]>([]);
+
+  // 🎯 PDF Viewer state
+  const [showPDFViewer, setShowPDFViewer] = useState(false);
+  const [pdfPmid, setPdfPmid] = useState<string>('');
+  const [pdfTitle, setPdfTitle] = useState<string>('');
 
   // Fetch collections for the project OR all collections across all projects if no projectId
   const fetchCollections = useCallback(async () => {
@@ -141,6 +159,38 @@ export default function MultiColumnNetworkView({
   useEffect(() => {
     fetchCollections();
   }, [fetchCollections]);
+
+  // 🎯 Listen for PDF viewer open/close events for dynamic resizing
+  useEffect(() => {
+    const handlePDFOpened = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      console.log('📄 PDF Viewer opened:', customEvent.detail);
+      setIsPDFViewerOpen(true);
+      setIsPDFViewerExpanded(customEvent.detail?.isExpanded || false);
+    };
+
+    const handlePDFClosed = () => {
+      console.log('📄 PDF Viewer closed');
+      setIsPDFViewerOpen(false);
+      setIsPDFViewerExpanded(false);
+    };
+
+    const handlePDFResized = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      console.log('📄 PDF Viewer resized:', customEvent.detail);
+      setIsPDFViewerExpanded(customEvent.detail?.isExpanded || false);
+    };
+
+    window.addEventListener('pdfViewerOpened', handlePDFOpened);
+    window.addEventListener('pdfViewerClosed', handlePDFClosed);
+    window.addEventListener('pdfViewerResized', handlePDFResized);
+
+    return () => {
+      window.removeEventListener('pdfViewerOpened', handlePDFOpened);
+      window.removeEventListener('pdfViewerClosed', handlePDFClosed);
+      window.removeEventListener('pdfViewerResized', handlePDFResized);
+    };
+  }, []);
 
   // Network type selection state
   const [defaultNetworkType, setDefaultNetworkType] = useState<'citations' | 'similar' | 'references'>('citations');
@@ -678,6 +728,16 @@ export default function MultiColumnNetworkView({
           style={{ width: mainViewWidth }}
         >
         <div className="h-full relative flex flex-col">
+          {/* Research Path Bar - Horizontal bar above network view */}
+          <ResearchPathBar
+            explorationPath={explorationPath}
+            onEntryClick={(entry, index) => {
+              console.log('📋 Research path entry clicked:', entry, index);
+              // Could navigate to that paper or restore that exploration state
+            }}
+            maxVisible={10}
+          />
+
           {/* Network Type Selector */}
           <div className="flex-shrink-0 bg-gray-50 border-b border-gray-200 p-2">
             <div className="flex items-center justify-between">
@@ -805,6 +865,13 @@ export default function MultiColumnNetworkView({
                   onShowReferences={handleShowReferences}
                   edges={mainNetworkViewRef.current?.getEdges?.() || []}
                   sourceNodeId={mainNetworkViewRef.current?.getSourceId?.() || sourceId}
+                  onExplorationPathChange={(path) => setExplorationPath(path)}
+                  onOpenPDF={(pmid, title) => {
+                    console.log('📄 Opening PDF in side viewer:', pmid, title);
+                    setPdfPmid(pmid);
+                    setPdfTitle(title);
+                    setShowPDFViewer(true);
+                  }}
                 />
               </ErrorBoundary>
               </div>
@@ -982,6 +1049,13 @@ export default function MultiColumnNetworkView({
                       onExploreCluster={onExploreCluster}
                       onShowCitations={handleShowCitations}
                       onShowReferences={handleShowReferences}
+                      onExplorationPathChange={(path) => setExplorationPath(path)}
+                      onOpenPDF={(pmid, title) => {
+                        console.log('📄 Opening PDF in side viewer from column:', pmid, title);
+                        setPdfPmid(pmid);
+                        setPdfTitle(title);
+                        setShowPDFViewer(true);
+                      }}
                     />
                   </ErrorBoundary>
                 </div>
@@ -992,6 +1066,19 @@ export default function MultiColumnNetworkView({
       ))}
         </div>
       </div>
+
+      {/* PDF Viewer - Side panel */}
+      {showPDFViewer && pdfPmid && (
+        <NetworkPDFViewer
+          pmid={pdfPmid}
+          title={pdfTitle}
+          onClose={() => {
+            setShowPDFViewer(false);
+            setPdfPmid('');
+            setPdfTitle('');
+          }}
+        />
+      )}
     </div>
   );
 }

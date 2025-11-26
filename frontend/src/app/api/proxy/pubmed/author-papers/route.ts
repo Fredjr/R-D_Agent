@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { pubmedRateLimiter } from '@/utils/pubmedRateLimiter';
 
 // PubMed eUtils base URLs
 const PUBMED_SEARCH_URL = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi';
@@ -163,7 +164,7 @@ async function searchAuthorPapers(
         sort: 'relevance'
       });
 
-      const searchResponse = await fetch(`${PUBMED_SEARCH_URL}?${searchParams}`, {
+      const searchResponse = await pubmedRateLimiter.fetch(`${PUBMED_SEARCH_URL}?${searchParams}`, {
         headers: {
           'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
         }
@@ -202,7 +203,7 @@ async function searchAuthorPapers(
       rettype: 'abstract'
     });
 
-    const fetchResponse = await fetch(`${PUBMED_FETCH_URL}?${fetchParams}`, {
+    const fetchResponse = await pubmedRateLimiter.fetch(`${PUBMED_FETCH_URL}?${fetchParams}`, {
       headers: {
         'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
       }

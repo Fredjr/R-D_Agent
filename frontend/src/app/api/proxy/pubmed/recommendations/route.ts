@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { pubmedRateLimiter } from '@/utils/pubmedRateLimiter';
 
 /**
  * PubMed Recommendations API
@@ -227,7 +228,7 @@ async function getSimilarPapers(pmid: string, limit: number): Promise<PubMedPape
     // Step 1: Use eLink to find similar papers
     const elinkUrl = `${PUBMED_LINK_URL}?dbfrom=pubmed&db=pubmed&id=${pmid}&linkname=pubmed_pubmed&retmode=json`;
 
-    const elinkResponse = await fetch(elinkUrl, {
+    const elinkResponse = await pubmedRateLimiter.fetch(elinkUrl, {
       headers: { 'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)' }
     });
 
@@ -297,8 +298,8 @@ async function getCitingPapers(pmid: string, limit: number): Promise<PubMedPaper
   try {
     // Step 1: Use eLink to find citing papers
     const elinkUrl = `${PUBMED_LINK_URL}?dbfrom=pubmed&db=pubmed&id=${pmid}&linkname=pubmed_pubmed_citedin&retmode=json`;
-    
-    const elinkResponse = await fetch(elinkUrl, {
+
+    const elinkResponse = await pubmedRateLimiter.fetch(elinkUrl, {
       headers: { 'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)' }
     });
 
@@ -350,8 +351,8 @@ async function getReferencedPapers(pmid: string, limit: number): Promise<PubMedP
   try {
     // Step 1: Use eLink to find referenced papers
     const elinkUrl = `${PUBMED_LINK_URL}?dbfrom=pubmed&db=pubmed&id=${pmid}&linkname=pubmed_pubmed_refs&retmode=json`;
-    
-    const elinkResponse = await fetch(elinkUrl, {
+
+    const elinkResponse = await pubmedRateLimiter.fetch(elinkUrl, {
       headers: { 'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)' }
     });
 
@@ -428,7 +429,7 @@ async function getTrendingPapers(userDomains: string[], limit: number): Promise<
     // Step 1: Search for trending PMIDs
     const searchUrl = `${PUBMED_SEARCH_URL}?db=pubmed&term=${encodeURIComponent(searchQuery)}&retmax=${limit}&retmode=json&sort=date`;
 
-    const searchResponse = await fetch(searchUrl, {
+    const searchResponse = await pubmedRateLimiter.fetch(searchUrl, {
       headers: { 'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)' }
     });
 
@@ -470,7 +471,7 @@ async function fetchPaperDetails(pmids: string[]): Promise<PubMedPaper[]> {
     console.log(`🔄 [fetchPaperDetails] Fetching details for PMIDs: ${pmids.join(', ')}`);
     const fetchUrl = `${PUBMED_FETCH_URL}?db=pubmed&id=${pmids.join(',')}&retmode=xml&rettype=abstract`;
 
-    const fetchResponse = await fetch(fetchUrl, {
+    const fetchResponse = await pubmedRateLimiter.fetch(fetchUrl, {
       headers: { 'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)' }
     });
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { pubmedRateLimiter } from '@/utils/pubmedRateLimiter';
 
 /**
  * PubMed References Network API
@@ -92,12 +93,12 @@ function parseArticleXML(xmlText: string): PubMedArticle[] {
  */
 async function fetchArticleDetails(pmids: string[]): Promise<PubMedArticle[]> {
   if (pmids.length === 0) return [];
-  
+
   try {
     const pmidList = pmids.join(',');
     const fetchUrl = `${PUBMED_FETCH_URL}?db=pubmed&id=${pmidList}&retmode=xml&rettype=abstract`;
-    
-    const response = await fetch(fetchUrl, {
+
+    const response = await pubmedRateLimiter.fetch(fetchUrl, {
       headers: {
         'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
       }
@@ -125,11 +126,11 @@ async function findReferenceArticles(pmid: string, limit: number = 20): Promise<
 
     console.log(`🔗 Fetching references for PMID ${pmid} from: ${linkUrl}`);
 
-    const response = await fetch(linkUrl, {
+    const response = await pubmedRateLimiter.fetch(linkUrl, {
       headers: {
         'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
       },
-      signal: AbortSignal.timeout(10000) // 10 second timeout
+      signal: AbortSignal.timeout(30000) // 30 second timeout (increased for retries)
     });
 
     console.log(`📡 PubMed eLink response status: ${response.status}`);
@@ -241,7 +242,7 @@ export async function GET(request: NextRequest) {
         const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(searchTerm)}+AND+("2015"[Date - Publication]:"2019"[Date - Publication])&retmax=5&retmode=json&sort=relevance`;
         console.log(`🔍 [References] Search URL: ${searchUrl}`);
 
-        const searchResponse = await fetch(searchUrl);
+        const searchResponse = await pubmedRateLimiter.fetch(searchUrl);
         console.log(`🔍 [References] Search response status: ${searchResponse.status}`);
 
         if (searchResponse.ok) {
@@ -266,7 +267,7 @@ export async function GET(request: NextRequest) {
         try {
           console.log(`🔍 [References] Trying simple search without date restrictions`);
           const simpleSearchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent('diabetes treatment')}&retmax=3&retmode=json&sort=relevance`;
-          const simpleResponse = await fetch(simpleSearchUrl);
+          const simpleResponse = await pubmedRateLimiter.fetch(simpleSearchUrl);
 
           if (simpleResponse.ok) {
             const simpleData = await simpleResponse.json();

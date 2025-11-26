@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { pubmedRateLimiter } from '@/utils/pubmedRateLimiter';
 
 /**
  * PubMed Citation Network API
@@ -147,120 +148,94 @@ async function fetchArticleDetails(pmids: string[], filterOpenAccess: boolean = 
     return [];
   }
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const pmidList = pmids.join(',');
-      const fetchUrl = `${PUBMED_FETCH_URL}?db=pubmed&id=${pmidList}&retmode=xml&rettype=abstract`;
-      console.log(`🔍 Fetching article details for ${pmids.length} PMIDs (attempt ${attempt + 1}/${retries + 1}, OA filter: ${filterOpenAccess}): ${pmidList.substring(0, 100)}...`);
+  // Rate limiter handles retries, so we only need one attempt
+  try {
+    const pmidList = pmids.join(',');
+    const fetchUrl = `${PUBMED_FETCH_URL}?db=pubmed&id=${pmidList}&retmode=xml&rettype=abstract`;
+    console.log(`🔍 Fetching article details for ${pmids.length} PMIDs (OA filter: ${filterOpenAccess}): ${pmidList.substring(0, 100)}...`);
 
-      const response = await fetch(fetchUrl, {
-        headers: {
-          'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
-        },
-        signal: AbortSignal.timeout(15000) // 15 second timeout
-      });
+    const response = await pubmedRateLimiter.fetch(fetchUrl, {
+      headers: {
+        'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
+      },
+      signal: AbortSignal.timeout(30000) // 30 second timeout (increased for retries)
+    });
 
-      if (!response.ok) {
-        console.error(`❌ PubMed efetch failed: ${response.status} ${response.statusText}`);
-        if (attempt < retries) {
-          console.log(`⏳ Retrying in ${(attempt + 1) * 1000}ms...`);
-          await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 1000));
-          continue;
-        }
-        throw new Error(`PubMed fetch failed: ${response.status}`);
-      }
-
-      const xmlText = await response.text();
-      console.log(`📄 Received XML response: ${xmlText.length} characters`);
-
-      // If filtering for OA, we need to parse and filter
-      if (filterOpenAccess) {
-        const articleMatches = xmlText.match(/<PubmedArticle>[\s\S]*?<\/PubmedArticle>/g) || [];
-        const oaArticleXmls = articleMatches.filter(articleXml => isOpenAccessArticle(articleXml));
-        const oaXmlText = oaArticleXmls.join('\n');
-        console.log(`🔓 Filtered to ${oaArticleXmls.length} Open Access articles out of ${articleMatches.length} total`);
-        const articles = parseArticleXML(oaXmlText);
-        console.log(`✅ Parsed ${articles.length} OA articles from XML`);
-        return articles;
-      } else {
-        const articles = parseArticleXML(xmlText);
-        console.log(`✅ Parsed ${articles.length} articles from XML`);
-        return articles;
-      }
-    } catch (error) {
-      console.error(`❌ Error fetching article details (attempt ${attempt + 1}):`, error);
-      if (attempt < retries) {
-        console.log(`⏳ Retrying in ${(attempt + 1) * 1000}ms...`);
-        await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 1000));
-        continue;
-      }
-      console.error('❌ All retry attempts exhausted, returning empty array');
-      return [];
+    if (!response.ok) {
+      console.error(`❌ PubMed efetch failed: ${response.status} ${response.statusText}`);
+      throw new Error(`PubMed fetch failed: ${response.status}`);
     }
+
+    const xmlText = await response.text();
+    console.log(`📄 Received XML response: ${xmlText.length} characters`);
+
+    // If filtering for OA, we need to parse and filter
+    if (filterOpenAccess) {
+      const articleMatches = xmlText.match(/<PubmedArticle>[\s\S]*?<\/PubmedArticle>/g) || [];
+      const oaArticleXmls = articleMatches.filter(articleXml => isOpenAccessArticle(articleXml));
+      const oaXmlText = oaArticleXmls.join('\n');
+      console.log(`🔓 Filtered to ${oaArticleXmls.length} Open Access articles out of ${articleMatches.length} total`);
+      const articles = parseArticleXML(oaXmlText);
+      console.log(`✅ Parsed ${articles.length} OA articles from XML`);
+      return articles;
+    } else {
+      const articles = parseArticleXML(xmlText);
+      console.log(`✅ Parsed ${articles.length} articles from XML`);
+      return articles;
+    }
+  } catch (error) {
+    console.error(`❌ Error fetching article details:`, error);
+    return [];
   }
-  return [];
 }
 
 /**
  * Find related articles using PubMed eLink
  */
 async function findRelatedArticles(pmid: string, linkType: string, limit: number = 10, retries: number = 2): Promise<string[]> {
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const linkUrl = `${PUBMED_LINK_URL}?dbfrom=pubmed&id=${pmid}&db=pubmed&linkname=${linkType}&retmode=json`;
-      console.log(`🔍 Fetching related articles (attempt ${attempt + 1}/${retries + 1}): ${linkUrl}`);
+  try {
+    const linkUrl = `${PUBMED_LINK_URL}?dbfrom=pubmed&id=${pmid}&db=pubmed&linkname=${linkType}&retmode=json`;
+    console.log(`🔍 Fetching related articles: ${linkUrl}`);
 
-      const response = await fetch(linkUrl, {
-        headers: {
-          'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
-        },
-        signal: AbortSignal.timeout(10000) // 10 second timeout
-      });
+    const response = await pubmedRateLimiter.fetch(linkUrl, {
+      headers: {
+        'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
+      },
+      signal: AbortSignal.timeout(30000) // 30 second timeout (increased for retries)
+    });
 
-      if (!response.ok) {
-        console.error(`❌ PubMed eLink failed for PMID ${pmid}, linkType ${linkType}: ${response.status}`);
-        if (attempt < retries) {
-          console.log(`⏳ Retrying in ${(attempt + 1) * 1000}ms...`);
-          await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 1000));
-          continue;
-        }
-        return [];
-      }
-
-      const data = await response.json();
-      console.log(`📊 PubMed eLink response for ${pmid} (${linkType}):`, JSON.stringify(data).substring(0, 500));
-
-      const linksets = data.linksets || [];
-
-      for (const linkset of linksets) {
-        const linksetdbs = linkset.linksetdbs || [];
-        for (const linksetdb of linksetdbs) {
-          if (linksetdb.linkname === linkType) {
-            const links = linksetdb.links || [];
-            console.log(`✅ Found ${links.length} related articles for ${pmid} (${linkType})`);
-            const filtered = links
-              .filter((id: string) => id.toString() !== pmid) // Exclude self
-              .slice(0, limit)
-              .map((id: string) => id.toString());
-            console.log(`📤 Returning ${filtered.length} articles after filtering and limiting`);
-            return filtered;
-          }
-        }
-      }
-
-      console.log(`⚠️ No linksetdb found with linkname ${linkType} for PMID ${pmid}`);
-      return [];
-    } catch (error) {
-      console.error(`❌ Error finding related articles (${linkType}), attempt ${attempt + 1}:`, error);
-      if (attempt < retries) {
-        console.log(`⏳ Retrying in ${(attempt + 1) * 1000}ms...`);
-        await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 1000));
-        continue;
-      }
+    if (!response.ok) {
+      console.error(`❌ PubMed eLink failed for PMID ${pmid}, linkType ${linkType}: ${response.status}`);
       return [];
     }
+
+    const data = await response.json();
+    console.log(`📊 PubMed eLink response for ${pmid} (${linkType}):`, JSON.stringify(data).substring(0, 500));
+
+    const linksets = data.linksets || [];
+
+    for (const linkset of linksets) {
+      const linksetdbs = linkset.linksetdbs || [];
+      for (const linksetdb of linksetdbs) {
+        if (linksetdb.linkname === linkType) {
+          const links = linksetdb.links || [];
+          console.log(`✅ Found ${links.length} related articles for ${pmid} (${linkType})`);
+          const filtered = links
+            .filter((id: string) => id.toString() !== pmid) // Exclude self
+            .slice(0, limit)
+            .map((id: string) => id.toString());
+          console.log(`📤 Returning ${filtered.length} articles after filtering and limiting`);
+          return filtered;
+        }
+      }
+    }
+
+    console.log(`⚠️ No linksetdb found with linkname ${linkType} for PMID ${pmid}`);
+    return [];
+  } catch (error) {
+    console.error(`❌ Error finding related articles (${linkType}):`, error);
+    return [];
   }
-  return [];
 }
 
 /**

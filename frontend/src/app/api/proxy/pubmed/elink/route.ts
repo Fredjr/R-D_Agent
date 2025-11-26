@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { pubmedRateLimiter } from '@/utils/pubmedRateLimiter';
 
 const PUBMED_LINK_URL = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi';
 
@@ -32,14 +33,15 @@ export async function GET(request: NextRequest) {
   try {
     // Build eLink URL with all parameters
     const elinkUrl = `${PUBMED_LINK_URL}?dbfrom=${dbfrom}&db=${db}&id=${pmid}&linkname=${linkname}&cmd=${cmd}&retmode=${retmode}`;
-    
+
     console.log(`🔗 PubMed eLink request: ${elinkUrl}`);
 
-    const response = await fetch(elinkUrl, {
+    // Use rate limiter to prevent 429 errors
+    const response = await pubmedRateLimiter.fetch(elinkUrl, {
       headers: {
         'User-Agent': 'RD-Agent/1.0 (Research Discovery Tool)'
       },
-      signal: AbortSignal.timeout(15000) // 15 second timeout
+      signal: AbortSignal.timeout(30000) // 30 second timeout (increased for retries)
     });
 
     if (!response.ok) {
