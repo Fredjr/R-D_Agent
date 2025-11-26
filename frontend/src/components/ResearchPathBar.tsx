@@ -18,21 +18,17 @@ interface ResearchPathBarProps {
   maxVisible?: number;
 }
 
-export default function ResearchPathBar({ 
-  explorationPath, 
+export default function ResearchPathBar({
+  explorationPath,
   onEntryClick,
-  maxVisible = 10 
+  maxVisible = 10
 }: ResearchPathBarProps) {
-  if (explorationPath.length === 0) {
-    return null;
-  }
-
   // Show the most recent entries
   const visiblePath = explorationPath.slice(-maxVisible);
   const hasMore = explorationPath.length > maxVisible;
 
   return (
-    <div className="w-full bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-200 shadow-sm">
+    <div className="w-full bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-200 shadow-sm flex-shrink-0">
       <div className="px-4 py-2">
         {/* Header */}
         <div className="flex items-center gap-2 mb-2">
@@ -40,14 +36,21 @@ export default function ResearchPathBar({
             <span className="text-white text-sm">📋</span>
           </div>
           <h3 className="text-sm font-semibold text-blue-900">Research Path</h3>
-          <span className="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">
-            {explorationPath.length} {explorationPath.length === 1 ? 'step' : 'steps'}
-          </span>
+          {explorationPath.length > 0 ? (
+            <span className="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">
+              {explorationPath.length} {explorationPath.length === 1 ? 'step' : 'steps'}
+            </span>
+          ) : (
+            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+              Start exploring to build your research path
+            </span>
+          )}
         </div>
 
         {/* Path Trail - Horizontal Scrollable */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-blue-300 scrollbar-track-blue-100">
-          {hasMore && (
+        {explorationPath.length > 0 ? (
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-blue-300 scrollbar-track-blue-100">
+            {hasMore && (
             <div className="flex-shrink-0 text-xs text-blue-500 bg-blue-100 px-2 py-1 rounded">
               +{explorationPath.length - maxVisible} more
             </div>
@@ -109,7 +112,12 @@ export default function ResearchPathBar({
               </React.Fragment>
             );
           })}
-        </div>
+          </div>
+        ) : (
+          <div className="text-xs text-gray-500 italic">
+            Click on exploration buttons (Similar Work, Citations, References, etc.) to start building your research path
+          </div>
+        )}
       </div>
     </div>
   );

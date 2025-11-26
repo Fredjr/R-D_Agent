@@ -338,6 +338,31 @@ const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
     };
   }, []);
 
+  // Handle window resize and browser zoom
+  useEffect(() => {
+    if (!cyRef.current || !containerRef.current) return;
+
+    const handleResize = () => {
+      if (cyRef.current) {
+        console.log('📐 [Cytoscape] Resizing graph to fit container');
+        cyRef.current.resize();
+        cyRef.current.fit(undefined, 50); // Fit with 50px padding
+      }
+    };
+
+    // Use ResizeObserver to detect container size changes (including browser zoom)
+    const resizeObserver = new ResizeObserver(handleResize);
+    resizeObserver.observe(containerRef.current);
+
+    // Also listen to window resize events
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [isInitialized]);
+
   // Update nodes and edges
   useEffect(() => {
     if (!cyRef.current || !isInitialized) return;

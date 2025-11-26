@@ -63,20 +63,24 @@ export default function NetworkPDFViewer({ pmid, title, onClose }: NetworkPDFVie
     setError(null);
 
     try {
-      const response = await fetch(`/api/proxy/pdf/${pmid}`);
-      
+      console.log(`🔍 Fetching PDF URL for PMID: ${pmid}`);
+      const response = await fetch(`/api/proxy/articles/${pmid}/pdf-url`);
+
       if (response.ok) {
         const data = await response.json();
-        if (data.pdf_url) {
-          setPdfUrl(data.pdf_url);
+        console.log(`✅ PDF URL response:`, data);
+        if (data.url && data.pdf_available) {
+          setPdfUrl(data.url);
         } else {
           setError('PDF not available for this article');
         }
       } else {
+        const errorText = await response.text();
+        console.error(`❌ Failed to fetch PDF URL: ${response.status} - ${errorText}`);
         setError('Failed to fetch PDF');
       }
     } catch (err) {
-      console.error('Error fetching PDF:', err);
+      console.error('❌ Error fetching PDF:', err);
       setError('Error loading PDF');
     } finally {
       setLoading(false);

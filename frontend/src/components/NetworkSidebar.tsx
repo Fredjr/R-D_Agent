@@ -1106,7 +1106,7 @@ export default function NetworkSidebar({
   const { metadata } = selectedNode;
 
   return (
-    <div className="network-sidebar w-full h-full bg-white border-l border-gray-200 flex flex-col overflow-hidden">
+    <div className="network-sidebar w-full h-screen bg-white border-l border-gray-200 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b border-gray-200 flex justify-between items-start flex-shrink-0">
         <div className="flex-1">

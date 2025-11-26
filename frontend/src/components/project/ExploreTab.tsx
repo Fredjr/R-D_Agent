@@ -730,7 +730,7 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden" style={{ height: 'calc(100vh - 200px)', minHeight: '600px' }}>
             <MultiColumnNetworkView
               sourceType="article"
               sourceId={selectedPaperPMID}
@@ -754,7 +754,7 @@ export function ExploreTab({ project, onRefresh }: ExploreTabProps) {
       ) : (
         <>
           {/* Project-Level Network Visualization */}
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden" style={{ height: 'calc(100vh - 200px)', minHeight: '600px' }}>
             <MultiColumnNetworkView
               sourceType="project"
               sourceId={project.project_id}
