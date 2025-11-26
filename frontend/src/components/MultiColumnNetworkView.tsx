@@ -595,30 +595,31 @@ export default function MultiColumnNetworkView({
   const isDesktop = screenWidth >= 1024;
   const isLargeDesktop = screenWidth >= 1440;
 
-  // Dynamic minimum widths - use viewportWidth for zoom responsiveness
-  const MAIN_VIEW_MIN_WIDTH = isMobile ? viewportWidth : isTablet ? viewportWidth * 0.6 : isLargeDesktop ? viewportWidth * 0.7 : viewportWidth * 0.65;
-  const COLUMN_MIN_WIDTH = isMobile ? viewportWidth : isTablet ? viewportWidth * 0.5 : isLargeDesktop ? viewportWidth * 0.55 : viewportWidth * 0.5;
-  // Sidebar width: 280px at standard viewport, scales with zoom
-  // At 1920px viewport: 280px = 14.6% of viewport
-  // Use percentage-based calculation that scales with browser zoom
-  const SIDEBAR_WIDTH = isMobile ? viewportWidth : Math.round(Math.max(280, Math.min(400, viewportWidth * 0.146))); // ~280px at 1920px viewport, scales with zoom
+  // Use FIXED pixel widths - browser zoom will handle scaling naturally
+  // This is the correct approach: define sizes at 100% zoom, let browser scale them
+  const MAIN_VIEW_MIN_WIDTH = isMobile ? screenWidth : isTablet ? 600 : isLargeDesktop ? 1000 : 900;
+  const COLUMN_MIN_WIDTH = isMobile ? screenWidth : isTablet ? 500 : isLargeDesktop ? 800 : 700;
+  // Sidebar: Fixed 320px width - browser zoom will scale it naturally
+  const SIDEBAR_WIDTH = isMobile ? screenWidth : 320;
 
   // 🎯 FIX: Main view should take FULL WIDTH when no columns are open
   // When columns exist, use fixed width for consistent multi-column layout
-  // When PDF viewer is open, adjust width to accommodate it
+  // When PDF viewer is open, use FIXED pixel widths that browser zoom will scale
   let mainViewWidth: string;
   if (isMobile) {
     mainViewWidth = '100vw';
   } else if (isPDFViewerOpen) {
-    // PDF viewer takes 35% (or 50% when expanded), so network view takes the remaining space
-    mainViewWidth = isPDFViewerExpanded ? '50%' : '65%';
+    // Use fixed pixel widths - browser zoom will scale them naturally
+    // At 1920px screen: PDF=600px (31%), Network=1320px (69%)
+    // When expanded: PDF=900px (47%), Network=1020px (53%)
+    mainViewWidth = isPDFViewerExpanded ? '1020px' : '1320px';
   } else if (hasColumns) {
-    mainViewWidth = `${Math.round(MAIN_VIEW_MIN_WIDTH)}px`;
+    mainViewWidth = `${MAIN_VIEW_MIN_WIDTH}px`;
   } else {
     mainViewWidth = '100%';
   }
 
-  const columnWidth = isMobile ? '100vw' : `${Math.round(COLUMN_MIN_WIDTH)}px`;
+  const columnWidth = isMobile ? '100vw' : `${COLUMN_MIN_WIDTH}px`;
 
   // Scroll container ref for keyboard/mouse navigation
   const scrollContainerRef = useRef<HTMLDivElement>(null);
