@@ -33,6 +33,8 @@ export default function NetworkPDFViewer({ pmid, title, onClose }: NetworkPDFVie
   const [error, setError] = useState<string | null>(null);
   const [scale, setScale] = useState<number>(1.0);
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const [pdfSource, setPdfSource] = useState<string>('');
+  const [pdfAvailable, setPdfAvailable] = useState<boolean>(false);
 
   // 🎯 Notify network view that PDF viewer is open
   useEffect(() => {
@@ -59,12 +61,15 @@ export default function NetworkPDFViewer({ pmid, title, onClose }: NetworkPDFVie
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         console.log('🔑 ESC key pressed - closing PDF viewer');
+        event.preventDefault();
+        event.stopPropagation();
         onClose();
       }
     };
 
-    window.addEventListener('keydown', handleEscKey);
-    return () => window.removeEventListener('keydown', handleEscKey);
+    // Use capture phase to intercept ESC before other handlers
+    window.addEventListener('keydown', handleEscKey, true);
+    return () => window.removeEventListener('keydown', handleEscKey, true);
   }, [onClose]);
 
   useEffect(() => {
@@ -77,27 +82,62 @@ export default function NetworkPDFViewer({ pmid, title, onClose }: NetworkPDFVie
 
     try {
       console.log(`🔍 Fetching PDF URL for PMID: ${pmid}`);
-      const response = await fetch(`/api/proxy/articles/${pmid}/pdf-url`);
+      const response = await fetch(`/api/proxy/articles/${pmid}/pdf-url`, {
+        headers: {
+          'User-ID': 'default_user',
+        },
+      });
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log(`✅ PDF URL response:`, data);
-        if (data.url && data.pdf_available) {
-          // Use proxy endpoint to avoid CORS issues
+      if (!response.ok) {
+        throw new Error('Failed to fetch PDF URL');
+      }
+
+      const data = await response.json();
+      console.log(`✅ PDF URL response:`, data);
+
+      setPdfSource(data.source);
+      setPdfAvailable(data.pdf_available);
+
+      if (data.pdf_available) {
+        // Check if source typically blocks proxying
+        const DIRECT_LINK_SOURCES = [
+          'wolters_kluwer',
+          'wiley_enhanced',
+          'wiley',
+          'pubmed_fulltext_atypon',
+          'pubmed_fulltext_silverchair',
+          'pubmed_fulltext_highwire',
+          'nejm',
+          'springer',
+          'oxford_academic',
+        ];
+
+        if (DIRECT_LINK_SOURCES.includes(data.source)) {
+          // Open in new tab instead of proxying (these publishers block server requests)
+          console.log(`📄 Opening PDF in new tab (source: ${data.source} typically blocks proxying)`);
+          window.open(data.url, '_blank');
+          setError(`PDF opened in new tab. ${data.source} requires direct browser access.`);
+          setPdfUrl(null);
+        } else {
+          // Use our proxy endpoint to avoid CORS issues
           const proxyUrl = `/api/proxy/articles/${pmid}/pdf-proxy`;
           console.log(`🔄 Using proxy URL: ${proxyUrl}`);
           setPdfUrl(proxyUrl);
-        } else {
-          setError('PDF not available for this article');
         }
       } else {
-        const errorText = await response.text();
-        console.error(`❌ Failed to fetch PDF URL: ${response.status} - ${errorText}`);
-        setError('Failed to fetch PDF');
+        // No direct PDF available - show message with link
+        setError(`PDF not directly available. This article may be behind a paywall.`);
+        setPdfUrl(null);
+
+        // Open the article URL in a new tab
+        if (data.url) {
+          window.open(data.url, '_blank');
+        }
       }
     } catch (err) {
       console.error('❌ Error fetching PDF:', err);
-      setError('Error loading PDF');
+      setError('Failed to load PDF. The article may not be available or may be behind a paywall.');
+      setPdfUrl(null);
     } finally {
       setLoading(false);
     }
@@ -117,21 +157,22 @@ export default function NetworkPDFViewer({ pmid, title, onClose }: NetworkPDFVie
 
   return (
     <div
-      className={`fixed top-0 right-0 h-full bg-white shadow-2xl border-l border-gray-300 z-50 flex flex-col transition-all duration-300 ${
+      className={`fixed top-0 right-0 h-full bg-white shadow-2xl border-l border-gray-300 flex flex-col transition-all duration-300 ${
         isExpanded ? 'w-[70%]' : 'w-[50%]'
       }`}
+      style={{ zIndex: 9999 }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-b border-blue-700 relative z-10">
-        <div className="flex-1 min-w-0 mr-4">
+      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-b border-blue-700 relative">
+        <div className="flex-1 min-w-0 mr-12">
           <h3 className="text-sm font-semibold truncate">{title || 'PDF Viewer'}</h3>
           <p className="text-xs text-blue-100">PMID: {pmid}</p>
         </div>
 
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0 absolute right-4 top-1/2 -translate-y-1/2">
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="p-1.5 hover:bg-blue-500 rounded transition-colors z-20"
+            className="p-1.5 hover:bg-blue-500 rounded transition-colors"
             title={isExpanded ? 'Collapse' : 'Expand'}
           >
             {isExpanded ? (
@@ -142,7 +183,7 @@ export default function NetworkPDFViewer({ pmid, title, onClose }: NetworkPDFVie
           </button>
           <button
             onClick={onClose}
-            className="p-1.5 hover:bg-blue-500 rounded transition-colors z-20"
+            className="p-1.5 hover:bg-blue-500 rounded transition-colors"
             title="Close PDF (or press ESC)"
           >
             <XMarkIcon className="w-5 h-5" />
