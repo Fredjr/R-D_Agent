@@ -147,7 +147,10 @@ export default function NetworkSidebar({
 
   // Notify parent component when exploration path changes
   useEffect(() => {
+    console.log('📋 [NetworkSidebar] explorationPath changed:', explorationPath);
+    console.log('📋 [NetworkSidebar] onExplorationPathChange exists:', !!onExplorationPathChange);
     if (onExplorationPathChange) {
+      console.log('📋 [NetworkSidebar] Calling onExplorationPathChange with path:', explorationPath);
       onExplorationPathChange(explorationPath);
     }
   }, [explorationPath, onExplorationPathChange]);

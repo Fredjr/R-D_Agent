@@ -204,6 +204,20 @@ export default function MultiColumnNetworkView({
   const handleShowCitations = useCallback((pmid: string) => {
     console.log('🔍 [MultiColumnNetworkView] Showing citations network for PMID:', pmid);
     setMainNetworkType('citations');
+
+    // 📋 Update exploration path
+    const selectedNode = mainNetworkViewRef.current?.getSelectedNode?.();
+    const auditEntry = {
+      pmid: pmid || 'unknown',
+      title: selectedNode?.label || 'Unknown Article',
+      explorationType: 'citations-network',
+      timestamp: new Date(),
+      resultCount: 0, // Will be updated when results load
+      sourceNode: pmid || 'unknown'
+    };
+    setExplorationPath(prev => [...prev, auditEntry]);
+    console.log('📋 Exploration path updated for citations:', auditEntry);
+
     // Force re-render of main network view
     if (mainNetworkViewRef.current) {
       console.log('✅ [MultiColumnNetworkView] Changing main network to citations');
@@ -213,6 +227,20 @@ export default function MultiColumnNetworkView({
   const handleShowReferences = useCallback((pmid: string) => {
     console.log('🔍 [MultiColumnNetworkView] Showing references network for PMID:', pmid);
     setMainNetworkType('references');
+
+    // 📋 Update exploration path
+    const selectedNode = mainNetworkViewRef.current?.getSelectedNode?.();
+    const auditEntry = {
+      pmid: pmid || 'unknown',
+      title: selectedNode?.label || 'Unknown Article',
+      explorationType: 'references-network',
+      timestamp: new Date(),
+      resultCount: 0, // Will be updated when results load
+      sourceNode: pmid || 'unknown'
+    };
+    setExplorationPath(prev => [...prev, auditEntry]);
+    console.log('📋 Exploration path updated for references:', auditEntry);
+
     // Force re-render of main network view
     if (mainNetworkViewRef.current) {
       console.log('✅ [MultiColumnNetworkView] Changing main network to references');
@@ -417,6 +445,19 @@ export default function MultiColumnNetworkView({
         hasExplorationData: !!newColumn.explorationData,
         explorationData: newColumn.explorationData
       });
+
+      // 📋 Update exploration path when creating a new column
+      const auditEntry = {
+        pmid: paper.metadata.pmid || 'unknown',
+        title: paper.metadata.title || 'Unknown Article',
+        explorationType: paper.metadata.explorationType || `column-${networkType}`,
+        timestamp: new Date(),
+        resultCount: paper.metadata.explorationResults?.length || 0,
+        sourceNode: paper.metadata.pmid || 'unknown'
+      };
+      setExplorationPath(prev => [...prev, auditEntry]);
+      console.log('📋 Exploration path updated for new column:', auditEntry);
+
       setColumns(prev => {
         const newColumns = [...prev, newColumn];
         console.log('📊 Updated columns:', newColumns);
@@ -865,7 +906,10 @@ export default function MultiColumnNetworkView({
                   onShowReferences={handleShowReferences}
                   edges={mainNetworkViewRef.current?.getEdges?.() || []}
                   sourceNodeId={mainNetworkViewRef.current?.getSourceId?.() || sourceId}
-                  onExplorationPathChange={(path) => setExplorationPath(path)}
+                  onExplorationPathChange={(path) => {
+                    console.log('📋 [MultiColumnNetworkView] Received exploration path update:', path);
+                    setExplorationPath(path);
+                  }}
                   onOpenPDF={(pmid, title) => {
                     console.log('📄 Opening PDF in side viewer:', pmid, title);
                     setPdfPmid(pmid);

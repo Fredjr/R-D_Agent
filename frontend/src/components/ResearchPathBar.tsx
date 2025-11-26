@@ -23,6 +23,9 @@ export default function ResearchPathBar({
   onEntryClick,
   maxVisible = 10
 }: ResearchPathBarProps) {
+  console.log('📋 [ResearchPathBar] Rendered with explorationPath:', explorationPath);
+  console.log('📋 [ResearchPathBar] Path length:', explorationPath.length);
+
   // Show the most recent entries
   const visiblePath = explorationPath.slice(-maxVisible);
   const hasMore = explorationPath.length > maxVisible;
