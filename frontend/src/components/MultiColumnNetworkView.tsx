@@ -869,10 +869,9 @@ export default function MultiColumnNetworkView({
                 forceNetworkType={mainNetworkType}
               />
             </ErrorBoundary>
-          </div>
-          
-          {/* Main Sidebar */}
-          {mainSelectedNode && (() => {
+
+            {/* Main Sidebar - Positioned inside NetworkView container */}
+            {mainSelectedNode && (() => {
             // DEBUG: Log props being passed to NetworkSidebar
             console.log('🔍 [MultiColumnNetworkView] Rendering NetworkSidebar with props:', {
               hasMainSelectedNode: !!mainSelectedNode,
@@ -948,6 +947,7 @@ export default function MultiColumnNetworkView({
               </div>
             );
           })()}
+          </div>{/* End NetworkView container with sidebar */}
         </div>
       </div>
 
