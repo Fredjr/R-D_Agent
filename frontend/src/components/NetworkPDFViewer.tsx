@@ -187,12 +187,10 @@ export default function NetworkPDFViewer({ pmid, title, onClose }: NetworkPDFVie
 
   return (
     <div
-      className="fixed top-0 right-0 h-full bg-white shadow-2xl border-l border-gray-300 flex flex-col transition-all duration-300"
-      style={{
-        zIndex: 9999,
-        // Use fixed pixel widths - browser zoom will scale them naturally
-        width: isExpanded ? '900px' : '600px'
-      }}
+      className={`fixed top-0 right-0 h-full bg-white shadow-2xl border-l border-gray-300 flex flex-col transition-all duration-300 ${
+        isExpanded ? 'w-[50vw]' : 'w-[35vw]'
+      }`}
+      style={{ zIndex: 9999 }}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-b border-blue-700 relative">

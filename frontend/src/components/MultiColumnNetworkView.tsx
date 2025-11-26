@@ -595,24 +595,22 @@ export default function MultiColumnNetworkView({
   const isDesktop = screenWidth >= 1024;
   const isLargeDesktop = screenWidth >= 1440;
 
-  // Use FIXED pixel widths - browser zoom will handle scaling naturally
-  // This is the correct approach: define sizes at 100% zoom, let browser scale them
-  const MAIN_VIEW_MIN_WIDTH = isMobile ? screenWidth : isTablet ? 600 : isLargeDesktop ? 1000 : 900;
-  const COLUMN_MIN_WIDTH = isMobile ? screenWidth : isTablet ? 500 : isLargeDesktop ? 800 : 700;
-  // Sidebar: Fixed 320px width - browser zoom will scale it naturally
-  const SIDEBAR_WIDTH = isMobile ? screenWidth : 320;
+  // Use viewport-relative widths (vw) - adapts to screen size AND browser zoom
+  // vw units scale with both viewport size and browser zoom
+  const SIDEBAR_WIDTH = isMobile ? screenWidth : Math.round(screenWidth * 0.25); // 25% of screen width
+  const MAIN_VIEW_MIN_WIDTH = isMobile ? screenWidth : Math.round(screenWidth * 0.6); // 60% of screen width
+  const COLUMN_MIN_WIDTH = isMobile ? screenWidth : Math.round(screenWidth * 0.5); // 50% of screen width
 
   // 🎯 FIX: Main view should take FULL WIDTH when no columns are open
-  // When columns exist, use fixed width for consistent multi-column layout
-  // When PDF viewer is open, use FIXED pixel widths that browser zoom will scale
+  // When columns exist, use viewport-relative width for consistent multi-column layout
+  // When PDF viewer is open, use viewport-relative widths that adapt to screen size
   let mainViewWidth: string;
   if (isMobile) {
     mainViewWidth = '100vw';
   } else if (isPDFViewerOpen) {
-    // Use fixed pixel widths - browser zoom will scale them naturally
-    // At 1920px screen: PDF=600px (31%), Network=1320px (69%)
-    // When expanded: PDF=900px (47%), Network=1020px (53%)
-    mainViewWidth = isPDFViewerExpanded ? '1020px' : '1320px';
+    // Use viewport-relative widths - adapts to screen size AND browser zoom
+    // PDF takes 35% (or 50% when expanded), network takes the rest
+    mainViewWidth = isPDFViewerExpanded ? '50vw' : '65vw';
   } else if (hasColumns) {
     mainViewWidth = `${MAIN_VIEW_MIN_WIDTH}px`;
   } else {
