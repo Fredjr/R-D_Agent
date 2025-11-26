@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
-import 'react-pdf/dist/Page/TextLayer.css';
-import { 
+import {
   XMarkIcon, 
   ChevronLeftIcon, 
   ChevronRightIcon, 
@@ -189,7 +188,7 @@ export default function NetworkPDFViewer({ pmid, title, onClose }: NetworkPDFVie
   return (
     <div
       className={`fixed top-0 right-0 h-full bg-white shadow-2xl border-l border-gray-300 flex flex-col transition-all duration-300 ${
-        isExpanded ? 'w-[70%]' : 'w-[50%]'
+        isExpanded ? 'w-[50%]' : 'w-[35%]'
       }`}
       style={{ zIndex: 9999 }}
     >
@@ -447,7 +446,7 @@ export default function NetworkPDFViewer({ pmid, title, onClose }: NetworkPDFVie
               <Page
                 pageNumber={pageNumber}
                 scale={scale}
-                renderTextLayer={true}
+                renderTextLayer={false}
                 renderAnnotationLayer={false}
               />
             </Document>

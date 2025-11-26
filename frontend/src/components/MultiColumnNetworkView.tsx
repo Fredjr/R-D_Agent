@@ -595,12 +595,13 @@ export default function MultiColumnNetworkView({
   const isDesktop = screenWidth >= 1024;
   const isLargeDesktop = screenWidth >= 1440;
 
-  // Dynamic minimum widths
-  const MAIN_VIEW_MIN_WIDTH = isMobile ? screenWidth : isTablet ? 600 : isLargeDesktop ? 1000 : 900;
-  const COLUMN_MIN_WIDTH = isMobile ? screenWidth : isTablet ? 500 : isLargeDesktop ? 800 : 700;
-  // Use viewport-relative width for sidebar to scale with browser zoom
-  // Use viewportWidth (which updates on zoom) instead of screenWidth
-  const SIDEBAR_WIDTH = isMobile ? viewportWidth : Math.max(320, Math.min(450, viewportWidth * 0.25)); // Min 320px, max 450px, or 25% of viewport
+  // Dynamic minimum widths - use viewportWidth for zoom responsiveness
+  const MAIN_VIEW_MIN_WIDTH = isMobile ? viewportWidth : isTablet ? viewportWidth * 0.6 : isLargeDesktop ? viewportWidth * 0.7 : viewportWidth * 0.65;
+  const COLUMN_MIN_WIDTH = isMobile ? viewportWidth : isTablet ? viewportWidth * 0.5 : isLargeDesktop ? viewportWidth * 0.55 : viewportWidth * 0.5;
+  // Sidebar width: 280px at standard viewport, scales with zoom
+  // At 1920px viewport: 280px = 14.6% of viewport
+  // Use percentage-based calculation that scales with browser zoom
+  const SIDEBAR_WIDTH = isMobile ? viewportWidth : Math.round(Math.max(280, Math.min(400, viewportWidth * 0.146))); // ~280px at 1920px viewport, scales with zoom
 
   // 🎯 FIX: Main view should take FULL WIDTH when no columns are open
   // When columns exist, use fixed width for consistent multi-column layout
@@ -609,15 +610,15 @@ export default function MultiColumnNetworkView({
   if (isMobile) {
     mainViewWidth = '100vw';
   } else if (isPDFViewerOpen) {
-    // PDF viewer takes 50% (or 70% when expanded), so network view takes the remaining space
-    mainViewWidth = isPDFViewerExpanded ? '30%' : '50%';
+    // PDF viewer takes 35% (or 50% when expanded), so network view takes the remaining space
+    mainViewWidth = isPDFViewerExpanded ? '50%' : '65%';
   } else if (hasColumns) {
-    mainViewWidth = `${MAIN_VIEW_MIN_WIDTH}px`;
+    mainViewWidth = `${Math.round(MAIN_VIEW_MIN_WIDTH)}px`;
   } else {
     mainViewWidth = '100%';
   }
 
-  const columnWidth = isMobile ? '100vw' : `${COLUMN_MIN_WIDTH}px`;
+  const columnWidth = isMobile ? '100vw' : `${Math.round(COLUMN_MIN_WIDTH)}px`;
 
   // Scroll container ref for keyboard/mouse navigation
   const scrollContainerRef = useRef<HTMLDivElement>(null);
