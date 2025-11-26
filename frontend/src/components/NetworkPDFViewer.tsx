@@ -35,6 +35,7 @@ export default function NetworkPDFViewer({ pmid, title, onClose }: NetworkPDFVie
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [pdfSource, setPdfSource] = useState<string>('');
   const [pdfAvailable, setPdfAvailable] = useState<boolean>(false);
+  const [articleUrl, setArticleUrl] = useState<string>('');
 
   // 🎯 Notify network view that PDF viewer is open
   useEffect(() => {
@@ -125,14 +126,13 @@ export default function NetworkPDFViewer({ pmid, title, onClose }: NetworkPDFVie
           setPdfUrl(proxyUrl);
         }
       } else {
-        // No direct PDF available - show message with link
-        setError(`PDF not directly available. This article may be behind a paywall.`);
+        // No direct PDF available - show message with link (don't auto-open)
+        console.log(`ℹ️ PDF not available, article URL: ${data.url}`);
+        setError(`PDF not directly available. Click the button below to view the article on the publisher's website.`);
         setPdfUrl(null);
-
-        // Open the article URL in a new tab
-        if (data.url) {
-          window.open(data.url, '_blank');
-        }
+        // Store the URL and source for the "Open Article" button
+        setArticleUrl(data.url || '');
+        setPdfSource(data.source);
       }
     } catch (err) {
       console.error('❌ Error fetching PDF:', err);
@@ -252,9 +252,25 @@ export default function NetworkPDFViewer({ pmid, title, onClose }: NetworkPDFVie
         )}
 
         {error && (
-          <div className="flex flex-col items-center justify-center p-8 text-center">
-            <p className="text-sm text-red-600 mb-2">{error}</p>
-            <p className="text-xs text-gray-500">This PDF may not be available or accessible.</p>
+          <div className="flex flex-col items-center justify-center p-8 text-center max-w-md">
+            <div className="text-4xl mb-4">📄</div>
+            <p className="text-sm text-gray-700 mb-4">{error}</p>
+            {articleUrl && (
+              <button
+                onClick={() => window.open(articleUrl, '_blank')}
+                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                Open Article on Publisher Website
+              </button>
+            )}
+            <p className="text-xs text-gray-500 mt-4">
+              {articleUrl
+                ? "The full text may be available on the publisher's website."
+                : "This PDF may not be available or accessible."}
+            </p>
           </div>
         )}
 

@@ -857,11 +857,12 @@ export default function MultiColumnNetworkView({
               supportsMultiColumn: true
             });
             return (
-              <div className="absolute top-0 right-0 bottom-0 z-10 bg-white border-l-2 border-gray-300 shadow-xl overflow-hidden" style={{ width: `${SIDEBAR_WIDTH}px` }}>
-                <div className="p-3 bg-blue-50 border-b border-blue-200">
+              <div className="absolute top-0 right-0 bottom-0 z-10 bg-white border-l-2 border-gray-300 shadow-xl flex flex-col" style={{ width: `${SIDEBAR_WIDTH}px` }}>
+                <div className="p-3 bg-blue-50 border-b border-blue-200 flex-shrink-0">
                   <h3 className="text-sm font-semibold text-blue-800 mb-1">📄 Article Details</h3>
                   <p className="text-xs text-blue-600">Click options below to explore related research</p>
                 </div>
+                <div className="flex-1 overflow-y-auto">{/* Scrollable wrapper */}
               <ErrorBoundary
                 fallback={
                   <div className="flex items-center justify-center h-full p-4 bg-red-50 border border-red-200 rounded">
@@ -918,6 +919,7 @@ export default function MultiColumnNetworkView({
                   }}
                 />
               </ErrorBoundary>
+                </div>{/* End scrollable wrapper */}
               </div>
             );
           })()}
