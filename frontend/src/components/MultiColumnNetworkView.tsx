@@ -84,6 +84,9 @@ export default function MultiColumnNetworkView({
   const [pdfPmid, setPdfPmid] = useState<string>('');
   const [pdfTitle, setPdfTitle] = useState<string>('');
 
+  // 🎯 Track viewport width for responsive sidebar
+  const [viewportWidth, setViewportWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1920);
+
   // Fetch collections for the project OR all collections across all projects if no projectId
   const fetchCollections = useCallback(async () => {
     if (!user?.email) return;
@@ -159,6 +162,26 @@ export default function MultiColumnNetworkView({
   useEffect(() => {
     fetchCollections();
   }, [fetchCollections]);
+
+  // 🎯 Track viewport width changes (including browser zoom)
+  useEffect(() => {
+    const handleResize = () => {
+      setViewportWidth(window.innerWidth);
+      console.log('📐 Viewport width changed:', window.innerWidth);
+    };
+
+    // Use ResizeObserver to detect all size changes including browser zoom
+    const resizeObserver = new ResizeObserver(handleResize);
+    resizeObserver.observe(document.body);
+
+    // Also listen to window resize events
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
 
   // 🎯 Listen for PDF viewer open/close events for dynamic resizing
   useEffect(() => {
@@ -575,7 +598,9 @@ export default function MultiColumnNetworkView({
   // Dynamic minimum widths
   const MAIN_VIEW_MIN_WIDTH = isMobile ? screenWidth : isTablet ? 600 : isLargeDesktop ? 1000 : 900;
   const COLUMN_MIN_WIDTH = isMobile ? screenWidth : isTablet ? 500 : isLargeDesktop ? 800 : 700;
-  const SIDEBAR_WIDTH = isMobile ? screenWidth : 360; // Wider sidebar for better readability
+  // Use viewport-relative width for sidebar to scale with browser zoom
+  // Use viewportWidth (which updates on zoom) instead of screenWidth
+  const SIDEBAR_WIDTH = isMobile ? viewportWidth : Math.max(320, Math.min(450, viewportWidth * 0.25)); // Min 320px, max 450px, or 25% of viewport
 
   // 🎯 FIX: Main view should take FULL WIDTH when no columns are open
   // When columns exist, use fixed width for consistent multi-column layout

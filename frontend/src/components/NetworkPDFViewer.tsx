@@ -37,6 +37,11 @@ export default function NetworkPDFViewer({ pmid, title, onClose }: NetworkPDFVie
   const [pdfAvailable, setPdfAvailable] = useState<boolean>(false);
   const [articleUrl, setArticleUrl] = useState<string>('');
 
+  // HTML content state
+  const [htmlContent, setHtmlContent] = useState<any>(null);
+  const [loadingHtml, setLoadingHtml] = useState<boolean>(false);
+  const [showHtmlView, setShowHtmlView] = useState<boolean>(false);
+
   // 🎯 Notify network view that PDF viewer is open
   useEffect(() => {
     // Dispatch event to notify network view that PDF is opening
@@ -76,6 +81,32 @@ export default function NetworkPDFViewer({ pmid, title, onClose }: NetworkPDFVie
   useEffect(() => {
     fetchPDF();
   }, [pmid]);
+
+  const fetchHTMLContent = async () => {
+    setLoadingHtml(true);
+    try {
+      console.log(`🔍 Fetching HTML content for PMID: ${pmid}`);
+      const response = await fetch(`/api/proxy/articles/${pmid}/html-content`, {
+        headers: {
+          'User-ID': 'default_user',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch HTML content');
+      }
+
+      const data = await response.json();
+      console.log(`✅ HTML content fetched:`, data);
+      setHtmlContent(data);
+      setShowHtmlView(true);
+    } catch (err) {
+      console.error('❌ Error fetching HTML content:', err);
+      setError('Failed to load article content. Please try opening on the publisher website.');
+    } finally {
+      setLoadingHtml(false);
+    }
+  };
 
   const fetchPDF = async () => {
     setLoading(true);
@@ -251,30 +282,154 @@ export default function NetworkPDFViewer({ pmid, title, onClose }: NetworkPDFVie
           </div>
         )}
 
-        {error && (
+        {error && !showHtmlView && (
           <div className="flex flex-col items-center justify-center p-8 text-center max-w-md">
             <div className="text-4xl mb-4">📄</div>
             <p className="text-sm text-gray-700 mb-4">{error}</p>
-            {articleUrl && (
-              <button
-                onClick={() => window.open(articleUrl, '_blank')}
-                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-                Open Article on Publisher Website
-              </button>
-            )}
+            <div className="flex flex-col gap-3 w-full">
+              {articleUrl && (
+                <>
+                  <button
+                    onClick={fetchHTMLContent}
+                    disabled={loadingHtml}
+                    className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loadingHtml ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Loading Article...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        View Article Content
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => window.open(articleUrl, '_blank')}
+                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    Open on Publisher Website
+                  </button>
+                </>
+              )}
+            </div>
             <p className="text-xs text-gray-500 mt-4">
               {articleUrl
-                ? "The full text may be available on the publisher's website."
+                ? "Try viewing the article content here, or open it on the publisher's website."
                 : "This PDF may not be available or accessible."}
             </p>
           </div>
         )}
 
-        {!loading && !error && pdfUrl && (
+        {/* HTML Content Viewer */}
+        {showHtmlView && htmlContent && (
+          <div className="flex-1 overflow-y-auto bg-white p-8">
+            <div className="max-w-4xl mx-auto">
+              {/* Header with back button */}
+              <div className="mb-6 flex items-center justify-between border-b pb-4">
+                <button
+                  onClick={() => setShowHtmlView(false)}
+                  className="text-blue-600 hover:text-blue-700 flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  </svg>
+                  Back to PDF View
+                </button>
+                {articleUrl && (
+                  <button
+                    onClick={() => window.open(articleUrl, '_blank')}
+                    className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    Open Original
+                  </button>
+                )}
+              </div>
+
+              {/* Title */}
+              <h1 className="text-3xl font-bold text-gray-900 mb-4">{htmlContent.title}</h1>
+
+              {/* Authors */}
+              {htmlContent.authors && htmlContent.authors.length > 0 && (
+                <div className="text-sm text-gray-600 mb-6">
+                  {htmlContent.authors.join(', ')}
+                </div>
+              )}
+
+              {/* Abstract */}
+              {htmlContent.abstract && (
+                <div className="mb-8 p-4 bg-blue-50 rounded-lg">
+                  <h2 className="text-lg font-semibold text-blue-900 mb-2">Abstract</h2>
+                  <p className="text-gray-700 leading-relaxed">{htmlContent.abstract}</p>
+                </div>
+              )}
+
+              {/* Sections */}
+              {htmlContent.sections && htmlContent.sections.length > 0 && (
+                <div className="space-y-6">
+                  {htmlContent.sections.map((section: any, idx: number) => (
+                    <div key={idx} className="border-l-4 border-blue-500 pl-4">
+                      <h2 className="text-xl font-semibold text-gray-900 mb-3">{section.heading}</h2>
+                      <div className="text-gray-700 leading-relaxed whitespace-pre-line">{section.content}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Tables */}
+              {htmlContent.tables && htmlContent.tables.length > 0 && (
+                <div className="mt-8 space-y-6">
+                  <h2 className="text-2xl font-bold text-gray-900">Tables</h2>
+                  {htmlContent.tables.map((table: any, idx: number) => (
+                    <div key={idx} className="border rounded-lg overflow-hidden">
+                      {table.caption && (
+                        <div className="bg-gray-100 px-4 py-2 font-semibold text-gray-800">
+                          {table.caption}
+                        </div>
+                      )}
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {table.data.map((row: string[], rowIdx: number) => (
+                              <tr key={rowIdx} className={rowIdx === 0 ? 'bg-gray-50 font-semibold' : ''}>
+                                {row.map((cell: string, cellIdx: number) => (
+                                  <td key={cellIdx} className="px-4 py-2 text-sm text-gray-700 border-r last:border-r-0">
+                                    {cell}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* No content message */}
+              {!htmlContent.full_text_available && (
+                <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-yellow-800">
+                    ⚠️ Full text content could not be extracted. Please open the article on the publisher's website for complete access.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {!loading && !error && pdfUrl && !showHtmlView && (
           <div className="bg-white shadow-lg">
             <Document
               file={pdfUrl}
