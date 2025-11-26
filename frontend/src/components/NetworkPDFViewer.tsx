@@ -54,6 +54,19 @@ export default function NetworkPDFViewer({ pmid, title, onClose }: NetworkPDFVie
     }));
   }, [isExpanded]);
 
+  // 🎯 ESC key handler to close PDF viewer
+  useEffect(() => {
+    const handleEscKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        console.log('🔑 ESC key pressed - closing PDF viewer');
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleEscKey);
+    return () => window.removeEventListener('keydown', handleEscKey);
+  }, [onClose]);
+
   useEffect(() => {
     fetchPDF();
   }, [pmid]);
@@ -70,7 +83,10 @@ export default function NetworkPDFViewer({ pmid, title, onClose }: NetworkPDFVie
         const data = await response.json();
         console.log(`✅ PDF URL response:`, data);
         if (data.url && data.pdf_available) {
-          setPdfUrl(data.url);
+          // Use proxy endpoint to avoid CORS issues
+          const proxyUrl = `/api/proxy/articles/${pmid}/pdf-proxy`;
+          console.log(`🔄 Using proxy URL: ${proxyUrl}`);
+          setPdfUrl(proxyUrl);
         } else {
           setError('PDF not available for this article');
         }
@@ -106,16 +122,16 @@ export default function NetworkPDFViewer({ pmid, title, onClose }: NetworkPDFVie
       }`}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-b border-blue-700">
-        <div className="flex-1 min-w-0">
+      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-b border-blue-700 relative z-10">
+        <div className="flex-1 min-w-0 mr-4">
           <h3 className="text-sm font-semibold truncate">{title || 'PDF Viewer'}</h3>
           <p className="text-xs text-blue-100">PMID: {pmid}</p>
         </div>
-        
-        <div className="flex items-center gap-2 ml-4">
+
+        <div className="flex items-center gap-2 flex-shrink-0">
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="p-1.5 hover:bg-blue-500 rounded transition-colors"
+            className="p-1.5 hover:bg-blue-500 rounded transition-colors z-20"
             title={isExpanded ? 'Collapse' : 'Expand'}
           >
             {isExpanded ? (
@@ -126,8 +142,8 @@ export default function NetworkPDFViewer({ pmid, title, onClose }: NetworkPDFVie
           </button>
           <button
             onClick={onClose}
-            className="p-1.5 hover:bg-blue-500 rounded transition-colors"
-            title="Close PDF"
+            className="p-1.5 hover:bg-blue-500 rounded transition-colors z-20"
+            title="Close PDF (or press ESC)"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
