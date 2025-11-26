@@ -621,6 +621,18 @@ export default function NetworkSidebar({
         }
       }));
 
+      // 📋 Update exploration path
+      const auditEntry = {
+        pmid: pmid || 'unknown',
+        title: selectedNode?.label || selectedNode?.metadata?.title || 'Unknown Article',
+        explorationType: 'similar-work',
+        timestamp: new Date(),
+        resultCount: data.citations.length,
+        sourceNode: pmid || 'unknown'
+      };
+      setExplorationPath(prev => [...prev, auditEntry]);
+      console.log('📋 Audit trail updated for Similar Work:', auditEntry);
+
       success(`✅ Found ${data.citations.length} similar papers`);
     } catch (err) {
       console.error('[Similar Work] Error:', err);
@@ -668,6 +680,18 @@ export default function NetworkSidebar({
         }
       }));
 
+      // 📋 Update exploration path
+      const auditEntry = {
+        pmid: pmid || 'unknown',
+        title: selectedNode?.label || selectedNode?.metadata?.title || 'Unknown Article',
+        explorationType: 'earlier-work',
+        timestamp: new Date(),
+        resultCount: data.references.length,
+        sourceNode: pmid || 'unknown'
+      };
+      setExplorationPath(prev => [...prev, auditEntry]);
+      console.log('📋 Audit trail updated for Earlier Work:', auditEntry);
+
       success(`✅ Found ${data.references.length} earlier work papers`);
     } catch (err) {
       console.error('[Earlier Work] Error:', err);
@@ -714,6 +738,18 @@ export default function NetworkSidebar({
           papers: data.citations
         }
       }));
+
+      // 📋 Update exploration path
+      const auditEntry = {
+        pmid: pmid || 'unknown',
+        title: selectedNode?.label || selectedNode?.metadata?.title || 'Unknown Article',
+        explorationType: 'later-work',
+        timestamp: new Date(),
+        resultCount: data.citations.length,
+        sourceNode: pmid || 'unknown'
+      };
+      setExplorationPath(prev => [...prev, auditEntry]);
+      console.log('📋 Audit trail updated for Later Work:', auditEntry);
 
       success(`✅ Found ${data.citations.length} later work papers`);
     } catch (err) {
