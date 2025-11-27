@@ -4797,6 +4797,68 @@ async def health_check():
         "features": ["increased_recommendation_limits", "author_fixes", "citation_opportunities"]
     }
 
+@app.get("/admin/verify-phase1-migration")
+async def verify_phase1_migration(db: Session = Depends(get_db)):
+    """
+    Phase 1: Verify database migrations completed successfully
+
+    Checks:
+    1. New tables exist (project_collections, etc.)
+    2. Data backfill completed
+    3. Counts match between collections and project_collections
+    """
+    try:
+        from database import ProjectCollection, Collection
+        from sqlalchemy import text, inspect
+
+        # Check if project_collections table exists
+        inspector = inspect(db.bind)
+        tables = inspector.get_table_names()
+
+        phase0_tables = [
+            "project_collections",
+            "collection_research_questions",
+            "collection_hypotheses",
+            "collection_decisions",
+            "collection_question_evidence",
+            "collection_hypothesis_evidence"
+        ]
+
+        tables_exist = {table: table in tables for table in phase0_tables}
+
+        # Count active collections
+        active_collections_count = db.query(Collection).filter(Collection.is_active == True).count()
+
+        # Count project_collections (only if table exists)
+        project_collections_count = 0
+        if tables_exist["project_collections"]:
+            project_collections_count = db.query(ProjectCollection).count()
+
+        # Check if counts match
+        counts_match = active_collections_count == project_collections_count
+
+        return {
+            "status": "success",
+            "phase0_migration": {
+                "tables_created": tables_exist,
+                "all_tables_exist": all(tables_exist.values())
+            },
+            "phase1_migration": {
+                "active_collections": active_collections_count,
+                "project_collections": project_collections_count,
+                "counts_match": counts_match,
+                "backfill_complete": counts_match and project_collections_count > 0
+            },
+            "overall_status": "✅ COMPLETE" if all(tables_exist.values()) and counts_match else "⚠️ INCOMPLETE"
+        }
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "overall_status": "❌ ERROR"
+        }
+
 @app.post("/admin/enrich-articles")
 async def enrich_articles_endpoint(
     request: Request,
