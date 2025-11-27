@@ -9860,6 +9860,8 @@ async def create_collection(
 
     try:
         import uuid
+        from datetime import datetime
+        from database import ProjectCollection
         from backend.app.services.collection_hypothesis_integration_service import CollectionHypothesisIntegrationService
 
         # Week 24: Validate hypothesis and question links if provided
@@ -9889,6 +9891,21 @@ async def create_collection(
         )
 
         db.add(collection)
+
+        # Phase 1: Dual-Write Pattern - Also write to project_collections junction table
+        project_collection = ProjectCollection(
+            project_id=project_id,
+            collection_id=collection.collection_id,
+            research_context=collection_data.description,  # Use description as initial context
+            tags=[],  # Empty initially, will be populated in Phase 4
+            linked_project_question_ids={},  # Empty initially, will be populated in Phase 4
+            linked_project_hypothesis_ids={},  # Empty initially, will be populated in Phase 4
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        db.add(project_collection)
+
+        # Atomic commit for both tables
         db.commit()
         db.refresh(collection)
 
@@ -10004,6 +10021,8 @@ async def update_collection(
         raise HTTPException(status_code=403, detail="Access denied")
 
     try:
+        from datetime import datetime
+        from database import ProjectCollection
         from backend.app.services.collection_hypothesis_integration_service import CollectionHypothesisIntegrationService
 
         # Find the collection
@@ -10045,6 +10064,32 @@ async def update_collection(
         if collection_data.auto_update is not None:
             collection.auto_update = collection_data.auto_update
 
+        # Phase 1: Dual-Write Pattern - Also update project_collections junction table
+        project_collection = db.query(ProjectCollection).filter(
+            ProjectCollection.project_id == project_id,
+            ProjectCollection.collection_id == collection_id
+        ).first()
+
+        if project_collection:
+            # Update existing record
+            if collection_data.description is not None:
+                project_collection.research_context = collection_data.description
+            project_collection.updated_at = datetime.utcnow()
+        else:
+            # Backfill: Create if doesn't exist (for collections created before Phase 1)
+            project_collection = ProjectCollection(
+                project_id=project_id,
+                collection_id=collection_id,
+                research_context=collection.description,
+                tags=[],
+                linked_project_question_ids={},
+                linked_project_hypothesis_ids={},
+                created_at=collection.created_at,
+                updated_at=datetime.utcnow()
+            )
+            db.add(project_collection)
+
+        # Atomic commit for both tables
         db.commit()
         db.refresh(collection)
 
@@ -10103,6 +10148,8 @@ async def delete_collection(
         raise HTTPException(status_code=403, detail="Access denied")
 
     try:
+        from database import ProjectCollection
+
         # Find the collection
         collection = db.query(Collection).filter(
             Collection.collection_id == collection_id,
@@ -10115,6 +10162,18 @@ async def delete_collection(
 
         # Soft delete the collection
         collection.is_active = False
+
+        # Phase 1: Dual-Delete Pattern - Also delete from project_collections junction table
+        # CASCADE DELETE will automatically remove related collection-level entities
+        project_collection = db.query(ProjectCollection).filter(
+            ProjectCollection.project_id == project_id,
+            ProjectCollection.collection_id == collection_id
+        ).first()
+
+        if project_collection:
+            db.delete(project_collection)  # Hard delete (CASCADE handles related records)
+
+        # Atomic commit for both operations
         db.commit()
 
         # Log activity

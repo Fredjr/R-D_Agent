@@ -409,6 +409,188 @@ class ArticleCollection(Base):
         Index('idx_unique_article_collection', 'collection_id', 'article_pmid', 'article_url', unique=True),
     )
 
+# ============================================================================
+# Phase 0: Many-to-Many Collections Architecture (2025-11-27)
+# ============================================================================
+
+class ProjectCollection(Base):
+    """Many-to-many relationship between projects and collections with edge metadata
+
+    Phase 0: Foundation for independent collections that can be linked to multiple projects.
+    This junction table stores WHY a collection is linked to a project and maps
+    collection-level entities to project-level entities.
+    """
+    __tablename__ = "project_collections"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    project_id = Column(String, ForeignKey("projects.project_id", ondelete="CASCADE"), nullable=False)
+    collection_id = Column(String, ForeignKey("collections.collection_id", ondelete="CASCADE"), nullable=False)
+
+    # Edge metadata - WHY is this collection linked to this project?
+    research_context = Column(Text, nullable=True)  # "Exploring GLP-1 agonists for diabetes treatment"
+    tags = Column(JSON, default=list)  # ["diabetes", "glp1", "clinical-trials"]
+
+    # Mapping between collection-level and project-level entities
+    # Format: {collection_question_id: project_question_id}
+    linked_project_question_ids = Column(JSON, default=dict)
+    linked_project_hypothesis_ids = Column(JSON, default=dict)
+
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    project = relationship("Project", backref="project_collection_links")
+    collection = relationship("Collection", backref="project_collection_links")
+
+    # Indexes and constraints
+    __table_args__ = (
+        Index('idx_project_collection_project', 'project_id'),
+        Index('idx_project_collection_collection', 'collection_id'),
+        Index('idx_project_collection_unique', 'project_id', 'collection_id', unique=True),
+    )
+
+class CollectionResearchQuestion(Base):
+    """Collection-level research questions (independent from projects)
+
+    Phase 0: Allows organizing research questions at the collection level.
+    These can optionally be mapped to project-level questions via ProjectCollection.
+    """
+    __tablename__ = "collection_research_questions"
+
+    question_id = Column(String, primary_key=True)  # UUID
+    collection_id = Column(String, ForeignKey("collections.collection_id", ondelete="CASCADE"), nullable=False)
+    question_text = Column(Text, nullable=False)
+    question_type = Column(String, default='exploratory')  # exploratory, confirmatory, methodological
+    priority = Column(String, default='medium')  # low, medium, high
+    status = Column(String, default='open')  # open, investigating, answered, closed
+
+    # Metadata
+    created_by = Column(String, ForeignKey("users.user_id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    collection = relationship("Collection", backref="collection_questions")
+    creator = relationship("User")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_collection_question_collection', 'collection_id'),
+        Index('idx_collection_question_status', 'status'),
+    )
+
+class CollectionHypothesis(Base):
+    """Collection-level hypotheses (independent from projects)
+
+    Phase 0: Allows organizing hypotheses at the collection level.
+    These can optionally be mapped to project-level hypotheses via ProjectCollection.
+    """
+    __tablename__ = "collection_hypotheses"
+
+    hypothesis_id = Column(String, primary_key=True)  # UUID
+    collection_id = Column(String, ForeignKey("collections.collection_id", ondelete="CASCADE"), nullable=False)
+    hypothesis_text = Column(Text, nullable=False)
+    confidence_level = Column(Float, default=0.5)  # 0.0 to 1.0
+    status = Column(String, default='untested')  # untested, testing, supported, refuted, inconclusive
+
+    # Metadata
+    created_by = Column(String, ForeignKey("users.user_id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    collection = relationship("Collection", backref="collection_hypotheses")
+    creator = relationship("User")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_collection_hypothesis_collection', 'collection_id'),
+        Index('idx_collection_hypothesis_status', 'status'),
+    )
+
+class CollectionDecision(Base):
+    """Collection-level decisions (independent from projects)
+
+    Phase 0: Tracks research direction decisions at the collection level.
+    """
+    __tablename__ = "collection_decisions"
+
+    decision_id = Column(String, primary_key=True)  # UUID
+    collection_id = Column(String, ForeignKey("collections.collection_id", ondelete="CASCADE"), nullable=False)
+    decision_text = Column(Text, nullable=False)
+    decision_type = Column(String, default='research_direction')  # research_direction, methodology, resource_allocation
+    rationale = Column(Text, nullable=True)
+
+    # Metadata
+    created_by = Column(String, ForeignKey("users.user_id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    collection = relationship("Collection", backref="collection_decisions")
+    creator = relationship("User")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_collection_decision_collection', 'collection_id'),
+    )
+
+class CollectionQuestionEvidence(Base):
+    """Evidence linking articles to collection-level research questions
+
+    Phase 0: Supports evidence-based research at the collection level.
+    """
+    __tablename__ = "collection_question_evidence"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    question_id = Column(String, ForeignKey("collection_research_questions.question_id", ondelete="CASCADE"), nullable=False)
+    article_id = Column(String, nullable=False)  # PMID or other identifier
+    evidence_type = Column(String, default='supporting')  # supporting, contradicting, testing
+    excerpt = Column(Text, nullable=True)  # Relevant excerpt from article
+    relevance_score = Column(Float, nullable=True)  # 0.0 to 1.0
+
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    question = relationship("CollectionResearchQuestion", backref="evidence")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_collection_question_evidence_question', 'question_id'),
+        Index('idx_collection_question_evidence_article', 'article_id'),
+    )
+
+class CollectionHypothesisEvidence(Base):
+    """Evidence linking articles to collection-level hypotheses
+
+    Phase 0: Supports evidence-based hypothesis testing at the collection level.
+    """
+    __tablename__ = "collection_hypothesis_evidence"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    hypothesis_id = Column(String, ForeignKey("collection_hypotheses.hypothesis_id", ondelete="CASCADE"), nullable=False)
+    article_id = Column(String, nullable=False)  # PMID or other identifier
+    evidence_type = Column(String, default='supporting')  # supporting, contradicting, testing
+    excerpt = Column(Text, nullable=True)  # Relevant excerpt from article
+    confidence_impact = Column(Float, nullable=True)  # How much this evidence affects confidence
+
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    hypothesis = relationship("CollectionHypothesis", backref="evidence")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_collection_hypothesis_evidence_hypothesis', 'hypothesis_id'),
+        Index('idx_collection_hypothesis_evidence_article', 'article_id'),
+    )
+
+# ============================================================================
+# End of Phase 0 Models
+# ============================================================================
+
 class BackgroundJob(Base):
     """Background job tracking for long-running processes"""
     __tablename__ = "background_jobs"
