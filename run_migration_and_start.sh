@@ -19,6 +19,14 @@ python3 backend/migrations/002_enhance_paper_triage.py upgrade
 echo "📄 Running migration: add_pdf_text_fields (Week 19-20)..."
 python3 run_migration_006.py
 
+# Run Phase 0 migration (Many-to-Many Collections Architecture)
+echo "🏗️ Running migration: phase0_add_many_to_many_collections (Phase 0)..."
+python3 migrations/phase0_add_many_to_many_collections.py
+
+# Run Phase 1 migration (Backfill Project Collections)
+echo "📊 Running migration: phase1_backfill_project_collections (Phase 1)..."
+python3 migrations/phase1_backfill_project_collections.py
+
 echo "✅ All migrations completed successfully!"
 
 # Start the FastAPI server
