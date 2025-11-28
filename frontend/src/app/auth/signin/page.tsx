@@ -28,7 +28,7 @@ export default function SignIn() {
 
     try {
       await signin(email, password);
-      router.push('/dashboard');
+      router.push('/home');
     } catch (error: any) {
       if (error.message === 'INCOMPLETE_REGISTRATION') {
         // Redirect to complete profile page
