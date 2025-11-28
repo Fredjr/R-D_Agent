@@ -83,6 +83,8 @@ export {
   ErythosDecisionsTab,
   ErythosTeamTab,
   ErythosReportsTab,
+  ErythosInsightsTab,
+  ErythosSummaryTab,
 } from './project';
 
 // Lab Page

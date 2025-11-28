@@ -15,8 +15,9 @@ interface LabMetrics {
 
 interface Experiment {
   plan_id: string;
-  title: string;
-  status: 'planning' | 'in_progress' | 'completed' | 'paused';
+  plan_name: string;  // Backend uses plan_name, not title
+  title?: string;     // Keep for backwards compatibility
+  status: 'planning' | 'in_progress' | 'completed' | 'paused' | 'draft';
   progress_percentage: number;
 }
 
@@ -144,7 +145,7 @@ export function ErythosLabProgressTab({ projectId }: ErythosLabProgressTabProps)
             {experiments.slice(0, 3).map((experiment) => (
               <div key={experiment.plan_id} className="p-4 bg-gray-800/50 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-white font-medium">{experiment.title}</h4>
+                  <h4 className="text-white font-medium">{experiment.plan_name || experiment.title || 'Untitled Experiment'}</h4>
                   <span className={`px-2 py-0.5 rounded text-xs ${getStatusColor(experiment.status)}`}>
                     {experiment.status.replace('_', ' ')}
                   </span>

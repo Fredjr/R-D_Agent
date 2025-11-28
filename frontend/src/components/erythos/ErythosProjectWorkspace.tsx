@@ -11,7 +11,9 @@ import {
   ErythosLabProgressTab,
   ErythosDecisionsTab,
   ErythosTeamTab,
-  ErythosReportsTab
+  ErythosReportsTab,
+  ErythosInsightsTab,
+  ErythosSummaryTab
 } from './project';
 
 interface Project {
@@ -36,7 +38,7 @@ interface ErythosProjectWorkspaceProps {
   projectId: string;
 }
 
-type TabId = 'overview' | 'questions' | 'collections' | 'lab' | 'decisions' | 'team' | 'reports';
+type TabId = 'overview' | 'questions' | 'collections' | 'lab' | 'decisions' | 'team' | 'reports' | 'insights' | 'summary';
 
 export function ErythosProjectWorkspace({ projectId }: ErythosProjectWorkspaceProps) {
   const { user } = useAuth();
@@ -120,6 +122,8 @@ export function ErythosProjectWorkspace({ projectId }: ErythosProjectWorkspacePr
     { id: 'collections', label: 'Collections', icon: '📁' },
     { id: 'lab', label: 'Lab Progress', icon: '🧪' },
     { id: 'decisions', label: 'Decisions', icon: '✅' },
+    { id: 'insights', label: 'AI Insights', icon: '✨' },
+    { id: 'summary', label: 'Summary', icon: '📝' },
     { id: 'team', label: 'Team', icon: '👥' },
     { id: 'reports', label: 'Reports', icon: '📊' },
   ];
@@ -181,6 +185,8 @@ export function ErythosProjectWorkspace({ projectId }: ErythosProjectWorkspacePr
         {activeTab === 'collections' && <ErythosProjectCollectionsTab projectId={projectId} />}
         {activeTab === 'lab' && <ErythosLabProgressTab projectId={projectId} />}
         {activeTab === 'decisions' && <ErythosDecisionsTab projectId={projectId} />}
+        {activeTab === 'insights' && <ErythosInsightsTab projectId={projectId} />}
+        {activeTab === 'summary' && <ErythosSummaryTab projectId={projectId} />}
         {activeTab === 'team' && <ErythosTeamTab projectId={projectId} ownerId={project.owner_user_id} />}
         {activeTab === 'reports' && <ErythosReportsTab projectId={projectId} />}
       </div>

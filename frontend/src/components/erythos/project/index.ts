@@ -6,4 +6,6 @@ export { ErythosLabProgressTab } from './ErythosLabProgressTab';
 export { ErythosDecisionsTab } from './ErythosDecisionsTab';
 export { ErythosTeamTab } from './ErythosTeamTab';
 export { ErythosReportsTab } from './ErythosReportsTab';
+export { ErythosInsightsTab } from './ErythosInsightsTab';
+export { ErythosSummaryTab } from './ErythosSummaryTab';
 
