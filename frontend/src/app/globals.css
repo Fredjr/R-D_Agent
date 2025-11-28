@@ -10,6 +10,148 @@
   --foreground: var(--spotify-white);
 }
 
+/* ==========================================
+   ERYTHOS THEME - Phase 1 Visual Rebrand
+   ========================================== */
+
+:root {
+  /* Primary Colors - Red (Main brand color) */
+  --erythos-red: #DC2626;
+  --erythos-red-dark: #991B1B;
+  --erythos-red-light: #FCA5A5;
+  --erythos-red-50: #FEF2F2;
+  --erythos-red-100: #FEE2E2;
+  --erythos-red-500: #EF4444;
+  --erythos-red-600: #DC2626;
+  --erythos-red-700: #B91C1C;
+  --erythos-red-900: #7F1D1D;
+
+  /* Purple (Lab) */
+  --erythos-purple: #8B5CF6;
+  --erythos-purple-dark: #6D28D9;
+  --erythos-purple-light: #C4B5FD;
+  --erythos-purple-500: #8B5CF6;
+  --erythos-purple-600: #7C3AED;
+  --erythos-purple-900: #4C1D95;
+
+  /* Orange (Collections/Organize) */
+  --erythos-orange: #FB923C;
+  --erythos-orange-dark: #EA580C;
+  --erythos-orange-light: #FED7AA;
+  --erythos-orange-500: #F97316;
+  --erythos-orange-600: #EA580C;
+
+  /* Yellow (Write) */
+  --erythos-yellow: #FBBF24;
+  --erythos-yellow-dark: #F59E0B;
+  --erythos-yellow-500: #EAB308;
+  --erythos-yellow-600: #CA8A04;
+
+  /* Background Colors */
+  --erythos-bg-black: #000000;
+  --erythos-bg-dark: #1C1C1E;
+  --erythos-bg-medium: #2C2C2E;
+  --erythos-bg-light: #3C3C3E;
+
+  /* Text Colors */
+  --erythos-text-white: #FFFFFF;
+  --erythos-text-gray: #8E8E93;
+  --erythos-text-light: #AEAEB2;
+  --erythos-text-muted: #636366;
+
+  /* Border Colors */
+  --erythos-border-dark: #38383A;
+  --erythos-border-light: #48484A;
+
+  /* Gradients */
+  --gradient-discover: linear-gradient(135deg, #DC2626 0%, #991B1B 100%);
+  --gradient-organize: linear-gradient(135deg, #FB923C 0%, #EA580C 100%);
+  --gradient-lab: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%);
+  --gradient-write: linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%);
+
+  /* Card gradients */
+  --gradient-card-red: linear-gradient(135deg, rgba(220, 38, 38, 0.1) 0%, rgba(153, 27, 27, 0.05) 100%);
+  --gradient-card-purple: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(109, 40, 217, 0.05) 100%);
+  --gradient-card-orange: linear-gradient(135deg, rgba(251, 146, 60, 0.1) 0%, rgba(234, 88, 12, 0.05) 100%);
+  --gradient-card-yellow: linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%);
+}
+
+/* Erythos Typography */
+.erythos-font {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Erythos Body (when theme is enabled) */
+body.erythos-theme {
+  background-color: var(--erythos-bg-black);
+  color: var(--erythos-text-white);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Erythos Animations */
+@keyframes erythos-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes erythos-fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes erythos-slideIn {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes erythos-glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(220, 38, 38, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(220, 38, 38, 0.6); }
+}
+
+.animate-erythos-pulse {
+  animation: erythos-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-erythos-fadeIn {
+  animation: erythos-fadeIn 0.3s ease-out;
+}
+
+.animate-erythos-slideIn {
+  animation: erythos-slideIn 0.3s ease-out;
+}
+
+.animate-erythos-glow {
+  animation: erythos-glow 2s ease-in-out infinite;
+}
+
+/* Erythos Focus States */
+.erythos-focus:focus-visible {
+  outline: 2px solid var(--erythos-red);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Erythos Scrollbar */
+.erythos-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.erythos-scrollbar::-webkit-scrollbar-track {
+  background: var(--erythos-bg-dark);
+  border-radius: 4px;
+}
+
+.erythos-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--erythos-border-light);
+  border-radius: 4px;
+}
+
+.erythos-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--erythos-text-muted);
+}
+
 /* Global Spotify Dark Theme */
 body {
   background-color: var(--spotify-black);

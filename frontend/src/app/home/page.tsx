@@ -32,6 +32,9 @@ import {
 import { useRealTimeAnalytics } from '@/hooks/useRealTimeAnalytics';
 import { useWeeklyMixIntegration } from '@/hooks/useWeeklyMixIntegration';
 import { hasMinimalInterests } from '@/lib/interest-inference';
+import { useNewHomePage, useErythosTheme } from '@/contexts/FeatureFlagsContext';
+import { ErythosHomePage } from '@/components/erythos';
+import { ErythosHeader } from '@/components/erythos';
 
 interface RecommendationData {
   papers_for_you: any[];
@@ -73,6 +76,10 @@ interface QuickAction {
 export default function HomePage() {
   const { user } = useAuth();
   const router = useRouter();
+
+  // Feature flags for Erythos restructuring
+  const enableNewHomePage = useNewHomePage();
+  const enableErythosTheme = useErythosTheme();
 
   // Initialize real-time analytics
   const { trackEvent, trackRecommendationInteraction } = useRealTimeAnalytics('home');
@@ -367,7 +374,17 @@ export default function HomePage() {
     );
   }
 
-  // Hero actions for home page
+  // Render new Erythos home page if feature flag is enabled
+  if (enableNewHomePage) {
+    return (
+      <>
+        {enableErythosTheme && <ErythosHeader />}
+        <ErythosHomePage />
+      </>
+    );
+  }
+
+  // Hero actions for home page (legacy)
   const heroActions: HeroAction[] = [
     {
       id: 'explore-network',

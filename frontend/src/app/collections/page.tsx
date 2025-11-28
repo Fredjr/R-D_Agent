@@ -30,6 +30,8 @@ import { useRouter } from 'next/navigation';
 import EnhancedCollectionNavigation from '@/components/EnhancedCollectionNavigation';
 import { useRealTimeAnalytics } from '@/hooks/useRealTimeAnalytics';
 import MultiColumnNetworkView from '@/components/MultiColumnNetworkView';
+import { useNewCollectionsPage, useErythosTheme } from '@/contexts/FeatureFlagsContext';
+import { ErythosCollectionsPage, ErythosHeader } from '@/components/erythos';
 
 interface Collection {
   id: string;
@@ -50,6 +52,11 @@ interface Collection {
 export default function CollectionsPage() {
   const { user } = useAuth();
   const router = useRouter();
+
+  // Feature flags for Erythos
+  const enableNewCollectionsPage = useNewCollectionsPage();
+  const enableErythosTheme = useErythosTheme();
+
   const [collections, setCollections] = useState<Collection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -79,6 +86,142 @@ export default function CollectionsPage() {
 
   // Initialize real-time analytics
   const { trackCollectionAction } = useRealTimeAnalytics('collections');
+
+  const colors = [
+    '#3B82F6', '#EF4444', '#10B981', '#F59E0B',
+    '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'
+  ];
+
+  // Handle creating a new collection (shared between old and new pages)
+  const handleCreateCollection = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!newCollection.collection_name.trim()) {
+      alert('Please enter a collection name');
+      return;
+    }
+
+    // Get the first project ID (or create a default project)
+    const projectId = 'default_project'; // TODO: Get from user's projects
+
+    setCreatingCollection(true);
+    try {
+      const response = await fetch(`/api/proxy/projects/${projectId}/collections`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user?.email || 'default_user',
+        },
+        body: JSON.stringify(newCollection),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create collection');
+      }
+
+      // Reset form and close modal
+      setNewCollection({
+        collection_name: '',
+        description: '',
+        color: '#3B82F6',
+        icon: 'folder'
+      });
+      setShowCreateModal(false);
+
+      alert('✅ Collection created successfully!');
+
+      // Refresh will happen via useEffect when state changes
+      window.location.reload(); // Force reload to fetch new collections
+    } catch (error) {
+      console.error('Error creating collection:', error);
+      alert('❌ Failed to create collection. Please try again.');
+    } finally {
+      setCreatingCollection(false);
+    }
+  };
+
+  // 🔴 ERYTHOS: Render new collections page when feature flag is enabled
+  if (enableNewCollectionsPage) {
+    return (
+      <>
+        {enableErythosTheme && <ErythosHeader />}
+        <ErythosCollectionsPage onCreateCollection={() => setShowCreateModal(true)} />
+
+        {/* Keep Create Modal for both old and new pages */}
+        {showCreateModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-[#1C1C1E] rounded-xl p-6 w-full max-w-md mx-4 border border-gray-700">
+              <h3 className="text-lg font-semibold text-white mb-4">Create New Collection</h3>
+              <form onSubmit={handleCreateCollection} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Name *</label>
+                  <input
+                    type="text"
+                    value={newCollection.collection_name}
+                    onChange={(e) => setNewCollection(prev => ({ ...prev, collection_name: e.target.value }))}
+                    placeholder="Enter collection name..."
+                    className="w-full p-3 bg-gray-900/70 border border-gray-700/50 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Description</label>
+                  <textarea
+                    value={newCollection.description}
+                    onChange={(e) => setNewCollection(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Enter description (optional)..."
+                    className="w-full p-3 bg-gray-900/70 border border-gray-700/50 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    rows={3}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Color</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {colors.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setNewCollection(prev => ({ ...prev, color }))}
+                        className={`w-8 h-8 rounded-full border-2 transition-all ${
+                          newCollection.color === color ? 'border-white scale-110' : 'border-gray-600'
+                        }`}
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreateModal(false);
+                      setNewCollection({
+                        collection_name: '',
+                        description: '',
+                        color: '#3B82F6',
+                        icon: 'folder'
+                      });
+                    }}
+                    className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+                    disabled={creatingCollection}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!newCollection.collection_name.trim() || creatingCollection}
+                    className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {creatingCollection ? 'Creating...' : 'Create Collection'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
 
   // 🔧 FIX: Wait for user to be loaded before fetching collections
   useEffect(() => {
@@ -244,59 +387,6 @@ export default function CollectionsPage() {
       day: 'numeric'
     });
   };
-
-  // Handle creating a new collection
-  const handleCreateCollection = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!newCollection.collection_name.trim()) {
-      alert('Please enter a collection name');
-      return;
-    }
-
-    // Get the first project ID (or create a default project)
-    const projectId = 'default_project'; // TODO: Get from user's projects
-
-    setCreatingCollection(true);
-    try {
-      const response = await fetch(`/api/proxy/projects/${projectId}/collections`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-ID': user?.email || 'default_user',
-        },
-        body: JSON.stringify(newCollection),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create collection');
-      }
-
-      // Reset form and close modal
-      setNewCollection({
-        collection_name: '',
-        description: '',
-        color: '#3B82F6',
-        icon: 'folder'
-      });
-      setShowCreateModal(false);
-
-      // Refresh collections
-      fetchCollections();
-
-      alert('✅ Collection created successfully!');
-    } catch (error) {
-      console.error('Error creating collection:', error);
-      alert('❌ Failed to create collection. Please try again.');
-    } finally {
-      setCreatingCollection(false);
-    }
-  };
-
-  const colors = [
-    '#3B82F6', '#EF4444', '#10B981', '#F59E0B',
-    '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'
-  ];
 
   // Hero actions for collections page
   const heroActions: HeroAction[] = [

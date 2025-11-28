@@ -142,7 +142,7 @@ class User(Base):
 class Project(Base):
     """Project workspace model - organizes all research activities"""
     __tablename__ = "projects"
-    
+
     project_id = Column(String, primary_key=True)  # UUID
     project_name = Column(String, nullable=False)
     description = Column(Text)
@@ -150,11 +150,18 @@ class Project(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     is_active = Column(Boolean, default=True)
-    
+
     # Project metadata
     tags = Column(JSON, default=list)  # Research topics, molecules, etc.
     settings = Column(JSON, default=dict)  # Project-specific preferences
-    
+
+    # Erythos: Cached counts for stats grid
+    paper_count = Column(Integer, default=0)  # Total papers across all collections
+    collection_count = Column(Integer, default=0)  # Total collections
+    note_count = Column(Integer, default=0)  # Total annotations
+    report_count = Column(Integer, default=0)  # Total reports
+    experiment_count = Column(Integer, default=0)  # Total experiments
+
     # Relationships
     owner = relationship("User", back_populates="owned_projects")
     collaborators = relationship("ProjectCollaborator", back_populates="project", cascade="all, delete-orphan")
@@ -351,6 +358,9 @@ class Collection(Base):
     linked_question_ids = Column(JSON, default=list)  # List of research question IDs this collection relates to
     collection_purpose = Column(String, default='general')  # 'supporting_evidence', 'contradicting_evidence', 'methodology', 'general'
     auto_update = Column(Boolean, default=False)  # Auto-add papers matching linked hypotheses
+
+    # Erythos: UI enhancements
+    note_count = Column(Integer, default=0)  # Cached count of annotations for this collection
 
     # Relationships
     project = relationship("Project", back_populates="collections")
@@ -1013,6 +1023,7 @@ class PaperTriage(Base):
 
     triage_id = Column(String, primary_key=True)  # UUID
     project_id = Column(String, ForeignKey("projects.project_id", ondelete="CASCADE"), nullable=False)
+    collection_id = Column(String, ForeignKey("collections.collection_id", ondelete="CASCADE"), nullable=True)  # Erythos: Collection-centric triage
     article_pmid = Column(String, ForeignKey("articles.pmid", ondelete="CASCADE"), nullable=False)
 
     # Triage status
@@ -1094,6 +1105,9 @@ class Protocol(Base):
     potential_applications = Column(JSON, default=list)  # How to use protocol
     recommendations = Column(JSON, default=list)  # Actionable recommendations
     context_relevance = Column(Text, nullable=True)  # How protocol relates to context
+
+    # Erythos: Enhanced protocol cards
+    protocol_comparison = Column(Text, nullable=True)  # Comparison with other protocols
 
     # Extraction metadata
     extraction_method = Column(String, default='basic')  # 'basic' or 'intelligent_multi_agent'
@@ -1219,6 +1233,12 @@ class ExperimentPlan(Base):
     actual_duration = Column(String(200), nullable=True)  # Actual time taken
     actual_cost = Column(String(200), nullable=True)  # Actual cost incurred
 
+    # Erythos: Progress tracking for enhanced experiment cards
+    progress_percentage = Column(Integer, default=0)  # 0-100 progress
+    data_points_collected = Column(Integer, default=0)  # Number of data points collected
+    data_points_total = Column(Integer, default=0)  # Total expected data points
+    metrics = Column(JSON, default=dict)  # Custom metrics {metric_name: value}
+
     # Results (after execution)
     results_summary = Column(Text, nullable=True)
     outcome = Column(String(50), nullable=True)  # success, partial_success, failure, inconclusive
@@ -1246,6 +1266,40 @@ class ExperimentPlan(Base):
         Index('idx_experiment_plans_status', 'status'),
         Index('idx_experiment_plans_created_by', 'created_by'),
         Index('idx_experiment_plans_created_at', 'created_at'),
+    )
+
+
+class LabFile(Base):
+    """Lab files for data management (Erythos Phase 0)"""
+    __tablename__ = "lab_files"
+
+    file_id = Column(String, primary_key=True)  # UUID
+    experiment_id = Column(String, ForeignKey("experiment_plans.plan_id", ondelete="CASCADE"), nullable=False)
+
+    # File metadata
+    file_type = Column(String(50), nullable=False)  # 'raw_data', 'analysis', 'photo'
+    file_name = Column(String(500), nullable=False)
+    file_size = Column(Integer, nullable=False)  # Size in bytes
+    file_path = Column(Text, nullable=False)  # Path to file in storage
+
+    # Upload metadata
+    uploaded_by = Column(String, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
+    uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    experiment = relationship("ExperimentPlan")
+    uploader = relationship("User")
+
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_lab_files_experiment', 'experiment_id'),
+        Index('idx_lab_files_type', 'file_type'),
+        Index('idx_lab_files_uploaded_by', 'uploaded_by'),
+        Index('idx_lab_files_uploaded_at', 'uploaded_at'),
     )
 
 

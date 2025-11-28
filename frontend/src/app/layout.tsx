@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { FeatureFlagsProvider } from "@/contexts/FeatureFlagsContext";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import "./globals.css";
 
@@ -33,11 +34,13 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased overflow-x-hidden`}
       >
         <AuthProvider>
-          {children}
-          {/* Global Notification Center - positioned fixed */}
-          <div className="fixed top-4 right-4 z-50">
-            <NotificationCenter />
-          </div>
+          <FeatureFlagsProvider>
+            {children}
+            {/* Global Notification Center - positioned fixed */}
+            <div className="fixed top-4 right-4 z-50">
+              <NotificationCenter />
+            </div>
+          </FeatureFlagsProvider>
         </AuthProvider>
       </body>
     </html>

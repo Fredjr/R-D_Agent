@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNewProjectWorkspace, useErythosTheme } from '@/contexts/FeatureFlagsContext';
+import { ErythosProjectWorkspace, ErythosHeader } from '@/components/erythos';
 import { MobileResponsiveLayout } from '@/components/ui/MobileResponsiveLayout';
 import AnnotationsFeed from '@/components/AnnotationsFeed';
 import ActivityFeed from '@/components/ActivityFeed';
@@ -112,6 +114,11 @@ export default function ProjectPage() {
   const searchParams = useSearchParams();
   const projectId = params.projectId as string;
   const { user } = useAuth();
+
+  // Feature flags for Erythos restructuring
+  const useNewWorkspace = useNewProjectWorkspace();
+  const useErythos = useErythosTheme();
+
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1148,6 +1155,18 @@ export default function ProjectPage() {
           </a>
         </div>
       </div>
+    );
+  }
+
+  // ============================================================================
+  // FEATURE FLAG: NEW ERYTHOS PROJECT WORKSPACE
+  // ============================================================================
+  if (useNewWorkspace) {
+    return (
+      <>
+        {useErythos && <ErythosHeader />}
+        <ErythosProjectWorkspace projectId={projectId} />
+      </>
     );
   }
 

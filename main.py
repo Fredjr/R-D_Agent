@@ -180,6 +180,24 @@ app = FastAPI(title="R&D Agent API", version="1.0.0")
 # Register notification callback with background processor
 background_processor.add_notification_callback(background_job_notification_callback)
 
+# =============================================================================
+# Phase 3: Read-Only Mode Helper Functions
+# =============================================================================
+
+def is_read_only_mode() -> bool:
+    """
+    Check if collections are in read-only mode.
+
+    In read-only mode:
+    - Users can view and browse collections
+    - Write operations (create, update, delete) are disabled
+    - Used during migration testing phase
+
+    Returns:
+        bool: True if read-only mode is enabled, False otherwise
+    """
+    return os.getenv("READ_ONLY_MODE", "false").lower() == "true"
+
 # Test endpoint to verify app is working
 @app.get("/api/test-app")
 async def test_app():
@@ -994,6 +1012,15 @@ try:
     print("✅ Research timeline endpoints registered successfully")
 except ImportError as e:
     print(f"⚠️ Failed to import research timeline router: {e}")
+    print(f"   Error details: {type(e).__name__}")
+
+# Erythos Phase 0: Feature Flags endpoint
+try:
+    from backend.app.routers.feature_flags import router as feature_flags_router
+    app.include_router(feature_flags_router)
+    print("✅ Feature flags endpoint registered successfully")
+except ImportError as e:
+    print(f"⚠️ Failed to import feature flags router: {e}")
     print(f"   Error details: {type(e).__name__}")
 
 # Database migration endpoint for Phase 5
@@ -4619,6 +4646,64 @@ async def get_feature_flags():
             "USE_MULTI_AGENT_TRIAGE": "Use multi-agent system for triage (vs legacy single-agent)",
             "USE_ENHANCED_TRIAGE": "Use enhanced triage service (vs basic triage)"
         }
+    }
+
+
+# =============================================================================
+# Phase 3: Read-Only Mode Admin Endpoints
+# =============================================================================
+
+@app.get("/admin/read-only-mode")
+async def get_read_only_mode():
+    """
+    Phase 3: Get current read-only mode status.
+
+    Returns:
+        dict: Current read-only mode status and description
+    """
+    is_read_only = is_read_only_mode()
+
+    return {
+        "status": "success",
+        "read_only_mode": is_read_only,
+        "message": "Read-only mode is currently " + ("enabled" if is_read_only else "disabled"),
+        "description": {
+            "enabled": "Collections are in read-only mode. Users can view and browse collections, but write operations (create, update, delete) are disabled.",
+            "disabled": "Collections are in normal mode. All operations are enabled."
+        },
+        "instructions": "To toggle read-only mode, set the READ_ONLY_MODE environment variable on Railway to 'true' or 'false'"
+    }
+
+
+@app.post("/admin/toggle-read-only-mode")
+async def toggle_read_only_mode(enabled: bool):
+    """
+    Phase 3: Toggle read-only mode (requires manual environment variable update).
+
+    Note: This endpoint returns instructions for toggling the mode.
+    The actual toggle requires updating the READ_ONLY_MODE environment variable on Railway.
+
+    Args:
+        enabled: True to enable read-only mode, False to disable
+
+    Returns:
+        dict: Instructions for toggling read-only mode
+    """
+    current_mode = is_read_only_mode()
+
+    return {
+        "status": "info",
+        "current_mode": current_mode,
+        "requested_mode": enabled,
+        "message": "To toggle read-only mode, update the READ_ONLY_MODE environment variable on Railway",
+        "instructions": {
+            "step_1": "Go to Railway dashboard",
+            "step_2": "Navigate to your service settings",
+            "step_3": "Add/update environment variable: READ_ONLY_MODE=" + ("true" if enabled else "false"),
+            "step_4": "Redeploy the service",
+            "step_5": "Verify with GET /admin/read-only-mode"
+        },
+        "note": "Environment variables cannot be changed programmatically for security reasons"
     }
 
 
@@ -9951,6 +10036,13 @@ async def create_collection(
     db: Session = Depends(get_db)
 ):
     """Create a new collection within a project"""
+    # Phase 3: Check if read-only mode is enabled
+    if is_read_only_mode():
+        raise HTTPException(
+            status_code=403,
+            detail="Collections are in read-only mode. Write operations are temporarily disabled."
+        )
+
     current_user = request.headers.get("User-ID", "default_user")
 
     # Check project access
@@ -10113,6 +10205,13 @@ async def update_collection(
     db: Session = Depends(get_db)
 ):
     """Update a collection"""
+    # Phase 3: Check if read-only mode is enabled
+    if is_read_only_mode():
+        raise HTTPException(
+            status_code=403,
+            detail="Collections are in read-only mode. Write operations are temporarily disabled."
+        )
+
     current_user = request.headers.get("User-ID", "default_user")
 
     # Check project access
@@ -10240,6 +10339,13 @@ async def delete_collection(
     db: Session = Depends(get_db)
 ):
     """Delete a collection (soft delete)"""
+    # Phase 3: Check if read-only mode is enabled
+    if is_read_only_mode():
+        raise HTTPException(
+            status_code=403,
+            detail="Collections are in read-only mode. Write operations are temporarily disabled."
+        )
+
     current_user = request.headers.get("User-ID", "default_user")
 
     # Check project access
