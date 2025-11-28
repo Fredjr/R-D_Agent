@@ -92,7 +92,20 @@ def run_migration():
                 print(f"   ✓ {col_name} already exists")
 
         # =====================================================
-        # 3. ExperimentPlans table - add Erythos progress columns
+        # 3. Collections table - add note_count column
+        # =====================================================
+        print("📋 Checking collections table...")
+        collections_columns = {col['name'] for col in inspector.get_columns('collections')}
+
+        if 'note_count' not in collections_columns:
+            print("   ➕ Adding note_count column...")
+            conn.execute(text("ALTER TABLE collections ADD COLUMN note_count INTEGER DEFAULT 0"))
+            print("   ✅ note_count added")
+        else:
+            print("   ✓ note_count already exists")
+
+        # =====================================================
+        # 4. ExperimentPlans table - add Erythos progress columns
         # =====================================================
         print("📋 Checking experiment_plans table...")
 

@@ -67,7 +67,8 @@ from database import (
     get_db, init_db, User, Project, ProjectCollaborator,
     Report, DeepDiveAnalysis, Annotation, Collection, ArticleCollection,
     Article, NetworkGraph, AuthorCollaboration, create_tables,
-    ResearchQuestion, Hypothesis  # Phase 2: Dashboard UI
+    ResearchQuestion, Hypothesis,  # Phase 2: Dashboard UI
+    WriteDocument, WriteSource, DocumentCitation  # Write Feature
 )
 
 # Annotation models
@@ -1021,6 +1022,15 @@ try:
     print("✅ Feature flags endpoint registered successfully")
 except ImportError as e:
     print(f"⚠️ Failed to import feature flags router: {e}")
+    print(f"   Error details: {type(e).__name__}")
+
+# Erythos Write Feature: Thesis/Paper Writing with AI
+try:
+    from backend.app.routers.write import router as write_router
+    app.include_router(write_router)
+    print("✅ Write feature endpoints registered successfully")
+except ImportError as e:
+    print(f"⚠️ Failed to import write router: {e}")
     print(f"   Error details: {type(e).__name__}")
 
 # Database migration endpoint for Phase 5

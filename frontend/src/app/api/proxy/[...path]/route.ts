@@ -9,7 +9,7 @@ function buildTargetUrl(req: Request, path: string[]): string {
   // Always use the production backend as primary
   const backend = BACKEND_BASE || "https://r-dagent-production.up.railway.app";
 
-  // Routes that need /api prefix (new pivot endpoints + Week 9-18 features)
+  // Routes that need /api prefix (new pivot endpoints + Week 9-18 features + Erythos Write)
   const needsApiPrefix = suffix.startsWith('questions') ||
                          suffix.startsWith('hypotheses') ||
                          suffix.startsWith('analytics') ||
@@ -20,7 +20,8 @@ function buildTargetUrl(req: Request, path: string[]): string {
                          suffix.startsWith('experiment-plans') ||
                          suffix.startsWith('experiment-results') ||
                          suffix.startsWith('summaries') ||
-                         suffix.startsWith('insights');
+                         suffix.startsWith('insights') ||
+                         suffix.startsWith('write');
 
   const finalPath = needsApiPrefix ? `api/${suffix}` : suffix;
 

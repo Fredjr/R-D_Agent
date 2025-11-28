@@ -126,22 +126,24 @@ def get_collection_with_articles(collection_id: str, db: Session, limit: int = 5
 def get_project_collections_optimized(project_id: str, db: Session) -> List[Collection]:
     """
     Get all collections for a project with article counts
-    
+
     Optimizations:
     - Single query with aggregation
     - Includes article counts without N+1 queries
     - Cached for 5 minutes
     """
     start_time = time.time()
-    
+
     # Get collections with article counts in a single query
+    # Filter by is_active == True to exclude deleted/inactive collections
     collections = db.query(
         Collection,
         func.count(ArticleCollection.article_pmid).label('article_count')
     ).outerjoin(
         ArticleCollection, Collection.collection_id == ArticleCollection.collection_id
     ).filter(
-        Collection.project_id == project_id
+        Collection.project_id == project_id,
+        Collection.is_active == True
     ).group_by(
         Collection.collection_id
     ).all()

@@ -1555,6 +1555,104 @@ class ConversationMemory(Base):
     )
 
 
+# =============================================================================
+# WRITE FEATURE - Thesis/Paper Writing with AI Assistance
+# =============================================================================
+
+class WriteDocument(Base):
+    """
+    User's thesis/paper documents linked to collections.
+    Supports rich text editing, citations, and AI assistance.
+    """
+    __tablename__ = 'write_documents'
+
+    document_id = Column(String(36), primary_key=True)
+    user_id = Column(String(255), ForeignKey('users.user_id'), nullable=False)
+    collection_id = Column(String(36), ForeignKey('collections.collection_id'), nullable=True)
+    title = Column(String(500), nullable=False, default='Untitled Document')
+    content = Column(Text)  # HTML or structured JSON content
+    content_json = Column(JSON)  # Structured content for TipTap
+    word_count = Column(Integer, default=0)
+    citation_count = Column(Integer, default=0)
+    citation_style = Column(String(50), default='vancouver')  # vancouver, apa, harvard, chicago
+    status = Column(String(50), default='draft')  # draft, in_progress, completed
+    is_deleted = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User")
+    collection = relationship("Collection")
+
+    __table_args__ = (
+        Index('idx_write_doc_user', 'user_id'),
+        Index('idx_write_doc_collection', 'collection_id'),
+        Index('idx_write_doc_status', 'status'),
+        Index('idx_write_doc_created', 'created_at'),
+    )
+
+
+class WriteSource(Base):
+    """
+    Extracted sources/references from papers in a collection.
+    Used for drag-and-drop citation insertion.
+    """
+    __tablename__ = 'write_sources'
+
+    source_id = Column(String(36), primary_key=True)
+    collection_id = Column(String(36), ForeignKey('collections.collection_id'), nullable=False)
+    article_pmid = Column(String(50), ForeignKey('articles.pmid'), nullable=True)
+    source_type = Column(String(50))  # abstract, annotation, triage, figure, table, quote
+    title = Column(String(500))  # Key finding/excerpt title
+    text = Column(Text)  # The actual quote/excerpt
+    page_number = Column(String(20))  # Page reference
+    section = Column(String(100))  # Section name in the paper
+    paper_title = Column(String(500))  # Source paper title
+    paper_authors = Column(String(1000))  # Source paper authors
+    paper_year = Column(Integer)  # Publication year
+    embedding = Column(JSON)  # Vector embedding for similarity search (list of floats)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    collection = relationship("Collection")
+    article = relationship("Article")
+
+    __table_args__ = (
+        Index('idx_write_source_collection', 'collection_id'),
+        Index('idx_write_source_article', 'article_pmid'),
+        Index('idx_write_source_type', 'source_type'),
+    )
+
+
+class DocumentCitation(Base):
+    """
+    Citations used in a WriteDocument.
+    Links document positions to sources.
+    """
+    __tablename__ = 'document_citations'
+
+    citation_id = Column(String(36), primary_key=True)
+    document_id = Column(String(36), ForeignKey('write_documents.document_id'), nullable=False)
+    source_id = Column(String(36), ForeignKey('write_sources.source_id'), nullable=True)
+    article_pmid = Column(String(50), ForeignKey('articles.pmid'), nullable=True)
+    citation_number = Column(Integer)  # [1], [2], etc.
+    citation_text = Column(Text)  # The cited text
+    position_start = Column(Integer)  # Character position in document
+    position_end = Column(Integer)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    document = relationship("WriteDocument")
+    source = relationship("WriteSource")
+    article = relationship("Article")
+
+    __table_args__ = (
+        Index('idx_doc_citation_document', 'document_id'),
+        Index('idx_doc_citation_source', 'source_id'),
+        Index('idx_doc_citation_number', 'document_id', 'citation_number'),
+    )
+
+
 # Database session dependency
 def get_db():
     """Dependency to get database session"""

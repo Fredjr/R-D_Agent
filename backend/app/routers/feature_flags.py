@@ -31,14 +31,19 @@ async def get_feature_flags(user_id: Optional[str] = Header(None, alias="User-ID
     Returns:
         dict: Feature flags with boolean values
     """
+    # Master Erythos flag - when true, enables all Erythos features by default
+    enable_erythos = str_to_bool(os.getenv("ENABLE_ERYTHOS", "true"))
+
     return {
-        "enable_new_home_page": str_to_bool(os.getenv("ENABLE_NEW_HOME_PAGE", "false")),
-        "enable_new_discover_page": str_to_bool(os.getenv("ENABLE_NEW_DISCOVER_PAGE", "false")),
-        "enable_new_collections_page": str_to_bool(os.getenv("ENABLE_NEW_COLLECTIONS_PAGE", "false")),
-        "enable_new_project_workspace": str_to_bool(os.getenv("ENABLE_NEW_PROJECT_WORKSPACE", "false")),
-        "enable_new_lab_page": str_to_bool(os.getenv("ENABLE_NEW_LAB_PAGE", "false")),
-        "enable_global_triage": str_to_bool(os.getenv("ENABLE_GLOBAL_TRIAGE", "false")),
-        "enable_erythos_theme": str_to_bool(os.getenv("ENABLE_ERYTHOS_THEME", "false")),
+        "enable_erythos": enable_erythos,
+        "enable_new_home_page": str_to_bool(os.getenv("ENABLE_NEW_HOME_PAGE", str(enable_erythos))),
+        "enable_new_discover_page": str_to_bool(os.getenv("ENABLE_NEW_DISCOVER_PAGE", str(enable_erythos))),
+        "enable_new_collections_page": str_to_bool(os.getenv("ENABLE_NEW_COLLECTIONS_PAGE", str(enable_erythos))),
+        "enable_new_project_workspace": str_to_bool(os.getenv("ENABLE_NEW_PROJECT_WORKSPACE", str(enable_erythos))),
+        "enable_new_lab_page": str_to_bool(os.getenv("ENABLE_NEW_LAB_PAGE", str(enable_erythos))),
+        "enable_global_triage": str_to_bool(os.getenv("ENABLE_GLOBAL_TRIAGE", str(enable_erythos))),
+        "enable_erythos_theme": str_to_bool(os.getenv("ENABLE_ERYTHOS_THEME", str(enable_erythos))),
+        "enable_write_feature": str_to_bool(os.getenv("ENABLE_WRITE_FEATURE", str(enable_erythos))),
     }
 
 
@@ -55,6 +60,7 @@ async def get_feature_flags_status(user_id: Optional[str] = Header(None, alias="
     return {
         "flags": flags,
         "descriptions": {
+            "enable_erythos": "Master flag - enables all Erythos features when true",
             "enable_new_home_page": "Simplified home page with 4 workflow cards (Discover, Organize, Lab, Write)",
             "enable_new_discover_page": "Unified discovery page with 3 tabs (Smart Inbox, Explore, All Papers)",
             "enable_new_collections_page": "Simplified collections page with flat list and note count",
@@ -62,6 +68,7 @@ async def get_feature_flags_status(user_id: Optional[str] = Header(None, alias="
             "enable_new_lab_page": "Global lab page with 3 tabs (Protocols, Experiments, Data Management)",
             "enable_global_triage": "Collection-centric AI triage (scans across all collections)",
             "enable_erythos_theme": "New visual theme with red/purple/orange color scheme",
+            "enable_write_feature": "Thesis/paper writing feature with AI assistance",
         },
         "enabled_count": sum(1 for v in flags.values() if v),
         "total_count": len(flags),

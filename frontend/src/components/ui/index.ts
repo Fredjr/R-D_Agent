@@ -69,3 +69,12 @@ export {
   tabVariants,
   breadcrumbVariants
 } from './Navigation';
+export {
+  LoadingSpinner as LoadingSpinnerNew,
+  LoadingCard,
+  LoadingPage,
+  LoadingOverlay,
+  LoadingButton,
+  EmptyState,
+  ErrorState
+} from './LoadingStates';

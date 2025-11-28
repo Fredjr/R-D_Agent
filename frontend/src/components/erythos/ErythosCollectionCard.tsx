@@ -7,8 +7,8 @@ interface ErythosCollectionCardProps {
   id: string;
   name: string;
   description: string;
-  icon: string;
-  color: string;
+  icon?: string | null;  // Allow null/undefined for icon
+  color?: string | null; // Allow null/undefined for color
   articleCount: number;
   noteCount?: number;
   onClick?: () => void;
@@ -52,21 +52,27 @@ export function ErythosCollectionCard({
   className = '',
 }: ErythosCollectionCardProps) {
   // Determine gradient from color or use default based on hash
+  // Handle null/undefined color safely
   const getGradientType = (): CollectionGradientType => {
+    if (!color) {
+      // No color provided, use hash-based default
+      const hash = (id || '').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      return defaultGradients[hash % defaultGradients.length];
+    }
     const normalizedColor = color.toUpperCase();
     if (colorToGradient[normalizedColor]) {
       return colorToGradient[normalizedColor];
     }
     // Hash the ID to get consistent gradient for same collection
-    const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const hash = (id || '').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     return defaultGradients[hash % defaultGradients.length];
   };
 
   const gradientType = getGradientType();
   const gradient = collectionGradients[gradientType];
 
-  // Get emoji from icon field or use default
-  const displayIcon = icon && icon !== 'folder' && icon !== 'beaker' ? icon : '📁';
+  // Get emoji from icon field or use default - handle null/undefined safely
+  const displayIcon = icon && icon !== 'folder' && icon !== 'beaker' && icon !== 'null' ? icon : '📁';
 
   return (
     <div

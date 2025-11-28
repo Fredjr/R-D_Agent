@@ -151,3 +151,58 @@ async def add_pdf_columns(
         logger.error(f"❌ Manual column addition failed: {e}")
         raise HTTPException(status_code=500, detail=f"Column addition failed: {str(e)}")
 
+
+@router.post("/add-collections-note-count")
+async def add_collections_note_count(
+    admin_key: str = Header(..., alias="X-Admin-Key"),
+    db: Session = Depends(get_db)
+):
+    """
+    Add note_count column to collections table.
+
+    Headers:
+        X-Admin-Key: Admin authentication key
+
+    Returns:
+        Status of column addition
+    """
+    # Verify admin key
+    if admin_key != ADMIN_KEY:
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+
+    try:
+        logger.info("🗄️ Adding note_count column to collections...")
+
+        # Check if column exists
+        check_result = db.execute(text("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'collections'
+            AND column_name = 'note_count'
+        """))
+
+        exists = check_result.fetchone() is not None
+
+        if exists:
+            return {
+                "success": True,
+                "message": "Column note_count already exists",
+                "status": "already_exists"
+            }
+
+        # Add column
+        db.execute(text("ALTER TABLE collections ADD COLUMN note_count INTEGER DEFAULT 0"))
+        db.commit()
+
+        logger.info("✅ Added note_count column to collections")
+
+        return {
+            "success": True,
+            "message": "Successfully added note_count column to collections",
+            "status": "added"
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Failed to add note_count column: {e}")
+        raise HTTPException(status_code=500, detail=f"Column addition failed: {str(e)}")
+
