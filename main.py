@@ -66,7 +66,8 @@ from scoring import calculate_publication_score
 from database import (
     get_db, init_db, User, Project, ProjectCollaborator,
     Report, DeepDiveAnalysis, Annotation, Collection, ArticleCollection,
-    Article, NetworkGraph, AuthorCollaboration, create_tables
+    Article, NetworkGraph, AuthorCollaboration, create_tables,
+    ResearchQuestion, Hypothesis, CollectionArticle  # Phase 2: Dashboard UI
 )
 
 # Annotation models
@@ -4291,6 +4292,10 @@ class ProjectDetailResponse(BaseModel):
     collaborators: List[dict]
     annotations: List[dict]
     deep_dive_analyses: List[dict]
+    # Phase 2: Dashboard UI - Additional fields
+    collections: List[dict] = []
+    research_questions: List[dict] = []
+    hypotheses: List[dict] = []
     # Statistics fields for dashboard
     reports_count: int
     deep_dive_analyses_count: int
@@ -5846,6 +5851,22 @@ async def get_project(project_id: str, request: Request, db: Session = Depends(g
     annotations = project.annotations
     deep_dive_analyses = project.deep_dive_analyses
 
+    # Phase 2: Dashboard UI - Fetch additional data for dashboard widgets
+    # Fetch collections for this project
+    collections = db.query(Collection).filter(
+        Collection.project_id == project_id
+    ).all()
+
+    # Fetch research questions
+    research_questions = db.query(ResearchQuestion).filter(
+        ResearchQuestion.project_id == project_id
+    ).all()
+
+    # Fetch hypotheses
+    hypotheses = db.query(Hypothesis).filter(
+        Hypothesis.project_id == project_id
+    ).all()
+
     # Calculate active days (days with any activity)
     try:
         from sqlalchemy import func, distinct
@@ -5868,11 +5889,13 @@ async def get_project(project_id: str, request: Request, db: Session = Depends(g
             "title": r.title,
             "objective": r.objective,
             "created_at": r.created_at.isoformat(),
-            "created_by": r.created_by
+            "created_by": r.created_by,
+            "report_name": r.title  # Alias for consistency
         } for r in reports],
         collaborators=[{
             "user_id": c.user_id,
             "username": c.user.username,
+            "email": c.user.email,  # Phase 2: Add email for TeamMembersWidget
             "role": c.role,
             "invited_at": c.invited_at.isoformat()
         } for c in collaborators],
@@ -5893,6 +5916,32 @@ async def get_project(project_id: str, request: Request, db: Session = Depends(g
             "created_at": d.created_at.isoformat(),
             "created_by": d.created_by
         } for d in deep_dive_analyses],
+        # Phase 2: Dashboard UI - Additional fields
+        collections=[{
+            "collection_id": c.collection_id,
+            "collection_name": c.collection_name,
+            "description": c.description,
+            "color": c.color,
+            "icon": c.icon,
+            "created_at": c.created_at.isoformat() if c.created_at else None,
+            "article_count": db.query(CollectionArticle).filter(
+                CollectionArticle.collection_id == c.collection_id
+            ).count()
+        } for c in collections],
+        research_questions=[{
+            "question_id": q.question_id,
+            "question_text": q.question_text,
+            "question_type": q.question_type,
+            "status": q.status,
+            "created_at": q.created_at.isoformat() if q.created_at else None
+        } for q in research_questions],
+        hypotheses=[{
+            "hypothesis_id": h.hypothesis_id,
+            "hypothesis_text": h.hypothesis_text,
+            "hypothesis_type": h.hypothesis_type,
+            "status": h.status,
+            "created_at": h.created_at.isoformat() if h.created_at else None
+        } for h in hypotheses],
         # Statistics for dashboard
         reports_count=len(reports),
         deep_dive_analyses_count=len(deep_dive_analyses),

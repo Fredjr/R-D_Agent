@@ -50,6 +50,8 @@ export default function RecentActivityWidget({
 }: RecentActivityWidgetProps) {
   // Generate mock activities from project data
   const generateActivities = (): Activity[] => {
+    if (!project) return [];
+
     const activities: Activity[] = [];
 
     // Add collection activities
@@ -59,7 +61,7 @@ export default function RecentActivityWidget({
         id: `collection-${recentCollection.collection_id}`,
         user_name: 'You',
         action_type: 'collection_created',
-        action_description: `Created collection "${recentCollection.collection_name}"`,
+        action_description: `Created collection "${recentCollection.collection_name || 'Untitled'}"`,
         timestamp: recentCollection.created_at || new Date().toISOString(),
       });
     }
@@ -71,7 +73,7 @@ export default function RecentActivityWidget({
         id: `report-${recentReport.report_id}`,
         user_name: 'You',
         action_type: 'report_generated',
-        action_description: `Generated report "${recentReport.report_name}"`,
+        action_description: `Generated report "${recentReport.report_name || recentReport.title || 'Untitled'}"`,
         timestamp: recentReport.created_at || new Date().toISOString(),
       });
     }
@@ -82,7 +84,7 @@ export default function RecentActivityWidget({
         id: `project-created`,
         user_name: 'You',
         action_type: 'project_created',
-        action_description: `Created project "${project.project_name}"`,
+        action_description: `Created project "${project.project_name || 'Untitled'}"`,
         timestamp: project.created_at,
       });
     }
