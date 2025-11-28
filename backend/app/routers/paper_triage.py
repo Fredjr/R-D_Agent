@@ -171,7 +171,7 @@ async def get_global_inbox(
                     "abstract": article.abstract,
                     "authors": article.authors,
                     "journal": article.journal,
-                    "publication_date": str(article.publication_date) if article.publication_date else None
+                    "publication_date": str(article.publication_year) if article.publication_year else None
                 }
 
             responses.append(TriageResponse(

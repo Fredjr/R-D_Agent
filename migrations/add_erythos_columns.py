@@ -90,7 +90,33 @@ def run_migration():
                 print(f"   ✅ {col_name} added")
             else:
                 print(f"   ✓ {col_name} already exists")
-        
+
+        # =====================================================
+        # 3. ExperimentPlans table - add Erythos progress columns
+        # =====================================================
+        print("📋 Checking experiment_plans table...")
+
+        # Check if table exists
+        if 'experiment_plans' in inspector.get_table_names():
+            exp_columns = {col['name'] for col in inspector.get_columns('experiment_plans')}
+
+            exp_additions = [
+                ("progress_percentage", "INTEGER DEFAULT 0"),
+                ("data_points_collected", "INTEGER DEFAULT 0"),
+                ("data_points_total", "INTEGER DEFAULT 0"),
+                ("metrics", "JSONB DEFAULT '{}'::jsonb"),
+            ]
+
+            for col_name, col_type in exp_additions:
+                if col_name not in exp_columns:
+                    print(f"   ➕ Adding {col_name} column...")
+                    conn.execute(text(f"ALTER TABLE experiment_plans ADD COLUMN {col_name} {col_type}"))
+                    print(f"   ✅ {col_name} added")
+                else:
+                    print(f"   ✓ {col_name} already exists")
+        else:
+            print("   ⚠️ experiment_plans table does not exist yet")
+
         conn.commit()
         print("\n✅ Migration completed successfully!")
 
