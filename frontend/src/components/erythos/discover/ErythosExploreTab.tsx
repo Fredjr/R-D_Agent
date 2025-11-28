@@ -70,8 +70,8 @@ export function ErythosExploreTab() {
             });
             const collections = collectionsRes.ok ? await collectionsRes.json() : [];
 
-            // Fetch hypotheses for project
-            const hypothesesRes = await fetch(`/api/proxy/projects/${project.project_id}/hypotheses`, {
+            // Fetch hypotheses for project (correct API path)
+            const hypothesesRes = await fetch(`/api/proxy/hypotheses/project/${project.project_id}`, {
               headers: { 'User-ID': user.email }
             });
             const hypotheses = hypothesesRes.ok ? await hypothesesRes.json() : [];
