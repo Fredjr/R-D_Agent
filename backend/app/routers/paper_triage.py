@@ -99,7 +99,170 @@ class InboxStats(BaseModel):
 
 
 # =============================================================================
-# API Endpoints
+# Global Triage Endpoints (Erythos Discover Page)
+# Must be defined BEFORE project-specific endpoints to avoid route conflicts
+# =============================================================================
+
+@router.get("/inbox", response_model=List[TriageResponse])
+async def get_global_inbox(
+    triage_status: Optional[str] = None,
+    read_status: Optional[str] = None,
+    min_relevance: Optional[int] = None,
+    limit: int = 50,
+    offset: int = 0,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all papers in global inbox across all projects.
+
+    This endpoint aggregates triaged papers from all projects the user has access to.
+    Used by the Erythos Discover page's Smart Inbox tab.
+    """
+    try:
+        logger.info(f"📬 Getting global inbox for user {user_id}")
+
+        # Get all projects the user has access to
+        from database import Project, ProjectCollaborator
+
+        # Get owned projects
+        owned_projects = db.query(Project.project_id).filter(
+            Project.owner_user_id == user_id,
+            Project.is_active == True
+        ).all()
+
+        # Get collaborated projects
+        collaborated_projects = db.query(Project.project_id).join(ProjectCollaborator).filter(
+            ProjectCollaborator.user_id == user_id,
+            ProjectCollaborator.is_active == True,
+            Project.is_active == True
+        ).all()
+
+        project_ids = list(set([p[0] for p in owned_projects + collaborated_projects]))
+
+        if not project_ids:
+            return []
+
+        # Build query for triages across all projects
+        query = db.query(PaperTriage).filter(PaperTriage.project_id.in_(project_ids))
+
+        # Apply filters
+        if triage_status:
+            query = query.filter(PaperTriage.triage_status == triage_status)
+        if read_status:
+            query = query.filter(PaperTriage.read_status == read_status)
+        if min_relevance:
+            query = query.filter(PaperTriage.relevance_score >= min_relevance)
+
+        # Order by relevance and apply pagination
+        triages = query.order_by(
+            PaperTriage.relevance_score.desc()
+        ).offset(offset).limit(limit).all()
+
+        # Build response with article details
+        responses = []
+        for triage in triages:
+            article = db.query(Article).filter(Article.pmid == triage.article_pmid).first()
+            article_dict = None
+            if article:
+                article_dict = {
+                    "pmid": article.pmid,
+                    "title": article.title,
+                    "abstract": article.abstract,
+                    "authors": article.authors,
+                    "journal": article.journal,
+                    "publication_date": str(article.publication_date) if article.publication_date else None
+                }
+
+            responses.append(TriageResponse(
+                triage_id=triage.triage_id,
+                project_id=triage.project_id,
+                article_pmid=triage.article_pmid,
+                relevance_score=triage.relevance_score,
+                triage_status=triage.triage_status,
+                ai_reasoning=triage.ai_reasoning,
+                affected_questions=triage.affected_questions or [],
+                affected_hypotheses=triage.affected_hypotheses or [],
+                key_findings=triage.key_findings or [],
+                read_status=triage.read_status,
+                user_override=triage.user_override,
+                reviewed_by=triage.reviewed_by,
+                reviewed_at=triage.reviewed_at,
+                created_at=triage.created_at,
+                updated_at=triage.updated_at,
+                article=article_dict
+            ))
+
+        logger.info(f"✅ Retrieved {len(responses)} papers from global inbox")
+        return responses
+
+    except Exception as e:
+        logger.error(f"❌ Error getting global inbox: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get global inbox: {str(e)}")
+
+
+@router.get("/stats")
+async def get_global_stats(
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get global inbox statistics across all projects.
+
+    Used by the Erythos Discover page to show unread counts.
+    """
+    try:
+        logger.info(f"📊 Getting global stats for user {user_id}")
+
+        # Get all projects the user has access to
+        from database import Project, ProjectCollaborator
+
+        # Get owned projects
+        owned_projects = db.query(Project.project_id).filter(
+            Project.owner_user_id == user_id,
+            Project.is_active == True
+        ).all()
+
+        # Get collaborated projects
+        collaborated_projects = db.query(Project.project_id).join(ProjectCollaborator).filter(
+            ProjectCollaborator.user_id == user_id,
+            ProjectCollaborator.is_active == True,
+            Project.is_active == True
+        ).all()
+
+        project_ids = list(set([p[0] for p in owned_projects + collaborated_projects]))
+
+        if not project_ids:
+            return {
+                "total": 0,
+                "must_read": 0,
+                "nice_to_know": 0,
+                "ignored": 0,
+                "unread": 0
+            }
+
+        # Get all triages across projects
+        triages = db.query(PaperTriage).filter(PaperTriage.project_id.in_(project_ids)).all()
+
+        # Calculate stats
+        stats = {
+            "total": len(triages),
+            "must_read": len([t for t in triages if t.triage_status == "must_read"]),
+            "nice_to_know": len([t for t in triages if t.triage_status == "nice_to_know"]),
+            "ignored": len([t for t in triages if t.triage_status == "ignore"]),
+            "unread": len([t for t in triages if t.read_status == "unread"])
+        }
+
+        logger.info(f"✅ Global stats: {stats['total']} total, {stats['unread']} unread")
+        return stats
+
+    except Exception as e:
+        logger.error(f"❌ Error getting global stats: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get global stats: {str(e)}")
+
+
+# =============================================================================
+# Project-Specific API Endpoints
 # =============================================================================
 
 @router.post("/project/{project_id}/triage", response_model=TriageResponse)
@@ -581,165 +744,3 @@ async def delete_triage(
     except Exception as e:
         logger.error(f"❌ Error deleting triage: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to delete triage: {str(e)}")
-
-
-# =============================================================================
-# Global Triage Endpoints (Erythos Discover Page)
-# =============================================================================
-
-@router.get("/inbox", response_model=List[TriageResponse])
-async def get_global_inbox(
-    triage_status: Optional[str] = None,
-    read_status: Optional[str] = None,
-    min_relevance: Optional[int] = None,
-    limit: int = 50,
-    offset: int = 0,
-    user_id: str = Header(..., alias="User-ID"),
-    db: Session = Depends(get_db)
-):
-    """
-    Get all papers in global inbox across all projects.
-
-    This endpoint aggregates triaged papers from all projects the user has access to.
-    Used by the Erythos Discover page's Smart Inbox tab.
-    """
-    try:
-        logger.info(f"📬 Getting global inbox for user {user_id}")
-
-        # Get all projects the user has access to
-        from database import Project, ProjectCollaborator
-
-        # Get owned projects
-        owned_projects = db.query(Project.project_id).filter(
-            Project.owner_user_id == user_id,
-            Project.is_active == True
-        ).all()
-
-        # Get collaborated projects
-        collaborated_projects = db.query(Project.project_id).join(ProjectCollaborator).filter(
-            ProjectCollaborator.user_id == user_id,
-            ProjectCollaborator.is_active == True,
-            Project.is_active == True
-        ).all()
-
-        project_ids = list(set([p[0] for p in owned_projects + collaborated_projects]))
-
-        if not project_ids:
-            return []
-
-        # Build query for triages across all projects
-        query = db.query(PaperTriage).filter(PaperTriage.project_id.in_(project_ids))
-
-        # Apply filters
-        if triage_status:
-            query = query.filter(PaperTriage.triage_status == triage_status)
-        if read_status:
-            query = query.filter(PaperTriage.read_status == read_status)
-        if min_relevance:
-            query = query.filter(PaperTriage.relevance_score >= min_relevance)
-
-        # Order by relevance and apply pagination
-        triages = query.order_by(
-            PaperTriage.relevance_score.desc()
-        ).offset(offset).limit(limit).all()
-
-        # Build response with article details
-        responses = []
-        for triage in triages:
-            article = db.query(Article).filter(Article.pmid == triage.article_pmid).first()
-            article_dict = None
-            if article:
-                article_dict = {
-                    "pmid": article.pmid,
-                    "title": article.title,
-                    "abstract": article.abstract,
-                    "authors": article.authors,
-                    "journal": article.journal,
-                    "publication_date": str(article.publication_date) if article.publication_date else None
-                }
-
-            responses.append(TriageResponse(
-                triage_id=triage.triage_id,
-                project_id=triage.project_id,
-                article_pmid=triage.article_pmid,
-                relevance_score=triage.relevance_score,
-                triage_status=triage.triage_status,
-                ai_reasoning=triage.ai_reasoning,
-                affected_questions=triage.affected_questions or [],
-                affected_hypotheses=triage.affected_hypotheses or [],
-                key_findings=triage.key_findings or [],
-                read_status=triage.read_status,
-                user_override=triage.user_override,
-                reviewed_by=triage.reviewed_by,
-                reviewed_at=triage.reviewed_at,
-                created_at=triage.created_at,
-                updated_at=triage.updated_at,
-                article=article_dict
-            ))
-
-        logger.info(f"✅ Retrieved {len(responses)} papers from global inbox")
-        return responses
-
-    except Exception as e:
-        logger.error(f"❌ Error getting global inbox: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get global inbox: {str(e)}")
-
-
-@router.get("/stats")
-async def get_global_stats(
-    user_id: str = Header(..., alias="User-ID"),
-    db: Session = Depends(get_db)
-):
-    """
-    Get global inbox statistics across all projects.
-
-    Used by the Erythos Discover page to show unread counts.
-    """
-    try:
-        logger.info(f"📊 Getting global stats for user {user_id}")
-
-        # Get all projects the user has access to
-        from database import Project, ProjectCollaborator
-
-        # Get owned projects
-        owned_projects = db.query(Project.project_id).filter(
-            Project.owner_user_id == user_id,
-            Project.is_active == True
-        ).all()
-
-        # Get collaborated projects
-        collaborated_projects = db.query(Project.project_id).join(ProjectCollaborator).filter(
-            ProjectCollaborator.user_id == user_id,
-            ProjectCollaborator.is_active == True,
-            Project.is_active == True
-        ).all()
-
-        project_ids = list(set([p[0] for p in owned_projects + collaborated_projects]))
-
-        if not project_ids:
-            return {
-                "total": 0,
-                "must_read": 0,
-                "nice_to_know": 0,
-                "ignored": 0,
-                "unread": 0
-            }
-
-        # Get all triages across projects
-        triages = db.query(PaperTriage).filter(PaperTriage.project_id.in_(project_ids)).all()
-
-        # Calculate stats
-        stats = {
-            "total": len(triages),
-            "must_read": len([t for t in triages if t.triage_status == "must_read"]),
-            "nice_to_know": len([t for t in triages if t.triage_status == "nice_to_know"]),
-            "ignored": len([t for t in triages if t.triage_status == "ignore"]),
-            "unread": len([t for t in triages if t.read_status == "unread"])
-        }
-
-        logger.info(f"✅ Global stats: {stats['total']} total, {stats['unread']} unread")
-        return stats
-
-    except Exception as e:
-        logger.error(f"❌ Error getting global stats: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get global stats: {str(e)}")
