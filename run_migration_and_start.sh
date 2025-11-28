@@ -27,6 +27,10 @@ python3 migrations/phase0_add_many_to_many_collections.py
 echo "📊 Running migration: phase1_backfill_project_collections (Phase 1)..."
 python3 migrations/phase1_backfill_project_collections.py
 
+# Run project stats columns migration (Erythos UI)
+echo "📈 Running migration: add_project_stats_columns (Erythos UI)..."
+python3 migrations/add_project_stats_columns.py
+
 echo "✅ All migrations completed successfully!"
 
 # Start the FastAPI server
