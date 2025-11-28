@@ -6,11 +6,11 @@ API endpoints for AI-powered experiment planning.
 Week 19-20: Experiment Planning Feature
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
-from database import get_db
+from database import get_db, ExperimentPlan
 from backend.app.services.experiment_planner_service import ExperimentPlannerService
 import logging
 
@@ -113,13 +113,71 @@ async def create_experiment_plan(
         
         logger.info(f"✅ Experiment plan created: {plan['plan_id']}")
         return plan
-        
+
     except ValueError as e:
         logger.error(f"❌ Validation error: {e}")
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.error(f"❌ Error creating experiment plan: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create experiment plan: {str(e)}")
+
+
+@router.get("", response_model=List[ExperimentPlanResponse])
+async def get_all_experiment_plans(
+    project_id: Optional[str] = Query(None, description="Filter by project ID"),
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all experiment plans for the user, optionally filtered by project.
+
+    This is a global endpoint for the Erythos Lab view.
+    """
+    try:
+        logger.info(f"📋 Fetching all experiment plans for user {user_id}")
+
+        query = db.query(ExperimentPlan).filter(ExperimentPlan.created_by == user_id)
+        if project_id:
+            query = query.filter(ExperimentPlan.project_id == project_id)
+
+        plans = query.order_by(ExperimentPlan.created_at.desc()).all()
+
+        responses = []
+        for plan in plans:
+            responses.append(ExperimentPlanResponse(
+                plan_id=plan.plan_id,
+                project_id=plan.project_id,
+                protocol_id=plan.protocol_id,
+                plan_name=plan.plan_name,
+                objective=plan.objective or '',
+                linked_questions=plan.linked_questions or [],
+                linked_hypotheses=plan.linked_hypotheses or [],
+                materials=plan.materials or [],
+                procedure=plan.procedure or [],
+                expected_outcomes=plan.expected_outcomes or [],
+                success_criteria=plan.success_criteria or [],
+                timeline_estimate=plan.timeline_estimate,
+                estimated_cost=plan.estimated_cost,
+                difficulty_level=plan.difficulty_level or 'intermediate',
+                risk_assessment=plan.risk_assessment or {},
+                troubleshooting_guide=plan.troubleshooting_guide or [],
+                safety_considerations=plan.safety_considerations or [],
+                required_expertise=plan.required_expertise or [],
+                notes=plan.notes,
+                generated_by=plan.generated_by or 'ai',
+                generation_model=plan.generation_model,
+                status=plan.status or 'draft',
+                created_by=plan.created_by,
+                created_at=plan.created_at.isoformat() if plan.created_at else None,
+                updated_at=plan.updated_at.isoformat() if plan.updated_at else None
+            ))
+
+        logger.info(f"✅ Found {len(responses)} experiment plans")
+        return responses
+
+    except Exception as e:
+        logger.error(f"❌ Error fetching experiment plans: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch experiment plans: {str(e)}")
 
 
 @router.get("/project/{project_id}", response_model=List[ExperimentPlanResponse])

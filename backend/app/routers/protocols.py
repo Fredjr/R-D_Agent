@@ -430,6 +430,82 @@ async def extract_protocol(
         raise HTTPException(status_code=500, detail=f"Failed to extract protocol: {str(e)}")
 
 
+@router.get("", response_model=List[ProtocolResponse])
+async def get_all_protocols(
+    project_id: Optional[str] = Query(None, description="Filter by project ID"),
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all protocols for the user, optionally filtered by project.
+
+    This is a global endpoint for the Erythos Lab view.
+    """
+    try:
+        from sqlalchemy import inspect
+        inspector = inspect(db.bind)
+        existing_columns = {col['name'] for col in inspector.get_columns('protocols')}
+        has_new_columns = 'key_parameters' in existing_columns
+
+        # Build query
+        query = db.query(Protocol).filter(Protocol.created_by == user_id)
+        if project_id:
+            query = query.filter(Protocol.project_id == project_id)
+
+        protocols = query.order_by(Protocol.created_at.desc()).all()
+
+        responses = []
+        for protocol in protocols:
+            article = db.query(Article).filter(Article.pmid == protocol.source_pmid).first()
+            normalized_materials, normalized_steps = normalize_protocol_data(
+                protocol.materials or [], protocol.steps or []
+            )
+
+            responses.append(ProtocolResponse(
+                protocol_id=protocol.protocol_id,
+                source_pmid=protocol.source_pmid,
+                protocol_name=protocol.protocol_name,
+                protocol_type=protocol.protocol_type,
+                materials=normalized_materials,
+                steps=normalized_steps,
+                equipment=protocol.equipment or [],
+                duration_estimate=protocol.duration_estimate,
+                difficulty_level=protocol.difficulty_level or 'intermediate',
+                extracted_by=protocol.extracted_by or 'ai',
+                created_by=protocol.created_by,
+                created_at=protocol.created_at.isoformat() if protocol.created_at else None,
+                updated_at=protocol.updated_at.isoformat() if protocol.updated_at else None,
+                article_title=article.title if article else None,
+                article_authors=format_authors(article.authors) if article else None,
+                article_journal=article.journal if article else None,
+                article_year=article.publication_year if article else None,
+                key_parameters=normalize_string_list(getattr(protocol, 'key_parameters', [])) if has_new_columns else [],
+                expected_outcomes=normalize_string_list(getattr(protocol, 'expected_outcomes', [])) if has_new_columns else [],
+                troubleshooting_tips=normalize_string_list(getattr(protocol, 'troubleshooting_tips', [])) if has_new_columns else [],
+                relevance_score=getattr(protocol, 'relevance_score', 50) if has_new_columns else 50,
+                affected_questions=getattr(protocol, 'affected_questions', []) if has_new_columns else [],
+                affected_hypotheses=getattr(protocol, 'affected_hypotheses', []) if has_new_columns else [],
+                relevance_reasoning=getattr(protocol, 'relevance_reasoning', None) if has_new_columns else None,
+                key_insights=normalize_string_list(getattr(protocol, 'key_insights', [])) if has_new_columns else [],
+                potential_applications=normalize_string_list(getattr(protocol, 'potential_applications', [])) if has_new_columns else [],
+                recommendations=normalize_dict_list(getattr(protocol, 'recommendations', [])) if has_new_columns else [],
+                context_relevance=getattr(protocol, 'context_relevance', None) if has_new_columns else None,
+                extraction_method=getattr(protocol, 'extraction_method', 'basic') if has_new_columns else 'basic',
+                context_aware=getattr(protocol, 'context_aware', False) if has_new_columns else False,
+                extraction_confidence=getattr(protocol, 'extraction_confidence', None) if has_new_columns else None,
+                confidence_explanation=getattr(protocol, 'confidence_explanation', None) if has_new_columns else None,
+                material_sources=getattr(protocol, 'material_sources', None) if has_new_columns else None,
+                step_sources=getattr(protocol, 'step_sources', None) if has_new_columns else None
+            ))
+
+        logger.info(f"✅ Retrieved {len(responses)} protocols for user {user_id}")
+        return responses
+
+    except Exception as e:
+        logger.error(f"❌ Error getting protocols: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/project/{project_id}", response_model=List[ProtocolResponse])
 async def get_project_protocols(
     project_id: str,
