@@ -5894,8 +5894,8 @@ async def get_project(project_id: str, request: Request, db: Session = Depends(g
         } for r in reports],
         collaborators=[{
             "user_id": c.user_id,
-            "username": c.user.username,
-            "email": c.user.email,  # Phase 2: Add email for TeamMembersWidget
+            "username": c.user.username if c.user else c.user_id,
+            "email": c.user.email if c.user and hasattr(c.user, 'email') else c.user_id,  # Phase 2: Add email for TeamMembersWidget
             "role": c.role,
             "invited_at": c.invited_at.isoformat()
         } for c in collaborators],
