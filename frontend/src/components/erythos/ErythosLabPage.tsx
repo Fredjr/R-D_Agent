@@ -8,7 +8,7 @@ import { ErythosProtocolsTab, ErythosExperimentsTab, ErythosDataManagementTab } 
 
 interface Project {
   project_id: string;
-  name: string;
+  project_name: string;
 }
 
 export function ErythosLabPage() {
@@ -71,7 +71,7 @@ export function ErythosLabPage() {
             <option value="">All Projects</option>
             {projects.map((project) => (
               <option key={project.project_id} value={project.project_id}>
-                {project.name}
+                {project.project_name}
               </option>
             ))}
           </select>

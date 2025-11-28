@@ -22,6 +22,11 @@ interface AISummary {
   emergingTrends: string;
 }
 
+interface Project {
+  project_id: string;
+  project_name: string;
+}
+
 export function ErythosAllPapersTab() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
@@ -32,6 +37,31 @@ export function ErythosAllPapersTab() {
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [totalFound, setTotalFound] = useState(0);
   const [triagingPapers, setTriagingPapers] = useState<Set<string>>(new Set());
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+
+  // Fetch projects for triage selection
+  React.useEffect(() => {
+    const fetchProjects = async () => {
+      if (!user?.email) return;
+      try {
+        const response = await fetch('/api/proxy/projects', {
+          headers: { 'User-ID': user.email }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const projectList = data.projects || data || [];
+          setProjects(projectList);
+          if (projectList.length > 0 && !selectedProjectId) {
+            setSelectedProjectId(projectList[0].project_id);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching projects:', error);
+      }
+    };
+    fetchProjects();
+  }, [user?.email]);
 
   const handleSearch = useCallback(async () => {
     if (!query.trim() || !user?.email) return;
@@ -81,10 +111,16 @@ export function ErythosAllPapersTab() {
 
   const handleAITriage = async (paper: SearchResult) => {
     if (!user?.email) return;
-    
+
+    if (!selectedProjectId) {
+      alert('⚠️ Please select a project first');
+      return;
+    }
+
     setTriagingPapers(prev => new Set(prev).add(paper.pmid));
     try {
-      const response = await fetch('/api/proxy/triage', {
+      // Use project-specific triage endpoint
+      const response = await fetch(`/api/proxy/triage/project/${selectedProjectId}/triage`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -92,11 +128,12 @@ export function ErythosAllPapersTab() {
         },
         body: JSON.stringify({ article_pmid: paper.pmid })
       });
-      
+
       if (response.ok) {
         alert(`✅ Paper triaged! Check Smart Inbox for results.`);
       } else {
-        alert('❌ Failed to triage paper');
+        const errorData = await response.json().catch(() => ({}));
+        alert(`❌ Failed to triage paper: ${errorData.detail || response.statusText}`);
       }
     } catch (error) {
       console.error('Triage error:', error);
@@ -116,8 +153,8 @@ export function ErythosAllPapersTab() {
 
   return (
     <div className="space-y-6">
-      {/* Search Bar */}
-      <div className="relative">
+      {/* Search Bar and Project Selector */}
+      <div className="space-y-3">
         <div className="flex gap-3">
           <div className="flex-1 relative">
             <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -134,6 +171,22 @@ export function ErythosAllPapersTab() {
           <ErythosButton variant="primary" onClick={handleSearch} disabled={loading}>
             {loading ? 'Searching...' : 'Search'}
           </ErythosButton>
+        </div>
+        {/* Project selector for triaging */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-400">Triage to:</span>
+          <select
+            value={selectedProjectId}
+            onChange={(e) => setSelectedProjectId(e.target.value)}
+            className="px-3 py-1.5 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
+          >
+            <option value="">Select Project</option>
+            {projects.map((project) => (
+              <option key={project.project_id} value={project.project_id}>
+                {project.project_name}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

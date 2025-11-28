@@ -286,6 +286,10 @@ class ProtocolResponse(BaseModel):
     article_journal: Optional[str] = None
     article_year: Optional[int] = None
 
+    # Project details (for global view)
+    project_id: Optional[str] = None
+    project_name: Optional[str] = None
+
     class Config:
         from_attributes = True
 
@@ -457,6 +461,8 @@ async def get_all_protocols(
         responses = []
         for protocol in protocols:
             article = db.query(Article).filter(Article.pmid == protocol.source_pmid).first()
+            # Get project name for display
+            project = db.query(Project).filter(Project.project_id == protocol.project_id).first() if protocol.project_id else None
             normalized_materials, normalized_steps = normalize_protocol_data(
                 protocol.materials or [], protocol.steps or []
             )
@@ -479,6 +485,9 @@ async def get_all_protocols(
                 article_authors=format_authors(article.authors) if article else None,
                 article_journal=article.journal if article else None,
                 article_year=article.publication_year if article else None,
+                # Project details for global view
+                project_id=protocol.project_id,
+                project_name=project.project_name if project else None,
                 key_parameters=normalize_string_list(getattr(protocol, 'key_parameters', [])) if has_new_columns else [],
                 expected_outcomes=normalize_string_list(getattr(protocol, 'expected_outcomes', [])) if has_new_columns else [],
                 troubleshooting_tips=normalize_string_list(getattr(protocol, 'troubleshooting_tips', [])) if has_new_columns else [],

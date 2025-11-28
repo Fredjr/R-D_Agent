@@ -24,6 +24,7 @@ interface PaperTriage {
     title: string;
     authors?: string[];
     year?: number;
+    publication_date?: string; // Backend returns publication_date as string
     journal?: string;
     abstract?: string;
   };
@@ -199,7 +200,7 @@ export function ErythosSmartInboxTab({ projectId }: SmartInboxTabProps) {
               id={paper.triage_id}
               title={paper.article?.title || `Paper ${paper.article_pmid}`}
               authors={paper.article?.authors}
-              year={paper.article?.year}
+              year={paper.article?.year || (paper.article?.publication_date ? parseInt(paper.article.publication_date) : undefined)}
               journal={paper.article?.journal}
               pmid={paper.article_pmid}
               abstract={paper.article?.abstract}

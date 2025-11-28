@@ -58,10 +58,12 @@ export function ErythosExploreTab() {
       
       if (projectsRes.ok) {
         const projectsData = await projectsRes.json();
-        
+        // Handle both { projects: [...] } and direct array responses
+        const projectsArray = projectsData.projects || projectsData || [];
+
         // For each project, fetch collections and hypotheses
         const enrichedProjects = await Promise.all(
-          projectsData.map(async (project: Project) => {
+          projectsArray.map(async (project: Project) => {
             // Fetch collections for project
             const collectionsRes = await fetch(`/api/proxy/projects/${project.project_id}/collections`, {
               headers: { 'User-ID': user.email }

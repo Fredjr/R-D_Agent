@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
-from database import get_db, ExperimentPlan
+from database import get_db, ExperimentPlan, Project
 from backend.app.services.experiment_planner_service import ExperimentPlannerService
 import logging
 
@@ -81,6 +81,10 @@ class ExperimentPlanResponse(BaseModel):
     created_by: str
     created_at: Optional[str]
     updated_at: Optional[str]
+    # Project details for global view
+    project_name: Optional[str] = None
+    # Progress tracking for Erythos UI
+    progress_percentage: Optional[int] = 0
 
 
 @router.post("", response_model=ExperimentPlanResponse)
@@ -144,6 +148,8 @@ async def get_all_experiment_plans(
 
         responses = []
         for plan in plans:
+            # Get project name for display
+            project = db.query(Project).filter(Project.project_id == plan.project_id).first()
             responses.append(ExperimentPlanResponse(
                 plan_id=plan.plan_id,
                 project_id=plan.project_id,
@@ -169,7 +175,11 @@ async def get_all_experiment_plans(
                 status=plan.status or 'draft',
                 created_by=plan.created_by,
                 created_at=plan.created_at.isoformat() if plan.created_at else None,
-                updated_at=plan.updated_at.isoformat() if plan.updated_at else None
+                updated_at=plan.updated_at.isoformat() if plan.updated_at else None,
+                # Project details for global view
+                project_name=project.project_name if project else None,
+                # Progress tracking
+                progress_percentage=getattr(plan, 'progress_percentage', 0) or 0
             ))
 
         logger.info(f"✅ Found {len(responses)} experiment plans")

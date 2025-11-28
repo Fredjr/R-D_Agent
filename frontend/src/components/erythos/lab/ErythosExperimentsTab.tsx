@@ -6,7 +6,8 @@ import { ErythosProgressBar } from '../ErythosProgressBar';
 
 interface Experiment {
   plan_id: string;
-  title: string;
+  plan_name: string; // Backend uses plan_name, not title
+  title?: string; // Keep for backwards compatibility
   protocol_name?: string;
   project_id?: string;
   project_name?: string;
@@ -113,7 +114,7 @@ export function ErythosExperimentsTab({ projectFilter }: ErythosExperimentsTabPr
                 <div className="flex items-start gap-3 mb-3">
                   <div className={`w-3 h-3 rounded-full mt-1.5 ${statusConfig.dot}`}></div>
                   <div className="flex-1">
-                    <h4 className="text-white font-medium">{exp.title}</h4>
+                    <h4 className="text-white font-medium">{exp.plan_name || exp.title}</h4>
                     <div className="flex items-center gap-2 mt-1 text-sm text-gray-400">
                       {exp.protocol_name && <span>📋 {exp.protocol_name}</span>}
                       {exp.project_name && <span>• {exp.project_name}</span>}
