@@ -67,7 +67,7 @@ from database import (
     get_db, init_db, User, Project, ProjectCollaborator,
     Report, DeepDiveAnalysis, Annotation, Collection, ArticleCollection,
     Article, NetworkGraph, AuthorCollaboration, create_tables,
-    ResearchQuestion, Hypothesis, CollectionArticle  # Phase 2: Dashboard UI
+    ResearchQuestion, Hypothesis  # Phase 2: Dashboard UI
 )
 
 # Annotation models
@@ -5924,8 +5924,8 @@ async def get_project(project_id: str, request: Request, db: Session = Depends(g
             "color": c.color,
             "icon": c.icon,
             "created_at": c.created_at.isoformat() if c.created_at else None,
-            "article_count": db.query(CollectionArticle).filter(
-                CollectionArticle.collection_id == c.collection_id
+            "article_count": db.query(ArticleCollection).filter(
+                ArticleCollection.collection_id == c.collection_id
             ).count()
         } for c in collections],
         research_questions=[{
