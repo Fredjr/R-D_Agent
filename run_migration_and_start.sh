@@ -31,6 +31,10 @@ python3 migrations/phase1_backfill_project_collections.py
 echo "📈 Running migration: add_project_stats_columns (Erythos UI)..."
 python3 migrations/add_project_stats_columns.py
 
+# Run Erythos columns migration (collection_id, protocol columns)
+echo "🎨 Running migration: add_erythos_columns (Erythos UI)..."
+python3 migrations/add_erythos_columns.py
+
 echo "✅ All migrations completed successfully!"
 
 # Start the FastAPI server
