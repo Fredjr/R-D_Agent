@@ -23,6 +23,7 @@ import { EnhancedSpotifyProjectHeader } from '@/components/ui/EnhancedSpotifyPro
 import { SpotifyProjectTabs } from '@/components/ui/SpotifyProjectTabs';
 import { SpotifySubTabs } from '@/components/ui/SpotifySubTabs';
 import { SpotifyQuickActions, createQuickActions } from '@/components/ui/SpotifyQuickActions';
+import ProjectDashboardTab from '@/components/project/ProjectDashboardTab';
 import { ResearchQuestionTab } from '@/components/project/ResearchQuestionTab';
 import { NotesTab } from '@/components/project/NotesTab';
 import { ExploreTab } from '@/components/project/ExploreTab';
@@ -174,9 +175,9 @@ export default function ProjectPage() {
   });
   const [creatingCollection, setCreatingCollection] = useState(false);
 
-  // Tab navigation state - New 5-tab structure
-  const [activeTab, setActiveTab] = useState<'research' | 'papers' | 'lab' | 'notes' | 'analysis'>('research');
-  const [activeSubTab, setActiveSubTab] = useState<string>('questions'); // Default sub-tab for each main tab
+  // Tab navigation state - New 6-tab structure (Dashboard + 5 tabs)
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'research' | 'papers' | 'lab' | 'notes' | 'analysis'>('dashboard');
+  const [activeSubTab, setActiveSubTab] = useState<string>(''); // Default sub-tab for each main tab
 
   // Research stats state - For enhanced header and discover section
   const [researchStats, setResearchStats] = useState<ResearchStats>({
@@ -1308,15 +1309,22 @@ export default function ProjectPage() {
           <SpotifyProjectTabs
             activeTab={activeTab}
             onTabChange={(tab) => {
-              setActiveTab(tab as 'research' | 'papers' | 'lab' | 'notes' | 'analysis');
+              setActiveTab(tab as 'dashboard' | 'research' | 'papers' | 'lab' | 'notes' | 'analysis');
               // Set default sub-tab for each main tab
-              if (tab === 'research') setActiveSubTab('questions');
+              if (tab === 'dashboard') setActiveSubTab('');
+              else if (tab === 'research') setActiveSubTab('questions');
               else if (tab === 'papers') setActiveSubTab('explore');
               else if (tab === 'lab') setActiveSubTab('protocols');
               else if (tab === 'notes') setActiveSubTab('ideas');
               else if (tab === 'analysis') setActiveSubTab('reports');
             }}
             tabs={[
+              {
+                id: 'dashboard',
+                label: 'Dashboard',
+                icon: '🏠',
+                description: 'Project overview and quick actions'
+              },
               {
                 id: 'research',
                 label: 'Research',
@@ -1913,6 +1921,35 @@ export default function ProjectPage() {
         )}
 
         {/* Tab Content - New Structure with Sub-Tabs */}
+
+        {/* Dashboard Tab */}
+        {activeTab === 'dashboard' && (
+          <div className="mb-8">
+            <ProjectDashboardTab
+              projectId={projectId}
+              project={project}
+              collections={collections}
+              onCreateCollection={() => setShowCollectionModal(true)}
+              onInviteCollaborator={() => setShowInviteModal(true)}
+              onNavigateToTab={(tab) => {
+                // Map dashboard navigation to tabs
+                if (tab === 'collections') {
+                  setActiveTab('papers');
+                  setActiveSubTab('collections');
+                } else if (tab === 'questions') {
+                  setActiveTab('research');
+                  setActiveSubTab('questions');
+                } else if (tab === 'hypotheses') {
+                  setActiveTab('research');
+                  setActiveSubTab('hypotheses');
+                } else if (tab === 'reports') {
+                  setActiveTab('analysis');
+                  setActiveSubTab('reports');
+                }
+              }}
+            />
+          </div>
+        )}
 
         {/* Research Tab */}
         {activeTab === 'research' && (
