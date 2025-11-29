@@ -11,6 +11,26 @@ interface SmartInboxTabProps {
   projectId?: string; // Optional - if not provided, shows global inbox
 }
 
+interface EvidenceExcerpt {
+  quote: string;
+  relevance: string;
+}
+
+interface RelevanceScore {
+  score: number;
+  reasoning: string;
+  evidence?: string;
+  support_type?: string; // For hypotheses: 'supports' | 'contradicts' | 'tests'
+}
+
+interface CollectionSuggestion {
+  collection_id: string;
+  collection_name: string;
+  reason: string;
+  confidence: number;
+  matching_hypothesis_count?: number;
+}
+
 interface PaperTriage {
   triage_id: string;
   article_pmid: string;
@@ -18,13 +38,21 @@ interface PaperTriage {
   relevance_score: number;
   read_status?: string;
   ai_reasoning?: string;
+  impact_assessment?: string;
   affected_questions?: string[];
   affected_hypotheses?: string[];
+  evidence_excerpts?: EvidenceExcerpt[];
+  question_relevance_scores?: Record<string, RelevanceScore>;
+  hypothesis_relevance_scores?: Record<string, RelevanceScore>;
+  collection_suggestions?: CollectionSuggestion[];
+  confidence_score?: number;
+  metadata_score?: number;
   article?: {
     title: string;
     authors?: string[];
     year?: number;
     publication_date?: string; // Backend returns publication_date as string
+    pub_year?: number;
     journal?: string;
     abstract?: string;
   };
@@ -200,12 +228,21 @@ export function ErythosSmartInboxTab({ projectId }: SmartInboxTabProps) {
               id={paper.triage_id}
               title={paper.article?.title || `Paper ${paper.article_pmid}`}
               authors={paper.article?.authors}
-              year={paper.article?.year || (paper.article?.publication_date ? parseInt(paper.article.publication_date) : undefined)}
+              year={paper.article?.year || paper.article?.pub_year || (paper.article?.publication_date ? parseInt(paper.article.publication_date) : undefined)}
               journal={paper.article?.journal}
               pmid={paper.article_pmid}
               abstract={paper.article?.abstract}
               triageStatus={paper.triage_status}
               relevanceScore={paper.relevance_score}
+              // Full AI triage details
+              impactAssessment={paper.impact_assessment}
+              aiReasoning={paper.ai_reasoning}
+              evidenceExcerpts={paper.evidence_excerpts}
+              questionScores={paper.question_relevance_scores}
+              hypothesisScores={paper.hypothesis_relevance_scores}
+              collectionSuggestions={paper.collection_suggestions}
+              confidenceScore={paper.confidence_score}
+              // Legacy evidence links (IDs only - for fallback)
               evidenceLinks={[
                 ...(paper.affected_hypotheses || []).map(h => ({ type: 'hypothesis' as const, text: h })),
                 ...(paper.affected_questions || []).map(q => ({ type: 'question' as const, text: q }))

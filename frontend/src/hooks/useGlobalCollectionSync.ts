@@ -8,6 +8,7 @@ export interface Collection {
   created_at: string;
   updated_at: string;
   article_count: number;
+  note_count?: number;  // Number of notes in collection
   project_id?: string;  // Optional since API doesn't always include it
   created_by?: string;  // Additional fields from API
   color?: string;
