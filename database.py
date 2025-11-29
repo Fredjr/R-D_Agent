@@ -1018,13 +1018,19 @@ class ProjectDecision(Base):
 
 
 class PaperTriage(Base):
-    """Smart inbox for AI-powered paper triage"""
+    """Smart inbox for AI-powered paper triage - supports both project and contextless triages"""
     __tablename__ = "paper_triage"
 
     triage_id = Column(String, primary_key=True)  # UUID
-    project_id = Column(String, ForeignKey("projects.project_id", ondelete="CASCADE"), nullable=False)
-    collection_id = Column(String, ForeignKey("collections.collection_id", ondelete="CASCADE"), nullable=True)  # Erythos: Collection-centric triage
+    # Phase 1: Make project_id nullable to support contextless triages
+    project_id = Column(String, ForeignKey("projects.project_id", ondelete="CASCADE"), nullable=True)
+    collection_id = Column(String, ForeignKey("collections.collection_id", ondelete="CASCADE"), nullable=True)
     article_pmid = Column(String, ForeignKey("articles.pmid", ondelete="CASCADE"), nullable=False)
+
+    # Phase 1: New fields for contextless triage support
+    context_type = Column(String, default='project')  # project | collection | search_query | ad_hoc | multi_project
+    triage_context = Column(JSON, nullable=True)  # Store context data: {"search_query": "...", "ad_hoc_question": "...", "best_match": {...}}
+    user_id = Column(String, ForeignKey("users.user_id"), nullable=True)  # Owner of contextless triage
 
     # Triage status
     triage_status = Column(String, default='must_read')  # must_read, nice_to_know, ignore
@@ -1044,8 +1050,17 @@ class PaperTriage(Base):
     question_relevance_scores = Column(JSON, default=dict)  # Per-question scores with reasoning
     hypothesis_relevance_scores = Column(JSON, default=dict)  # Per-hypothesis scores with support type
 
+    # Phase 1: Additional fields for rich contextless results
+    key_findings = Column(JSON, default=list)  # Key findings from paper (for search_query/ad_hoc)
+    relevance_aspects = Column(JSON, default=dict)  # topic_match, methodology_relevance, practical_value
+    how_it_helps = Column(Text, nullable=True)  # How paper helps research (for ad_hoc)
+    # Multi-project assessment fields
+    project_scores = Column(JSON, nullable=True)  # [{project_id, project_name, relevance_score, reasoning}]
+    collection_scores = Column(JSON, nullable=True)  # [{collection_id, collection_name, relevance_score, reasoning}]
+    best_match = Column(JSON, nullable=True)  # {id, name, score, type}
+
     # Triage metadata
-    triaged_by = Column(String, default='ai')  # 'ai', 'ai_enhanced', or 'user'
+    triaged_by = Column(String, default='ai')  # 'ai', 'ai_enhanced', 'contextless', or 'user'
     triaged_at = Column(DateTime(timezone=True), server_default=func.now())
     reviewed_by = Column(String, ForeignKey("users.user_id"), nullable=True)  # User who reviewed AI triage
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
@@ -1055,19 +1070,28 @@ class PaperTriage(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Relationships
-    project = relationship("Project")
+    project = relationship("Project", foreign_keys=[project_id])
+    collection = relationship("Collection", foreign_keys=[collection_id])
     article = relationship("Article")
     reviewer = relationship("User", foreign_keys=[reviewed_by])
+    owner = relationship("User", foreign_keys=[user_id])
 
     # Indexes for performance
     __table_args__ = (
         Index('idx_triage_project', 'project_id'),
+        Index('idx_triage_collection', 'collection_id'),
+        Index('idx_triage_context_type', 'context_type'),
+        Index('idx_triage_user', 'user_id'),
         Index('idx_triage_status', 'triage_status'),
         Index('idx_triage_relevance', 'relevance_score'),
         Index('idx_triage_read_status', 'read_status'),
         Index('idx_triage_confidence', 'confidence_score'),
-        # Unique constraint to prevent duplicate triage entries
-        Index('idx_unique_project_article_triage', 'project_id', 'article_pmid', unique=True),
+        # Unique constraint for project-based triage (when project_id is set)
+        Index('idx_unique_project_article_triage', 'project_id', 'article_pmid', unique=True, postgresql_where=text("project_id IS NOT NULL")),
+        # Unique constraint for collection-based triage (when collection_id is set and project_id is null)
+        Index('idx_unique_collection_article_triage', 'collection_id', 'article_pmid', unique=True, postgresql_where=text("collection_id IS NOT NULL AND project_id IS NULL")),
+        # Unique constraint for user-level contextless triage (search_query, ad_hoc, multi_project)
+        Index('idx_unique_user_contextless_triage', 'user_id', 'article_pmid', 'context_type', unique=True, postgresql_where=text("project_id IS NULL AND collection_id IS NULL")),
     )
 
 

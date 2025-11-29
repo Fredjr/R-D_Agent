@@ -53,7 +53,7 @@ class TriageStatusUpdate(BaseModel):
 class TriageResponse(BaseModel):
     """Triage response with enhanced fields"""
     triage_id: str
-    project_id: str
+    project_id: Optional[str] = None  # Phase 1: Make nullable for contextless triages
     article_pmid: str
     triage_status: str
     relevance_score: int
@@ -79,6 +79,18 @@ class TriageResponse(BaseModel):
     # Week 24: Integration Gaps - Collection suggestions
     collection_suggestions: Optional[List[dict]] = []
 
+    # Phase 1: New fields for contextless triage support
+    collection_id: Optional[str] = None
+    context_type: Optional[str] = "project"  # project | collection | search_query | ad_hoc | multi_project
+    triage_context: Optional[dict] = None  # Context data (search_query, ad_hoc_question, best_match)
+    user_id: Optional[str] = None
+    key_findings: Optional[List[str]] = []
+    relevance_aspects: Optional[dict] = {}
+    how_it_helps: Optional[str] = None
+    project_scores: Optional[List[dict]] = None  # For multi_project
+    collection_scores: Optional[List[dict]] = None  # For multi_project
+    best_match: Optional[dict] = None  # For multi_project
+
     # Include article details for convenience
     article: Optional[dict] = None
 
@@ -96,15 +108,256 @@ class InboxStats(BaseModel):
     reading_count: int
     read_count: int
     avg_relevance_score: float
+    # Phase 3: Context-type breakdown
+    by_context_type: Optional[dict] = {}  # {project: X, collection: Y, search_query: Z, ...}
 
 
 # =============================================================================
 # Global Triage Endpoints (Erythos Discover Page)
+# Phase 3: Enhanced to support all context types (project, collection, contextless)
 # Must be defined BEFORE project-specific endpoints to avoid route conflicts
 # =============================================================================
 
 @router.get("/inbox", response_model=List[TriageResponse])
 async def get_global_inbox(
+    triage_status: Optional[str] = None,
+    read_status: Optional[str] = None,
+    min_relevance: Optional[int] = None,
+    context_type: Optional[str] = None,  # Phase 3: Filter by context type
+    limit: int = 50,
+    offset: int = 0,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all papers in global inbox across all projects, collections, and contextless triages.
+
+    Phase 3: Enhanced to support all context types:
+    - project: Papers triaged within a project context
+    - collection: Papers triaged within a collection context
+    - search_query: Papers triaged against a search query
+    - ad_hoc: Papers triaged against a custom question
+    - multi_project: Papers compared across all projects/collections
+
+    Used by the Erythos Discover page's Smart Inbox tab.
+    """
+    try:
+        logger.info(f"📬 Getting global inbox for user {user_id}, context_type={context_type}")
+
+        from database import Project, ProjectCollaborator, Collection, User
+        from sqlalchemy import or_
+
+        # Resolve user_id to UUID if it's an email
+        resolved_user_id = user_id
+        if "@" in user_id:
+            user = db.query(User).filter(User.email == user_id).first()
+            if user:
+                resolved_user_id = user.user_id
+
+        # Get all projects the user has access to
+        owned_projects = db.query(Project.project_id).filter(
+            Project.owner_user_id == resolved_user_id,
+            Project.is_active == True
+        ).all()
+
+        collaborated_projects = db.query(Project.project_id).join(ProjectCollaborator).filter(
+            ProjectCollaborator.user_id == resolved_user_id,
+            ProjectCollaborator.is_active == True,
+            Project.is_active == True
+        ).all()
+
+        project_ids = list(set([p[0] for p in owned_projects + collaborated_projects]))
+
+        # Get all collections the user has access to
+        user_collections = db.query(Collection.collection_id).filter(
+            or_(
+                Collection.created_by == resolved_user_id,
+                Collection.created_by == user_id  # Also check email format
+            )
+        ).all()
+        collection_ids = [c[0] for c in user_collections]
+
+        # Phase 3: Build unified query for ALL triage types
+        # Include: project-based, collection-based, and user's contextless triages
+        query = db.query(PaperTriage).filter(
+            or_(
+                # Project-based triages
+                PaperTriage.project_id.in_(project_ids) if project_ids else False,
+                # Collection-based triages (project_id is null)
+                (PaperTriage.collection_id.in_(collection_ids) & PaperTriage.project_id.is_(None)) if collection_ids else False,
+                # User's contextless triages (search_query, ad_hoc, multi_project)
+                (PaperTriage.user_id == resolved_user_id) & PaperTriage.project_id.is_(None) & PaperTriage.collection_id.is_(None)
+            )
+        )
+
+        # Apply context_type filter if specified
+        if context_type:
+            query = query.filter(PaperTriage.context_type == context_type)
+
+        # Apply other filters
+        if triage_status:
+            query = query.filter(PaperTriage.triage_status == triage_status)
+        if read_status:
+            query = query.filter(PaperTriage.read_status == read_status)
+        if min_relevance:
+            query = query.filter(PaperTriage.relevance_score >= min_relevance)
+
+        # Order by relevance and apply pagination
+        triages = query.order_by(
+            PaperTriage.relevance_score.desc()
+        ).offset(offset).limit(limit).all()
+
+        # Build response with article details
+        responses = []
+        for triage in triages:
+            article = db.query(Article).filter(Article.pmid == triage.article_pmid).first()
+            article_dict = None
+            if article:
+                article_dict = {
+                    "pmid": article.pmid,
+                    "title": article.title,
+                    "abstract": article.abstract,
+                    "authors": article.authors,
+                    "journal": article.journal,
+                    "publication_date": str(article.publication_year) if article.publication_year else None
+                }
+
+            responses.append(TriageResponse(
+                triage_id=triage.triage_id,
+                project_id=triage.project_id,
+                collection_id=triage.collection_id,
+                article_pmid=triage.article_pmid,
+                relevance_score=triage.relevance_score,
+                triage_status=triage.triage_status,
+                impact_assessment=triage.impact_assessment,
+                ai_reasoning=triage.ai_reasoning,
+                affected_questions=triage.affected_questions or [],
+                affected_hypotheses=triage.affected_hypotheses or [],
+                read_status=triage.read_status,
+                triaged_by=triage.triaged_by or 'ai',
+                triaged_at=str(triage.triaged_at) if triage.triaged_at else str(triage.created_at),
+                reviewed_by=triage.reviewed_by,
+                reviewed_at=str(triage.reviewed_at) if triage.reviewed_at else None,
+                created_at=str(triage.created_at),
+                updated_at=str(triage.updated_at),
+                confidence_score=triage.confidence_score,
+                metadata_score=triage.metadata_score,
+                evidence_excerpts=triage.evidence_excerpts or [],
+                question_relevance_scores=triage.question_relevance_scores or {},
+                hypothesis_relevance_scores=triage.hypothesis_relevance_scores or {},
+                # Phase 3: Include new contextless fields
+                context_type=triage.context_type or "project",
+                triage_context=triage.triage_context,
+                user_id=triage.user_id,
+                key_findings=getattr(triage, 'key_findings', None) or [],
+                relevance_aspects=getattr(triage, 'relevance_aspects', None) or {},
+                how_it_helps=getattr(triage, 'how_it_helps', None),
+                project_scores=getattr(triage, 'project_scores', None),
+                collection_scores=getattr(triage, 'collection_scores', None),
+                best_match=getattr(triage, 'best_match', None),
+                article=article_dict
+            ))
+
+        logger.info(f"✅ Retrieved {len(responses)} papers from global inbox")
+        return responses
+
+    except Exception as e:
+        logger.error(f"❌ Error getting global inbox: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to get global inbox: {str(e)}")
+
+
+@router.get("/stats")
+async def get_global_stats(
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get global inbox statistics across all projects, collections, and contextless triages.
+
+    Phase 3: Enhanced to include context_type breakdown.
+    Used by the Erythos Discover page to show unread counts.
+    """
+    try:
+        logger.info(f"📊 Getting global stats for user {user_id}")
+
+        from database import Project, ProjectCollaborator, Collection, User
+        from sqlalchemy import or_
+
+        # Resolve user_id to UUID if it's an email
+        resolved_user_id = user_id
+        if "@" in user_id:
+            user = db.query(User).filter(User.email == user_id).first()
+            if user:
+                resolved_user_id = user.user_id
+
+        # Get all projects the user has access to
+        owned_projects = db.query(Project.project_id).filter(
+            Project.owner_user_id == resolved_user_id,
+            Project.is_active == True
+        ).all()
+
+        collaborated_projects = db.query(Project.project_id).join(ProjectCollaborator).filter(
+            ProjectCollaborator.user_id == resolved_user_id,
+            ProjectCollaborator.is_active == True,
+            Project.is_active == True
+        ).all()
+
+        project_ids = list(set([p[0] for p in owned_projects + collaborated_projects]))
+
+        # Get all collections the user has access to
+        user_collections = db.query(Collection.collection_id).filter(
+            or_(
+                Collection.created_by == resolved_user_id,
+                Collection.created_by == user_id
+            )
+        ).all()
+        collection_ids = [c[0] for c in user_collections]
+
+        # Phase 3: Get ALL triages the user has access to
+        triages = db.query(PaperTriage).filter(
+            or_(
+                PaperTriage.project_id.in_(project_ids) if project_ids else False,
+                (PaperTriage.collection_id.in_(collection_ids) & PaperTriage.project_id.is_(None)) if collection_ids else False,
+                (PaperTriage.user_id == resolved_user_id) & PaperTriage.project_id.is_(None) & PaperTriage.collection_id.is_(None)
+            )
+        ).all()
+
+        # Calculate stats with context_type breakdown
+        by_context_type = {}
+        for t in triages:
+            ctx = t.context_type or "project"
+            if ctx not in by_context_type:
+                by_context_type[ctx] = 0
+            by_context_type[ctx] += 1
+
+        stats = {
+            "total": len(triages),
+            "must_read": len([t for t in triages if t.triage_status == "must_read"]),
+            "nice_to_know": len([t for t in triages if t.triage_status == "nice_to_know"]),
+            "ignored": len([t for t in triages if t.triage_status == "ignore"]),
+            "unread": len([t for t in triages if t.read_status == "unread"]),
+            "by_context_type": by_context_type
+        }
+
+        logger.info(f"✅ Global stats: {stats['total']} total, {stats['unread']} unread, by_context: {by_context_type}")
+        return stats
+
+    except Exception as e:
+        logger.error(f"❌ Error getting global stats: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to get global stats: {str(e)}")
+
+
+# =============================================================================
+# Phase 4: Collection-Specific Triage Endpoints
+# =============================================================================
+
+@router.get("/collections/{collection_id}/inbox", response_model=List[TriageResponse])
+async def get_collection_inbox(
+    collection_id: str,
     triage_status: Optional[str] = None,
     read_status: Optional[str] = None,
     min_relevance: Optional[int] = None,
@@ -114,37 +367,25 @@ async def get_global_inbox(
     db: Session = Depends(get_db)
 ):
     """
-    Get all papers in global inbox across all projects.
+    Phase 4: Get papers triaged for a specific collection.
 
-    This endpoint aggregates triaged papers from all projects the user has access to.
-    Used by the Erythos Discover page's Smart Inbox tab.
+    Returns papers that were triaged against this collection's Q&H.
     """
     try:
-        logger.info(f"📬 Getting global inbox for user {user_id}")
+        logger.info(f"📬 Getting collection inbox for {collection_id}")
 
-        # Get all projects the user has access to
-        from database import Project, ProjectCollaborator
+        from database import Collection
 
-        # Get owned projects
-        owned_projects = db.query(Project.project_id).filter(
-            Project.owner_user_id == user_id,
-            Project.is_active == True
-        ).all()
+        # Verify collection exists
+        collection = db.query(Collection).filter(Collection.collection_id == collection_id).first()
+        if not collection:
+            raise HTTPException(status_code=404, detail=f"Collection {collection_id} not found")
 
-        # Get collaborated projects
-        collaborated_projects = db.query(Project.project_id).join(ProjectCollaborator).filter(
-            ProjectCollaborator.user_id == user_id,
-            ProjectCollaborator.is_active == True,
-            Project.is_active == True
-        ).all()
-
-        project_ids = list(set([p[0] for p in owned_projects + collaborated_projects]))
-
-        if not project_ids:
-            return []
-
-        # Build query for triages across all projects
-        query = db.query(PaperTriage).filter(PaperTriage.project_id.in_(project_ids))
+        # Build query for collection triages
+        query = db.query(PaperTriage).filter(
+            PaperTriage.collection_id == collection_id,
+            PaperTriage.context_type == "collection"
+        )
 
         # Apply filters
         if triage_status:
@@ -177,6 +418,7 @@ async def get_global_inbox(
             responses.append(TriageResponse(
                 triage_id=triage.triage_id,
                 project_id=triage.project_id,
+                collection_id=triage.collection_id,
                 article_pmid=triage.article_pmid,
                 relevance_score=triage.relevance_score,
                 triage_status=triage.triage_status,
@@ -196,75 +438,288 @@ async def get_global_inbox(
                 evidence_excerpts=triage.evidence_excerpts or [],
                 question_relevance_scores=triage.question_relevance_scores or {},
                 hypothesis_relevance_scores=triage.hypothesis_relevance_scores or {},
+                context_type=triage.context_type or "collection",
+                triage_context=triage.triage_context,
                 article=article_dict
             ))
 
-        logger.info(f"✅ Retrieved {len(responses)} papers from global inbox")
+        logger.info(f"✅ Retrieved {len(responses)} papers from collection inbox")
         return responses
 
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"❌ Error getting global inbox: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get global inbox: {str(e)}")
+        logger.error(f"❌ Error getting collection inbox: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to get collection inbox: {str(e)}")
 
 
-@router.get("/stats")
-async def get_global_stats(
+@router.post("/collections/{collection_id}/triage", response_model=TriageResponse)
+async def triage_paper_for_collection(
+    collection_id: str,
+    request: TriageRequest,
     user_id: str = Header(..., alias="User-ID"),
     db: Session = Depends(get_db)
 ):
     """
-    Get global inbox statistics across all projects.
+    Phase 4: Triage a paper against a collection's Q&H.
 
-    Used by the Erythos Discover page to show unread counts.
+    Similar to project triage but uses collection's research questions and hypotheses.
     """
     try:
-        logger.info(f"📊 Getting global stats for user {user_id}")
+        logger.info(f"📥 Triage request for paper {request.article_pmid} in collection {collection_id}")
 
-        # Get all projects the user has access to
-        from database import Project, ProjectCollaborator
+        from database import Collection, CollectionResearchQuestion, CollectionHypothesis
+        from backend.app.services.contextless_triage_service import ContextlessTriageService
 
-        # Get owned projects
-        owned_projects = db.query(Project.project_id).filter(
-            Project.owner_user_id == user_id,
-            Project.is_active == True
-        ).all()
+        # Verify collection exists
+        collection = db.query(Collection).filter(Collection.collection_id == collection_id).first()
+        if not collection:
+            raise HTTPException(status_code=404, detail=f"Collection {collection_id} not found")
 
-        # Get collaborated projects
-        collaborated_projects = db.query(Project.project_id).join(ProjectCollaborator).filter(
-            ProjectCollaborator.user_id == user_id,
-            ProjectCollaborator.is_active == True,
-            Project.is_active == True
-        ).all()
+        # Get or create article
+        article = db.query(Article).filter(Article.pmid == request.article_pmid).first()
+        if not article:
+            logger.info(f"📡 Article {request.article_pmid} not in database, fetching from PubMed")
+            article_data = await fetch_article_from_pubmed(request.article_pmid)
 
-        project_ids = list(set([p[0] for p in owned_projects + collaborated_projects]))
+            if not article_data:
+                raise HTTPException(status_code=404, detail=f"Article {request.article_pmid} not found")
 
-        if not project_ids:
-            return {
-                "total": 0,
-                "must_read": 0,
-                "nice_to_know": 0,
-                "ignored": 0,
-                "unread": 0
-            }
+            article = Article(
+                pmid=request.article_pmid,
+                title=article_data.get("title", "Unknown"),
+                abstract=article_data.get("abstract"),
+                authors=article_data.get("authors", []),
+                journal=article_data.get("journal"),
+                publication_year=article_data.get("publication_year"),
+                doi=article_data.get("doi"),
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+            db.add(article)
+            db.commit()
 
-        # Get all triages across projects
-        triages = db.query(PaperTriage).filter(PaperTriage.project_id.in_(project_ids)).all()
+        # Use contextless triage service with collection context
+        triage_service = ContextlessTriageService()
+        result = await triage_service.triage_paper(
+            article_pmid=request.article_pmid,
+            context_type="collection",
+            collection_id=collection_id,
+            user_id=user_id,
+            db=db,
+            persist=True
+        )
 
-        # Calculate stats
-        stats = {
-            "total": len(triages),
-            "must_read": len([t for t in triages if t.triage_status == "must_read"]),
-            "nice_to_know": len([t for t in triages if t.triage_status == "nice_to_know"]),
-            "ignored": len([t for t in triages if t.triage_status == "ignore"]),
-            "unread": len([t for t in triages if t.read_status == "unread"])
+        # Get the persisted triage
+        triage = db.query(PaperTriage).filter(
+            PaperTriage.article_pmid == request.article_pmid,
+            PaperTriage.collection_id == collection_id,
+            PaperTriage.context_type == "collection"
+        ).first()
+
+        if not triage:
+            raise HTTPException(status_code=500, detail="Failed to persist triage")
+
+        article_dict = {
+            "pmid": article.pmid,
+            "title": article.title,
+            "abstract": article.abstract,
+            "authors": article.authors,
+            "journal": article.journal,
+            "publication_date": str(article.publication_year) if article.publication_year else None
         }
 
-        logger.info(f"✅ Global stats: {stats['total']} total, {stats['unread']} unread")
-        return stats
+        return TriageResponse(
+            triage_id=triage.triage_id,
+            project_id=triage.project_id,
+            collection_id=triage.collection_id,
+            article_pmid=triage.article_pmid,
+            relevance_score=triage.relevance_score,
+            triage_status=triage.triage_status,
+            impact_assessment=triage.impact_assessment,
+            ai_reasoning=triage.ai_reasoning,
+            affected_questions=triage.affected_questions or [],
+            affected_hypotheses=triage.affected_hypotheses or [],
+            read_status=triage.read_status,
+            triaged_by=triage.triaged_by or 'ai',
+            triaged_at=str(triage.triaged_at) if triage.triaged_at else str(triage.created_at),
+            reviewed_by=triage.reviewed_by,
+            reviewed_at=str(triage.reviewed_at) if triage.reviewed_at else None,
+            created_at=str(triage.created_at),
+            updated_at=str(triage.updated_at),
+            confidence_score=triage.confidence_score,
+            metadata_score=triage.metadata_score,
+            evidence_excerpts=triage.evidence_excerpts or [],
+            question_relevance_scores=triage.question_relevance_scores or {},
+            hypothesis_relevance_scores=triage.hypothesis_relevance_scores or {},
+            context_type=triage.context_type or "collection",
+            triage_context=triage.triage_context,
+            article=article_dict
+        )
 
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"❌ Error getting global stats: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get global stats: {str(e)}")
+        logger.error(f"❌ Error triaging paper for collection: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to triage paper: {str(e)}")
+
+
+@router.post("/copy-to-project", response_model=TriageResponse)
+async def copy_triage_to_project(
+    triage_id: str,
+    project_id: str,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Phase 4: Copy a contextless triage to a project.
+
+    Option B implementation: Fast copy without re-running triage.
+    Copies the existing triage result and associates it with the project.
+    """
+    try:
+        logger.info(f"📋 Copying triage {triage_id} to project {project_id}")
+
+        from database import Project
+        import uuid
+
+        # Get original triage
+        original = db.query(PaperTriage).filter(PaperTriage.triage_id == triage_id).first()
+        if not original:
+            raise HTTPException(status_code=404, detail=f"Triage {triage_id} not found")
+
+        # Verify project exists
+        project = db.query(Project).filter(Project.project_id == project_id).first()
+        if not project:
+            raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+
+        # Check if already exists in project
+        existing = db.query(PaperTriage).filter(
+            PaperTriage.article_pmid == original.article_pmid,
+            PaperTriage.project_id == project_id
+        ).first()
+
+        if existing:
+            logger.info(f"⚠️ Paper already triaged in project, returning existing")
+            article = db.query(Article).filter(Article.pmid == existing.article_pmid).first()
+            article_dict = {
+                "pmid": article.pmid,
+                "title": article.title,
+                "abstract": article.abstract,
+                "authors": article.authors,
+                "journal": article.journal,
+                "publication_date": str(article.publication_year) if article.publication_year else None
+            } if article else None
+
+            return TriageResponse(
+                triage_id=existing.triage_id,
+                project_id=existing.project_id,
+                collection_id=existing.collection_id,
+                article_pmid=existing.article_pmid,
+                relevance_score=existing.relevance_score,
+                triage_status=existing.triage_status,
+                impact_assessment=existing.impact_assessment,
+                ai_reasoning=existing.ai_reasoning,
+                affected_questions=existing.affected_questions or [],
+                affected_hypotheses=existing.affected_hypotheses or [],
+                read_status=existing.read_status,
+                triaged_by=existing.triaged_by or 'ai',
+                triaged_at=str(existing.triaged_at) if existing.triaged_at else str(existing.created_at),
+                reviewed_by=existing.reviewed_by,
+                reviewed_at=str(existing.reviewed_at) if existing.reviewed_at else None,
+                created_at=str(existing.created_at),
+                updated_at=str(existing.updated_at),
+                confidence_score=existing.confidence_score,
+                metadata_score=existing.metadata_score,
+                evidence_excerpts=existing.evidence_excerpts or [],
+                question_relevance_scores=existing.question_relevance_scores or {},
+                hypothesis_relevance_scores=existing.hypothesis_relevance_scores or {},
+                context_type=existing.context_type or "project",
+                article=article_dict
+            )
+
+        # Create new triage as copy
+        new_triage = PaperTriage(
+            triage_id=str(uuid.uuid4()),
+            project_id=project_id,
+            collection_id=None,  # Clear collection association
+            article_pmid=original.article_pmid,
+            context_type="project",  # Now it's a project triage
+            triage_context={"copied_from": triage_id, "original_context_type": original.context_type},
+            user_id=original.user_id,
+            relevance_score=original.relevance_score,
+            triage_status=original.triage_status,
+            impact_assessment=original.impact_assessment,
+            ai_reasoning=original.ai_reasoning + f"\n\n[Copied from {original.context_type} triage]",
+            affected_questions=original.affected_questions or [],
+            affected_hypotheses=original.affected_hypotheses or [],
+            read_status="unread",
+            triaged_by=original.triaged_by or 'ai',
+            triaged_at=datetime.utcnow(),
+            confidence_score=original.confidence_score,
+            metadata_score=original.metadata_score,
+            evidence_excerpts=original.evidence_excerpts or [],
+            question_relevance_scores=original.question_relevance_scores or {},
+            hypothesis_relevance_scores=original.hypothesis_relevance_scores or {},
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+
+        db.add(new_triage)
+        db.commit()
+        db.refresh(new_triage)
+
+        # Get article for response
+        article = db.query(Article).filter(Article.pmid == new_triage.article_pmid).first()
+        article_dict = {
+            "pmid": article.pmid,
+            "title": article.title,
+            "abstract": article.abstract,
+            "authors": article.authors,
+            "journal": article.journal,
+            "publication_date": str(article.publication_year) if article.publication_year else None
+        } if article else None
+
+        logger.info(f"✅ Copied triage to project: {new_triage.triage_id}")
+
+        return TriageResponse(
+            triage_id=new_triage.triage_id,
+            project_id=new_triage.project_id,
+            collection_id=new_triage.collection_id,
+            article_pmid=new_triage.article_pmid,
+            relevance_score=new_triage.relevance_score,
+            triage_status=new_triage.triage_status,
+            impact_assessment=new_triage.impact_assessment,
+            ai_reasoning=new_triage.ai_reasoning,
+            affected_questions=new_triage.affected_questions or [],
+            affected_hypotheses=new_triage.affected_hypotheses or [],
+            read_status=new_triage.read_status,
+            triaged_by=new_triage.triaged_by or 'ai',
+            triaged_at=str(new_triage.triaged_at) if new_triage.triaged_at else str(new_triage.created_at),
+            reviewed_by=new_triage.reviewed_by,
+            reviewed_at=str(new_triage.reviewed_at) if new_triage.reviewed_at else None,
+            created_at=str(new_triage.created_at),
+            updated_at=str(new_triage.updated_at),
+            confidence_score=new_triage.confidence_score,
+            metadata_score=new_triage.metadata_score,
+            evidence_excerpts=new_triage.evidence_excerpts or [],
+            question_relevance_scores=new_triage.question_relevance_scores or {},
+            hypothesis_relevance_scores=new_triage.hypothesis_relevance_scores or {},
+            context_type=new_triage.context_type or "project",
+            article=article_dict
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error copying triage to project: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to copy triage: {str(e)}")
 
 
 # =============================================================================

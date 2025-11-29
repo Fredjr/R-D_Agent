@@ -74,6 +74,23 @@ interface PaperTriage {
   collection_suggestions?: CollectionSuggestion[];
   confidence_score?: number;
   metadata_score?: number;
+  // Phase 3: New contextless triage fields
+  project_id?: string;
+  collection_id?: string;
+  context_type?: 'project' | 'collection' | 'search_query' | 'ad_hoc' | 'multi_project';
+  triage_context?: {
+    search_query?: string;
+    ad_hoc_question?: string;
+    project_scores?: Array<{ project_id: string; project_name: string; relevance_score: number; reasoning: string }>;
+    collection_scores?: Array<{ collection_id: string; collection_name: string; relevance_score: number; reasoning: string }>;
+    best_match?: { id: string; name: string; score: number; type: string };
+  };
+  key_findings?: string[];
+  relevance_aspects?: Record<string, number>;
+  how_it_helps?: string;
+  project_scores?: Array<{ project_id: string; project_name: string; relevance_score: number; reasoning: string }>;
+  collection_scores?: Array<{ collection_id: string; collection_name: string; relevance_score: number; reasoning: string }>;
+  best_match?: { id: string; name: string; score: number; type: string };
   article?: {
     title: string;
     authors?: string[];
@@ -91,7 +108,20 @@ interface InboxStats {
   nice_to_know: number;
   ignored: number;
   unread: number;
+  by_context_type?: Record<string, number>;  // Phase 3: Context type breakdown
 }
+
+// Phase 3: Context type options for filtering
+type ContextTypeFilter = 'all' | 'project' | 'collection' | 'search_query' | 'ad_hoc' | 'multi_project';
+
+const CONTEXT_TYPE_LABELS: Record<ContextTypeFilter, string> = {
+  all: 'All Sources',
+  project: 'Projects',
+  collection: 'Collections',
+  search_query: 'Search Queries',
+  ad_hoc: 'Custom Questions',
+  multi_project: 'Multi-Project'
+};
 
 export function ErythosSmartInboxTab({ projectId }: SmartInboxTabProps) {
   const { user } = useAuth();
@@ -100,6 +130,7 @@ export function ErythosSmartInboxTab({ projectId }: SmartInboxTabProps) {
   const [stats, setStats] = useState<InboxStats>({ total: 0, must_read: 0, nice_to_know: 0, ignored: 0, unread: 0 });
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'must_read' | 'nice_to_know' | 'ignore'>('all');
+  const [contextTypeFilter, setContextTypeFilter] = useState<ContextTypeFilter>('all');  // Phase 3
   const [batchMode, setBatchMode] = useState(false);
   const [selectedPapers, setSelectedPapers] = useState<Set<string>>(new Set());
   const [focusedIndex, setFocusedIndex] = useState(0);
@@ -139,15 +170,19 @@ export function ErythosSmartInboxTab({ projectId }: SmartInboxTabProps) {
       const params = new URLSearchParams();
       if (filter !== 'all') params.append('triage_status', filter);
       if (projectId) params.append('project_id', projectId);
-      
-      const endpoint = projectId 
+      // Phase 3: Add context_type filter for global inbox
+      if (!projectId && contextTypeFilter !== 'all') {
+        params.append('context_type', contextTypeFilter);
+      }
+
+      const endpoint = projectId
         ? `/api/proxy/triage/project/${projectId}/inbox?${params}`
         : `/api/proxy/triage/inbox?${params}`;
-      
+
       const response = await fetch(endpoint, {
         headers: { 'User-ID': user.email }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setPapers(data);
@@ -157,19 +192,19 @@ export function ErythosSmartInboxTab({ projectId }: SmartInboxTabProps) {
     } finally {
       setLoading(false);
     }
-  }, [user?.email, filter, projectId]);
+  }, [user?.email, filter, contextTypeFilter, projectId]);
 
   const loadStats = useCallback(async () => {
     if (!user?.email) return;
     try {
-      const endpoint = projectId 
+      const endpoint = projectId
         ? `/api/proxy/triage/project/${projectId}/stats`
         : `/api/proxy/triage/stats`;
-      
+
       const response = await fetch(endpoint, {
         headers: { 'User-ID': user.email }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setStats({
@@ -177,7 +212,8 @@ export function ErythosSmartInboxTab({ projectId }: SmartInboxTabProps) {
           must_read: data.must_read || 0,
           nice_to_know: data.nice_to_know || 0,
           ignored: data.ignored || 0,
-          unread: data.unread || 0
+          unread: data.unread || 0,
+          by_context_type: data.by_context_type || {}  // Phase 3
         });
       }
     } catch (error) {
@@ -434,6 +470,32 @@ export function ErythosSmartInboxTab({ projectId }: SmartInboxTabProps) {
         onFilterChange={setFilter}
       />
 
+      {/* Phase 3: Context Type Filter - Only show in global inbox */}
+      {!projectId && (
+        <div className="flex flex-wrap items-center gap-2 p-3 bg-gray-800/30 rounded-lg border border-gray-700/50">
+          <span className="text-sm text-gray-400 mr-2">Source:</span>
+          {(Object.keys(CONTEXT_TYPE_LABELS) as ContextTypeFilter[]).map((type) => {
+            const count = type === 'all' ? stats.total : (stats.by_context_type?.[type] || 0);
+            // Only show types that have papers or 'all'
+            if (type !== 'all' && count === 0) return null;
+            return (
+              <button
+                key={type}
+                onClick={() => setContextTypeFilter(type)}
+                className={`px-3 py-1.5 text-sm rounded-lg transition-all ${
+                  contextTypeFilter === type
+                    ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
+                    : 'bg-gray-700/50 text-gray-300 border border-gray-600/50 hover:bg-gray-700'
+                }`}
+              >
+                {CONTEXT_TYPE_LABELS[type]}
+                {count > 0 && <span className="ml-1.5 text-xs opacity-70">({count})</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Controls Row */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         {/* Batch Mode Toggle */}
@@ -445,7 +507,7 @@ export function ErythosSmartInboxTab({ projectId }: SmartInboxTabProps) {
           >
             {batchMode ? '✓ Batch Mode' : 'Batch Mode'}
           </ErythosButton>
-          
+
           {batchMode && selectedPapers.size > 0 && (
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-400">{selectedPapers.size} selected</span>
@@ -498,6 +560,14 @@ export function ErythosSmartInboxTab({ projectId }: SmartInboxTabProps) {
               hypothesisScores={paper.hypothesis_relevance_scores}
               collectionSuggestions={paper.collection_suggestions}
               confidenceScore={paper.confidence_score}
+              // Phase 3: Context type information
+              contextType={paper.context_type}
+              triageContext={paper.triage_context}
+              projectScores={paper.project_scores}
+              collectionScores={paper.collection_scores}
+              bestMatch={paper.best_match}
+              keyFindings={paper.key_findings}
+              howItHelps={paper.how_it_helps}
               // Legacy evidence links (IDs only - for fallback)
               evidenceLinks={[
                 ...(paper.affected_hypotheses || []).map(h => ({ type: 'hypothesis' as const, text: h })),

@@ -69,6 +69,18 @@ interface TriagedPaperCardProps {
     type: 'question' | 'hypothesis';
     text: string;
   }>;
+  // Phase 3: Context type information
+  contextType?: 'project' | 'collection' | 'search_query' | 'ad_hoc' | 'multi_project';
+  triageContext?: {
+    search_query?: string;
+    ad_hoc_question?: string;
+    best_match?: { id: string; name: string; score: number; type: string };
+  };
+  projectScores?: Array<{ project_id: string; project_name: string; relevance_score: number; reasoning: string }>;
+  collectionScores?: Array<{ collection_id: string; collection_name: string; relevance_score: number; reasoning: string }>;
+  bestMatch?: { id: string; name: string; score: number; type: string };
+  keyFindings?: string[];
+  howItHelps?: string;
   isSelected?: boolean;
   isFocused?: boolean;
   batchMode?: boolean;
@@ -79,6 +91,7 @@ interface TriagedPaperCardProps {
   onNetworkView?: () => void;
   onExtractProtocol?: () => void;
   onAddToCollection?: (collectionId: string, collectionName: string) => void;
+  onCopyToProject?: (projectId: string) => void;  // Phase 4: Copy to project action
 }
 
 const statusConfig = {
@@ -92,6 +105,15 @@ const getScoreColor = (score: number) => {
   if (score >= 60) return 'text-yellow-400';
   if (score >= 40) return 'text-orange-400';
   return 'text-red-400';
+};
+
+// Phase 3: Context type labels and colors
+const contextTypeConfig = {
+  project: { label: 'Project', icon: '📁', color: 'text-blue-400', bg: 'bg-blue-500/20' },
+  collection: { label: 'Collection', icon: '📚', color: 'text-purple-400', bg: 'bg-purple-500/20' },
+  search_query: { label: 'Search', icon: '🔍', color: 'text-green-400', bg: 'bg-green-500/20' },
+  ad_hoc: { label: 'Custom Q', icon: '❓', color: 'text-yellow-400', bg: 'bg-yellow-500/20' },
+  multi_project: { label: 'Multi', icon: '🎯', color: 'text-orange-400', bg: 'bg-orange-500/20' },
 };
 
 export function ErythosTriagedPaperCard({
@@ -113,6 +135,14 @@ export function ErythosTriagedPaperCard({
   confidenceScore,
   richEvidenceLinks = [],
   evidenceLinks = [],
+  // Phase 3: New context props
+  contextType = 'project',
+  triageContext,
+  projectScores = [],
+  collectionScores = [],
+  bestMatch,
+  keyFindings = [],
+  howItHelps,
   isSelected = false,
   isFocused = false,
   batchMode = false,
@@ -122,16 +152,19 @@ export function ErythosTriagedPaperCard({
   onDeepDive,
   onNetworkView,
   onExtractProtocol,
-  onAddToCollection
+  onAddToCollection,
+  onCopyToProject
 }: TriagedPaperCardProps) {
   const status = statusConfig[triageStatus];
+  const ctxConfig = contextTypeConfig[contextType] || contextTypeConfig.project;
   const [expanded, setExpanded] = useState(false);
   const [addingToCollection, setAddingToCollection] = useState<string | null>(null);
 
   // Check if we have rich AI triage details
   const hasRichDetails = impactAssessment || aiReasoning || evidenceExcerpts.length > 0 ||
     Object.keys(questionScores).length > 0 || Object.keys(hypothesisScores).length > 0 ||
-    collectionSuggestions.length > 0 || richEvidenceLinks.length > 0;
+    collectionSuggestions.length > 0 || richEvidenceLinks.length > 0 ||
+    keyFindings.length > 0 || howItHelps || projectScores.length > 0 || collectionScores.length > 0;
 
   return (
     <div
@@ -161,6 +194,13 @@ export function ErythosTriagedPaperCard({
           </h3>
         </div>
 
+        {/* Phase 3: Context type badge */}
+        {contextType && contextType !== 'project' && (
+          <div className={`flex-shrink-0 px-2 py-1 rounded text-xs font-medium ${ctxConfig.bg} ${ctxConfig.color}`}>
+            {ctxConfig.icon} {ctxConfig.label}
+          </div>
+        )}
+
         {/* Triage badge */}
         <div className={`flex-shrink-0 px-2 py-1 rounded text-xs font-semibold ${status.bg} ${status.text} ${status.border} border`}>
           {status.label}
@@ -183,6 +223,16 @@ export function ErythosTriagedPaperCard({
         {year && <span>• {year}</span>}
         {journal && <span>• {journal}</span>}
         <span className="text-orange-400">• PMID: {pmid}</span>
+        {/* Phase 3: Show context info */}
+        {triageContext?.search_query && (
+          <span className="text-green-400">• Search: "{triageContext.search_query}"</span>
+        )}
+        {triageContext?.ad_hoc_question && (
+          <span className="text-yellow-400">• Q: "{triageContext.ad_hoc_question.slice(0, 50)}..."</span>
+        )}
+        {bestMatch && (
+          <span className="text-orange-400">• Best: {bestMatch.name} ({bestMatch.score})</span>
+        )}
       </div>
 
       {/* Abstract */}
@@ -457,6 +507,75 @@ export function ErythosTriagedPaperCard({
                             📊 Matches {suggestion.matching_hypothesis_count} hypothesis{suggestion.matching_hypothesis_count > 1 ? 'es' : ''} in this collection
                           </p>
                         )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Phase 3: Key Findings (for search_query and ad_hoc) */}
+              {keyFindings.length > 0 && (
+                <div className="p-3 rounded-lg bg-teal-500/10 border border-teal-500/20">
+                  <div className="flex items-center gap-2 text-teal-400 text-sm font-medium mb-2">
+                    <span>🔑</span>
+                    <span>Key Findings</span>
+                  </div>
+                  <ul className="space-y-1">
+                    {keyFindings.map((finding, i) => (
+                      <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
+                        <span className="text-teal-400">•</span>
+                        <span>{finding}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Phase 3: How It Helps (for ad_hoc) */}
+              {howItHelps && (
+                <div className="p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
+                  <div className="flex items-center gap-2 text-indigo-400 text-sm font-medium mb-2">
+                    <span>💡</span>
+                    <span>How This Paper Helps</span>
+                  </div>
+                  <p className="text-sm text-gray-300">{howItHelps}</p>
+                </div>
+              )}
+
+              {/* Phase 3: Multi-Project Scores */}
+              {projectScores.length > 0 && (
+                <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                  <div className="flex items-center gap-2 text-blue-400 text-sm font-medium mb-2">
+                    <span>📁</span>
+                    <span>Project Relevance Scores</span>
+                  </div>
+                  <div className="space-y-2">
+                    {projectScores.map((ps) => (
+                      <div key={ps.project_id} className="flex items-center justify-between p-2 rounded bg-gray-800/50">
+                        <span className="text-sm text-gray-300">{ps.project_name}</span>
+                        <span className={`text-sm font-bold ${getScoreColor(ps.relevance_score)}`}>
+                          {ps.relevance_score}/100
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Phase 3: Multi-Collection Scores */}
+              {collectionScores.length > 0 && (
+                <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                  <div className="flex items-center gap-2 text-purple-400 text-sm font-medium mb-2">
+                    <span>📚</span>
+                    <span>Collection Relevance Scores</span>
+                  </div>
+                  <div className="space-y-2">
+                    {collectionScores.map((cs) => (
+                      <div key={cs.collection_id} className="flex items-center justify-between p-2 rounded bg-gray-800/50">
+                        <span className="text-sm text-gray-300">{cs.collection_name}</span>
+                        <span className={`text-sm font-bold ${getScoreColor(cs.relevance_score)}`}>
+                          {cs.relevance_score}/100
+                        </span>
                       </div>
                     ))}
                   </div>
