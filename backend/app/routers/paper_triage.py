@@ -1305,3 +1305,173 @@ async def contextless_triage(
         import traceback
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Triage failed: {str(e)}")
+
+
+# =============================================================================
+# Bulk Evidence Discovery (Option E)
+# =============================================================================
+
+class EvidenceDiscoveryRequest(BaseModel):
+    """Request for bulk evidence discovery"""
+    project_id: str
+    collection_ids: List[str]
+    max_papers: int = 100
+
+
+class EvidenceDiscoveryResponse(BaseModel):
+    """Response from bulk evidence discovery"""
+    status: str
+    evidence_count: int
+    papers_processed: int
+    processing_time_seconds: Optional[float] = None
+    message: Optional[str] = None
+    qh_summary: Optional[dict] = None
+    evidence_matrix: Optional[dict] = None
+
+
+@router.post("/evidence/discover", response_model=EvidenceDiscoveryResponse)
+async def discover_evidence(
+    request: EvidenceDiscoveryRequest,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Option E: Bulk Evidence Discovery Engine
+
+    Discovers evidence across papers in selected collections against
+    aggregated Q&H from project and collections.
+
+    Flow:
+    1. User selects project → Collections pre-ticked
+    2. User selects/deselects collections
+    3. Q&H auto-loaded from project + selected collections
+    4. Run discovery → Extract evidence from ALL papers
+
+    Returns evidence matrix grouped by Q/H, with paper and collection tags.
+    """
+    logger.info(f"🔬 Evidence Discovery Request:")
+    logger.info(f"   Project: {request.project_id}")
+    logger.info(f"   Collections: {request.collection_ids}")
+    logger.info(f"   Max Papers: {request.max_papers}")
+    logger.info(f"   User: {user_id}")
+
+    try:
+        from backend.app.services.bulk_evidence_discovery_service import bulk_evidence_service
+
+        result = await bulk_evidence_service.discover_evidence(
+            project_id=request.project_id,
+            collection_ids=request.collection_ids,
+            user_id=user_id,
+            db=db,
+            max_papers=request.max_papers
+        )
+
+        return EvidenceDiscoveryResponse(**result)
+
+    except Exception as e:
+        logger.error(f"❌ Evidence discovery error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Discovery failed: {str(e)}")
+
+
+@router.get("/evidence/collections/{project_id}")
+async def get_collections_for_evidence_discovery(
+    project_id: str,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all collections available for evidence discovery.
+
+    Returns:
+    - Collections in the project (pre-selected)
+    - All user's other collections (can be added)
+    - Paper counts for each collection
+    - Q&H counts for each collection
+    """
+    from database import Collection, ArticleCollection, CollectionResearchQuestion, CollectionHypothesis, User
+    from sqlalchemy import func
+
+    # Resolve user
+    user = db.query(User).filter(User.email == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Get collections with paper counts
+    collections_with_counts = db.query(
+        Collection,
+        func.count(ArticleCollection.id).label('paper_count')
+    ).outerjoin(
+        ArticleCollection, Collection.collection_id == ArticleCollection.collection_id
+    ).filter(
+        Collection.created_by == user.user_id,
+        Collection.is_active == True
+    ).group_by(Collection.collection_id).all()
+
+    result = []
+    for collection, paper_count in collections_with_counts:
+        # Get Q&H counts for this collection
+        q_count = db.query(CollectionResearchQuestion).filter(
+            CollectionResearchQuestion.collection_id == collection.collection_id
+        ).count()
+
+        h_count = db.query(CollectionHypothesis).filter(
+            CollectionHypothesis.collection_id == collection.collection_id
+        ).count()
+
+        result.append({
+            "collection_id": collection.collection_id,
+            "collection_name": collection.collection_name,
+            "description": collection.description,
+            "paper_count": paper_count,
+            "questions_count": q_count,
+            "hypotheses_count": h_count,
+            "in_project": collection.project_id == project_id,
+            "project_id": collection.project_id
+        })
+
+    # Sort: in-project first, then by paper count
+    result.sort(key=lambda x: (not x['in_project'], -x['paper_count']))
+
+    return result
+
+
+@router.post("/evidence/preview-context")
+async def preview_evidence_context(
+    request: EvidenceDiscoveryRequest,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Preview the Q&H context that will be used for evidence discovery.
+    Helps users understand what will be searched before running the full discovery.
+    """
+    from backend.app.services.bulk_evidence_discovery_service import bulk_evidence_service
+    from database import ArticleCollection
+
+    # Get Q&H context
+    qh_context = bulk_evidence_service._aggregate_qh_context(
+        request.project_id,
+        request.collection_ids,
+        db
+    )
+
+    # Count papers
+    seen_pmids = set()
+    for collection_id in request.collection_ids:
+        article_collections = db.query(ArticleCollection).filter(
+            ArticleCollection.collection_id == collection_id
+        ).all()
+        for ac in article_collections:
+            if ac.article_pmid:
+                seen_pmids.add(ac.article_pmid)
+
+    total_papers = min(len(seen_pmids), request.max_papers)
+
+    return {
+        "questions": qh_context['questions'],
+        "hypotheses": qh_context['hypotheses'],
+        "total_papers": total_papers,
+        "estimated_time_seconds": total_papers * 2  # ~2 seconds per paper estimate
+    }
