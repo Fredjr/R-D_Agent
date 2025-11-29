@@ -15,6 +15,7 @@ Hybrid Triage Implementation for Discovery Flow
 import os
 import json
 import logging
+import uuid as uuid_module
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
@@ -22,13 +23,33 @@ from openai import AsyncOpenAI
 
 from database import (
     Article, Project, ResearchQuestion, Hypothesis,
-    Collection, CollectionResearchQuestion, CollectionHypothesis
+    Collection, CollectionResearchQuestion, CollectionHypothesis, User
 )
 
 logger = logging.getLogger(__name__)
 
 # Initialize OpenAI client
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+
+def resolve_user_id(user_identifier: str, db: Session) -> str:
+    """
+    Resolve user identifier (email or UUID) to UUID.
+    """
+    try:
+        uuid_module.UUID(user_identifier)
+        return user_identifier  # Already a UUID
+    except (ValueError, AttributeError):
+        pass
+
+    # It's an email, resolve to UUID
+    if "@" in user_identifier:
+        user = db.query(User).filter(User.email == user_identifier).first()
+        if user:
+            return user.user_id
+
+    # Fallback to original identifier
+    return user_identifier
 
 
 class ContextlessTriageService:
@@ -178,11 +199,21 @@ class ContextlessTriageService:
         """Triage paper against ALL user's projects and collections"""
         logger.info(f"🔍 Multi-project triage for {article.pmid}")
 
-        # Get all user's projects
-        projects = db.query(Project).filter(Project.user_id == user_id).all()
+        # Resolve user_id (email -> UUID if needed)
+        resolved_user_id = resolve_user_id(user_id, db)
+        logger.info(f"🔍 Resolved user_id: {user_id} -> {resolved_user_id}")
 
-        # Get all user's collections
-        collections = db.query(Collection).filter(Collection.user_id == user_id).all()
+        # Get all user's projects (using owner_user_id)
+        projects = db.query(Project).filter(Project.owner_user_id == resolved_user_id).all()
+
+        # Get all user's collections (using created_by) - check both resolved and original
+        from sqlalchemy import or_
+        collections = db.query(Collection).filter(
+            or_(
+                Collection.created_by == resolved_user_id,
+                Collection.created_by == user_id  # Also check original (email) format
+            )
+        ).all()
 
         results = {
             "article_pmid": article.pmid,
@@ -207,20 +238,20 @@ class ContextlessTriageService:
 
         # Score against each collection with Q&H
         for collection in collections[:5]:  # Limit to 5 for performance
-            # Check if collection has Q&H
+            # Check if collection has Q&H (using collection_id)
             q_count = db.query(CollectionResearchQuestion).filter(
-                CollectionResearchQuestion.collection_id == collection.id
+                CollectionResearchQuestion.collection_id == collection.collection_id
             ).count()
             h_count = db.query(CollectionHypothesis).filter(
-                CollectionHypothesis.collection_id == collection.id
+                CollectionHypothesis.collection_id == collection.collection_id
             ).count()
 
             if q_count > 0 or h_count > 0:
-                context = self._build_collection_context(collection.id, db)
+                context = self._build_collection_context(collection.collection_id, db)
                 score_result = await self._analyze_paper_relevance(article, context, "collection")
                 results["collection_scores"].append({
-                    "collection_id": collection.id,
-                    "collection_name": collection.name,
+                    "collection_id": collection.collection_id,
+                    "collection_name": collection.collection_name,
                     "relevance_score": score_result["relevance_score"],
                     "reasoning": score_result.get("quick_reasoning", score_result.get("ai_reasoning", ""))[:200]
                 })
