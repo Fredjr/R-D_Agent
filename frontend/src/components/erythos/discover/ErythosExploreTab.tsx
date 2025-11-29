@@ -124,7 +124,7 @@ export function ErythosExploreTab() {
         const data = await res.json();
         setCollections(data);
         // Auto-select in-project collections
-        const inProjectIds = new Set(
+        const inProjectIds = new Set<string>(
           data.filter((c: CollectionWithCounts) => c.in_project).map((c: CollectionWithCounts) => c.collection_id)
         );
         setSelectedCollectionIds(inProjectIds);
