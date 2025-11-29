@@ -3,13 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { PlusIcon, Squares2X2Icon, ListBulletIcon, MagnifyingGlassIcon, FunnelIcon, ChevronRightIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, Squares2X2Icon, ListBulletIcon, MagnifyingGlassIcon, FunnelIcon, ChevronRightIcon, ArrowLeftIcon, BeakerIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRealTimeAnalytics } from '@/hooks/useRealTimeAnalytics';
 import { ErythosCollectionCard } from './ErythosCollectionCard';
 import { ErythosButton } from './ErythosButton';
 import { ErythosCreateProjectModal } from './ErythosCreateProjectModal';
 import { ErythosAnalyzeModal } from './ErythosAnalyzeModal';
+import { ErythosCollectionResearchSection } from './collection/ErythosCollectionResearchSection';
 import CollectionArticles from '@/components/CollectionArticles';
 import MultiColumnNetworkView from '@/components/MultiColumnNetworkView';
 
@@ -60,6 +61,7 @@ export function ErythosCollectionsPage({ onCreateCollection }: ErythosCollection
   // State for inline collection detail view (explore/network)
   const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null);
   const [viewType, setViewType] = useState<'list' | 'explore' | 'network'>('list');
+  const [showResearchSection, setShowResearchSection] = useState(false);
 
   // Fetch collections and projects
   useEffect(() => {
@@ -185,6 +187,7 @@ export function ErythosCollectionsPage({ onCreateCollection }: ErythosCollection
   const handleBackToList = () => {
     setSelectedCollection(null);
     setViewType('list');
+    setShowResearchSection(false); // Reset research section state
     fetchCollections(); // Refresh collections
   };
 
@@ -220,8 +223,24 @@ export function ErythosCollectionsPage({ onCreateCollection }: ErythosCollection
                 )}
               </p>
             </div>
-            {/* Toggle between explore and network */}
+            {/* Toggle between explore, network, and research */}
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowResearchSection(!showResearchSection)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  showResearchSection
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30'
+                }`}
+              >
+                <BeakerIcon className="w-4 h-4" />
+                Research
+                {showResearchSection ? (
+                  <ChevronUpIcon className="w-4 h-4" />
+                ) : (
+                  <ChevronDownIcon className="w-4 h-4" />
+                )}
+              </button>
               <button
                 onClick={() => setViewType('explore')}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -244,6 +263,19 @@ export function ErythosCollectionsPage({ onCreateCollection }: ErythosCollection
               </button>
             </div>
           </div>
+
+          {/* Research Questions & Hypotheses Section (collapsible) */}
+          {showResearchSection && user?.email && (
+            <div className="mb-6">
+              <ErythosCollectionResearchSection
+                collectionId={selectedCollection.id}
+                collectionName={selectedCollection.name}
+                projectId={linkedProjectId || ''}
+                userId={user.email}
+                onRefresh={fetchCollections}
+              />
+            </div>
+          )}
 
           {/* Content based on view type */}
           <div className="bg-[#1a1a1a] rounded-xl border border-gray-800 overflow-hidden">
