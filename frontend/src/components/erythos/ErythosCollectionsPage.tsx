@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { PlusIcon, Squares2X2Icon, ListBulletIcon, MagnifyingGlassIcon, FunnelIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, Squares2X2Icon, ListBulletIcon, MagnifyingGlassIcon, FunnelIcon, ChevronRightIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRealTimeAnalytics } from '@/hooks/useRealTimeAnalytics';
 import { ErythosCollectionCard } from './ErythosCollectionCard';
 import { ErythosButton } from './ErythosButton';
 import { ErythosCreateProjectModal } from './ErythosCreateProjectModal';
+import { ErythosAnalyzeModal } from './ErythosAnalyzeModal';
 
 interface Project {
   project_id: string;
@@ -46,6 +48,12 @@ export function ErythosCollectionsPage({ onCreateCollection }: ErythosCollection
   const [searchQuery, setSearchQuery] = useState('');
   const [projectFilter, setProjectFilter] = useState<string>('all'); // 'all' | 'standalone' | project_id
   const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
+  const [showAnalyzeModal, setShowAnalyzeModal] = useState(false);
+  const [selectedCollectionForAnalysis, setSelectedCollectionForAnalysis] = useState<{
+    collection_id: string;
+    collection_name: string;
+    article_count: number;
+  } | undefined>(undefined);
 
   // Fetch collections and projects
   useEffect(() => {
@@ -162,13 +170,38 @@ export function ErythosCollectionsPage({ onCreateCollection }: ErythosCollection
     return matchesSearch && matchesProject;
   });
 
+  // Get selected project name for breadcrumb
+  const selectedProject = projectFilter !== 'all' && projectFilter !== 'standalone'
+    ? projects.find(p => p.project_id === projectFilter)
+    : null;
+
   return (
     <div className="min-h-screen bg-black text-white">
       <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Breadcrumb Navigation */}
+        {selectedProject && (
+          <nav className="flex items-center gap-2 text-sm mb-4">
+            <Link
+              href={`/project/${selectedProject.project_id}`}
+              className="flex items-center gap-1 text-gray-400 hover:text-white transition-colors"
+            >
+              <ArrowLeftIcon className="w-4 h-4" />
+              <span>Back to {selectedProject.project_name}</span>
+            </Link>
+            <ChevronRightIcon className="w-4 h-4 text-gray-600" />
+            <span className="text-orange-400">Collections</span>
+          </nav>
+        )}
+
         {/* Page Header - Simplified */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-white mb-2">📁 Collections</h1>
-          <p className="text-gray-400">Organize and manage your research article collections</p>
+          <p className="text-gray-400">
+            {selectedProject
+              ? `Collections in ${selectedProject.project_name}`
+              : 'Organize and manage your research article collections'
+            }
+          </p>
         </div>
 
         {/* Controls Bar */}
@@ -296,6 +329,15 @@ export function ErythosCollectionsPage({ onCreateCollection }: ErythosCollection
                     trackCollectionAction('network_view', collection.id);
                     router.push(`/project/${collection.projectId}?tab=collections&collection=${collection.id}&view=network`);
                   }}
+                  onAnalyze={() => {
+                    trackCollectionAction('view', collection.id, { action_type: 'analyze' });
+                    setSelectedCollectionForAnalysis({
+                      collection_id: collection.id,
+                      collection_name: collection.name,
+                      article_count: collection.articleCount,
+                    });
+                    setShowAnalyzeModal(true);
+                  }}
                   onAddToProject={() => {
                     // TODO: Open add to project modal
                     console.log('Add to project:', collection.id);
@@ -354,6 +396,21 @@ export function ErythosCollectionsPage({ onCreateCollection }: ErythosCollection
         isOpen={showCreateProjectModal}
         onClose={() => setShowCreateProjectModal(false)}
         onProjectCreated={handleProjectCreated}
+      />
+
+      {/* Analyze Collection Modal */}
+      <ErythosAnalyzeModal
+        isOpen={showAnalyzeModal}
+        onClose={() => {
+          setShowAnalyzeModal(false);
+          setSelectedCollectionForAnalysis(undefined);
+        }}
+        collection={selectedCollectionForAnalysis}
+        onSuccess={(result) => {
+          if (result.projectId) {
+            router.push(`/project/${result.projectId}?tab=reports`);
+          }
+        }}
       />
     </div>
   );

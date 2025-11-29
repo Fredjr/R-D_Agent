@@ -1162,12 +1162,8 @@ export default function ProjectPage() {
   // FEATURE FLAG: NEW ERYTHOS PROJECT WORKSPACE
   // ============================================================================
   if (useNewWorkspace) {
-    return (
-      <>
-        {useErythos && <ErythosHeader />}
-        <ErythosProjectWorkspace projectId={projectId} />
-      </>
-    );
+    // ErythosProjectWorkspace includes ErythosHeader internally with project context
+    return <ErythosProjectWorkspace projectId={projectId} />;
   }
 
   // ============================================================================

@@ -21,6 +21,7 @@ interface ErythosCollectionCardProps {
   onExplore?: () => void;
   onNetworkView?: () => void;
   onAddToProject?: () => void;  // Handler to add collection to project
+  onAnalyze?: () => void;  // Handler to analyze collection (generate report/insights)
   className?: string;
 }
 
@@ -58,6 +59,7 @@ export function ErythosCollectionCard({
   onExplore,
   onNetworkView,
   onAddToProject,
+  onAnalyze,
   className = '',
 }: ErythosCollectionCardProps) {
   // Determine gradient from color or use default based on hash
@@ -169,6 +171,19 @@ export function ErythosCollectionCard({
           <span>🌐</span>
           <span>Network</span>
         </button>
+        {onAnalyze && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAnalyze();
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 hover:text-purple-300 text-sm font-medium rounded-lg transition-colors border border-purple-500/30"
+            title="Analyze collection with AI"
+          >
+            <span>✨</span>
+            <span>Analyze</span>
+          </button>
+        )}
         {onAddToProject && (
           <button
             onClick={(e) => {

@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { ChevronRightIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import { ErythosTabs } from './ErythosTabs';
 import { ErythosProtocolsTab, ErythosExperimentsTab, ErythosDataManagementTab } from './lab';
@@ -52,13 +54,36 @@ export function ErythosLabPage() {
     { id: 'data', label: 'Data Management' },
   ];
 
+  // Get selected project name for breadcrumb
+  const selectedProject = projects.find(p => p.project_id === projectFilter);
+
   return (
     <div className="min-h-screen bg-[#121212]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Breadcrumb Navigation */}
+        {projectFilter && selectedProject && (
+          <nav className="flex items-center gap-2 text-sm mb-4">
+            <Link
+              href={`/project/${projectFilter}`}
+              className="flex items-center gap-1 text-gray-400 hover:text-white transition-colors"
+            >
+              <ArrowLeftIcon className="w-4 h-4" />
+              <span>Back to {selectedProject.project_name}</span>
+            </Link>
+            <ChevronRightIcon className="w-4 h-4 text-gray-600" />
+            <span className="text-orange-400">Lab</span>
+          </nav>
+        )}
+
         {/* Page Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-white mb-2">🧪 Lab</h1>
-          <p className="text-gray-400">Execute protocols and track your experiments</p>
+          <p className="text-gray-400">
+            {projectFilter && selectedProject
+              ? `Lab experiments for ${selectedProject.project_name}`
+              : 'Execute protocols and track your experiments'
+            }
+          </p>
         </div>
 
         {/* Project Filter */}

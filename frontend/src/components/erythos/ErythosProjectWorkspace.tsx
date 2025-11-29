@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { ErythosTabs } from './ErythosTabs';
+import { ErythosHeader } from './ErythosHeader';
 import {
   ErythosProjectHeader,
   ErythosOverviewTab,
@@ -130,32 +131,42 @@ export function ErythosProjectWorkspace({ projectId }: ErythosProjectWorkspacePr
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#121212] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto"></div>
-          <p className="mt-4 text-gray-400">Loading project...</p>
+      <>
+        <ErythosHeader />
+        <div className="min-h-screen bg-[#121212] flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto"></div>
+            <p className="mt-4 text-gray-400">Loading project...</p>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   if (error || !project) {
     return (
-      <div className="min-h-screen bg-[#121212] flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-400 mb-4">{error || 'Project not found'}</p>
-          <a href="/dashboard" className="text-red-400 hover:text-red-300 underline">
-            Back to Dashboard
-          </a>
+      <>
+        <ErythosHeader />
+        <div className="min-h-screen bg-[#121212] flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-red-400 mb-4">{error || 'Project not found'}</p>
+            <a href="/" className="text-red-400 hover:text-red-300 underline">
+              Back to Home
+            </a>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#121212]">
-      {/* Project Header with Stats */}
-      <ErythosProjectHeader project={project} stats={stats} />
+    <>
+      {/* Global Header with Project Name in Navigation */}
+      <ErythosHeader projectName={project.project_name} projectId={projectId} />
+
+      <div className="min-h-screen bg-[#121212]">
+        {/* Project Header with Stats */}
+        <ErythosProjectHeader project={project} stats={stats} />
 
       {/* Tab Navigation - 7 Flat Tabs */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -191,6 +202,7 @@ export function ErythosProjectWorkspace({ projectId }: ErythosProjectWorkspacePr
         {activeTab === 'reports' && <ErythosReportsTab projectId={projectId} />}
       </div>
     </div>
+    </>
   );
 }
 

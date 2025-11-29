@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import {
   PlusIcon,
   FolderIcon,
@@ -15,6 +16,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useErythos } from '@/contexts/FeatureFlagsContext';
 import {
   Button,
   FullPageLoading,
@@ -57,6 +59,7 @@ function DashboardContent() {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isErythosEnabled = useErythos();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +71,13 @@ function DashboardContent() {
   const [tourRequested, setTourRequested] = useState(false);
 
   console.log('📊 Dashboard page initialized');
+
+  // Redirect to Erythos home if feature flag is enabled
+  useEffect(() => {
+    if (isErythosEnabled) {
+      router.replace('/');
+    }
+  }, [isErythosEnabled, router]);
 
   // Redirect to home if not authenticated
   useEffect(() => {

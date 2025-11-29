@@ -21,6 +21,7 @@ import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { ContextualHelp } from '@/components/ui/ContextualHelp';
 import { SuggestedNextSteps } from '@/components/ui/SuggestedNextSteps';
 import { useAuth } from '@/contexts/AuthContext';
+import { useErythos } from '@/contexts/FeatureFlagsContext';
 import { useWeeklyMixIntegration } from '@/hooks/useWeeklyMixIntegration';
 import dynamic from 'next/dynamic';
 
@@ -53,7 +54,16 @@ function SearchPageContent() {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isErythosEnabled = useErythos();
   const [query, setQuery] = useState(searchParams?.get('q') || '');
+
+  // Redirect to Erythos discover page if feature flag is enabled
+  useEffect(() => {
+    if (isErythosEnabled) {
+      const q = searchParams?.get('q');
+      router.replace(q ? `/discover?q=${encodeURIComponent(q)}` : '/discover');
+    }
+  }, [isErythosEnabled, router, searchParams]);
 
   // Initialize weekly mix integration
   const { trackSearchPageSearch, trackPaperView } = useWeeklyMixIntegration();
