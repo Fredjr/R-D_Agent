@@ -352,6 +352,39 @@ export function ErythosSmartInboxTab({ projectId }: SmartInboxTabProps) {
     }
   };
 
+  // Direct Add to Collection (from suggested collections)
+  const handleAddToCollection = async (paper: PaperTriage, collectionId: string, collectionName: string) => {
+    if (!user?.email) return;
+    try {
+      const response = await fetch(`/api/proxy/collections/${collectionId}/pubmed-articles`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user.email
+        },
+        body: JSON.stringify({
+          article: {
+            pmid: paper.article_pmid,
+            title: paper.article?.title,
+            authors: paper.article?.authors,
+            year: paper.article?.year,
+            journal: paper.article?.journal,
+            abstract: paper.article?.abstract
+          }
+        })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        console.log(`✅ Article added to ${collectionName}`);
+      } else if (result.duplicate) {
+        console.log(`⚠️ Already in ${collectionName}`);
+      }
+    } catch (error) {
+      console.error('Error adding to collection:', error);
+    }
+  };
+
   // Protocol Extraction Handler
   const handleExtractProtocol = async (paper: PaperTriage) => {
     setProtocolPaper(paper);
@@ -479,6 +512,7 @@ export function ErythosSmartInboxTab({ projectId }: SmartInboxTabProps) {
               onDeepDive={() => handleDeepDive(paper)}
               onNetworkView={() => handleNetworkView(paper)}
               onExtractProtocol={() => handleExtractProtocol(paper)}
+              onAddToCollection={(collectionId, collectionName) => handleAddToCollection(paper, collectionId, collectionName)}
             />
           ))}
         </div>

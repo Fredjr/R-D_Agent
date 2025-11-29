@@ -30,6 +30,18 @@ interface CollectionSuggestion {
   collection_name: string;
   reason: string;
   confidence: number;
+  matching_hypothesis_count?: number;
+}
+
+// Rich evidence link with full context
+interface RichEvidenceLink {
+  id: string;
+  type: 'question' | 'hypothesis';
+  text: string; // Full question/hypothesis text
+  score?: number;
+  reasoning?: string;
+  evidence?: string; // Extracted evidence from paper
+  support_type?: string; // For hypotheses
 }
 
 interface TriagedPaperCardProps {
@@ -50,6 +62,8 @@ interface TriagedPaperCardProps {
   hypothesisScores?: Record<string, RelevanceScore>;
   collectionSuggestions?: CollectionSuggestion[];
   confidenceScore?: number;
+  // Rich evidence links with full details
+  richEvidenceLinks?: RichEvidenceLink[];
   // Legacy evidence links (IDs only)
   evidenceLinks?: Array<{
     type: 'question' | 'hypothesis';
@@ -64,6 +78,7 @@ interface TriagedPaperCardProps {
   onDeepDive?: () => void;
   onNetworkView?: () => void;
   onExtractProtocol?: () => void;
+  onAddToCollection?: (collectionId: string, collectionName: string) => void;
 }
 
 const statusConfig = {
@@ -96,6 +111,7 @@ export function ErythosTriagedPaperCard({
   hypothesisScores = {},
   collectionSuggestions = [],
   confidenceScore,
+  richEvidenceLinks = [],
   evidenceLinks = [],
   isSelected = false,
   isFocused = false,
@@ -105,14 +121,17 @@ export function ErythosTriagedPaperCard({
   onReadPdf,
   onDeepDive,
   onNetworkView,
-  onExtractProtocol
+  onExtractProtocol,
+  onAddToCollection
 }: TriagedPaperCardProps) {
   const status = statusConfig[triageStatus];
   const [expanded, setExpanded] = useState(false);
+  const [addingToCollection, setAddingToCollection] = useState<string | null>(null);
 
   // Check if we have rich AI triage details
   const hasRichDetails = impactAssessment || aiReasoning || evidenceExcerpts.length > 0 ||
-    Object.keys(questionScores).length > 0 || Object.keys(hypothesisScores).length > 0;
+    Object.keys(questionScores).length > 0 || Object.keys(hypothesisScores).length > 0 ||
+    collectionSuggestions.length > 0 || richEvidenceLinks.length > 0;
 
   return (
     <div
@@ -173,38 +192,99 @@ export function ErythosTriagedPaperCard({
         </p>
       )}
 
-      {/* Evidence Links (IDs with hypothesis/question scores) */}
-      {(evidenceLinks.length > 0 || Object.keys(hypothesisScores).length > 0 || Object.keys(questionScores).length > 0) && (
+      {/* Rich Evidence Links - Full details with extracted evidence */}
+      {(richEvidenceLinks.length > 0 || evidenceLinks.length > 0 || Object.keys(hypothesisScores).length > 0 || Object.keys(questionScores).length > 0) && (
         <div className="mb-3 p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
-          <div className="flex items-center gap-2 text-purple-400 text-sm font-medium mb-2">
+          <div className="flex items-center gap-2 text-purple-400 text-sm font-medium mb-3">
             <span>🔗</span>
             <span>Evidence Links</span>
+            <span className="text-xs text-gray-500">
+              ({richEvidenceLinks.length || Object.keys(hypothesisScores).length + Object.keys(questionScores).length} items)
+            </span>
           </div>
-          <div className="space-y-1.5">
-            {/* Show hypothesis scores with details if available */}
-            {Object.entries(hypothesisScores).map(([hId, score]) => (
-              <div key={hId} className="flex items-start gap-2 text-xs">
-                <span className="text-purple-300 font-mono bg-purple-500/20 px-1.5 py-0.5 rounded">📊 {hId.slice(0, 8)}...</span>
-                <span className={`font-medium ${getScoreColor(score.score)}`}>{score.score}/100</span>
-                {score.support_type && (
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium uppercase
-                    ${score.support_type === 'supports' ? 'bg-green-500/20 text-green-400' :
-                      score.support_type === 'contradicts' ? 'bg-red-500/20 text-red-400' :
-                      'bg-blue-500/20 text-blue-400'}`}>
-                    {score.support_type}
+          <div className="space-y-3">
+            {/* Rich evidence links with full context */}
+            {richEvidenceLinks.map((link, i) => (
+              <div key={link.id || i} className="p-2 rounded bg-gray-800/50 border border-gray-700/50">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={link.type === 'hypothesis' ? 'text-purple-400' : 'text-cyan-400'}>
+                    {link.type === 'hypothesis' ? '📊' : '❓'}
                   </span>
+                  <span className="text-sm text-white font-medium flex-1">{link.text}</span>
+                  {link.score !== undefined && (
+                    <span className={`text-sm font-bold ${getScoreColor(link.score)}`}>{link.score}/100</span>
+                  )}
+                  {link.support_type && (
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium uppercase
+                      ${link.support_type === 'supports' ? 'bg-green-500/20 text-green-400' :
+                        link.support_type === 'contradicts' ? 'bg-red-500/20 text-red-400' :
+                        'bg-blue-500/20 text-blue-400'}`}>
+                      {link.support_type}
+                    </span>
+                  )}
+                </div>
+                {link.reasoning && (
+                  <p className="text-xs text-gray-400 mt-1 pl-6">
+                    <span className="text-orange-400 font-medium">Why relevant:</span> {link.reasoning}
+                  </p>
+                )}
+                {link.evidence && (
+                  <div className="mt-2 pl-6 border-l-2 border-green-500/30">
+                    <p className="text-xs text-gray-500 mb-1">📝 Extracted evidence:</p>
+                    <p className="text-xs text-green-300 italic">&ldquo;{link.evidence}&rdquo;</p>
+                  </div>
                 )}
               </div>
             ))}
-            {/* Show question scores with details if available */}
-            {Object.entries(questionScores).map(([qId, score]) => (
-              <div key={qId} className="flex items-start gap-2 text-xs">
-                <span className="text-purple-300 font-mono bg-purple-500/20 px-1.5 py-0.5 rounded">❓ {qId.slice(0, 8)}...</span>
-                <span className={`font-medium ${getScoreColor(score.score)}`}>{score.score}/100</span>
+            {/* Fallback: Show hypothesis/question scores if no rich links */}
+            {richEvidenceLinks.length === 0 && Object.entries(hypothesisScores).map(([hId, score]) => (
+              <div key={hId} className="p-2 rounded bg-gray-800/50 border border-gray-700/50">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-purple-400">📊</span>
+                  <span className="text-xs text-gray-400 font-mono">{hId}</span>
+                  <span className={`text-sm font-bold ml-auto ${getScoreColor(score.score)}`}>{score.score}/100</span>
+                  {score.support_type && (
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium uppercase
+                      ${score.support_type === 'supports' ? 'bg-green-500/20 text-green-400' :
+                        score.support_type === 'contradicts' ? 'bg-red-500/20 text-red-400' :
+                        'bg-blue-500/20 text-blue-400'}`}>
+                      {score.support_type}
+                    </span>
+                  )}
+                </div>
+                {score.reasoning && (
+                  <p className="text-xs text-gray-400 pl-6">
+                    <span className="text-orange-400">Why:</span> {score.reasoning}
+                  </p>
+                )}
+                {score.evidence && (
+                  <div className="mt-1 pl-6 border-l-2 border-green-500/30">
+                    <p className="text-xs text-green-300 italic">&ldquo;{score.evidence}&rdquo;</p>
+                  </div>
+                )}
               </div>
             ))}
-            {/* Fallback to legacy evidence links if no rich data */}
-            {Object.keys(hypothesisScores).length === 0 && Object.keys(questionScores).length === 0 &&
+            {richEvidenceLinks.length === 0 && Object.entries(questionScores).map(([qId, score]) => (
+              <div key={qId} className="p-2 rounded bg-gray-800/50 border border-gray-700/50">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-cyan-400">❓</span>
+                  <span className="text-xs text-gray-400 font-mono">{qId}</span>
+                  <span className={`text-sm font-bold ml-auto ${getScoreColor(score.score)}`}>{score.score}/100</span>
+                </div>
+                {score.reasoning && (
+                  <p className="text-xs text-gray-400 pl-6">
+                    <span className="text-orange-400">Why:</span> {score.reasoning}
+                  </p>
+                )}
+                {score.evidence && (
+                  <div className="mt-1 pl-6 border-l-2 border-green-500/30">
+                    <p className="text-xs text-green-300 italic">&ldquo;{score.evidence}&rdquo;</p>
+                  </div>
+                )}
+              </div>
+            ))}
+            {/* Legacy fallback */}
+            {richEvidenceLinks.length === 0 && Object.keys(hypothesisScores).length === 0 && Object.keys(questionScores).length === 0 &&
               evidenceLinks.map((link, i) => (
                 <div key={i} className="text-xs text-purple-300">
                   {link.type === 'hypothesis' ? '📊' : '❓'} {link.text}
@@ -332,21 +412,51 @@ export function ErythosTriagedPaperCard({
                 </div>
               )}
 
-              {/* Collection Suggestions */}
+              {/* Collection Suggestions - with full reasoning and add button */}
               {collectionSuggestions.length > 0 && (
                 <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                  <div className="flex items-center gap-2 text-yellow-400 text-sm font-medium mb-2">
+                  <div className="flex items-center gap-2 text-yellow-400 text-sm font-medium mb-3">
                     <span>📁</span>
                     <span>Suggested Collections</span>
+                    <span className="text-xs text-gray-500">Click to add paper</span>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="space-y-3">
                     {collectionSuggestions.map((suggestion) => (
                       <div key={suggestion.collection_id}
-                        className="px-2 py-1 rounded bg-yellow-500/10 border border-yellow-500/20 text-xs"
-                        title={suggestion.reason}
+                        className="p-3 rounded bg-gray-800/50 border border-yellow-500/20 hover:border-yellow-500/40 transition-all"
                       >
-                        <span className="text-yellow-300">{suggestion.collection_name}</span>
-                        <span className="text-yellow-500 ml-1">({Math.round(suggestion.confidence * 100)}%)</span>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-yellow-300 font-medium">{suggestion.collection_name}</span>
+                            <span className={`text-sm font-bold ${getScoreColor(Math.round(suggestion.confidence * 100))}`}>
+                              {Math.round(suggestion.confidence * 100)}%
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              if (onAddToCollection) {
+                                setAddingToCollection(suggestion.collection_id);
+                                onAddToCollection(suggestion.collection_id, suggestion.collection_name);
+                                setTimeout(() => setAddingToCollection(null), 2000);
+                              }
+                            }}
+                            disabled={addingToCollection === suggestion.collection_id}
+                            className={`px-3 py-1 text-xs font-medium rounded transition-all
+                              ${addingToCollection === suggestion.collection_id
+                                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                                : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 hover:bg-yellow-500/30'}`}
+                          >
+                            {addingToCollection === suggestion.collection_id ? '✓ Added!' : '+ Add to Collection'}
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-400">
+                          <span className="text-orange-400 font-medium">Why:</span> {suggestion.reason}
+                        </p>
+                        {suggestion.matching_hypothesis_count && suggestion.matching_hypothesis_count > 0 && (
+                          <p className="text-xs text-purple-400 mt-1">
+                            📊 Matches {suggestion.matching_hypothesis_count} hypothesis{suggestion.matching_hypothesis_count > 1 ? 'es' : ''} in this collection
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>

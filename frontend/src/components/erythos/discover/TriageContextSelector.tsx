@@ -13,7 +13,10 @@ interface Project {
 interface Collection {
   id: string;
   name: string;
+  description?: string;
   has_qh?: boolean; // has questions or hypotheses
+  questions_count?: number;
+  hypotheses_count?: number;
 }
 
 interface TriageContextSelectorProps {
@@ -70,17 +73,21 @@ export function TriageContextSelector({
         setProjects(data.projects || data || []);
       }
 
-      // Fetch collections
+      // Fetch ALL collections (for adding papers to any collection)
       const collectionsRes = await fetch('/api/proxy/collections', {
         headers: { 'User-ID': user.email }
       });
       if (collectionsRes.ok) {
         const data = await collectionsRes.json();
-        // Filter to only show collections with Q&H
-        const collectionsWithQH = (data.collections || data || []).filter(
-          (c: any) => c.questions_count > 0 || c.hypotheses_count > 0
-        );
-        setCollections(collectionsWithQH);
+        const allCollections = (data.collections || data || []).map((c: any) => ({
+          id: c.collection_id || c.id,
+          name: c.collection_name || c.name,
+          description: c.description,
+          questions_count: c.questions_count || 0,
+          hypotheses_count: c.hypotheses_count || 0,
+          has_qh: (c.questions_count || 0) > 0 || (c.hypotheses_count || 0) > 0
+        }));
+        setCollections(allCollections);
       }
     } catch (error) {
       console.error('Error fetching projects/collections:', error);
@@ -258,18 +265,33 @@ export function TriageContextSelector({
                   </div>
                 )}
 
-                {/* Collections with Q&H */}
+                {/* Collections */}
                 {collections.length > 0 && (
                   <div>
-                    <h4 className="text-sm font-medium text-gray-300 mb-2">📚 Collections with Q&H</h4>
-                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                    <h4 className="text-sm font-medium text-gray-300 mb-2">📚 Collections</h4>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
                       {collections.map((collection) => (
                         <div
                           key={collection.id}
                           onClick={() => handleCollectionTriage(collection)}
-                          className="p-3 bg-gray-800/50 rounded border border-gray-700 cursor-pointer hover:border-purple-500/50 hover:bg-purple-500/5 transition-all"
+                          className={`p-3 bg-gray-800/50 rounded border cursor-pointer transition-all
+                            ${collection.has_qh
+                              ? 'border-purple-500/30 hover:border-purple-500/50 hover:bg-purple-500/5'
+                              : 'border-gray-700 hover:border-gray-600 hover:bg-gray-700/30'}`}
                         >
-                          <span className="text-white">{collection.name}</span>
+                          <div className="flex items-center justify-between">
+                            <span className="text-white">{collection.name}</span>
+                            {collection.has_qh ? (
+                              <span className="text-xs text-purple-400 bg-purple-500/20 px-2 py-0.5 rounded">
+                                {collection.questions_count || 0}Q / {collection.hypotheses_count || 0}H
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-500">No Q&H</span>
+                            )}
+                          </div>
+                          {collection.description && (
+                            <p className="text-xs text-gray-500 mt-1 line-clamp-1">{collection.description}</p>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -278,9 +300,9 @@ export function TriageContextSelector({
 
                 {projects.length === 0 && collections.length === 0 && (
                   <div className="text-center py-4 text-gray-500">
-                    No projects or collections with research questions found.
+                    No projects or collections found.
                     <br />
-                    <span className="text-sm">Create a project first or add Q&H to a collection.</span>
+                    <span className="text-sm">Create a project or collection first.</span>
                   </div>
                 )}
               </>
