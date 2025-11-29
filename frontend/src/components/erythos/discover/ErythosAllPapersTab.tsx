@@ -1,10 +1,24 @@
 'use client';
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSearchParams } from 'next/navigation';
-import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { MagnifyingGlassIcon, XMarkIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { ErythosButton } from '../ErythosButton';
+
+// Dynamic import for PDFViewer to avoid SSR issues
+const PDFViewer = dynamic(() => import('@/components/reading/PDFViewer').then(mod => ({ default: mod.default })), {
+  ssr: false,
+  loading: () => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
+      <div className="text-white text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+        <p>Loading PDF Viewer...</p>
+      </div>
+    </div>
+  )
+});
 
 interface SearchResult {
   pmid: string;
@@ -27,8 +41,14 @@ interface Project {
   project_name: string;
 }
 
+interface Collection {
+  collection_id: string;
+  collection_name: string;
+}
+
 export function ErythosAllPapersTab() {
   const { user } = useAuth();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const initialQuery = searchParams?.get('q') || '';
   const [query, setQuery] = useState(initialQuery);
@@ -41,6 +61,20 @@ export function ErythosAllPapersTab() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const hasSearchedRef = useRef(false);
+
+  // PDF Viewer state
+  const [showPdfViewer, setShowPdfViewer] = useState(false);
+  const [pdfPmid, setPdfPmid] = useState<string>('');
+  const [pdfTitle, setPdfTitle] = useState<string>('');
+
+  // Save to Collection modal state
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [savePaper, setSavePaper] = useState<SearchResult | null>(null);
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [selectedProjectForSave, setSelectedProjectForSave] = useState<string>('');
+  const [savingToCollection, setSavingToCollection] = useState(false);
+  const [creatingNewCollection, setCreatingNewCollection] = useState(false);
+  const [newCollectionName, setNewCollectionName] = useState('');
 
   // Fetch projects for triage selection
   React.useEffect(() => {
@@ -175,6 +209,160 @@ export function ErythosAllPapersTab() {
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') handleSearch();
+  };
+
+  // Load collections when project changes for save modal
+  const loadCollections = useCallback(async (targetProjectId: string) => {
+    if (!user?.email || !targetProjectId) return;
+    try {
+      const response = await fetch(`/api/proxy/collections?project_id=${targetProjectId}`, {
+        headers: { 'User-ID': user.email }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCollections(data.collections || data || []);
+      }
+    } catch (error) {
+      console.error('Error loading collections:', error);
+    }
+  }, [user?.email]);
+
+  useEffect(() => {
+    if (selectedProjectForSave) {
+      loadCollections(selectedProjectForSave);
+    }
+  }, [selectedProjectForSave, loadCollections]);
+
+  // ===== ACTION HANDLERS =====
+
+  // PDF Handler - opens read-only PDF viewer modal
+  const handleViewPdf = (paper: SearchResult) => {
+    setPdfPmid(paper.pmid);
+    setPdfTitle(paper.title || `Paper ${paper.pmid}`);
+    setShowPdfViewer(true);
+  };
+
+  // Network Handler - navigates to network view
+  const handleNetworkView = (paper: SearchResult) => {
+    router.push(`/explore/network?pmid=${paper.pmid}`);
+  };
+
+  // Save Handler - opens save modal
+  const handleSave = (paper: SearchResult) => {
+    setSavePaper(paper);
+    setShowSaveModal(true);
+    setCreatingNewCollection(false);
+    setNewCollectionName('');
+    // Set default project if not set
+    if (!selectedProjectForSave && projects.length > 0) {
+      setSelectedProjectForSave(projects[0].project_id);
+    }
+  };
+
+  // Save to existing collection
+  const handleConfirmSave = async (collectionId: string) => {
+    if (!savePaper || !user?.email) return;
+    setSavingToCollection(true);
+    try {
+      const response = await fetch(`/api/proxy/collections/${collectionId}/pubmed-articles`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user.email
+        },
+        body: JSON.stringify({
+          article: {
+            pmid: savePaper.pmid,
+            title: savePaper.title,
+            authors: savePaper.authors,
+            year: savePaper.year,
+            journal: savePaper.journal,
+            abstract: savePaper.abstract
+          },
+          projectId: selectedProjectForSave
+        })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        alert('✅ Article saved to collection!');
+        setShowSaveModal(false);
+        setSavePaper(null);
+      } else if (result.duplicate) {
+        alert('⚠️ This article is already in the collection.');
+      } else {
+        alert(`❌ Failed to save: ${result.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error saving to collection:', error);
+      alert('❌ Failed to save article');
+    } finally {
+      setSavingToCollection(false);
+    }
+  };
+
+  // Create new collection and save
+  const handleCreateAndSave = async () => {
+    if (!savePaper || !user?.email || !newCollectionName.trim() || !selectedProjectForSave) return;
+    setSavingToCollection(true);
+    try {
+      // First create the collection
+      const createResponse = await fetch('/api/proxy/collections', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user.email
+        },
+        body: JSON.stringify({
+          collection_name: newCollectionName.trim(),
+          project_id: selectedProjectForSave
+        })
+      });
+
+      if (!createResponse.ok) {
+        throw new Error('Failed to create collection');
+      }
+
+      const newCollection = await createResponse.json();
+      const collectionId = newCollection.collection_id;
+
+      // Then add the article
+      const addResponse = await fetch(`/api/proxy/collections/${collectionId}/pubmed-articles`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user.email
+        },
+        body: JSON.stringify({
+          article: {
+            pmid: savePaper.pmid,
+            title: savePaper.title,
+            authors: savePaper.authors,
+            year: savePaper.year,
+            journal: savePaper.journal,
+            abstract: savePaper.abstract
+          },
+          projectId: selectedProjectForSave
+        })
+      });
+
+      const result = await addResponse.json();
+      if (result.success) {
+        alert(`✅ Created "${newCollectionName}" and saved article!`);
+        setShowSaveModal(false);
+        setSavePaper(null);
+        setNewCollectionName('');
+        // Refresh collections
+        loadCollections(selectedProjectForSave);
+      } else {
+        alert(`❌ Collection created but failed to add article: ${result.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error creating collection:', error);
+      alert('❌ Failed to create collection');
+    } finally {
+      setSavingToCollection(false);
+    }
   };
 
   return (
@@ -317,15 +505,149 @@ export function ErythosAllPapersTab() {
                 >
                   {triagingPapers.has(paper.pmid) ? '⏳ Triaging...' : '🤖 AI Triage'}
                 </ErythosButton>
-                <ErythosButton variant="ghost" size="sm">
+                <ErythosButton variant="ghost" size="sm" onClick={() => handleViewPdf(paper)}>
                   📄 View PDF
                 </ErythosButton>
-                <ErythosButton variant="ghost" size="sm">
+                <ErythosButton variant="ghost" size="sm" onClick={() => handleSave(paper)}>
                   💾 Save
+                </ErythosButton>
+                <ErythosButton variant="ghost" size="sm" onClick={() => handleNetworkView(paper)}>
+                  🔗 Network
                 </ErythosButton>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ===== MODALS ===== */}
+
+      {/* PDF Viewer Modal (read-only) */}
+      {showPdfViewer && (
+        <PDFViewer
+          pmid={pdfPmid}
+          title={pdfTitle}
+          onClose={() => setShowPdfViewer(false)}
+          onViewInNetwork={() => {
+            setShowPdfViewer(false);
+            router.push(`/explore/network?pmid=${pdfPmid}`);
+          }}
+        />
+      )}
+
+      {/* Save to Collection Modal */}
+      {showSaveModal && savePaper && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setShowSaveModal(false)}
+        >
+          <div
+            className="bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6 border border-gray-700"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-white">📁 Save to Collection</h2>
+              <button
+                onClick={() => setShowSaveModal(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <XMarkIcon className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Paper title preview */}
+            <p className="text-gray-300 text-sm mb-4 line-clamp-2">{savePaper.title}</p>
+
+            {/* Project Selector */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-400 mb-2">Project</label>
+              <select
+                value={selectedProjectForSave}
+                onChange={(e) => setSelectedProjectForSave(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-orange-500 focus:border-orange-500"
+              >
+                <option value="">Select Project</option>
+                {projects.map((p) => (
+                  <option key={p.project_id} value={p.project_id}>
+                    {p.project_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Toggle between existing and new collection */}
+            <div className="flex items-center gap-4 mb-4">
+              <button
+                onClick={() => setCreatingNewCollection(false)}
+                className={`text-sm font-medium ${!creatingNewCollection ? 'text-orange-400' : 'text-gray-400 hover:text-white'}`}
+              >
+                Existing Collection
+              </button>
+              <button
+                onClick={() => setCreatingNewCollection(true)}
+                className={`text-sm font-medium ${creatingNewCollection ? 'text-orange-400' : 'text-gray-400 hover:text-white'}`}
+              >
+                + New Collection
+              </button>
+            </div>
+
+            {!creatingNewCollection ? (
+              /* Existing Collection List */
+              <div className="mb-4">
+                {collections.length === 0 ? (
+                  <div className="text-center py-6 text-gray-500">
+                    <p className="mb-2">No collections in this project</p>
+                    <button
+                      onClick={() => setCreatingNewCollection(true)}
+                      className="text-orange-400 hover:text-orange-300 text-sm"
+                    >
+                      Create your first collection
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {collections.map((c) => (
+                      <button
+                        key={c.collection_id}
+                        onClick={() => handleConfirmSave(c.collection_id)}
+                        disabled={savingToCollection}
+                        className="w-full text-left px-4 py-3 bg-gray-700/50 hover:bg-gray-600 rounded-lg text-white transition-colors disabled:opacity-50"
+                      >
+                        {c.collection_name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Create New Collection Form */
+              <div className="mb-4 space-y-3">
+                <input
+                  type="text"
+                  value={newCollectionName}
+                  onChange={(e) => setNewCollectionName(e.target.value)}
+                  placeholder="Collection name..."
+                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-orange-500 focus:border-orange-500"
+                  autoFocus
+                />
+                <button
+                  onClick={handleCreateAndSave}
+                  disabled={savingToCollection || !newCollectionName.trim() || !selectedProjectForSave}
+                  className="w-full px-4 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  <PlusIcon className="w-5 h-5" />
+                  Create & Save
+                </button>
+              </div>
+            )}
+
+            {savingToCollection && (
+              <div className="flex items-center justify-center py-2">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-orange-500"></div>
+                <span className="ml-2 text-gray-400">Saving...</span>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
