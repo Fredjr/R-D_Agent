@@ -7,7 +7,9 @@ import { type Collection } from '@/hooks/useGlobalCollectionSync';
 import MultiColumnNetworkView from './MultiColumnNetworkView';
 import { AnnotationList } from './annotations';
 import SmartAnnotationList from './annotations/SmartAnnotationList';
-import { triagePaper } from '@/lib/api';
+import { TriageContextSelector, TriageContext } from '@/components/erythos/discover/TriageContextSelector';
+import { ErythosModal } from '@/components/erythos/ErythosModal';
+import { MultiProjectRelevanceMatrix } from '@/components/erythos/discover/MultiProjectRelevanceMatrix';
 import dynamic from 'next/dynamic';
 
 // Dynamically import PDFViewer to avoid SSR issues
@@ -61,6 +63,10 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
 
   // Triage state
   const [triagingPmids, setTriagingPmids] = useState<Set<string>>(new Set());
+  const [showTriageSelector, setShowTriageSelector] = useState(false);
+  const [triageArticle, setTriageArticle] = useState<Article | null>(null);
+  const [showTriageResult, setShowTriageResult] = useState(false);
+  const [triageResult, setTriageResult] = useState<any>(null);
 
   // Protocol extraction state
   const [extractingProtocolPmids, setExtractingProtocolPmids] = useState<Set<string>>(new Set());
@@ -181,34 +187,64 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
     }
   };
 
-  const handleTriageArticle = async (article: Article, e: React.MouseEvent) => {
+  // Open triage context selector modal
+  const handleTriageArticle = (article: Article, e: React.MouseEvent) => {
     e.stopPropagation();
 
-    if (!user?.user_id || !article.article_pmid) {
+    if (!user?.email || !article.article_pmid) {
       alert('Unable to triage: Missing user ID or PMID');
       return;
     }
 
-    setTriagingPmids(prev => new Set(prev).add(article.article_pmid));
+    setTriageArticle(article);
+    setShowTriageSelector(true);
+  };
+
+  // Execute triage with selected context
+  const executeContextlessTriage = async (context: TriageContext) => {
+    if (!user?.email || !triageArticle) return;
+
+    setShowTriageSelector(false);
+    setTriagingPmids(prev => new Set(prev).add(triageArticle.article_pmid));
 
     try {
-      const result = await triagePaper(projectId, article.article_pmid, user.user_id);
-      console.log('✅ Paper triaged:', result);
+      const response = await fetch('/api/proxy/triage/contextless', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-ID': user.email
+        },
+        body: JSON.stringify({
+          article_pmid: triageArticle.article_pmid,
+          context_type: context.type,
+          search_query: context.searchQuery,
+          project_id: context.projectId || projectId,
+          collection_id: context.collectionId || collection.collection_id,
+          ad_hoc_question: context.adHocQuestion
+        })
+      });
 
-      // Update triage data
-      setTriageData(prev => new Map(prev).set(article.article_pmid, result));
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Paper triaged:', result);
 
-      // Show success message with relevance score
-      const statusEmoji = result.triage_status === 'must_read' ? '🔴' :
-                         result.triage_status === 'nice_to_know' ? '🟡' : '⚪';
-      alert(`${statusEmoji} Paper triaged!\n\nRelevance Score: ${result.relevance_score}/100\nStatus: ${result.triage_status.replace('_', ' ').toUpperCase()}\n\nCheck the Inbox tab to see AI insights.`);
+        // Update triage data
+        setTriageData(prev => new Map(prev).set(triageArticle.article_pmid, result));
+
+        // Show result modal
+        setTriageResult(result);
+        setShowTriageResult(true);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        alert(`❌ Failed to triage paper: ${errorData.detail || response.statusText}`);
+      }
     } catch (error) {
       console.error('❌ Error triaging article:', error);
       alert('Failed to triage article. Please try again.');
     } finally {
       setTriagingPmids(prev => {
         const next = new Set(prev);
-        next.delete(article.article_pmid);
+        if (triageArticle) next.delete(triageArticle.article_pmid);
         return next;
       });
     }
@@ -806,6 +842,92 @@ export default function CollectionArticles({ collection, projectId, onBack }: Co
             </div>
           </div>
         </div>
+      )}
+
+      {/* Triage Context Selector Modal */}
+      {showTriageSelector && triageArticle && (
+        <TriageContextSelector
+          isOpen={showTriageSelector}
+          onClose={() => {
+            setShowTriageSelector(false);
+            setTriageArticle(null);
+          }}
+          onSelectContext={executeContextlessTriage}
+          articlePmid={triageArticle.article_pmid}
+          articleTitle={triageArticle.article_title}
+        />
+      )}
+
+      {/* Triage Result Modal */}
+      {showTriageResult && triageResult && (
+        <ErythosModal
+          isOpen={showTriageResult}
+          onClose={() => {
+            setShowTriageResult(false);
+            setTriageResult(null);
+          }}
+          title="🤖 AI Triage Result"
+          subtitle={triageArticle?.article_title?.slice(0, 60) + '...' || `PMID: ${triageResult.article_pmid}`}
+        >
+          {triageResult.context_type === 'multi_project' ? (
+            <MultiProjectRelevanceMatrix
+              articlePmid={triageResult.article_pmid}
+              articleTitle={triageArticle?.article_title}
+              projectScores={triageResult.project_scores || []}
+              collectionScores={triageResult.collection_scores || []}
+              bestMatch={triageResult.best_match}
+              overallRelevance={triageResult.overall_relevance || 0}
+            />
+          ) : (
+            <div className="space-y-4">
+              {/* Score & Status */}
+              <div className="flex items-center gap-4">
+                <div className={`text-4xl font-bold ${
+                  triageResult.relevance_score >= 70 ? 'text-red-400' :
+                  triageResult.relevance_score >= 40 ? 'text-yellow-400' : 'text-gray-400'
+                }`}>
+                  {triageResult.relevance_score}/100
+                </div>
+                <div className="flex-1">
+                  <div className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
+                    triageResult.triage_status === 'must_read' ? 'bg-red-500/20 text-red-400' :
+                    triageResult.triage_status === 'nice_to_know' ? 'bg-yellow-500/20 text-yellow-400' :
+                    'bg-gray-500/20 text-gray-400'
+                  }`}>
+                    {triageResult.triage_status?.replace('_', ' ').toUpperCase()}
+                  </div>
+                </div>
+              </div>
+
+              {/* AI Reasoning */}
+              {triageResult.ai_reasoning && (
+                <div className="bg-gray-800/50 rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-gray-300 mb-2">AI Analysis</h4>
+                  <p className="text-sm text-gray-400">{triageResult.ai_reasoning}</p>
+                </div>
+              )}
+
+              {/* Evidence Excerpts */}
+              {triageResult.evidence_excerpts?.length > 0 && (
+                <div className="bg-gray-800/50 rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-gray-300 mb-2">Key Evidence</h4>
+                  <div className="space-y-2">
+                    {triageResult.evidence_excerpts.slice(0, 3).map((excerpt: any, idx: number) => (
+                      <div key={idx} className="text-sm text-gray-400 border-l-2 border-orange-500/50 pl-3">
+                        "{excerpt.quote}"
+                        <span className="block text-xs text-gray-500 mt-1">— {excerpt.relevance}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <p className="text-xs text-gray-500 text-center">
+                Paper added to Smart Inbox • Check Smart Inbox for full details
+              </p>
+            </div>
+          )}
+        </ErythosModal>
       )}
     </div>
   );
