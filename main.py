@@ -5916,6 +5916,92 @@ async def run_week24_migrations(
             "return_code": -1
         }
 
+@app.post("/admin/run-contextless-triage-migration")
+async def run_contextless_triage_migration(
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Run migration 013: Add contextless triage support to paper_triage table.
+    Phase 1 of AI Triage Architecture Redesign.
+    """
+    try:
+        from sqlalchemy import text, inspect
+
+        logger.info("🔧 Starting migration 013: Contextless triage support")
+
+        # Check if migration already applied
+        inspector = inspect(db.bind)
+        existing_columns = [col['name'] for col in inspector.get_columns('paper_triage')]
+
+        if 'context_type' in existing_columns:
+            return {
+                "status": "already_applied",
+                "message": "Migration 013 already applied - context_type column exists",
+                "existing_columns": existing_columns
+            }
+
+        results = []
+
+        # Step 1: Make project_id nullable
+        try:
+            db.execute(text("ALTER TABLE paper_triage ALTER COLUMN project_id DROP NOT NULL"))
+            results.append("✅ Made project_id nullable")
+        except Exception as e:
+            results.append(f"⚠️ project_id: {str(e)[:100]}")
+
+        # Step 2: Add new columns
+        columns_to_add = [
+            ("collection_id", "VARCHAR REFERENCES collections(collection_id) ON DELETE CASCADE"),
+            ("context_type", "VARCHAR DEFAULT 'project'"),
+            ("triage_context", "JSONB"),
+            ("user_id", "VARCHAR REFERENCES users(user_id)"),
+            ("key_findings", "JSONB DEFAULT '[]'::jsonb"),
+            ("relevance_aspects", "JSONB DEFAULT '{}'::jsonb"),
+            ("how_it_helps", "TEXT"),
+            ("project_scores", "JSONB"),
+            ("collection_scores", "JSONB"),
+            ("best_match", "JSONB"),
+        ]
+
+        for col_name, col_type in columns_to_add:
+            try:
+                db.execute(text(f"ALTER TABLE paper_triage ADD COLUMN IF NOT EXISTS {col_name} {col_type}"))
+                results.append(f"✅ Added column {col_name}")
+            except Exception as e:
+                results.append(f"⚠️ {col_name}: {str(e)[:100]}")
+
+        # Step 3: Add indexes
+        indexes = [
+            ("idx_paper_triage_collection_id", "collection_id"),
+            ("idx_paper_triage_context_type", "context_type"),
+            ("idx_paper_triage_user_id", "user_id"),
+        ]
+
+        for idx_name, idx_col in indexes:
+            try:
+                db.execute(text(f"CREATE INDEX IF NOT EXISTS {idx_name} ON paper_triage({idx_col})"))
+                results.append(f"✅ Created index {idx_name}")
+            except Exception as e:
+                results.append(f"⚠️ Index {idx_name}: {str(e)[:100]}")
+
+        db.commit()
+        logger.info("✅ Migration 013 completed successfully")
+
+        return {
+            "status": "success",
+            "message": "Migration 013 completed - Contextless triage support added",
+            "results": results
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Migration 013 failed: {e}")
+        db.rollback()
+        return {
+            "status": "error",
+            "message": f"Migration failed: {str(e)}",
+        }
+
 @app.get("/projects/{project_id}", response_model=ProjectDetailResponse)
 async def get_project(project_id: str, request: Request, db: Session = Depends(get_db)):
     """Get project details with associated reports and collaborators"""
