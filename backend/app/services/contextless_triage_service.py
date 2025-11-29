@@ -271,8 +271,26 @@ class ContextlessTriageService:
                 "type": best[3]
             }
             results["overall_relevance"] = best[2]
+            # Set required fields based on best match
+            results["relevance_score"] = best[2]
+            results["triage_status"] = self._score_to_status(best[2])
+            results["quick_reasoning"] = f"Best match: {best[1]} ({best[3]}) with score {best[2]}/100"
+        else:
+            # No projects or collections found
+            results["relevance_score"] = 0
+            results["triage_status"] = "low_priority"
+            results["quick_reasoning"] = "No projects or collections found to compare against"
 
         return results
+
+    def _score_to_status(self, score: int) -> str:
+        """Convert relevance score to triage status"""
+        if score >= 70:
+            return "must_read"
+        elif score >= 40:
+            return "nice_to_know"
+        else:
+            return "low_priority"
 
     async def _analyze_paper_relevance(
         self,
