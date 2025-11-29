@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSearchParams } from 'next/navigation';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
@@ -30,7 +30,8 @@ interface Project {
 export function ErythosAllPapersTab() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
-  const [query, setQuery] = useState(searchParams?.get('q') || '');
+  const initialQuery = searchParams?.get('q') || '';
+  const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [aiSummary, setAiSummary] = useState<AISummary | null>(null);
@@ -39,6 +40,7 @@ export function ErythosAllPapersTab() {
   const [triagingPapers, setTriagingPapers] = useState<Set<string>>(new Set());
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const hasSearchedRef = useRef(false);
 
   // Fetch projects for triage selection
   React.useEffect(() => {
@@ -63,25 +65,27 @@ export function ErythosAllPapersTab() {
     fetchProjects();
   }, [user?.email]);
 
-  const handleSearch = useCallback(async () => {
-    if (!query.trim() || !user?.email) return;
-    
+  const performSearch = useCallback(async (searchQuery: string) => {
+    if (!searchQuery.trim() || !user?.email) return;
+
     setLoading(true);
     setAiSummary(null);
     try {
-      const params = new URLSearchParams({ q: query, limit: '20' });
+      console.log('🔍 Searching PubMed for:', searchQuery);
+      const params = new URLSearchParams({ q: searchQuery, limit: '20' });
       const response = await fetch(`/api/proxy/pubmed/search?${params}`, {
         headers: { 'User-ID': user.email }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
+        console.log('📄 PubMed search results:', data);
         setResults(data.articles || data || []);
         setTotalFound(data.total_found || data.length || 0);
-        
+
         // Generate AI summary if we have results
         if ((data.articles || data).length > 0) {
-          generateAISummary(query, (data.articles || data).slice(0, 10));
+          generateAISummary(searchQuery, (data.articles || data).slice(0, 10));
         }
       }
     } catch (error) {
@@ -89,7 +93,29 @@ export function ErythosAllPapersTab() {
     } finally {
       setLoading(false);
     }
-  }, [query, user?.email]);
+  }, [user?.email]);
+
+  // Auto-search when loaded with a query parameter from Home page
+  useEffect(() => {
+    if (initialQuery && !hasSearchedRef.current && user?.email) {
+      console.log('🏠 Auto-searching from Home page query:', initialQuery);
+      hasSearchedRef.current = true;
+      performSearch(initialQuery);
+    }
+  }, [initialQuery, user?.email, performSearch]);
+
+  // Also watch for URL query changes
+  useEffect(() => {
+    const currentQuery = searchParams?.get('q');
+    if (currentQuery && currentQuery !== query) {
+      setQuery(currentQuery);
+      performSearch(currentQuery);
+    }
+  }, [searchParams]);
+
+  const handleSearch = useCallback(async () => {
+    performSearch(query);
+  }, [query, performSearch]);
 
   const generateAISummary = async (searchQuery: string, papers: SearchResult[]) => {
     setLoadingSummary(true);

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { ErythosTabs } from './ErythosTabs';
@@ -16,11 +16,19 @@ export function ErythosDiscoverPage() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
-  
-  // Get initial tab from URL or default to inbox
-  const initialTab = (searchParams?.get('tab') as DiscoverTab) || 'inbox';
-  const [activeTab, setActiveTab] = useState<DiscoverTab>(initialTab);
+
+  // Get search query from URL
+  const searchQuery = searchParams?.get('q') || '';
+
+  // If there's a search query, go directly to all-papers tab
+  const getInitialTab = (): DiscoverTab => {
+    if (searchQuery) return 'all-papers';
+    return (searchParams?.get('tab') as DiscoverTab) || 'inbox';
+  };
+
+  const [activeTab, setActiveTab] = useState<DiscoverTab>(getInitialTab());
   const [unreadStats, setUnreadStats] = useState<UnreadStats>({ inbox: 0 });
+  const initialLoadRef = useRef(true);
 
   // Fetch unread counts for badge
   useEffect(() => {
@@ -38,7 +46,7 @@ export function ErythosDiscoverPage() {
         console.error('Error fetching unread stats:', error);
       }
     };
-    
+
     fetchUnreadStats();
     // Refresh every 30 seconds
     const interval = setInterval(fetchUnreadStats, 30000);
@@ -49,15 +57,32 @@ export function ErythosDiscoverPage() {
   const handleTabChange = (tabId: string) => {
     const newTab = tabId as DiscoverTab;
     setActiveTab(newTab);
-    router.push(`/discover?tab=${newTab}`, { scroll: false });
+    // Preserve search query when changing tabs
+    const params = new URLSearchParams();
+    params.set('tab', newTab);
+    if (searchQuery && newTab === 'all-papers') {
+      params.set('q', searchQuery);
+    }
+    router.push(`/discover?${params.toString()}`, { scroll: false });
   };
 
-  // Sync tab with URL changes
+  // Sync tab with URL changes and handle search query
   useEffect(() => {
     const tabFromUrl = searchParams?.get('tab') as DiscoverTab;
+    const queryFromUrl = searchParams?.get('q');
+
+    // If there's a search query on initial load, switch to all-papers
+    if (initialLoadRef.current && queryFromUrl) {
+      setActiveTab('all-papers');
+      initialLoadRef.current = false;
+      return;
+    }
+
     if (tabFromUrl && tabFromUrl !== activeTab) {
       setActiveTab(tabFromUrl);
     }
+
+    initialLoadRef.current = false;
   }, [searchParams]);
 
   const tabs = [
