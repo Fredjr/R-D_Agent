@@ -67,14 +67,25 @@ class ContextlessTriageService:
         """
         logger.info(f"🔍 Contextless triage: {article_pmid} with context_type={context_type}")
 
-        # 1. Get article
+        # 1. Get article from database
         article = db.query(Article).filter(Article.pmid == article_pmid).first()
         if not article:
-            # Try to fetch from PubMed
+            # Try to fetch from PubMed and create Article object
             from backend.app.services.pubmed_service import fetch_article_from_pubmed
-            article = await fetch_article_from_pubmed(article_pmid, db)
-            if not article:
+            pubmed_data = await fetch_article_from_pubmed(article_pmid)
+            if not pubmed_data:
                 raise ValueError(f"Article {article_pmid} not found")
+
+            # Create a temporary Article object for triage (not persisted)
+            article = Article(
+                pmid=pubmed_data.get("pmid", article_pmid),
+                title=pubmed_data.get("title", f"Article {article_pmid}"),
+                abstract=pubmed_data.get("abstract", ""),
+                journal=pubmed_data.get("journal", ""),
+                publication_year=pubmed_data.get("publication_year"),
+                doi=pubmed_data.get("doi", ""),
+                authors=pubmed_data.get("authors", [])
+            )
 
         # 2. Build context based on context_type
         if context_type == "search_query":
