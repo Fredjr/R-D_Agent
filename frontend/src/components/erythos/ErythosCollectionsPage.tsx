@@ -10,6 +10,8 @@ import { ErythosCollectionCard } from './ErythosCollectionCard';
 import { ErythosButton } from './ErythosButton';
 import { ErythosCreateProjectModal } from './ErythosCreateProjectModal';
 import { ErythosAnalyzeModal } from './ErythosAnalyzeModal';
+import CollectionArticles from '@/components/CollectionArticles';
+import MultiColumnNetworkView from '@/components/MultiColumnNetworkView';
 
 interface Project {
   project_id: string;
@@ -54,6 +56,10 @@ export function ErythosCollectionsPage({ onCreateCollection }: ErythosCollection
     collection_name: string;
     article_count: number;
   } | undefined>(undefined);
+
+  // State for inline collection detail view (explore/network)
+  const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null);
+  const [viewType, setViewType] = useState<'list' | 'explore' | 'network'>('list');
 
   // Fetch collections and projects
   useEffect(() => {
@@ -174,6 +180,102 @@ export function ErythosCollectionsPage({ onCreateCollection }: ErythosCollection
   const selectedProject = projectFilter !== 'all' && projectFilter !== 'standalone'
     ? projects.find(p => p.project_id === projectFilter)
     : null;
+
+  // Handle back from detail view
+  const handleBackToList = () => {
+    setSelectedCollection(null);
+    setViewType('list');
+    fetchCollections(); // Refresh collections
+  };
+
+  // If a collection is selected for explore/network view, show that view
+  if (selectedCollection && (viewType === 'explore' || viewType === 'network')) {
+    // Get the first linked project ID for the collection, if any
+    const linkedProjectId = selectedCollection.projects.length > 0
+      ? selectedCollection.projects[0].id
+      : undefined;
+
+    return (
+      <div className="min-h-screen bg-black text-white">
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          {/* Back button and header */}
+          <div className="flex items-center gap-4 mb-6">
+            <button
+              onClick={handleBackToList}
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+            >
+              <ArrowLeftIcon className="w-5 h-5" />
+            </button>
+            <div className="flex-1">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">{selectedCollection.icon || '📁'}</span>
+                <h1 className="text-2xl font-bold text-white">{selectedCollection.name}</h1>
+              </div>
+              <p className="text-gray-400 text-sm mt-1">
+                {viewType === 'explore' ? '📄 Papers in this collection' : '🔗 Network View'}
+                {selectedCollection.projects.length > 0 && (
+                  <span className="ml-2">
+                    • Linked to: {selectedCollection.projects.map(p => p.name).join(', ')}
+                  </span>
+                )}
+              </p>
+            </div>
+            {/* Toggle between explore and network */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setViewType('explore')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  viewType === 'explore'
+                    ? 'bg-orange-500 text-white'
+                    : 'bg-gray-800 text-gray-400 hover:text-white'
+                }`}
+              >
+                📄 Papers
+              </button>
+              <button
+                onClick={() => setViewType('network')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  viewType === 'network'
+                    ? 'bg-orange-500 text-white'
+                    : 'bg-gray-800 text-gray-400 hover:text-white'
+                }`}
+              >
+                🔗 Network
+              </button>
+            </div>
+          </div>
+
+          {/* Content based on view type */}
+          <div className="bg-[#1a1a1a] rounded-xl border border-gray-800 overflow-hidden">
+            {viewType === 'explore' ? (
+              <CollectionArticles
+                projectId={linkedProjectId || ''}
+                collection={{
+                  collection_id: selectedCollection.id,
+                  collection_name: selectedCollection.name,
+                  description: selectedCollection.description || '',
+                  article_count: selectedCollection.articleCount,
+                  created_at: selectedCollection.createdAt || new Date().toISOString(),
+                  updated_at: selectedCollection.updatedAt || new Date().toISOString(),
+                }}
+                onBack={handleBackToList}
+              />
+            ) : (
+              <div className="h-[calc(100vh-280px)] min-h-[600px]">
+                <MultiColumnNetworkView
+                  sourceType="collection"
+                  sourceId={selectedCollection.id}
+                  projectId={linkedProjectId}
+                  onDeepDiveCreated={fetchCollections}
+                  onArticleSaved={fetchCollections}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -319,15 +421,18 @@ export function ErythosCollectionsPage({ onCreateCollection }: ErythosCollection
                   projects={collection.projects}
                   onClick={() => {
                     trackCollectionAction('view', collection.id);
-                    router.push(`/project/${collection.projectId}?tab=collections&collection=${collection.id}`);
+                    setSelectedCollection(collection);
+                    setViewType('explore');
                   }}
                   onExplore={() => {
                     trackCollectionAction('view', collection.id);
-                    router.push(`/project/${collection.projectId}?tab=collections&collection=${collection.id}&view=articles`);
+                    setSelectedCollection(collection);
+                    setViewType('explore');
                   }}
                   onNetworkView={() => {
                     trackCollectionAction('network_view', collection.id);
-                    router.push(`/project/${collection.projectId}?tab=collections&collection=${collection.id}&view=network`);
+                    setSelectedCollection(collection);
+                    setViewType('network');
                   }}
                   onAnalyze={() => {
                     trackCollectionAction('view', collection.id, { action_type: 'analyze' });
