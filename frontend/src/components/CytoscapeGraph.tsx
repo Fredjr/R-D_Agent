@@ -233,6 +233,24 @@ const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
             'target-arrow-color': '#4f46e5',
           },
         },
+        // Intra-collection citation edges (red) - papers citing each other within the collection
+        {
+          selector: 'edge[relationship="intra_collection_citation"]',
+          style: {
+            'line-color': '#ef4444',
+            'target-arrow-color': '#ef4444',
+            'width': 3,
+            'line-style': 'solid',
+          },
+        },
+        {
+          selector: 'edge[relationship="intra_collection_citation"]:hover',
+          style: {
+            'line-color': '#dc2626',
+            'target-arrow-color': '#dc2626',
+            'width': 4,
+          },
+        },
       ],
       layout: {
         name: 'cose',
@@ -287,7 +305,8 @@ const CytoscapeGraph: React.FC<CytoscapeGraphProps> = ({
         similarity: 'Similar: Related by content or topic',
         'co-authored': 'Co-authored: Shares authors',
         'same-journal': 'Same Journal: Published in same journal',
-        'topic-related': 'Topic: Related by research topic'
+        'topic-related': 'Topic: Related by research topic',
+        'intra_collection_citation': '🔴 Collection Link: Papers citing each other within this collection'
       };
 
       const tooltipText = tooltipTexts[relationship] || label || 'Related';

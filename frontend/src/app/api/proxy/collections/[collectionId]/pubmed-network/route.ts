@@ -47,6 +47,7 @@ interface HybridNetworkResponse {
     total_edges: number;
     collection_articles: number;
     pubmed_expansions: number;
+    inter_collection_edges: number; // Edges between papers within the collection
     source: 'hybrid_collection_pubmed';
   };
 }
@@ -264,40 +265,96 @@ export async function GET(
     
     // Step 3: Fetch detailed article information from PubMed
     const collectionArticleDetails = await fetchPubMedArticleDetails(collectionPmids);
-    
+
     // Step 4: Create network nodes and edges
     const nodes: NetworkNode[] = [];
     const edges: NetworkEdge[] = [];
-    
+    const collectionPmidSet = new Set(collectionPmids); // For fast lookup
+
     // Add collection articles as nodes
     for (const article of collectionArticleDetails) {
       nodes.push(createNetworkNode(article, 'collection'));
     }
-    
+
     console.log(`✅ Created ${nodes.length} collection nodes`);
-    
-    // Step 5: Expand network with PubMed citations and references
+
+    // Step 5: Find INTER-COLLECTION relationships (papers citing each other within the collection)
+    // This is the key feature: show how papers in the collection relate to each other
+    let interCollectionEdges = 0;
+
+    console.log(`🔍 Finding inter-collection relationships for ${collectionPmids.length} papers...`);
+
+    for (const pmid of collectionPmids) {
+      // Find what this paper references
+      const referencePmids = await findRelatedPubMedArticles(pmid, 'pubmed_pubmed_refs', 50); // Get more to find inter-collection links
+
+      // Check if any references are also in the collection
+      for (const refPmid of referencePmids) {
+        if (collectionPmidSet.has(refPmid) && refPmid !== pmid) {
+          // This paper references another paper in the collection!
+          const edgeId = `${pmid}-cites-${refPmid}`;
+          // Avoid duplicate edges
+          if (!edges.find(e => e.id === edgeId)) {
+            edges.push({
+              id: edgeId,
+              from: pmid,
+              to: refPmid,
+              relationship: 'intra_collection_citation', // Special relationship type
+              weight: 2 // Higher weight for inter-collection relationships
+            });
+            interCollectionEdges++;
+          }
+        }
+      }
+
+      // Also check citations (papers that cite this one)
+      const citingPmids = await findRelatedPubMedArticles(pmid, 'pubmed_pubmed_citedin', 50);
+
+      for (const citingPmid of citingPmids) {
+        if (collectionPmidSet.has(citingPmid) && citingPmid !== pmid) {
+          // Another paper in the collection cites this one!
+          const edgeId = `${citingPmid}-cites-${pmid}`;
+          // Avoid duplicate edges
+          if (!edges.find(e => e.id === edgeId)) {
+            edges.push({
+              id: edgeId,
+              from: citingPmid,
+              to: pmid,
+              relationship: 'intra_collection_citation',
+              weight: 2
+            });
+            interCollectionEdges++;
+          }
+        }
+      }
+    }
+
+    console.log(`✅ Found ${interCollectionEdges} inter-collection citation relationships`);
+
+    // Step 6: Expand network with external PubMed citations and references (optional expansion)
     let expansionCount = 0;
     const maxExpansions = Math.min(limit - nodes.length, collectionPmids.length * 3);
-    
+
     for (const pmid of collectionPmids.slice(0, 3)) { // Limit to first 3 articles for performance
       if (expansionCount >= maxExpansions) break;
-      
-      // Fetch citing articles
+
+      // Fetch citing articles (external only - not already in collection)
       if (includeCitations) {
-        const citingPmids = await findRelatedPubMedArticles(pmid, 'pubmed_pubmed_citedin', 3);
-        if (citingPmids.length > 0) {
-          const citingArticles = await fetchPubMedArticleDetails(citingPmids);
-          
+        const citingPmids = await findRelatedPubMedArticles(pmid, 'pubmed_pubmed_citedin', 5);
+        const externalCitingPmids = citingPmids.filter(p => !collectionPmidSet.has(p));
+
+        if (externalCitingPmids.length > 0) {
+          const citingArticles = await fetchPubMedArticleDetails(externalCitingPmids.slice(0, 3));
+
           for (const citingArticle of citingArticles) {
             if (expansionCount >= maxExpansions) break;
-            
+
             // Add citing article as node if not already present
             if (!nodes.find(n => n.id === citingArticle.pmid)) {
               nodes.push(createNetworkNode(citingArticle, 'pubmed_citation'));
               expansionCount++;
             }
-            
+
             // Add edge from citing article to collection article
             edges.push({
               id: `${citingArticle.pmid}-cites-${pmid}`,
@@ -309,22 +366,24 @@ export async function GET(
           }
         }
       }
-      
-      // Fetch reference articles
+
+      // Fetch reference articles (external only - not already in collection)
       if (includeReferences && expansionCount < maxExpansions) {
-        const referencePmids = await findRelatedPubMedArticles(pmid, 'pubmed_pubmed_refs', 3);
-        if (referencePmids.length > 0) {
-          const referenceArticles = await fetchPubMedArticleDetails(referencePmids);
-          
+        const referencePmids = await findRelatedPubMedArticles(pmid, 'pubmed_pubmed_refs', 5);
+        const externalReferencePmids = referencePmids.filter(p => !collectionPmidSet.has(p));
+
+        if (externalReferencePmids.length > 0) {
+          const referenceArticles = await fetchPubMedArticleDetails(externalReferencePmids.slice(0, 3));
+
           for (const referenceArticle of referenceArticles) {
             if (expansionCount >= maxExpansions) break;
-            
+
             // Add reference article as node if not already present
             if (!nodes.find(n => n.id === referenceArticle.pmid)) {
               nodes.push(createNetworkNode(referenceArticle, 'pubmed_reference'));
               expansionCount++;
             }
-            
+
             // Add edge from collection article to reference article
             edges.push({
               id: `${pmid}-references-${referenceArticle.pmid}`,
@@ -337,9 +396,9 @@ export async function GET(
         }
       }
     }
-    
-    console.log(`✅ Added ${expansionCount} PubMed expansion nodes`);
-    console.log(`✅ Created ${edges.length} network edges`);
+
+    console.log(`✅ Added ${expansionCount} external PubMed expansion nodes`);
+    console.log(`✅ Total edges: ${edges.length} (${interCollectionEdges} inter-collection + ${edges.length - interCollectionEdges} external)`);
     
     const response: HybridNetworkResponse = {
       nodes,
@@ -349,6 +408,7 @@ export async function GET(
         total_edges: edges.length,
         collection_articles: collectionArticleDetails.length,
         pubmed_expansions: expansionCount,
+        inter_collection_edges: interCollectionEdges,
         source: 'hybrid_collection_pubmed'
       }
     };

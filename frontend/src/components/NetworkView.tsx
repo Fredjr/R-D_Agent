@@ -1167,6 +1167,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         'co-authored': '#f59e0b', // 🟠 Orange - Same authors
         'same-journal': '#ec4899',// 🩷 Pink - Same journal
         'topic-related': '#6366f1', // 🔷 Indigo - Related topics
+        'intra_collection_citation': '#ef4444', // 🔴 Red - Papers citing each other within collection
         default: '#94a3b8'        // ⚪ Gray - Unknown
       };
 
@@ -1176,7 +1177,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
         similarity: 'similar',
         'co-authored': 'co-author',
         'same-journal': 'same journal',
-        'topic-related': 'related'
+        'topic-related': 'related',
+        'intra_collection_citation': 'cites (in collection)'
       };
 
       const getEdgeTooltip = (relationship: string): string => {
@@ -1186,7 +1188,8 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           similarity: 'Similar: Related by content or topic',
           'co-authored': 'Co-authored: Shares authors with source',
           'same-journal': 'Same Journal: Published in same journal',
-          'topic-related': 'Topic: Related by research topic'
+          'topic-related': 'Topic: Related by research topic',
+          'intra_collection_citation': 'Collection Link: Papers citing each other within this collection'
         };
         return tooltips[relationship] || 'Related paper';
       };
@@ -1206,7 +1209,7 @@ const NetworkView = forwardRef<any, NetworkViewProps>(({
           source: edge.from,
           target: edge.to,
           label: EDGE_LABELS[relationship] || '',
-          animated: relationship === 'citation' || relationship === 'reference',
+          animated: relationship === 'citation' || relationship === 'reference' || relationship === 'intra_collection_citation',
           data: {
             relationship: relationship,
           },
