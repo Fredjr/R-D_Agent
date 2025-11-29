@@ -295,7 +295,7 @@ PAPER:
 Title: {article.title}
 Abstract: {abstract}
 Journal: {article.journal or 'Unknown'}
-Year: {article.pub_year or 'Unknown'}
+Year: {article.publication_year or 'Unknown'}
 
 Respond in JSON:
 {{
