@@ -2,14 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-
-interface Collection {
-  collection_id: string;
-  collection_name: string;
-  description?: string;
-  article_count?: number;
-  note_count?: number;
-}
+import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import CollectionArticles from '@/components/CollectionArticles';
+import MultiColumnNetworkView from '@/components/MultiColumnNetworkView';
+import { type Collection } from '@/hooks/useGlobalCollectionSync';
 
 interface ErythosProjectCollectionsTabProps {
   projectId: string;
@@ -19,6 +15,9 @@ export function ErythosProjectCollectionsTab({ projectId }: ErythosProjectCollec
   const { user } = useAuth();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null);
+  const [showDetailView, setShowDetailView] = useState(false);
+  const [showNetworkView, setShowNetworkView] = useState(false);
 
   useEffect(() => {
     fetchCollections();
@@ -26,7 +25,7 @@ export function ErythosProjectCollectionsTab({ projectId }: ErythosProjectCollec
 
   const fetchCollections = async () => {
     if (!user?.email) return;
-    
+
     try {
       const response = await fetch(`/api/proxy/projects/${projectId}/collections`, {
         headers: { 'User-ID': user.email }
@@ -40,6 +39,25 @@ export function ErythosProjectCollectionsTab({ projectId }: ErythosProjectCollec
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCollectionClick = (collection: Collection) => {
+    setSelectedCollection(collection);
+    setShowDetailView(true);
+    setShowNetworkView(false);
+  };
+
+  const handleNetworkView = (collection: Collection) => {
+    setSelectedCollection(collection);
+    setShowNetworkView(true);
+    setShowDetailView(false);
+  };
+
+  const handleBack = () => {
+    setSelectedCollection(null);
+    setShowDetailView(false);
+    setShowNetworkView(false);
+    fetchCollections(); // Refresh collections after viewing
   };
 
   const colors = [
@@ -58,6 +76,74 @@ export function ErythosProjectCollectionsTab({ projectId }: ErythosProjectCollec
     );
   }
 
+  // Show Network View
+  if (showNetworkView && selectedCollection) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleBack}
+            className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+          >
+            <ArrowLeftIcon className="w-5 h-5" />
+          </button>
+          <div>
+            <h2 className="text-xl font-bold text-white">{selectedCollection.collection_name}</h2>
+            <p className="text-gray-400 text-sm">🔗 Network View</p>
+          </div>
+        </div>
+
+        <div className="bg-[#1a1a1a] rounded-xl border border-gray-800 p-6">
+          <div className="h-[600px]">
+            <MultiColumnNetworkView
+              sourceType="collection"
+              sourceId={selectedCollection.collection_id}
+              projectId={projectId}
+              onDeepDiveCreated={() => fetchCollections()}
+              onArticleSaved={() => fetchCollections()}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show Collection Articles (Detail View with PDF viewer, deep-dive, etc.)
+  if (showDetailView && selectedCollection) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-4 mb-4">
+          <button
+            onClick={handleBack}
+            className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+          >
+            <ArrowLeftIcon className="w-5 h-5" />
+          </button>
+          <div>
+            <h2 className="text-xl font-bold text-white">{selectedCollection.collection_name}</h2>
+            <p className="text-gray-400 text-sm">📄 {selectedCollection.article_count || 0} articles</p>
+          </div>
+          <button
+            onClick={() => {
+              setShowDetailView(false);
+              setShowNetworkView(true);
+            }}
+            className="ml-auto px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg text-sm transition-colors"
+          >
+            🔗 Network View
+          </button>
+        </div>
+
+        <CollectionArticles
+          collection={selectedCollection}
+          projectId={projectId}
+          onBack={handleBack}
+        />
+      </div>
+    );
+  }
+
+  // Collections Grid
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -91,47 +177,54 @@ export function ErythosProjectCollectionsTab({ projectId }: ErythosProjectCollec
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {collections.map((collection, index) => (
-            <div 
+            <div
               key={collection.collection_id}
-              className="bg-[#1a1a1a] rounded-xl border border-gray-800 p-4 hover:border-orange-500/50 transition-all group"
+              className="bg-[#1a1a1a] rounded-xl border border-gray-800 p-4 hover:border-orange-500/50 transition-all group cursor-pointer"
+              onClick={() => handleCollectionClick(collection)}
             >
               {/* Icon */}
               <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${colors[index % colors.length]} flex items-center justify-center mb-3`}>
                 <span className="text-2xl">📁</span>
               </div>
-              
+
               {/* Title */}
               <h4 className="text-white font-medium mb-1 group-hover:text-orange-400 transition-colors">
                 {collection.collection_name}
               </h4>
-              
+
               {/* Description */}
               {collection.description && (
                 <p className="text-gray-400 text-sm line-clamp-2 mb-3">
                   {collection.description}
                 </p>
               )}
-              
+
               {/* Meta */}
               <div className="flex items-center gap-3 text-xs text-gray-500">
                 <span>📄 {collection.article_count || 0} articles</span>
                 <span>📝 {collection.note_count || 0} notes</span>
               </div>
-              
+
               {/* Actions */}
               <div className="flex items-center gap-2 mt-4">
-                <a
-                  href={`/collections/${collection.collection_id}`}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCollectionClick(collection);
+                  }}
                   className="flex-1 px-3 py-1.5 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded-lg text-sm text-center transition-colors"
                 >
-                  View
-                </a>
-                <a
-                  href={`/collections/${collection.collection_id}/network`}
+                  📄 Explore
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleNetworkView(collection);
+                  }}
                   className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm transition-colors"
                 >
                   🔗 Network
-                </a>
+                </button>
               </div>
             </div>
           ))}
