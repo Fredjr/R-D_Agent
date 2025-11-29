@@ -9,20 +9,40 @@ Erythos Write Feature
 """
 
 import logging
-import uuid
+import uuid as uuid_module
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Header, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from pydantic import BaseModel, Field
 
 from database import (
     get_db, WriteDocument, WriteSource, DocumentCitation,
-    Collection, ArticleCollection, Article, Annotation, PaperTriage
+    Collection, ArticleCollection, Article, Annotation, PaperTriage, User, Project
 )
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_user_id(user_identifier: str, db: Session) -> str:
+    """
+    Resolve user identifier (email or UUID) to UUID.
+    """
+    try:
+        uuid_module.UUID(user_identifier)
+        return user_identifier  # Already a UUID
+    except (ValueError, AttributeError):
+        pass
+
+    # It's an email, resolve to UUID
+    if "@" in user_identifier:
+        user = db.query(User).filter(User.email == user_identifier).first()
+        if user:
+            return user.user_id
+
+    # Fallback to original identifier
+    return user_identifier
 
 router = APIRouter(prefix="/api/write", tags=["write"])
 
@@ -151,31 +171,61 @@ async def get_collections_for_write(
     """
     Get user's collections for the Write collection selector.
     Returns collections with article counts.
+
+    Fixed: Properly resolves email to UUID, handles empty projects case,
+    and also fetches collections created by the user.
     """
     try:
-        # Get all collections for the user's projects
-        from database import Project
-        
-        # Get user's projects
+        # Resolve user_id (email) to UUID
+        resolved_user_id = resolve_user_id(user_id, db)
+        logger.info(f"[Write] Fetching collections for user: {user_id} -> {resolved_user_id}")
+
+        # Get user's owned projects
         projects = db.query(Project).filter(
-            Project.owner_user_id == user_id
+            Project.owner_user_id == resolved_user_id
         ).all()
-        
+
         project_ids = [p.project_id for p in projects]
-        
-        # Get collections from those projects
-        collections = db.query(Collection).filter(
-            Collection.project_id.in_(project_ids),
-            Collection.is_active == True
-        ).all()
-        
+        logger.info(f"[Write] Found {len(project_ids)} projects for user")
+
+        # Build query for collections:
+        # 1. Collections from user's projects
+        # 2. Collections created by this user (handles both email and UUID)
+        if project_ids:
+            collections = db.query(Collection).filter(
+                or_(
+                    Collection.project_id.in_(project_ids),
+                    Collection.created_by == resolved_user_id,
+                    Collection.created_by == user_id  # Also check original (email) format
+                ),
+                Collection.is_active == True
+            ).all()
+        else:
+            # User has no projects, just get collections they created
+            collections = db.query(Collection).filter(
+                or_(
+                    Collection.created_by == resolved_user_id,
+                    Collection.created_by == user_id
+                ),
+                Collection.is_active == True
+            ).all()
+
+        logger.info(f"[Write] Found {len(collections)} collections")
+
+        # Deduplicate (in case a collection matches multiple criteria)
+        seen_ids = set()
         result = []
+
         for col in collections:
+            if col.collection_id in seen_ids:
+                continue
+            seen_ids.add(col.collection_id)
+
             # Count articles in collection
             article_count = db.query(ArticleCollection).filter(
                 ArticleCollection.collection_id == col.collection_id
             ).count()
-            
+
             result.append(CollectionForWriteResponse(
                 collection_id=col.collection_id,
                 collection_name=col.collection_name,
@@ -183,11 +233,12 @@ async def get_collections_for_write(
                 color=col.color,
                 icon=col.icon
             ))
-        
+
+        logger.info(f"[Write] Returning {len(result)} collections")
         return result
-        
+
     except Exception as e:
-        logger.error(f"Error fetching collections for write: {e}")
+        logger.error(f"Error fetching collections for write: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
