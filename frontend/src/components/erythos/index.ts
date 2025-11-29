@@ -110,3 +110,13 @@ export {
   ProjectSelector,
   ProjectSelectorCompact,
 } from './ProjectSelector';
+
+// Modal
+export { ErythosModal } from './ErythosModal';
+
+// Triage Components
+export {
+  TriageContextSelector,
+  MultiProjectRelevanceMatrix,
+} from './discover';
+export type { TriageContext } from './discover';

@@ -6,6 +6,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { MagnifyingGlassIcon, XMarkIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { ErythosButton } from '../ErythosButton';
+import { TriageContextSelector, TriageContext } from './TriageContextSelector';
+import { MultiProjectRelevanceMatrix } from './MultiProjectRelevanceMatrix';
+import { ErythosModal } from '../ErythosModal';
 
 // Dynamic import for PDFViewer to avoid SSR issues
 const PDFViewer = dynamic(() => import('@/components/reading/PDFViewer').then(mod => ({ default: mod.default })), {
@@ -75,6 +78,13 @@ export function ErythosAllPapersTab() {
   const [savingToCollection, setSavingToCollection] = useState(false);
   const [creatingNewCollection, setCreatingNewCollection] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState('');
+
+  // Hybrid Triage state
+  const [showTriageSelector, setShowTriageSelector] = useState(false);
+  const [triagePaper, setTriagePaper] = useState<SearchResult | null>(null);
+  const [showTriageResult, setShowTriageResult] = useState(false);
+  const [triageResult, setTriageResult] = useState<any>(null);
+  const [triageLoading, setTriageLoading] = useState(false);
 
   // Fetch projects for triage selection
   React.useEffect(() => {
@@ -169,28 +179,42 @@ export function ErythosAllPapersTab() {
     }
   };
 
-  const handleAITriage = async (paper: SearchResult) => {
+  // Open triage context selector
+  const handleAITriage = (paper: SearchResult) => {
     if (!user?.email) return;
+    setTriagePaper(paper);
+    setShowTriageSelector(true);
+  };
 
-    if (!selectedProjectId) {
-      alert('⚠️ Please select a project first');
-      return;
-    }
+  // Execute triage with selected context
+  const executeContextlessTriage = async (context: TriageContext) => {
+    if (!user?.email || !triagePaper) return;
 
-    setTriagingPapers(prev => new Set(prev).add(paper.pmid));
+    setShowTriageSelector(false);
+    setTriagingPapers(prev => new Set(prev).add(triagePaper.pmid));
+    setTriageLoading(true);
+
     try {
-      // Use project-specific triage endpoint
-      const response = await fetch(`/api/proxy/triage/project/${selectedProjectId}/triage`, {
+      const response = await fetch('/api/proxy/triage/contextless', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'User-ID': user.email
         },
-        body: JSON.stringify({ article_pmid: paper.pmid })
+        body: JSON.stringify({
+          article_pmid: triagePaper.pmid,
+          context_type: context.type,
+          search_query: context.searchQuery,
+          project_id: context.projectId,
+          collection_id: context.collectionId,
+          ad_hoc_question: context.adHocQuestion
+        })
       });
 
       if (response.ok) {
-        alert(`✅ Paper triaged! Check Smart Inbox for results.`);
+        const result = await response.json();
+        setTriageResult(result);
+        setShowTriageResult(true);
       } else {
         const errorData = await response.json().catch(() => ({}));
         alert(`❌ Failed to triage paper: ${errorData.detail || response.statusText}`);
@@ -201,9 +225,10 @@ export function ErythosAllPapersTab() {
     } finally {
       setTriagingPapers(prev => {
         const newSet = new Set(prev);
-        newSet.delete(paper.pmid);
+        if (triagePaper) newSet.delete(triagePaper.pmid);
         return newSet;
       });
+      setTriageLoading(false);
     }
   };
 
@@ -647,6 +672,122 @@ export function ErythosAllPapersTab() {
                 <span className="ml-2 text-gray-400">Saving...</span>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Triage Context Selector Modal */}
+      {showTriageSelector && triagePaper && (
+        <TriageContextSelector
+          isOpen={showTriageSelector}
+          onClose={() => {
+            setShowTriageSelector(false);
+            setTriagePaper(null);
+          }}
+          onSelectContext={executeContextlessTriage}
+          searchQuery={query}
+          articlePmid={triagePaper.pmid}
+          articleTitle={triagePaper.title}
+        />
+      )}
+
+      {/* Triage Result Modal */}
+      {showTriageResult && triageResult && (
+        <ErythosModal
+          isOpen={showTriageResult}
+          onClose={() => {
+            setShowTriageResult(false);
+            setTriageResult(null);
+          }}
+          title="🤖 AI Triage Result"
+          subtitle={triagePaper?.title?.slice(0, 60) + '...' || `PMID: ${triageResult.article_pmid}`}
+        >
+          {triageResult.context_type === 'multi_project' ? (
+            <MultiProjectRelevanceMatrix
+              articlePmid={triageResult.article_pmid}
+              articleTitle={triagePaper?.title}
+              projectScores={triageResult.project_scores || []}
+              collectionScores={triageResult.collection_scores || []}
+              bestMatch={triageResult.best_match}
+              overallRelevance={triageResult.overall_relevance || 0}
+              onClose={() => {
+                setShowTriageResult(false);
+                setTriageResult(null);
+              }}
+            />
+          ) : (
+            <div className="space-y-4">
+              {/* Score Display */}
+              <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg">
+                <div>
+                  <div className="text-sm text-gray-400">Relevance Score</div>
+                  <div className={`text-3xl font-bold ${
+                    triageResult.relevance_score >= 70 ? 'text-green-400' :
+                    triageResult.relevance_score >= 40 ? 'text-yellow-400' : 'text-gray-400'
+                  }`}>
+                    {triageResult.relevance_score}/100
+                  </div>
+                </div>
+                <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  triageResult.triage_status === 'must_read' ? 'bg-green-500/20 text-green-400' :
+                  triageResult.triage_status === 'nice_to_know' ? 'bg-yellow-500/20 text-yellow-400' :
+                  'bg-gray-500/20 text-gray-400'
+                }`}>
+                  {triageResult.triage_status === 'must_read' ? '🔴 Must Read' :
+                   triageResult.triage_status === 'nice_to_know' ? '🟡 Nice to Know' : '⚪ Low Priority'}
+                </div>
+              </div>
+
+              {/* Reasoning */}
+              <div className="p-4 bg-gray-800/50 rounded-lg">
+                <div className="text-sm text-gray-400 mb-2">AI Analysis</div>
+                <p className="text-white text-sm">
+                  {triageResult.quick_reasoning || triageResult.ai_reasoning || 'No reasoning provided'}
+                </p>
+              </div>
+
+              {/* Key Findings */}
+              {triageResult.key_findings && triageResult.key_findings.length > 0 && (
+                <div className="p-4 bg-gray-800/50 rounded-lg">
+                  <div className="text-sm text-gray-400 mb-2">Key Findings</div>
+                  <ul className="list-disc list-inside text-white text-sm space-y-1">
+                    {triageResult.key_findings.map((finding: string, i: number) => (
+                      <li key={i}>{finding}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Context Info */}
+              <div className="text-xs text-gray-500 text-center pt-2 border-t border-gray-800">
+                Triaged using: {triageResult.context_type === 'search_query' ? `Search: "${query}"` :
+                               triageResult.context_type === 'project' ? 'Project Q&H' :
+                               triageResult.context_type === 'collection' ? 'Collection Q&H' :
+                               triageResult.context_type === 'ad_hoc' ? 'Custom Question' : 'Unknown'}
+              </div>
+
+              <ErythosButton
+                variant="ghost"
+                onClick={() => {
+                  setShowTriageResult(false);
+                  setTriageResult(null);
+                }}
+                className="w-full"
+              >
+                Close
+              </ErythosButton>
+            </div>
+          )}
+        </ErythosModal>
+      )}
+
+      {/* Triage Loading Overlay */}
+      {triageLoading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+            <p className="text-white">Analyzing paper relevance...</p>
+            <p className="text-gray-400 text-sm mt-1">This may take a moment</p>
           </div>
         </div>
       )}

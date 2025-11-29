@@ -750,3 +750,102 @@ async def delete_triage(
     except Exception as e:
         logger.error(f"❌ Error deleting triage: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to delete triage: {str(e)}")
+
+
+# =============================================================================
+# Contextless Triage Endpoints (Discovery Flow)
+# =============================================================================
+
+class ContextlessTriageRequest(BaseModel):
+    """Request for contextless triage"""
+    article_pmid: str
+    context_type: str  # search_query | project | collection | ad_hoc | multi_project
+    search_query: Optional[str] = None
+    project_id: Optional[str] = None
+    collection_id: Optional[str] = None
+    ad_hoc_question: Optional[str] = None
+
+
+class ContextlessTriageResponse(BaseModel):
+    """Response for contextless triage"""
+    article_pmid: str
+    context_type: str
+    relevance_score: int
+    triage_status: str
+    quick_reasoning: str
+    ai_reasoning: Optional[str] = None
+    key_findings: Optional[List[str]] = []
+    affected_questions: Optional[List[str]] = []
+    affected_hypotheses: Optional[List[str]] = []
+    evidence_excerpts: Optional[List[dict]] = []
+    relevance_aspects: Optional[dict] = {}
+    how_it_helps: Optional[str] = None
+    # Multi-project fields
+    project_scores: Optional[List[dict]] = None
+    collection_scores: Optional[List[dict]] = None
+    best_match: Optional[dict] = None
+    overall_relevance: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
+@router.post("/contextless", response_model=ContextlessTriageResponse)
+async def contextless_triage(
+    request: ContextlessTriageRequest,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Triage a paper without requiring a project context.
+
+    Supports multiple context types for the discovery flow:
+    - search_query: Use search terms as relevance context
+    - project: Use specific project's Q&H
+    - collection: Use specific collection's Q&H
+    - ad_hoc: Use a custom research question
+    - multi_project: Score against all user's projects and collections
+
+    Returns relevance assessment based on the chosen context.
+    """
+    try:
+        logger.info(f"🔍 Contextless triage request: {request.article_pmid} with {request.context_type}")
+
+        # Validate context_type has required fields
+        if request.context_type == "search_query" and not request.search_query:
+            raise HTTPException(status_code=400, detail="search_query required for search_query context")
+        if request.context_type == "project" and not request.project_id:
+            raise HTTPException(status_code=400, detail="project_id required for project context")
+        if request.context_type == "collection" and not request.collection_id:
+            raise HTTPException(status_code=400, detail="collection_id required for collection context")
+        if request.context_type == "ad_hoc" and not request.ad_hoc_question:
+            raise HTTPException(status_code=400, detail="ad_hoc_question required for ad_hoc context")
+
+        # Import and use contextless triage service
+        from backend.app.services.contextless_triage_service import ContextlessTriageService
+        service = ContextlessTriageService()
+
+        result = await service.triage_paper(
+            article_pmid=request.article_pmid,
+            context_type=request.context_type,
+            db=db,
+            user_id=user_id,
+            search_query=request.search_query,
+            project_id=request.project_id,
+            collection_id=request.collection_id,
+            ad_hoc_question=request.ad_hoc_question
+        )
+
+        # Add article_pmid to result
+        result["article_pmid"] = request.article_pmid
+
+        logger.info(f"✅ Contextless triage complete: {result.get('relevance_score', 0)}/100")
+        return ContextlessTriageResponse(**result)
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"❌ Contextless triage error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Triage failed: {str(e)}")
