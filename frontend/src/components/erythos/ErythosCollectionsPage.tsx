@@ -2,11 +2,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { PlusIcon, Squares2X2Icon, ListBulletIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, Squares2X2Icon, ListBulletIcon, MagnifyingGlassIcon, FunnelIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRealTimeAnalytics } from '@/hooks/useRealTimeAnalytics';
 import { ErythosCollectionCard } from './ErythosCollectionCard';
 import { ErythosButton } from './ErythosButton';
+import { ErythosCreateProjectModal } from './ErythosCreateProjectModal';
+
+interface Project {
+  project_id: string;
+  project_name: string;
+}
 
 interface Collection {
   id: string;
@@ -18,6 +24,7 @@ interface Collection {
   noteCount: number;
   projectName: string;
   projectId: string;
+  projects: { id: string; name: string }[];  // All projects this collection belongs to
   createdAt: string;
   updatedAt: string;
 }
@@ -32,12 +39,15 @@ export function ErythosCollectionsPage({ onCreateCollection }: ErythosCollection
   const { trackCollectionAction } = useRealTimeAnalytics('collections');
 
   const [collections, setCollections] = useState<Collection[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
+  const [projectFilter, setProjectFilter] = useState<string>('all'); // 'all' | 'standalone' | project_id
+  const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
 
-  // Fetch collections
+  // Fetch collections and projects
   useEffect(() => {
     if (user?.email) {
       fetchCollections();
@@ -62,12 +72,14 @@ export function ErythosCollectionsPage({ onCreateCollection }: ErythosCollection
       }
 
       const projectsData = await projectsResponse.json();
-      const projects = projectsData.projects || [];
+      const projectsList = projectsData.projects || [];
+      setProjects(projectsList);
 
       // Fetch collections from all projects
       const allCollections: Collection[] = [];
+      const collectionProjectMap = new Map<string, { id: string; name: string }[]>();
 
-      for (const project of projects) {
+      for (const project of projectsList) {
         try {
           const response = await fetch(`/api/proxy/projects/${project.project_id}/collections`, {
             headers: {
@@ -78,27 +90,48 @@ export function ErythosCollectionsPage({ onCreateCollection }: ErythosCollection
 
           if (response.ok) {
             const projectCollections = await response.json();
-            const transformed = projectCollections.map((c: any) => ({
-              id: c.collection_id,
-              name: c.collection_name,
-              description: c.description || '',
-              color: c.color || '#FB923C',
-              icon: c.icon || 'folder',
-              articleCount: c.article_count || 0,
-              noteCount: c.note_count || 0,
-              projectName: project.project_name,
-              projectId: project.project_id,
-              createdAt: c.created_at,
-              updatedAt: c.updated_at,
-            }));
-            allCollections.push(...transformed);
+            for (const c of projectCollections) {
+              const collId = c.collection_id;
+              // Track which projects this collection belongs to
+              if (!collectionProjectMap.has(collId)) {
+                collectionProjectMap.set(collId, []);
+              }
+              collectionProjectMap.get(collId)!.push({
+                id: project.project_id,
+                name: project.project_name,
+              });
+
+              // Only add collection once (avoid duplicates)
+              if (!allCollections.find(col => col.id === collId)) {
+                allCollections.push({
+                  id: collId,
+                  name: c.collection_name,
+                  description: c.description || '',
+                  color: c.color || '#FB923C',
+                  icon: c.icon || 'folder',
+                  articleCount: c.article_count || 0,
+                  noteCount: c.note_count || 0,
+                  projectName: project.project_name,
+                  projectId: project.project_id,
+                  projects: [], // Will be filled below
+                  createdAt: c.created_at,
+                  updatedAt: c.updated_at,
+                });
+              }
+            }
           }
         } catch (err) {
           console.warn(`Failed to fetch collections for ${project.project_name}:`, err);
         }
       }
 
-      setCollections(allCollections);
+      // Fill in the projects array for each collection
+      const collectionsWithProjects = allCollections.map(c => ({
+        ...c,
+        projects: collectionProjectMap.get(c.id) || [],
+      }));
+
+      setCollections(collectionsWithProjects);
     } catch (err) {
       console.error('Failed to fetch collections:', err);
       setError(err instanceof Error ? err.message : 'Failed to load collections');
@@ -107,11 +140,27 @@ export function ErythosCollectionsPage({ onCreateCollection }: ErythosCollection
     }
   };
 
-  // Filter collections by search
-  const filteredCollections = collections.filter(c =>
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Handle project created from modal
+  const handleProjectCreated = (project: { project_id: string; project_name: string }) => {
+    setProjects(prev => [...prev, { project_id: project.project_id, project_name: project.project_name }]);
+  };
+
+  // Filter collections by search and project
+  const filteredCollections = collections.filter(c => {
+    // Search filter
+    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.description.toLowerCase().includes(searchQuery.toLowerCase());
+
+    // Project filter
+    let matchesProject = true;
+    if (projectFilter === 'standalone') {
+      matchesProject = c.projects.length === 0;
+    } else if (projectFilter !== 'all') {
+      matchesProject = c.projects.some(p => p.id === projectFilter);
+    }
+
+    return matchesSearch && matchesProject;
+  });
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -124,19 +173,38 @@ export function ErythosCollectionsPage({ onCreateCollection }: ErythosCollection
 
         {/* Controls Bar */}
         <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
-          {/* Search */}
-          <div className="relative flex-1 max-w-md">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search collections..."
-              className="w-full pl-10 pr-4 py-2.5 bg-gray-900/70 border border-gray-700/50 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50 transition-all"
-            />
+          {/* Search + Filter */}
+          <div className="flex items-center gap-3 flex-1">
+            {/* Search */}
+            <div className="relative flex-1 max-w-md">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search collections..."
+                className="w-full pl-10 pr-4 py-2.5 bg-gray-900/70 border border-gray-700/50 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50 transition-all"
+              />
+            </div>
+
+            {/* Project Filter */}
+            <div className="relative">
+              <FunnelIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+              <select
+                value={projectFilter}
+                onChange={(e) => setProjectFilter(e.target.value)}
+                className="pl-9 pr-8 py-2.5 bg-gray-900/70 border border-gray-700/50 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50 transition-all appearance-none cursor-pointer"
+              >
+                <option value="all">All Projects</option>
+                <option value="standalone">Standalone (No Project)</option>
+                {projects.map(p => (
+                  <option key={p.project_id} value={p.project_id}>{p.project_name}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          {/* View Toggle + Create Button */}
+          {/* View Toggle + Create Buttons */}
           <div className="flex items-center gap-3">
             {/* View Toggle */}
             <div className="flex bg-gray-900/70 rounded-lg p-1">
@@ -155,6 +223,15 @@ export function ErythosCollectionsPage({ onCreateCollection }: ErythosCollection
                 <ListBulletIcon className="w-5 h-5" />
               </button>
             </div>
+
+            {/* New Project Button */}
+            <button
+              onClick={() => setShowCreateProjectModal(true)}
+              className="px-4 py-2.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+            >
+              <PlusIcon className="w-4 h-4" />
+              New Project
+            </button>
 
             {/* New Collection Button */}
             <ErythosButton variant="primary" onClick={onCreateCollection} className="bg-orange-500 hover:bg-orange-600">
@@ -206,6 +283,7 @@ export function ErythosCollectionsPage({ onCreateCollection }: ErythosCollection
                   color={collection.color}
                   articleCount={collection.articleCount}
                   noteCount={collection.noteCount}
+                  projects={collection.projects}
                   onClick={() => {
                     trackCollectionAction('view', collection.id);
                     router.push(`/project/${collection.projectId}?tab=collections&collection=${collection.id}`);
@@ -216,8 +294,11 @@ export function ErythosCollectionsPage({ onCreateCollection }: ErythosCollection
                   }}
                   onNetworkView={() => {
                     trackCollectionAction('network_view', collection.id);
-                    // TODO: Show network view modal
                     router.push(`/project/${collection.projectId}?tab=collections&collection=${collection.id}&view=network`);
+                  }}
+                  onAddToProject={() => {
+                    // TODO: Open add to project modal
+                    console.log('Add to project:', collection.id);
                   }}
                 />
               </div>
@@ -231,17 +312,25 @@ export function ErythosCollectionsPage({ onCreateCollection }: ErythosCollection
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gray-900/70 mb-6">
               <span className="text-4xl">📁</span>
             </div>
-            {searchQuery ? (
+            {searchQuery || projectFilter !== 'all' ? (
               <>
                 <h3 className="text-xl font-semibold text-white mb-2">No collections found</h3>
                 <p className="text-gray-400 mb-6">
-                  No collections match "{searchQuery}"
+                  {searchQuery
+                    ? `No collections match "${searchQuery}"`
+                    : projectFilter === 'standalone'
+                      ? 'No standalone collections found'
+                      : 'No collections in this project'
+                  }
                 </p>
                 <button
-                  onClick={() => setSearchQuery('')}
+                  onClick={() => {
+                    setSearchQuery('');
+                    setProjectFilter('all');
+                  }}
                   className="text-orange-400 hover:text-orange-300 font-medium"
                 >
-                  Clear search
+                  Clear filters
                 </button>
               </>
             ) : (
@@ -259,6 +348,13 @@ export function ErythosCollectionsPage({ onCreateCollection }: ErythosCollection
           </div>
         )}
       </div>
+
+      {/* Create Project Modal */}
+      <ErythosCreateProjectModal
+        isOpen={showCreateProjectModal}
+        onClose={() => setShowCreateProjectModal(false)}
+        onProjectCreated={handleProjectCreated}
+      />
     </div>
   );
 }

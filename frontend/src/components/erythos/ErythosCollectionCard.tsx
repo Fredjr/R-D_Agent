@@ -3,6 +3,11 @@
 import React from 'react';
 import { collectionGradients, CollectionGradientType } from '@/utils/gradients';
 
+interface ProjectBadge {
+  id: string;
+  name: string;
+}
+
 interface ErythosCollectionCardProps {
   id: string;
   name: string;
@@ -11,9 +16,11 @@ interface ErythosCollectionCardProps {
   color?: string | null; // Allow null/undefined for color
   articleCount: number;
   noteCount?: number;
+  projects?: ProjectBadge[];  // Projects this collection belongs to
   onClick?: () => void;
   onExplore?: () => void;
   onNetworkView?: () => void;
+  onAddToProject?: () => void;  // Handler to add collection to project
   className?: string;
 }
 
@@ -46,9 +53,11 @@ export function ErythosCollectionCard({
   color,
   articleCount,
   noteCount = 0,
+  projects = [],
   onClick,
   onExplore,
   onNetworkView,
+  onAddToProject,
   className = '',
 }: ErythosCollectionCardProps) {
   // Determine gradient from color or use default based on hash
@@ -110,6 +119,25 @@ export function ErythosCollectionCard({
             <span>{noteCount} note{noteCount !== 1 ? 's' : ''}</span>
           </div>
 
+          {/* Project Badges */}
+          {projects.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 mb-2">
+              {projects.slice(0, 3).map((project) => (
+                <span
+                  key={project.id}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-500/10 text-orange-400 text-xs rounded-full border border-orange-500/20"
+                  title={project.name}
+                >
+                  <span className="text-[10px]">📂</span>
+                  <span className="max-w-[80px] truncate">{project.name}</span>
+                </span>
+              ))}
+              {projects.length > 3 && (
+                <span className="text-xs text-gray-500">+{projects.length - 3} more</span>
+              )}
+            </div>
+          )}
+
           {/* Description */}
           {description && (
             <p className="text-sm text-gray-500 line-clamp-2">
@@ -141,6 +169,19 @@ export function ErythosCollectionCard({
           <span>🌐</span>
           <span>Network</span>
         </button>
+        {onAddToProject && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddToProject();
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 hover:bg-gray-700/50 text-gray-300 hover:text-white text-sm font-medium rounded-lg transition-colors ml-auto"
+            title="Add to project"
+          >
+            <span>➕</span>
+            <span>Project</span>
+          </button>
+        )}
       </div>
     </div>
   );
