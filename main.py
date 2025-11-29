@@ -13894,25 +13894,52 @@ async def get_collections_by_hypothesis(
 # =============================================================================
 # COLLECTION RESEARCH - Questions & Hypotheses Linking
 # =============================================================================
+#
+# Collections can be:
+# 1. Linked to no project (standalone) - uses collection-specific Q&H only
+# 2. Linked to one project (via project_id) - can link to that project's Q&H
+# 3. Linked to multiple projects (via ProjectCollection) - can link to Q&H from ANY linked project
+#
+# Data sources:
+# - Collection-specific Q&H: CollectionResearchQuestion, CollectionHypothesis tables
+# - Project Q&H links: Collection.linked_question_ids, Collection.linked_hypothesis_ids
+# - Per-project mappings: ProjectCollection.linked_project_question_ids, linked_project_hypothesis_ids
 
 class CollectionResearchLink(BaseModel):
     """Request model for linking/unlinking questions or hypotheses to collections"""
     question_ids: Optional[List[str]] = None
     hypothesis_ids: Optional[List[str]] = None
+    project_id: Optional[str] = None  # Which project's Q&H to link (for multi-project collections)
+
+class CollectionResearchQuestionCreate(BaseModel):
+    """Request model for creating collection-specific research questions"""
+    question_text: str
+    question_type: str = 'exploratory'  # exploratory, confirmatory, methodological
+    priority: str = 'medium'  # low, medium, high
+
+class CollectionHypothesisCreate(BaseModel):
+    """Request model for creating collection-specific hypotheses"""
+    hypothesis_text: str
+    confidence_level: float = 0.5
+    status: str = 'untested'
 
 
 @app.get("/api/collections/{collection_id}/research")
 async def get_collection_research(
     collection_id: str,
+    project_id: Optional[str] = None,  # Optional: filter by specific project context
     user_id: str = Header(..., alias="User-ID"),
     db: Session = Depends(get_db)
 ):
     """
-    Get research questions and hypotheses linked to a collection.
-    Returns full question and hypothesis objects for display.
+    Get research questions and hypotheses for a collection.
+
+    Returns:
+    - Collection-specific Q&H (created directly on the collection)
+    - Linked project Q&H (from the primary project and any linked projects)
+    - All available project Q&H for linking UI (from all linked projects)
     """
     try:
-        # Resolve user ID
         resolved_user_id = resolve_user_id(user_id, db)
 
         # Get collection
@@ -13924,32 +13951,74 @@ async def get_collection_research(
         if not collection:
             raise HTTPException(status_code=404, detail="Collection not found")
 
-        # Check access via project
-        project = db.query(Project).filter(Project.project_id == collection.project_id).first()
-        if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
+        # Get all projects this collection is linked to
+        # 1. Primary project (collection.project_id)
+        # 2. Additional projects via ProjectCollection junction table
+        linked_project_ids = set()
+        project_names = {}
 
-        has_access = (
-            project.owner_user_id == resolved_user_id or
-            project.owner_user_id == user_id or
-            db.query(ProjectCollaborator).filter(
-                ProjectCollaborator.project_id == project.project_id,
-                ProjectCollaborator.user_id.in_([resolved_user_id, user_id]),
-                ProjectCollaborator.is_active == True
-            ).first() is not None
-        )
+        # Primary project
+        if collection.project_id:
+            linked_project_ids.add(collection.project_id)
+            primary_project = db.query(Project).filter(Project.project_id == collection.project_id).first()
+            if primary_project:
+                project_names[collection.project_id] = primary_project.project_name
+
+        # Additional linked projects via junction table
+        project_links = db.query(ProjectCollection).filter(
+            ProjectCollection.collection_id == collection_id
+        ).all()
+
+        for link in project_links:
+            linked_project_ids.add(link.project_id)
+            if link.project_id not in project_names:
+                proj = db.query(Project).filter(Project.project_id == link.project_id).first()
+                if proj:
+                    project_names[link.project_id] = proj.project_name
+
+        # Check access - user must have access to at least one linked project
+        has_access = False
+        for pid in linked_project_ids:
+            project = db.query(Project).filter(Project.project_id == pid).first()
+            if project and (
+                project.owner_user_id == resolved_user_id or
+                project.owner_user_id == user_id or
+                db.query(ProjectCollaborator).filter(
+                    ProjectCollaborator.project_id == pid,
+                    ProjectCollaborator.user_id.in_([resolved_user_id, user_id]),
+                    ProjectCollaborator.is_active == True
+                ).first() is not None
+            ):
+                has_access = True
+                break
+
+        # Also allow access if user created the collection
+        if not has_access:
+            if collection.created_by in [resolved_user_id, user_id]:
+                has_access = True
 
         if not has_access:
             raise HTTPException(status_code=403, detail="Access denied")
 
-        # Get linked questions
+        # 1. Get collection-specific Q&H (created directly on this collection)
+        collection_questions = db.query(CollectionResearchQuestion).filter(
+            CollectionResearchQuestion.collection_id == collection_id
+        ).all()
+
+        collection_hypotheses = db.query(CollectionHypothesis).filter(
+            CollectionHypothesis.collection_id == collection_id
+        ).all()
+
+        # 2. Get linked project Q&H
         linked_question_ids = collection.linked_question_ids or []
-        questions = []
+        linked_hypothesis_ids = collection.linked_hypothesis_ids or []
+
+        linked_project_questions = []
         if linked_question_ids:
             questions_db = db.query(ResearchQuestion).filter(
                 ResearchQuestion.question_id.in_(linked_question_ids)
             ).all()
-            questions = [
+            linked_project_questions = [
                 {
                     "question_id": q.question_id,
                     "question_text": q.question_text,
@@ -13957,19 +14026,19 @@ async def get_collection_research(
                     "status": q.status,
                     "priority": q.priority,
                     "description": q.description,
-                    "project_id": q.project_id
+                    "project_id": q.project_id,
+                    "project_name": project_names.get(q.project_id, "Unknown"),
+                    "source": "project"
                 }
                 for q in questions_db
             ]
 
-        # Get linked hypotheses
-        linked_hypothesis_ids = collection.linked_hypothesis_ids or []
-        hypotheses = []
+        linked_project_hypotheses = []
         if linked_hypothesis_ids:
             hypotheses_db = db.query(Hypothesis).filter(
                 Hypothesis.hypothesis_id.in_(linked_hypothesis_ids)
             ).all()
-            hypotheses = [
+            linked_project_hypotheses = [
                 {
                     "hypothesis_id": h.hypothesis_id,
                     "hypothesis_text": h.hypothesis_text,
@@ -13978,50 +14047,85 @@ async def get_collection_research(
                     "confidence_level": h.confidence_level,
                     "description": h.description,
                     "question_id": h.question_id,
-                    "project_id": h.project_id
+                    "project_id": h.project_id,
+                    "project_name": project_names.get(h.project_id, "Unknown"),
+                    "source": "project"
                 }
                 for h in hypotheses_db
             ]
 
-        # Get all project questions (for linking UI)
-        all_project_questions = db.query(ResearchQuestion).filter(
-            ResearchQuestion.project_id == collection.project_id
-        ).all()
+        # 3. Get all available Q&H from ALL linked projects (for linking UI)
+        all_available_questions = []
+        all_available_hypotheses = []
 
-        all_questions = [
-            {
-                "question_id": q.question_id,
-                "question_text": q.question_text,
-                "question_type": q.question_type,
-                "status": q.status
-            }
-            for q in all_project_questions
-        ]
+        if linked_project_ids:
+            all_questions_db = db.query(ResearchQuestion).filter(
+                ResearchQuestion.project_id.in_(linked_project_ids)
+            ).all()
+            all_available_questions = [
+                {
+                    "question_id": q.question_id,
+                    "question_text": q.question_text,
+                    "question_type": q.question_type,
+                    "status": q.status,
+                    "project_id": q.project_id,
+                    "project_name": project_names.get(q.project_id, "Unknown")
+                }
+                for q in all_questions_db
+            ]
 
-        # Get all project hypotheses (for linking UI)
-        all_project_hypotheses = db.query(Hypothesis).filter(
-            Hypothesis.project_id == collection.project_id
-        ).all()
-
-        all_hypotheses = [
-            {
-                "hypothesis_id": h.hypothesis_id,
-                "hypothesis_text": h.hypothesis_text,
-                "hypothesis_type": h.hypothesis_type,
-                "status": h.status,
-                "question_id": h.question_id
-            }
-            for h in all_project_hypotheses
-        ]
+            all_hypotheses_db = db.query(Hypothesis).filter(
+                Hypothesis.project_id.in_(linked_project_ids)
+            ).all()
+            all_available_hypotheses = [
+                {
+                    "hypothesis_id": h.hypothesis_id,
+                    "hypothesis_text": h.hypothesis_text,
+                    "hypothesis_type": h.hypothesis_type,
+                    "status": h.status,
+                    "question_id": h.question_id,
+                    "project_id": h.project_id,
+                    "project_name": project_names.get(h.project_id, "Unknown")
+                }
+                for h in all_hypotheses_db
+            ]
 
         return {
             "collection_id": collection_id,
             "collection_name": collection.collection_name,
-            "project_id": collection.project_id,
-            "linked_questions": questions,
-            "linked_hypotheses": hypotheses,
-            "all_project_questions": all_questions,
-            "all_project_hypotheses": all_hypotheses
+            "primary_project_id": collection.project_id,
+            "linked_projects": [
+                {"project_id": pid, "project_name": project_names.get(pid, "Unknown")}
+                for pid in linked_project_ids
+            ],
+            # Collection-specific Q&H
+            "collection_questions": [
+                {
+                    "question_id": q.question_id,
+                    "question_text": q.question_text,
+                    "question_type": q.question_type,
+                    "priority": q.priority,
+                    "status": q.status,
+                    "source": "collection"
+                }
+                for q in collection_questions
+            ],
+            "collection_hypotheses": [
+                {
+                    "hypothesis_id": h.hypothesis_id,
+                    "hypothesis_text": h.hypothesis_text,
+                    "confidence_level": h.confidence_level,
+                    "status": h.status,
+                    "source": "collection"
+                }
+                for h in collection_hypotheses
+            ],
+            # Linked project Q&H
+            "linked_project_questions": linked_project_questions,
+            "linked_project_hypotheses": linked_project_hypotheses,
+            # All available for linking
+            "all_available_questions": all_available_questions,
+            "all_available_hypotheses": all_available_hypotheses
         }
 
     except HTTPException:
@@ -14039,8 +14143,8 @@ async def link_research_to_collection(
     db: Session = Depends(get_db)
 ):
     """
-    Link questions and/or hypotheses to a collection.
-    Adds to existing linked IDs (doesn't replace).
+    Link project-level questions and/or hypotheses to a collection.
+    Validates that Q&H belong to one of the collection's linked projects.
     """
     try:
         resolved_user_id = resolve_user_id(user_id, db)
@@ -14053,26 +14157,63 @@ async def link_research_to_collection(
         if not collection:
             raise HTTPException(status_code=404, detail="Collection not found")
 
-        # Check access
-        project = db.query(Project).filter(Project.project_id == collection.project_id).first()
-        has_access = (
-            project and (
+        # Get all linked projects
+        linked_project_ids = set()
+        if collection.project_id:
+            linked_project_ids.add(collection.project_id)
+
+        project_links = db.query(ProjectCollection).filter(
+            ProjectCollection.collection_id == collection_id
+        ).all()
+        for link in project_links:
+            linked_project_ids.add(link.project_id)
+
+        # Check access - user must have access to at least one linked project
+        has_access = False
+        for pid in linked_project_ids:
+            project = db.query(Project).filter(Project.project_id == pid).first()
+            if project and (
                 project.owner_user_id == resolved_user_id or
                 project.owner_user_id == user_id
-            )
-        )
+            ):
+                has_access = True
+                break
+
+        # Also allow if user created the collection
+        if not has_access and collection.created_by in [resolved_user_id, user_id]:
+            has_access = True
 
         if not has_access:
             raise HTTPException(status_code=403, detail="Access denied")
 
-        # Link questions
+        # Validate that Q&H belong to linked projects
         if link_data.question_ids:
+            questions = db.query(ResearchQuestion).filter(
+                ResearchQuestion.question_id.in_(link_data.question_ids)
+            ).all()
+            for q in questions:
+                if q.project_id not in linked_project_ids:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Question {q.question_id} belongs to a project not linked to this collection"
+                    )
+
             current_questions = set(collection.linked_question_ids or [])
             current_questions.update(link_data.question_ids)
             collection.linked_question_ids = list(current_questions)
 
-        # Link hypotheses
+        # Validate and link hypotheses
         if link_data.hypothesis_ids:
+            hypotheses = db.query(Hypothesis).filter(
+                Hypothesis.hypothesis_id.in_(link_data.hypothesis_ids)
+            ).all()
+            for h in hypotheses:
+                if h.project_id not in linked_project_ids:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Hypothesis {h.hypothesis_id} belongs to a project not linked to this collection"
+                    )
+
             current_hypotheses = set(collection.linked_hypothesis_ids or [])
             current_hypotheses.update(link_data.hypothesis_ids)
             collection.linked_hypothesis_ids = list(current_hypotheses)
@@ -14115,14 +14256,30 @@ async def unlink_research_from_collection(
         if not collection:
             raise HTTPException(status_code=404, detail="Collection not found")
 
+        # Get all linked projects for access check
+        linked_project_ids = set()
+        if collection.project_id:
+            linked_project_ids.add(collection.project_id)
+
+        project_links = db.query(ProjectCollection).filter(
+            ProjectCollection.collection_id == collection_id
+        ).all()
+        for link in project_links:
+            linked_project_ids.add(link.project_id)
+
         # Check access
-        project = db.query(Project).filter(Project.project_id == collection.project_id).first()
-        has_access = (
-            project and (
+        has_access = False
+        for pid in linked_project_ids:
+            project = db.query(Project).filter(Project.project_id == pid).first()
+            if project and (
                 project.owner_user_id == resolved_user_id or
                 project.owner_user_id == user_id
-            )
-        )
+            ):
+                has_access = True
+                break
+
+        if not has_access and collection.created_by in [resolved_user_id, user_id]:
+            has_access = True
 
         if not has_access:
             raise HTTPException(status_code=403, detail="Access denied")
@@ -14153,6 +14310,156 @@ async def unlink_research_from_collection(
     except Exception as e:
         db.rollback()
         logger.error(f"Error unlinking research from collection: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/collections/{collection_id}/research/questions")
+async def create_collection_question(
+    collection_id: str,
+    question_data: CollectionResearchQuestionCreate,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Create a collection-specific research question.
+    These are independent from project questions.
+    """
+    try:
+        resolved_user_id = resolve_user_id(user_id, db)
+
+        collection = db.query(Collection).filter(
+            Collection.collection_id == collection_id,
+            Collection.is_active == True
+        ).first()
+
+        if not collection:
+            raise HTTPException(status_code=404, detail="Collection not found")
+
+        # Access check (similar to above)
+        linked_project_ids = set()
+        if collection.project_id:
+            linked_project_ids.add(collection.project_id)
+
+        has_access = False
+        for pid in linked_project_ids:
+            project = db.query(Project).filter(Project.project_id == pid).first()
+            if project and (
+                project.owner_user_id == resolved_user_id or
+                project.owner_user_id == user_id
+            ):
+                has_access = True
+                break
+
+        if not has_access and collection.created_by in [resolved_user_id, user_id]:
+            has_access = True
+
+        if not has_access:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # Create collection-specific question
+        new_question = CollectionResearchQuestion(
+            question_id=str(uuid.uuid4()),
+            collection_id=collection_id,
+            question_text=question_data.question_text,
+            question_type=question_data.question_type,
+            priority=question_data.priority,
+            status='open',
+            created_by=resolved_user_id or user_id
+        )
+
+        db.add(new_question)
+        db.commit()
+        db.refresh(new_question)
+
+        return {
+            "success": True,
+            "question_id": new_question.question_id,
+            "question_text": new_question.question_text,
+            "question_type": new_question.question_type,
+            "priority": new_question.priority,
+            "status": new_question.status,
+            "source": "collection"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating collection question: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/collections/{collection_id}/research/hypotheses")
+async def create_collection_hypothesis(
+    collection_id: str,
+    hypothesis_data: CollectionHypothesisCreate,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Create a collection-specific hypothesis.
+    These are independent from project hypotheses.
+    """
+    try:
+        resolved_user_id = resolve_user_id(user_id, db)
+
+        collection = db.query(Collection).filter(
+            Collection.collection_id == collection_id,
+            Collection.is_active == True
+        ).first()
+
+        if not collection:
+            raise HTTPException(status_code=404, detail="Collection not found")
+
+        # Access check
+        linked_project_ids = set()
+        if collection.project_id:
+            linked_project_ids.add(collection.project_id)
+
+        has_access = False
+        for pid in linked_project_ids:
+            project = db.query(Project).filter(Project.project_id == pid).first()
+            if project and (
+                project.owner_user_id == resolved_user_id or
+                project.owner_user_id == user_id
+            ):
+                has_access = True
+                break
+
+        if not has_access and collection.created_by in [resolved_user_id, user_id]:
+            has_access = True
+
+        if not has_access:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # Create collection-specific hypothesis
+        new_hypothesis = CollectionHypothesis(
+            hypothesis_id=str(uuid.uuid4()),
+            collection_id=collection_id,
+            hypothesis_text=hypothesis_data.hypothesis_text,
+            confidence_level=hypothesis_data.confidence_level,
+            status=hypothesis_data.status,
+            created_by=resolved_user_id or user_id
+        )
+
+        db.add(new_hypothesis)
+        db.commit()
+        db.refresh(new_hypothesis)
+
+        return {
+            "success": True,
+            "hypothesis_id": new_hypothesis.hypothesis_id,
+            "hypothesis_text": new_hypothesis.hypothesis_text,
+            "confidence_level": new_hypothesis.confidence_level,
+            "status": new_hypothesis.status,
+            "source": "collection"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating collection hypothesis: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
