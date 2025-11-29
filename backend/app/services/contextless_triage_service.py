@@ -160,7 +160,7 @@ class ContextlessTriageService:
 
     def _build_collection_context(self, collection_id: str, db: Session) -> Dict:
         """Build context from collection Q&H"""
-        collection = db.query(Collection).filter(Collection.id == collection_id).first()
+        collection = db.query(Collection).filter(Collection.collection_id == collection_id).first()
         if not collection:
             raise ValueError(f"Collection {collection_id} not found")
 
@@ -176,10 +176,10 @@ class ContextlessTriageService:
         return {
             "type": "collection",
             "collection_id": collection_id,
-            "collection_name": collection.name,
+            "collection_name": collection.collection_name,
             "description": collection.description or "",
-            "questions": [{"id": q.id, "text": q.question_text} for q in questions],
-            "hypotheses": [{"id": h.id, "text": h.hypothesis_text} for h in hypotheses]
+            "questions": [{"id": q.question_id, "text": q.question_text} for q in questions],
+            "hypotheses": [{"id": h.hypothesis_id, "text": h.hypothesis_text} for h in hypotheses]
         }
 
     def _build_ad_hoc_context(self, ad_hoc_question: str) -> Dict:
