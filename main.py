@@ -13940,7 +13940,7 @@ async def get_collection_research(
     - All available project Q&H for linking UI (from all linked projects)
     """
     try:
-        from database import ProjectCollection  # Import for multi-project collection support
+        from database import ProjectCollection, CollectionResearchQuestion, CollectionHypothesis  # Import for multi-project collection support
 
         resolved_user_id = resolve_user_id(user_id, db)
 
@@ -14331,6 +14331,8 @@ async def create_collection_question(
     These are independent from project questions.
     """
     try:
+        from database import CollectionResearchQuestion  # Import for collection-specific Q&H
+
         resolved_user_id = resolve_user_id(user_id, db)
 
         collection = db.query(Collection).filter(
@@ -14407,6 +14409,8 @@ async def create_collection_hypothesis(
     These are independent from project hypotheses.
     """
     try:
+        from database import CollectionHypothesis  # Import for collection-specific Q&H
+
         resolved_user_id = resolve_user_id(user_id, db)
 
         collection = db.query(Collection).filter(
