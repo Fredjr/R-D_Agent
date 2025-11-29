@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, BeakerIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import CollectionArticles from '@/components/CollectionArticles';
 import MultiColumnNetworkView from '@/components/MultiColumnNetworkView';
 import { type Collection } from '@/hooks/useGlobalCollectionSync';
+import { ErythosCollectionResearchSection } from '../collection/ErythosCollectionResearchSection';
 
 interface ErythosProjectCollectionsTabProps {
   projectId: string;
@@ -18,6 +19,7 @@ export function ErythosProjectCollectionsTab({ projectId }: ErythosProjectCollec
   const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null);
   const [showDetailView, setShowDetailView] = useState(false);
   const [showNetworkView, setShowNetworkView] = useState(false);
+  const [showResearchSection, setShowResearchSection] = useState(true);
 
   useEffect(() => {
     fetchCollections();
@@ -123,16 +125,41 @@ export function ErythosProjectCollectionsTab({ projectId }: ErythosProjectCollec
             <h2 className="text-xl font-bold text-white">{selectedCollection.collection_name}</h2>
             <p className="text-gray-400 text-sm">📄 {selectedCollection.article_count || 0} articles</p>
           </div>
-          <button
-            onClick={() => {
-              setShowDetailView(false);
-              setShowNetworkView(true);
-            }}
-            className="ml-auto px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg text-sm transition-colors"
-          >
-            🔗 Network View
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => setShowResearchSection(!showResearchSection)}
+              className="flex items-center gap-2 px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg text-sm transition-colors"
+            >
+              <BeakerIcon className="w-4 h-4" />
+              Research
+              {showResearchSection ? (
+                <ChevronUpIcon className="w-4 h-4" />
+              ) : (
+                <ChevronDownIcon className="w-4 h-4" />
+              )}
+            </button>
+            <button
+              onClick={() => {
+                setShowDetailView(false);
+                setShowNetworkView(true);
+              }}
+              className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg text-sm transition-colors"
+            >
+              🔗 Network View
+            </button>
+          </div>
         </div>
+
+        {/* Research Questions & Hypotheses Section */}
+        {showResearchSection && user?.email && (
+          <ErythosCollectionResearchSection
+            collectionId={selectedCollection.collection_id}
+            collectionName={selectedCollection.collection_name}
+            projectId={projectId}
+            userId={user.email}
+            onRefresh={fetchCollections}
+          />
+        )}
 
         <CollectionArticles
           collection={selectedCollection}

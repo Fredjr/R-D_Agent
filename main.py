@@ -13890,6 +13890,272 @@ async def get_collections_by_hypothesis(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get collections: {str(e)}")
 
+
+# =============================================================================
+# COLLECTION RESEARCH - Questions & Hypotheses Linking
+# =============================================================================
+
+class CollectionResearchLink(BaseModel):
+    """Request model for linking/unlinking questions or hypotheses to collections"""
+    question_ids: Optional[List[str]] = None
+    hypothesis_ids: Optional[List[str]] = None
+
+
+@app.get("/api/collections/{collection_id}/research")
+async def get_collection_research(
+    collection_id: str,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get research questions and hypotheses linked to a collection.
+    Returns full question and hypothesis objects for display.
+    """
+    try:
+        # Resolve user ID
+        resolved_user_id = resolve_user_id(user_id, db)
+
+        # Get collection
+        collection = db.query(Collection).filter(
+            Collection.collection_id == collection_id,
+            Collection.is_active == True
+        ).first()
+
+        if not collection:
+            raise HTTPException(status_code=404, detail="Collection not found")
+
+        # Check access via project
+        project = db.query(Project).filter(Project.project_id == collection.project_id).first()
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        has_access = (
+            project.owner_user_id == resolved_user_id or
+            project.owner_user_id == user_id or
+            db.query(ProjectCollaborator).filter(
+                ProjectCollaborator.project_id == project.project_id,
+                ProjectCollaborator.user_id.in_([resolved_user_id, user_id]),
+                ProjectCollaborator.is_active == True
+            ).first() is not None
+        )
+
+        if not has_access:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # Get linked questions
+        linked_question_ids = collection.linked_question_ids or []
+        questions = []
+        if linked_question_ids:
+            questions_db = db.query(ResearchQuestion).filter(
+                ResearchQuestion.question_id.in_(linked_question_ids)
+            ).all()
+            questions = [
+                {
+                    "question_id": q.question_id,
+                    "question_text": q.question_text,
+                    "question_type": q.question_type,
+                    "status": q.status,
+                    "priority": q.priority,
+                    "description": q.description,
+                    "project_id": q.project_id
+                }
+                for q in questions_db
+            ]
+
+        # Get linked hypotheses
+        linked_hypothesis_ids = collection.linked_hypothesis_ids or []
+        hypotheses = []
+        if linked_hypothesis_ids:
+            hypotheses_db = db.query(Hypothesis).filter(
+                Hypothesis.hypothesis_id.in_(linked_hypothesis_ids)
+            ).all()
+            hypotheses = [
+                {
+                    "hypothesis_id": h.hypothesis_id,
+                    "hypothesis_text": h.hypothesis_text,
+                    "hypothesis_type": h.hypothesis_type,
+                    "status": h.status,
+                    "confidence_level": h.confidence_level,
+                    "description": h.description,
+                    "question_id": h.question_id,
+                    "project_id": h.project_id
+                }
+                for h in hypotheses_db
+            ]
+
+        # Get all project questions (for linking UI)
+        all_project_questions = db.query(ResearchQuestion).filter(
+            ResearchQuestion.project_id == collection.project_id
+        ).all()
+
+        all_questions = [
+            {
+                "question_id": q.question_id,
+                "question_text": q.question_text,
+                "question_type": q.question_type,
+                "status": q.status
+            }
+            for q in all_project_questions
+        ]
+
+        # Get all project hypotheses (for linking UI)
+        all_project_hypotheses = db.query(Hypothesis).filter(
+            Hypothesis.project_id == collection.project_id
+        ).all()
+
+        all_hypotheses = [
+            {
+                "hypothesis_id": h.hypothesis_id,
+                "hypothesis_text": h.hypothesis_text,
+                "hypothesis_type": h.hypothesis_type,
+                "status": h.status,
+                "question_id": h.question_id
+            }
+            for h in all_project_hypotheses
+        ]
+
+        return {
+            "collection_id": collection_id,
+            "collection_name": collection.collection_name,
+            "project_id": collection.project_id,
+            "linked_questions": questions,
+            "linked_hypotheses": hypotheses,
+            "all_project_questions": all_questions,
+            "all_project_hypotheses": all_hypotheses
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting collection research: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/collections/{collection_id}/research/link")
+async def link_research_to_collection(
+    collection_id: str,
+    link_data: CollectionResearchLink,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Link questions and/or hypotheses to a collection.
+    Adds to existing linked IDs (doesn't replace).
+    """
+    try:
+        resolved_user_id = resolve_user_id(user_id, db)
+
+        collection = db.query(Collection).filter(
+            Collection.collection_id == collection_id,
+            Collection.is_active == True
+        ).first()
+
+        if not collection:
+            raise HTTPException(status_code=404, detail="Collection not found")
+
+        # Check access
+        project = db.query(Project).filter(Project.project_id == collection.project_id).first()
+        has_access = (
+            project and (
+                project.owner_user_id == resolved_user_id or
+                project.owner_user_id == user_id
+            )
+        )
+
+        if not has_access:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # Link questions
+        if link_data.question_ids:
+            current_questions = set(collection.linked_question_ids or [])
+            current_questions.update(link_data.question_ids)
+            collection.linked_question_ids = list(current_questions)
+
+        # Link hypotheses
+        if link_data.hypothesis_ids:
+            current_hypotheses = set(collection.linked_hypothesis_ids or [])
+            current_hypotheses.update(link_data.hypothesis_ids)
+            collection.linked_hypothesis_ids = list(current_hypotheses)
+
+        db.commit()
+
+        return {
+            "success": True,
+            "collection_id": collection_id,
+            "linked_question_ids": collection.linked_question_ids,
+            "linked_hypothesis_ids": collection.linked_hypothesis_ids
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error linking research to collection: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/collections/{collection_id}/research/unlink")
+async def unlink_research_from_collection(
+    collection_id: str,
+    unlink_data: CollectionResearchLink,
+    user_id: str = Header(..., alias="User-ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Unlink questions and/or hypotheses from a collection.
+    """
+    try:
+        resolved_user_id = resolve_user_id(user_id, db)
+
+        collection = db.query(Collection).filter(
+            Collection.collection_id == collection_id,
+            Collection.is_active == True
+        ).first()
+
+        if not collection:
+            raise HTTPException(status_code=404, detail="Collection not found")
+
+        # Check access
+        project = db.query(Project).filter(Project.project_id == collection.project_id).first()
+        has_access = (
+            project and (
+                project.owner_user_id == resolved_user_id or
+                project.owner_user_id == user_id
+            )
+        )
+
+        if not has_access:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # Unlink questions
+        if unlink_data.question_ids:
+            current_questions = set(collection.linked_question_ids or [])
+            current_questions -= set(unlink_data.question_ids)
+            collection.linked_question_ids = list(current_questions)
+
+        # Unlink hypotheses
+        if unlink_data.hypothesis_ids:
+            current_hypotheses = set(collection.linked_hypothesis_ids or [])
+            current_hypotheses -= set(unlink_data.hypothesis_ids)
+            collection.linked_hypothesis_ids = list(current_hypotheses)
+
+        db.commit()
+
+        return {
+            "success": True,
+            "collection_id": collection_id,
+            "linked_question_ids": collection.linked_question_ids,
+            "linked_hypothesis_ids": collection.linked_hypothesis_ids
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error unlinking research from collection: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # =============================================================================
 # NETWORK VIEW ENDPOINTS
 # =============================================================================
