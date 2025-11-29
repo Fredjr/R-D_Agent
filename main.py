@@ -13940,6 +13940,8 @@ async def get_collection_research(
     - All available project Q&H for linking UI (from all linked projects)
     """
     try:
+        from database import ProjectCollection  # Import for multi-project collection support
+
         resolved_user_id = resolve_user_id(user_id, db)
 
         # Get collection
@@ -14147,6 +14149,8 @@ async def link_research_to_collection(
     Validates that Q&H belong to one of the collection's linked projects.
     """
     try:
+        from database import ProjectCollection  # Import for multi-project collection support
+
         resolved_user_id = resolve_user_id(user_id, db)
 
         collection = db.query(Collection).filter(
@@ -14246,6 +14250,8 @@ async def unlink_research_from_collection(
     Unlink questions and/or hypotheses from a collection.
     """
     try:
+        from database import ProjectCollection  # Import for multi-project collection support
+
         resolved_user_id = resolve_user_id(user_id, db)
 
         collection = db.query(Collection).filter(
